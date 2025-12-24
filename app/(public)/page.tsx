@@ -1,0 +1,82 @@
+//app/(public)/page.tsx
+import Link from "next/link";
+import Image from "next/image";
+import ThemeLogo from "@/src/components/ThemeLogo";
+import { getCommunity } from "@/src/lib/community";
+import MultimediaHomeContent from "@/src/components/Multimedia/MultimediaHomeContent";
+
+export default async function CommunityLanding() {
+  const community = await getCommunity();
+  return (
+    <main className="mx-auto flex min-h-[70vh] max-w-5xl flex-col items-center justify-center gap-6 px-6 py-12 text-center">
+      <div className="inline-flex items-center justify-center">
+        <ThemeLogo className="max-w-[120px] sm:max-w-[160px]" />
+      </div>
+      <div className="space-y-3">
+        <p className="text-sm uppercase tracking-wide text-primary/80">
+          Welcome to
+        </p>
+        <h1 className="text-4xl font-bold sm:text-5xl">
+          Greater Harrisburg Magar Organization
+        </h1>
+        <div className="mx-auto max-w-3xl">
+          <Image
+            src="/assets/ghmo-akkha.png"
+            alt="Greater Harrisburg Magar Organization emblem"
+            width={800}
+            height={320}
+            className="h-auto w-full object-contain"
+            priority
+          />
+        </div>
+        <p className="max-w-3xl text-lg text-slate-600 dark:text-slate-200">
+          Secure, member-first hub with magic-link access, admin PIN controls,
+          fundraising, document generation, and multimedia highlights.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Link
+          href="/donate"
+          className="rounded-md bg-primary px-5 py-3 text-white shadow-sm hover:bg-primary/90"
+        >
+          Donate
+        </Link>
+        <Link
+          href="/login"
+          className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
+        >
+          Member Login
+        </Link>
+        <Link
+          href="/docs/onboarding"
+          className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
+        >
+          Onboarding Guide
+        </Link>
+      </div>
+      <div className="grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase text-slate-500">Members</p>
+          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+            Whitelist-only access with email magic links and audit logging.
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase text-slate-500">Admins</p>
+          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+            PIN-based login, content blocks, timeline updates, and GoFundMe
+            reconciliation.
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase text-slate-500">Docs & Guides</p>
+          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+            Keep operational instructions in the onboarding guide and expand as
+            you grow.
+          </p>
+        </div>
+      </div>
+      <MultimediaHomeContent />
+    </main>
+  );
+}

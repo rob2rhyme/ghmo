@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null &&
+        request.auth.token.communityId == "ghmo-site" &&
+        request.auth.token.role == "admin";
+    }
+
+    // TODO: align member doc IDs to auth.uid to enable rule-level member checks.
+    function isMember() {
+      return request.auth != null &&
+        request.auth.token.communityId == "ghmo-site" &&
+        request.auth.token.role == "member" ||
+        false;
+    }
+
+    // Publicly readable content + donation stats.
+    match /community/ghmo-site/content/{doc=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /community/ghmo-site/donations/{doc=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /community/ghmo-site/gumba/{doc=**} {
+      allow read: if isMember() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /community/ghmo-site/docgen/{doc=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /community/ghmo-site/pins/{doc=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /community/ghmo-site/members/{doc=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /community/{docId}/{any=**} {
+      allow read, write: if false;
+    }
+  }
+}

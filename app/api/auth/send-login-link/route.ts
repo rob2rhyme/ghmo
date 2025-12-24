@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/src/lib/firebaseAdmin";
+import { checkRateLimit } from "@/src/lib/rateLimit";
+import { COMMUNITY_ID } from "@/src/lib/community";
+
+type Body = { email?: string };
+
+export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
+  const rateKey = `send-login-link:${COMMUNITY_ID}:${ip}`;
+  const rate = checkRateLimit(rateKey, 5, 10 * 60 * 1000);
+  if (!rate.success) {
+    return NextResponse.json({ ok: true, message: genericMessage() });
+  }
+
+  const body = (await req.json()) as Body;
+  const emailRaw = body.email?.trim() || "";
+  const emailLower = emailRaw.toLowerCase();
+  if (!emailLower) {
+    return NextResponse.json({ ok: true, message: genericMessage() });
+  }
+
+  const memberSnapshot = await adminDb
+    .collection(`community/${COMMUNITY_ID}/members`)
+    .where("emailLower", "==", emailLower)
+    .where("status", "==", "active")
+    .limit(1)
+    .get();
+  if (memberSnapshot.empty) {
+    return NextResponse.json({ ok: true, message: genericMessage() });
+  }
+
+  const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const continueUrl = `${req.nextUrl.origin}/login`;
+  if (!firebaseApiKey) {
+    console.warn("Missing NEXT_PUBLIC_FIREBASE_API_KEY; cannot send magic link");
+    return NextResponse.json({ ok: true, message: genericMessage() });
+  }
+
+  try {
+    const sendLinkUrl = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseApiKey}`;
+    const payload = {
+      requestType: "EMAIL_SIGNIN",
+      email: emailRaw,
+      continueUrl,
+      canHandleCodeInApp: true
+    };
+    await fetch(sendLinkUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error("Failed to send magic link", err);
+  }
+
+  return NextResponse.json({ ok: true, message: genericMessage() });
+}
+
+function genericMessage() {
+  return "If your access is enabled, you'll receive a sign-in email.";
+}
