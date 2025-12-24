@@ -71,3 +71,14 @@ Single-community App Router site for GHMO with whitelist member access, admin PI
 - Magic-link endpoints are rate-limited and always return generic responses to avoid enumeration.
 - Webhooks validated via shared-secret HMAC placeholder; replace with provider verification if supplied.
 - Firebase rules: see `firestore.rules` for a draft locked to `community/ghmo-site` paths.
+
+## Reset Build Artifacts & Start Dev Server
+
+If you encounter caching or build issues, run the following commands to fully reset the local environment and restart the development server:
+
+```bash
+rm -rf .next
+rm -rf node_modules/.cache
+rm -rf .turbo
+npm run dev
+```
