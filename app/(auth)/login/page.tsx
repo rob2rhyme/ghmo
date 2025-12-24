@@ -1,11 +1,12 @@
 "use client";
 
-import { firebaseAuth, firebaseInitError, missingEnvKeys } from "@/src/lib/firebaseClient";
+import { firebaseInitError, getFirebaseAuth, missingEnvKeys } from "@/src/lib/firebaseClient";
 import { isSignInWithEmailLink, signInWithEmailLink, signOut } from "firebase/auth";
+import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function MemberLogin() {
+function MemberLoginInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -20,8 +21,18 @@ export default function MemberLogin() {
   }, []);
 
   useEffect(() => {
-    if (!firebaseAuth || firebaseInitError) return;
-    if (!isSignInWithEmailLink(firebaseAuth, window.location.href)) return;
+    if (firebaseInitError) return;
+
+    let auth: ReturnType<typeof getFirebaseAuth>;
+    try {
+      auth = getFirebaseAuth();
+    } catch (err) {
+      console.error(err);
+      setError("Firebase not available in this environment.");
+      return;
+    }
+
+    if (!isSignInWithEmailLink(auth, window.location.href)) return;
 
     const complete = async () => {
       setLoading(true);
@@ -36,7 +47,7 @@ export default function MemberLogin() {
           return;
         }
 
-        const cred = await signInWithEmailLink(firebaseAuth, emailForLink, window.location.href);
+        const cred = await signInWithEmailLink(auth, emailForLink, window.location.href);
         localStorage.setItem("magiclink-email", emailForLink);
         const idToken = await cred.user.getIdToken();
 
@@ -52,13 +63,13 @@ export default function MemberLogin() {
         });
         const postAuth = await postAuthRes.json();
         if (!postAuth.ok) {
-          await signOut(firebaseAuth);
+          await signOut(auth);
           setError("Access not enabled.");
           setStatus(null);
           return;
         }
 
-        const next = searchParams.get("next") ?? `/`;
+        const next = ((searchParams.get("next") as Route | null) ?? `/`) as Route;
         router.replace(next);
       } catch (err: any) {
         console.error(err);
@@ -70,7 +81,7 @@ export default function MemberLogin() {
     };
 
     void complete();
-  }, [firebaseAuth, firebaseInitError, router, searchParams]);
+  }, [firebaseInitError, router, searchParams]);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -148,5 +159,13 @@ export default function MemberLogin() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function MemberLogin() {
+  return (
+    <Suspense fallback={null}>
+      <MemberLoginInner />
+    </Suspense>
   );
 }

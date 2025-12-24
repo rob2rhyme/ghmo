@@ -1,11 +1,12 @@
 "use client";
 
-import { firebaseAuth, firebaseInitError } from "@/src/lib/firebaseClient";
+import { firebaseInitError, getFirebaseAuth } from "@/src/lib/firebaseClient";
 import { signInWithCustomToken } from "firebase/auth";
+import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function AdminLogin() {
+function AdminLoginInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -22,6 +23,7 @@ export default function AdminLogin() {
     setLoading(true);
     setError(null);
     try {
+      const auth = getFirebaseAuth();
       const res = await fetch("/api/auth/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -30,7 +32,7 @@ export default function AdminLogin() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
 
-      const cred = await signInWithCustomToken(firebaseAuth, data.customToken);
+      const cred = await signInWithCustomToken(auth, data.customToken);
       const idToken = await cred.user.getIdToken();
       await fetch("/api/auth/session", {
         method: "POST",
@@ -38,7 +40,7 @@ export default function AdminLogin() {
         body: JSON.stringify({ idToken })
       });
 
-      const next = searchParams.get("next") ?? `/admin`;
+      const next = ((searchParams.get("next") as Route | null) ?? `/admin`) as Route;
       router.replace(next);
     } catch (err: any) {
       setError(err.message || "Login failed");
@@ -95,5 +97,13 @@ export default function AdminLogin() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AdminLogin() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginInner />
+    </Suspense>
   );
 }

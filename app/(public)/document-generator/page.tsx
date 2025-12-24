@@ -10,7 +10,13 @@ export default async function DocumentGeneratorPage() {
   if (!auth) redirect(`/login?next=/document-generator`);
 
   const templatesSnapshot = await adminDb.collection(`community/${community.id}/docgen/templates`).limit(20).get();
-  const templates = templatesSnapshot.empty
+  type Template = {
+    id: string;
+    name: string;
+    letterhead?: { title?: string; subtitle?: string };
+    fields?: string[];
+  };
+  const templates: Template[] = templatesSnapshot.empty
     ? [
         {
           id: "default",
@@ -19,7 +25,15 @@ export default async function DocumentGeneratorPage() {
           fields: ["Recipient Name", "Address", "Subject", "Body"]
         }
       ]
-    : templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    : templatesSnapshot.docs.map(doc => {
+        const data = doc.data() as Partial<Template>;
+        return {
+          id: doc.id,
+          name: data.name || "Untitled Template",
+          letterhead: data.letterhead,
+          fields: Array.isArray(data.fields) ? data.fields : undefined
+        };
+      });
 
   return <DocumentGeneratorClient communityId={community.id} communitySlug={community.slug} templates={templates} />;
 }

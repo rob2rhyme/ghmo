@@ -21,14 +21,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many attempts", retryInMs: rate.retryInMs }, { status: 429 });
   }
 
-  const pinDoc = await loadPinByRole(requestedRole);
+  type PinDoc = {
+    id: string;
+    pinHash?: string;
+    failedAttempts?: number;
+    lockedUntil?: { toMillis?: () => number } | Date | null;
+  };
+
+  const pinDoc = (await loadPinByRole(requestedRole)) as PinDoc | null;
   if (!pinDoc) {
     await logAuthAttempt({ communityId: COMMUNITY_ID, role: requestedRole, success: false, ip, userAgent });
     return NextResponse.json({ error: "Invalid PIN" }, { status: 401 });
   }
 
-  if (pinDoc.lockedUntil && pinDoc.lockedUntil.toMillis && pinDoc.lockedUntil.toMillis() > Date.now()) {
+  const lockedUntilMs =
+    pinDoc.lockedUntil instanceof Date
+      ? pinDoc.lockedUntil.getTime()
+      : typeof pinDoc.lockedUntil?.toMillis === "function"
+        ? pinDoc.lockedUntil.toMillis()
+        : null;
+
+  if (lockedUntilMs && lockedUntilMs > Date.now()) {
     return NextResponse.json({ error: "PIN locked" }, { status: 423 });
+  }
+
+  if (!pinDoc.pinHash) {
+    await logAuthAttempt({ communityId: COMMUNITY_ID, role: requestedRole, success: false, pinId: pinDoc.id, ip, userAgent });
+    return NextResponse.json({ error: "Invalid PIN" }, { status: 401 });
   }
 
   const ok = await verifyPin(pin, pinDoc.pinHash);

@@ -11,14 +11,40 @@ export default async function GumbaProjectPage() {
   if (!auth) redirect(`/login?next=/gumba-project`);
 
   const statsSnap = await adminDb.doc(`community/${community.id}/donations/stats`).get();
-  const stats = statsSnap.exists ? statsSnap.data() : { totalRaised: 0, goal: 0 };
+  type DonationStats = { totalRaised?: number; goal?: number; lastUpdatedAt?: number | Date };
+  const stats: DonationStats = statsSnap.exists ? (statsSnap.data() as DonationStats) : { totalRaised: 0, goal: 0 };
 
   const timelineSnap = await adminDb
     .collection(`community/${community.id}/gumba/timeline`)
     .orderBy("timestamp", "desc")
     .limit(50)
     .get();
-  const timeline = timelineSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  type TimelineItem = {
+    id: string;
+    title?: string;
+    body?: string;
+    tags?: string[];
+    timestamp?: { toDate?: () => Date } | Date | number;
+  };
+  const timeline: TimelineItem[] = timelineSnap.docs.map(doc => {
+    const data = doc.data() as Partial<TimelineItem>;
+    return {
+      id: doc.id,
+      title: data.title || "Untitled",
+      body: data.body || "",
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      timestamp: data.timestamp
+    };
+  });
+
+  const totalRaised = stats?.totalRaised ?? 0;
+  const goal = stats?.goal ?? 0;
+  const lastUpdatedAt =
+    stats?.lastUpdatedAt instanceof Date
+      ? stats.lastUpdatedAt.getTime()
+      : typeof stats?.lastUpdatedAt === "number"
+        ? stats.lastUpdatedAt
+        : null;
 
   return (
     <div className="space-y-6">
@@ -28,16 +54,16 @@ export default async function GumbaProjectPage() {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-md bg-primary/10 px-4 py-3">
             <p className="text-xs uppercase text-slate-600">Raised</p>
-            <p className="text-2xl font-bold text-primary">${stats.totalRaised?.toLocaleString() || 0}</p>
+            <p className="text-2xl font-bold text-primary">${totalRaised.toLocaleString()}</p>
           </div>
           <div className="rounded-md bg-secondary/10 px-4 py-3">
             <p className="text-xs uppercase text-slate-600">Goal</p>
-            <p className="text-2xl font-bold text-secondary">${stats.goal?.toLocaleString() || 0}</p>
+            <p className="text-2xl font-bold text-secondary">${goal.toLocaleString()}</p>
           </div>
           <div className="rounded-md bg-slate-100 px-4 py-3 dark:bg-slate-800/70">
             <p className="text-xs uppercase text-slate-600">Last updated</p>
             <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-              {stats.lastUpdatedAt ? new Date(stats.lastUpdatedAt).toLocaleString() : "—"}
+              {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : "—"}
             </p>
           </div>
         </div>
@@ -59,11 +85,19 @@ export default async function GumbaProjectPage() {
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</p>
                 <span className="text-xs text-slate-500">
-                  {item.timestamp ? new Date(item.timestamp.toDate?.() || item.timestamp).toLocaleString() : ""}
+                  {item.timestamp
+                    ? new Date(
+                        typeof item.timestamp === "number"
+                          ? item.timestamp
+                          : item.timestamp instanceof Date
+                            ? item.timestamp.getTime()
+                            : item.timestamp.toDate?.() || ""
+                      ).toLocaleString()
+                    : ""}
                 </span>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{item.body}</p>
-              {item.tags?.length ? (
+              {item.tags && item.tags.length ? (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {item.tags.map((tag: string) => (
                     <span key={tag} className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-200">
