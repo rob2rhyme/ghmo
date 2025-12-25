@@ -1,12 +1,16 @@
 import { GoFundMeProDonationEmbed } from "@/src/components/GoFundMeProDonationEmbed";
-import { adminDb } from "@/src/lib/firebaseAdmin";
-import { getCommunity } from "@/src/lib/community";
+import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
+import { internalFetch } from "@/src/lib/internalFetch";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DonatePage() {
   const community = await getCommunity();
-  const statsSnap = await adminDb.doc(`community/${community.id}/donations/stats`).get();
-  type DonationStats = { totalRaised?: number; goal?: number; lastUpdatedAt?: number };
-  const stats: DonationStats = statsSnap.exists ? (statsSnap.data() as DonationStats) : { totalRaised: 0, goal: 0 };
+  const statsRes = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/donations/stats`);
+  if (!statsRes.ok) throw new Error("Failed to load donation stats");
+  const { stats } = (await statsRes.json()) as { stats: { totalRaised?: number; goal?: number | null } };
+
   const totalRaised = stats?.totalRaised ?? 0;
   const goal = stats?.goal;
   const campaigns = community.gofundmePro?.campaignIds || [];

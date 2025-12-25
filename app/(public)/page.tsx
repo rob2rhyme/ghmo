@@ -53,6 +53,12 @@ export default async function CommunityLanding() {
         >
           Onboarding Guide
         </Link>
+        <Link
+          href="/c/ghmo/events"
+          className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
+        >
+          Events
+        </Link>
       </div>
       <div className="grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">

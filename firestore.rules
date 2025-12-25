@@ -35,7 +35,7 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    match /community/ghmo-site/pins/{doc=**} {
+    match /organizations/ghmo/pins/{doc=**} {
       allow read, write: if isAdmin();
     }
 

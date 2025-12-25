@@ -3,7 +3,7 @@ import { logAudit } from "@/src/lib/audit";
 import { verifyPin, issueCustomToken, logAuthAttempt, loadPinByRole, Role } from "@/src/lib/auth";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { adminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID } from "@/src/lib/community";
+import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   if (!ok) {
     const failedAttempts = (pinDoc.failedAttempts || 0) + 1;
     const lockedUntil = failedAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
-    await adminDb.doc(`community/${COMMUNITY_ID}/pins/${pinDoc.id}`).set(
+    await adminDb.doc(`organizations/${COMMUNITY_SLUG}/pins/${pinDoc.id}`).set(
       {
         failedAttempts,
         lockedUntil
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid PIN" }, { status: 401 });
   }
 
-  await adminDb.doc(`community/${COMMUNITY_ID}/pins/${pinDoc.id}`).set(
+  await adminDb.doc(`organizations/${COMMUNITY_SLUG}/pins/${pinDoc.id}`).set(
     {
       failedAttempts: 0,
       lockedUntil: null,
@@ -78,7 +78,15 @@ export async function POST(req: NextRequest) {
   const customToken = await issueCustomToken(uid, requestedRole);
 
   await logAuthAttempt({ communityId: COMMUNITY_ID, role: requestedRole, success: true, pinId: pinDoc.id, ip, userAgent });
-  await logAudit({ communityId: COMMUNITY_ID, type: "pin_login", role: requestedRole, actorUid: uid, ip, userAgent });
+  await logAudit({
+    communityId: COMMUNITY_ID,
+    type: "pin_login",
+    summary: `${requestedRole === "admin" ? "Admin" : "Member"} signed in (PIN)`,
+    role: requestedRole,
+    actorUid: uid,
+    ip,
+    userAgent
+  });
 
   return NextResponse.json({ customToken, communityId: COMMUNITY_ID, role: requestedRole });
 }

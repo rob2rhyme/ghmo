@@ -56,6 +56,9 @@ function MemberLoginInner() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ idToken })
         });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth:changed"));
+        }
 
         const postAuthRes = await fetch(`/api/auth/post-auth`, {
           method: "POST",

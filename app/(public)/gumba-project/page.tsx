@@ -1,7 +1,11 @@
-import { adminDb } from "@/src/lib/firebaseAdmin";
-import { getCommunity } from "@/src/lib/community";
+import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { assertMember, assertCommunityRole } from "@/src/lib/auth";
+import { internalFetch } from "@/src/lib/internalFetch";
 import { redirect } from "next/navigation";
+import TimelineListClient from "@/src/components/TimelineListClient";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function GumbaProjectPage() {
   const community = await getCommunity();
@@ -10,32 +14,18 @@ export default async function GumbaProjectPage() {
   const auth = memberAuth || adminAuth;
   if (!auth) redirect(`/login?next=/gumba-project`);
 
-  const statsSnap = await adminDb.doc(`community/${community.id}/donations/stats`).get();
-  type DonationStats = { totalRaised?: number; goal?: number; lastUpdatedAt?: number | Date };
-  const stats: DonationStats = statsSnap.exists ? (statsSnap.data() as DonationStats) : { totalRaised: 0, goal: 0 };
+  const statsRes = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/donations/stats`);
+  if (!statsRes.ok) throw new Error("Failed to load donation stats");
+  const { stats } = (await statsRes.json()) as { stats: { totalRaised?: number; goal?: number; lastUpdatedAt?: number | Date | null } };
 
-  const timelineSnap = await adminDb
-    .collection(`community/${community.id}/gumba/timeline`)
-    .orderBy("timestamp", "desc")
-    .limit(50)
-    .get();
-  type TimelineItem = {
-    id: string;
-    title?: string;
-    body?: string;
-    tags?: string[];
-    timestamp?: { toDate?: () => Date } | Date | number;
+  const timelineRes = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/gumba/timeline`);
+  if (!timelineRes.ok) {
+    const body = await timelineRes.text().catch(() => "");
+    throw new Error(`Failed to load timeline (${timelineRes.status}): ${body}`);
+  }
+  const { timeline } = (await timelineRes.json()) as {
+    timeline: { id: string; title?: string; body?: string; tags?: string[]; timestamp?: number | null }[];
   };
-  const timeline: TimelineItem[] = timelineSnap.docs.map(doc => {
-    const data = doc.data() as Partial<TimelineItem>;
-    return {
-      id: doc.id,
-      title: data.title || "Untitled",
-      body: data.body || "",
-      tags: Array.isArray(data.tags) ? data.tags : [],
-      timestamp: data.timestamp
-    };
-  });
 
   const totalRaised = stats?.totalRaised ?? 0;
   const goal = stats?.goal ?? 0;
@@ -78,37 +68,7 @@ export default async function GumbaProjectPage() {
             </a>
           ) : null}
         </div>
-        <div className="mt-4 space-y-4">
-          {timeline.length === 0 ? <p className="text-sm text-slate-500">No entries yet.</p> : null}
-          {timeline.map(item => (
-            <div key={item.id} className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</p>
-                <span className="text-xs text-slate-500">
-                  {item.timestamp
-                    ? new Date(
-                        typeof item.timestamp === "number"
-                          ? item.timestamp
-                          : item.timestamp instanceof Date
-                            ? item.timestamp.getTime()
-                            : item.timestamp.toDate?.() || ""
-                      ).toLocaleString()
-                    : ""}
-                </span>
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{item.body}</p>
-              {item.tags && item.tags.length ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {item.tags.map((tag: string) => (
-                    <span key={tag} className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-200">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
+        <TimelineListClient items={timeline} />
       </div>
     </div>
   );

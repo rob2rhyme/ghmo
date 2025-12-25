@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { adminDb } from "./firebaseAdmin";
 import { serverEnv } from "./env.server";
 import { logAudit } from "./audit";
+import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
+import { orgDonationsWebhookEventsCollectionPath, orgDonationsStatsDocPath } from "./firestorePaths";
 
 type WebhookPayload = {
   communityId?: string;
@@ -19,7 +21,8 @@ export function verifyGfmWebhookSignature(rawBody: string, signatureHeader?: str
 }
 
 export async function recordWebhookEvent(communityId: string, eventId: string, payload: WebhookPayload) {
-  const ref = adminDb.doc(`community/${communityId}/donations/webhookEvents/${eventId}`);
+  const orgSlug = communityId === COMMUNITY_SLUG || communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
+  const ref = adminDb.doc(`${orgDonationsWebhookEventsCollectionPath(orgSlug)}/${eventId}`);
   const existing = await ref.get();
   if (existing.exists) {
     return { duplicate: true };
@@ -33,7 +36,8 @@ export async function recordWebhookEvent(communityId: string, eventId: string, p
 }
 
 export async function applyDonationStatsUpdate(communityId: string, deltaAmount: number, metadata?: Record<string, any>) {
-  const statsRef = adminDb.doc(`community/${communityId}/donations/stats`);
+  const orgSlug = communityId === COMMUNITY_SLUG || communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
+  const statsRef = adminDb.doc(orgDonationsStatsDocPath(orgSlug));
   await adminDb.runTransaction(async tx => {
     const doc = await tx.get(statsRef);
     const prev = doc.exists ? doc.data() : {};
@@ -53,7 +57,8 @@ export async function applyDonationStatsUpdate(communityId: string, deltaAmount:
 }
 
 export async function reconcileDonationTotals(communityId: string, totals: { totalRaised: number; goal?: number; donorCount?: number }) {
-  const statsRef = adminDb.doc(`community/${communityId}/donations/stats`);
+  const orgSlug = communityId === COMMUNITY_SLUG || communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
+  const statsRef = adminDb.doc(orgDonationsStatsDocPath(orgSlug));
   await statsRef.set(
     {
       ...totals,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { applyDonationStatsUpdate, logWebhookAudit, recordWebhookEvent, verifyGfmWebhookSignature } from "@/src/lib/gofundme";
-import { COMMUNITY_ID } from "@/src/lib/community";
+import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +21,10 @@ export async function POST(req: NextRequest) {
   };
 
   const communityId = payload.communityId || req.headers.get("x-community-id") || COMMUNITY_ID;
+  const orgSlug = communityId === COMMUNITY_ID ? COMMUNITY_SLUG : communityId || COMMUNITY_SLUG;
 
   const eventId = payload.event_id || crypto.randomUUID();
-  const { duplicate } = await recordWebhookEvent(communityId, eventId, payload);
+  const { duplicate } = await recordWebhookEvent(orgSlug, eventId, payload);
   if (duplicate) {
     return NextResponse.json({ ok: true, duplicate: true });
   }
@@ -32,10 +33,10 @@ export async function POST(req: NextRequest) {
   if (payload.type?.startsWith("transaction")) {
     const amount = Number(payload.data?.amount || 0);
     if (!Number.isNaN(amount)) {
-      await applyDonationStatsUpdate(communityId, amount, { source: "webhook" });
+      await applyDonationStatsUpdate(orgSlug, amount, { source: "webhook" });
     }
   }
 
-  await logWebhookAudit(communityId, payload, success);
+  await logWebhookAudit(orgSlug, payload, success);
   return NextResponse.json({ ok: true });
 }

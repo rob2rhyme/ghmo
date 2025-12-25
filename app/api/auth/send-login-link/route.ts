@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/src/lib/firebaseAdmin";
 import { checkRateLimit } from "@/src/lib/rateLimit";
-import { COMMUNITY_ID } from "@/src/lib/community";
+import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 
 type Body = { email?: string };
 
@@ -21,12 +22,22 @@ export async function POST(req: NextRequest) {
   }
 
   const memberSnapshot = await adminDb
-    .collection(`community/${COMMUNITY_ID}/members`)
+    .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
     .where("emailLower", "==", emailLower)
     .where("status", "==", "active")
     .limit(1)
     .get();
-  if (memberSnapshot.empty) {
+  const fallbackSnapshot =
+    memberSnapshot.empty
+      ? await adminDb
+          .collection(`community/${COMMUNITY_ID}/members`)
+          .where("emailLower", "==", emailLower)
+          .where("status", "==", "active")
+          .limit(1)
+          .get()
+      : null;
+  const effectiveSnapshot = memberSnapshot.empty && fallbackSnapshot ? fallbackSnapshot : memberSnapshot;
+  if (effectiveSnapshot.empty) {
     return NextResponse.json({ ok: true, message: genericMessage() });
   }
 

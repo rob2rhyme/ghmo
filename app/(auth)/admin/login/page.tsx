@@ -39,6 +39,7 @@ function AdminLoginInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken })
       });
+      window.dispatchEvent(new Event("auth:changed"));
 
       const next = ((searchParams.get("next") as Route | null) ?? `/admin`) as Route;
       router.replace(next);

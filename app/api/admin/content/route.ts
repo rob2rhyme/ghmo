@@ -17,10 +17,11 @@ export async function POST(req: NextRequest) {
   await upsertHomeBlocks(blocks || []);
   await logAudit({
     communityId: auth.communityId,
-    type: "admin_action",
+    type: "home_blocks_updated",
+    summary: "Updated home content blocks",
     actorUid: auth.uid,
     role: auth.role,
-    metadata: { action: "update_home_blocks" }
+    metadata: { blockCount: Array.isArray(blocks) ? blocks.length : 0 }
   });
   return NextResponse.json({ ok: true });
 }

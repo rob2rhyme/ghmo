@@ -1,6 +1,14 @@
+import "server-only";
+
 //src/lib/community.ts
 import { adminDb } from "./firebaseAdmin";
-import { communityDocPath, communityHomePagePath } from "./firestorePaths";
+import {
+  communityDocPath,
+  communityHomePagePath,
+  orgDocPath,
+  orgHomeBlocksDocPath
+} from "./firestorePaths";
+import { toPlain } from "./serialize.server";
 
 export type Community = {
   id: string;
@@ -43,19 +51,28 @@ const DEFAULT_COMMUNITY: Community = {
 };
 
 export async function getCommunity(): Promise<Community> {
-  const doc = await adminDb.doc(communityDocPath(COMMUNITY_ID)).get();
-  if (doc.exists) {
-    const data = doc.data() as Omit<Community, "id" | "slug">;
+  const orgDoc = await adminDb.doc(orgDocPath(COMMUNITY_SLUG)).get();
+  if (orgDoc.exists) {
+    const data = toPlain(orgDoc.data() || {}) as Omit<Community, "id" | "slug">;
     return { id: COMMUNITY_ID, slug: COMMUNITY_SLUG, ...data };
   }
+
+  const legacyDoc = await adminDb.doc(communityDocPath(COMMUNITY_ID)).get();
+  if (legacyDoc.exists) {
+    const data = toPlain(legacyDoc.data() || {}) as Omit<Community, "id" | "slug">;
+    return { id: COMMUNITY_ID, slug: COMMUNITY_SLUG, ...data };
+  }
+
   return DEFAULT_COMMUNITY;
 }
 
 export async function getHomeBlocks() {
-  const doc = await adminDb.doc(communityHomePagePath(COMMUNITY_ID)).get();
-  return doc.exists ? doc.data()?.blocks ?? [] : [];
+  const doc = await adminDb.doc(orgHomeBlocksDocPath(COMMUNITY_SLUG)).get();
+  if (doc.exists) return doc.data()?.blocks ?? [];
+  const legacy = await adminDb.doc(communityHomePagePath(COMMUNITY_ID)).get();
+  return legacy.exists ? legacy.data()?.blocks ?? [] : [];
 }
 
 export async function upsertHomeBlocks(blocks: unknown[]) {
-  await adminDb.doc(communityHomePagePath(COMMUNITY_ID)).set({ blocks }, { merge: true });
+  await adminDb.doc(orgHomeBlocksDocPath(COMMUNITY_SLUG)).set({ blocks }, { merge: true });
 }

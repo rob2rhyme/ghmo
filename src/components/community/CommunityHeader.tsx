@@ -1,13 +1,44 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import ThemeToggle from "@/src/components/ThemeToggle";
-import { COMMUNITY_NAME } from "@/src/lib/community";
+import SignOutButton from "@/src/components/SignOutButton";
 
 type CommunityHeaderProps = {
   name?: string;
 };
 
 export function CommunityHeader({ name }: CommunityHeaderProps) {
-  const label = name || COMMUNITY_NAME;
+  const label = name || "Greater Harrisburg Magar Organization";
+  const pathname = usePathname();
+  const [authState, setAuthState] = useState<{
+    authenticated: boolean;
+    role: "admin" | "member" | null;
+  } | null>(null);
+
+  const fetchAuth = async () => {
+    try {
+      const res = await fetch("/api/auth/me", { cache: "no-store" });
+      const data = await res.json();
+      setAuthState(data);
+    } catch {
+      setAuthState({ authenticated: false, role: null });
+    }
+  };
+
+  useEffect(() => {
+    fetchAuth();
+  }, [pathname]);
+
+  useEffect(() => {
+    const handler = () => fetchAuth();
+    window.addEventListener("auth:changed", handler);
+    return () => window.removeEventListener("auth:changed", handler);
+  }, []);
+
+  const hasSession = !!authState?.authenticated;
   return (
     <header className="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -23,6 +54,7 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
             Admin
           </Link>
           <ThemeToggle />
+          {hasSession ? <SignOutButton /> : null}
         </nav>
       </div>
     </header>
