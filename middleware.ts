@@ -2,9 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, search } = req.nextUrl;
 
-  if (pathname === "/login" || pathname === "/admin/login" || pathname.startsWith("/api") || pathname.startsWith("/_next")) {
+  if (
+    pathname === "/admin/login" ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/.well-known") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next")
+  ) {
     return NextResponse.next();
   }
 
@@ -13,7 +19,7 @@ export function middleware(req: NextRequest) {
     if (!session) {
       const loginUrl = req.nextUrl.clone();
       loginUrl.pathname = "/admin/login";
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${search}`);
       return NextResponse.redirect(loginUrl);
     }
   }

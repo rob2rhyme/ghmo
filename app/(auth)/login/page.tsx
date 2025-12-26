@@ -3,18 +3,28 @@
 import { firebaseInitError, getFirebaseAuth, missingEnvKeys } from "@/src/lib/firebaseClient";
 import { isSignInWithEmailLink, signInWithEmailLink, signOut } from "firebase/auth";
 import type { Route } from "next";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { useAuthSession } from "@/src/hooks/useAuthSession";
 
 function MemberLoginInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const { session } = useAuthSession();
+  const nextRoute = ((searchParams.get("next") as Route | null) ?? "/admin") as Route;
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (!session?.authenticated || !session?.isAdmin) return;
+    if (pathname === nextRoute) return;
+    router.replace(nextRoute);
+  }, [router, session, pathname, nextRoute]);
 
   useEffect(() => {
     setMounted(true);
@@ -84,7 +94,7 @@ function MemberLoginInner() {
     };
 
     void complete();
-  }, [firebaseInitError, router, searchParams]);
+  }, [router, searchParams]);
 
   const handleSubmit = async () => {
     setLoading(true);

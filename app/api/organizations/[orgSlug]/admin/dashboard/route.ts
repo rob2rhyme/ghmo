@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { adminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { toPlain } from "@/src/lib/serialize.server";
 import {
-  communityHomePagePath,
   orgAuditLogsCollectionPath,
   orgDonationsWebhookEventsCollectionPath,
   orgDonationsStatsDocPath,
   orgHomeBlocksDocPath,
   orgTimelineCollectionPath
 } from "@/src/lib/firestorePaths";
+import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 
 export const dynamic = "force-dynamic";
 
@@ -23,27 +22,21 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   if (params.orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const orgSlug = params.orgSlug;
 
-  const admin = await getAuthContextFromRequest(req);
-  if (!admin || admin.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await enforceActiveAdmin(req, orgSlug);
+  if ("response" in guard) return guard.response;
 
   const statsPath = orgDonationsStatsDocPath(orgSlug);
-  const fallbackStatsPath = `community/${COMMUNITY_ID}/donations/stats`;
   const webhookPath = orgDonationsWebhookEventsCollectionPath(orgSlug);
-  const fallbackWebhookPath = `community/${COMMUNITY_ID}/donations/webhookEvents/events`;
   const auditPath = orgAuditLogsCollectionPath(orgSlug);
-  const fallbackAuditPath = `community/${COMMUNITY_ID}/auditLogs`;
   const homeBlocksPath = orgHomeBlocksDocPath(orgSlug);
-  const fallbackBlocksPath = communityHomePagePath(COMMUNITY_ID);
   const timelinePath = orgTimelineCollectionPath(orgSlug);
-  const fallbackTimelinePath = `community/${COMMUNITY_ID}/timeline`;
 
   const warnings: string[] = [];
 
   let stats: Record<string, any> = { totalRaised: 0, goal: 0, donorCount: 0 };
   try {
     const statsSnap = await adminDb.doc(statsPath).get();
-    const fallbackStatsSnap = !statsSnap.exists ? await adminDb.doc(fallbackStatsPath).get() : null;
-    stats = statsSnap.exists ? statsSnap.data() || stats : fallbackStatsSnap?.data() || stats;
+    stats = statsSnap.exists ? statsSnap.data() || stats : stats;
   } catch (err) {
     warnings.push(`stats: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -51,17 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   let webhookEvents: any[] = [];
   try {
     const webhookSnap = await adminDb.collection(webhookPath).orderBy("receivedAt", "desc").limit(5).get();
-    if (!webhookSnap.empty) {
-      webhookEvents = webhookSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } else {
-      const fallbackSnap = await adminDb
-        .collection(fallbackWebhookPath)
-        .orderBy("receivedAt", "desc")
-        .limit(5)
-        .get()
-        .catch(() => null);
-      webhookEvents = fallbackSnap?.docs.map(doc => ({ id: doc.id, ...doc.data() })) ?? [];
-    }
+    webhookEvents = webhookSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {
     warnings.push(`webhookEvents: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -69,11 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   let auditLogs: any[] = [];
   try {
     const auditSnap = await adminDb.collection(auditPath).orderBy("createdAt", "desc").limit(10).get();
-    const legacyAudit =
-      auditSnap.empty && fallbackAuditPath
-        ? await adminDb.collection(fallbackAuditPath).orderBy("timestamp", "desc").limit(10).get().catch(() => null)
-        : null;
-    const source = !auditSnap.empty ? auditSnap.docs : legacyAudit?.docs || [];
+    const source = auditSnap.docs;
     auditLogs = source.map(doc => {
       const data = doc.data() as Record<string, any>;
       const ts = data.createdAt || data.timestamp;
@@ -97,8 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
     if (contentBlocksDoc.exists) {
       blocks = contentBlocksDoc.data()?.blocks || [];
     } else {
-      const legacyBlocksDoc = await adminDb.doc(fallbackBlocksPath).get().catch(() => null);
-      blocks = legacyBlocksDoc?.data()?.blocks || [];
+      blocks = [];
     }
   } catch (err) {
     warnings.push(`blocks: ${err instanceof Error ? err.message : String(err)}`);
@@ -107,17 +85,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   let timeline: any[] = [];
   try {
     const timelineSnap = await adminDb.collection(timelinePath).orderBy("timestamp", "desc").limit(20).get();
-    const docs =
-      !timelineSnap.empty
-        ? timelineSnap.docs
-        : (
-            await adminDb
-              .collection(fallbackTimelinePath)
-              .orderBy("timestamp", "desc")
-              .limit(20)
-              .get()
-              .catch(() => null)
-          )?.docs ?? [];
+    const docs = timelineSnap.docs;
     timeline = docs.map(doc => {
       const data = doc.data() as Record<string, any>;
       const ts = data.timestamp;

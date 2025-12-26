@@ -1,4 +1,4 @@
-import { assertCommunityRole } from "@/src/lib/auth";
+import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import Link from "next/link";
@@ -9,8 +9,14 @@ export const revalidate = 0;
 
 export default async function AdminEventsPage() {
   const community = await getCommunity();
-  const admin = await assertCommunityRole("admin");
-  if (!admin) redirect("/admin/login");
+  try {
+    await requireActiveAdmin(undefined, COMMUNITY_SLUG);
+  } catch (error) {
+    if (error instanceof AdminAccessError) {
+      redirect("/admin/login");
+    }
+    redirect("/admin/login");
+  }
 
   const res = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/admin/events`);
   if (!res.ok) throw new Error("Failed to load events");

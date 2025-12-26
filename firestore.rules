@@ -7,7 +7,6 @@ service cloud.firestore {
         request.auth.token.role == "admin";
     }
 
-    // TODO: align member doc IDs to auth.uid to enable rule-level member checks.
     function isMember() {
       return request.auth != null &&
         request.auth.token.communityId == "ghmo-site" &&
@@ -15,35 +14,47 @@ service cloud.firestore {
         false;
     }
 
-    // Publicly readable content + donation stats.
-    match /community/ghmo-site/content/{doc=**} {
+    match /organizations/{orgSlug}/home/blocks {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /community/ghmo-site/donations/{doc=**} {
+    match /organizations/{orgSlug}/donations/{doc=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /community/ghmo-site/gumba/{doc=**} {
+    match /organizations/{orgSlug}/donations/webhookEvents/events/{doc=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /organizations/{orgSlug}/gumba/{doc=**} {
       allow read: if isMember() || isAdmin();
       allow write: if isAdmin();
     }
 
-    match /community/ghmo-site/docgen/{doc=**} {
+    match /organizations/{orgSlug}/docgen/{doc=**} {
       allow read, write: if isAdmin();
     }
 
-    match /organizations/ghmo/pins/{doc=**} {
+    match /organizations/{orgSlug}/pins/{doc=**} {
       allow read, write: if isAdmin();
     }
 
-    match /community/ghmo-site/members/{doc=**} {
+    match /organizations/{orgSlug}/members/{doc=**} {
       allow read, write: if isAdmin();
     }
 
-    match /community/{docId}/{any=**} {
+    match /organizations/{orgSlug}/auditLogs/{doc=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /organizations/{orgSlug}/timeline/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /organizations/{docId}/{any=**} {
       allow read, write: if false;
     }
   }

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { logAudit } from "@/src/lib/audit";
+import { Timestamp } from "firebase-admin/firestore";
+import { logAuditEvent } from "@/src/lib/audit";
 import { verifyPin, issueCustomToken, logAuthAttempt, loadPinByRole, Role } from "@/src/lib/auth";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { adminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { getAdminProfile } from "@/src/lib/admin";
+import { orgAdminDocPath } from "@/src/lib/firestorePaths";
+import { serverEnv } from "@/src/lib/env.server";
 
 export async function POST(req: NextRequest) {
+  if (!serverEnv.FEATURE_PIN_LOGIN) {
+    return NextResponse.json({ error: "PIN login disabled" }, { status: 404 });
+  }
   const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
   const userAgent = req.headers.get("user-agent");
   const body = await req.json();
@@ -74,18 +81,28 @@ export async function POST(req: NextRequest) {
     { merge: true }
   );
 
-  const uid = `${COMMUNITY_ID}-${requestedRole}-${pinDoc.id}`;
-  const customToken = await issueCustomToken(uid, requestedRole);
+  const adminProfile = await getAdminProfile(COMMUNITY_SLUG, pinDoc.id);
+  if (!adminProfile || adminProfile.status !== "active") {
+    return NextResponse.json({ error: "Admin not authorized" }, { status: 403 });
+  }
+
+  await adminDb.doc(orgAdminDocPath(COMMUNITY_SLUG, pinDoc.id)).set(
+    {
+      lastLoginAt: Timestamp.now()
+    },
+    { merge: true }
+  );
+
+  const uid = pinDoc.id;
+  const customToken = await issueCustomToken(uid, requestedRole, { pinId: pinDoc.id });
 
   await logAuthAttempt({ communityId: COMMUNITY_ID, role: requestedRole, success: true, pinId: pinDoc.id, ip, userAgent });
-  await logAudit({
-    communityId: COMMUNITY_ID,
-    type: "pin_login",
-    summary: `${requestedRole === "admin" ? "Admin" : "Member"} signed in (PIN)`,
-    role: requestedRole,
-    actorUid: uid,
-    ip,
-    userAgent
+  await logAuditEvent({
+    orgSlug: COMMUNITY_SLUG,
+    action: "login",
+    actor: { uid, adminId: pinDoc.id, name: adminProfile.name, email: adminProfile.email, role: requestedRole },
+    resource: { type: "admin_session", summary: "PIN login" },
+    meta: { ip, userAgent, route: "/api/auth/pin" }
   });
 
   return NextResponse.json({ customToken, communityId: COMMUNITY_ID, role: requestedRole });

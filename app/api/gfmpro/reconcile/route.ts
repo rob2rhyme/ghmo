@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { fetchCampaignTotals, reconcileDonationTotals } from "@/src/lib/gofundme";
-import { logAudit } from "@/src/lib/audit";
-import { COMMUNITY_ID } from "@/src/lib/community";
+import { logAuditEvent } from "@/src/lib/audit";
+import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 
 export async function POST(req: NextRequest) {
-  const auth = await getAuthContextFromRequest(req);
-  if (!auth || auth.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
+  if ("response" in guard) return guard.response;
+  const { actor } = guard;
   const targetCommunityId = COMMUNITY_ID;
 
   const totals = await fetchCampaignTotals();
   if (!totals) return NextResponse.json({ error: "Missing GoFundMe credentials" }, { status: 400 });
 
   await reconcileDonationTotals(targetCommunityId, totals);
-  await logAudit({ communityId: targetCommunityId, type: "reconcile", actorUid: auth.uid, role: auth.role });
+  await logAuditEvent({
+    orgSlug: COMMUNITY_SLUG,
+    action: "reconcile",
+    actor: {
+      uid: actor.uid,
+      adminId: actor.adminDocId,
+      name: actor.name,
+      email: actor.email,
+      role: actor.roles[0] ?? "admin"
+    },
+    resource: { type: "reconcile", summary: "Reconcile donation totals" },
+    meta: { route: "/api/gfmpro/reconcile" }
+  });
 
   return NextResponse.json({ ok: true, totals });
 }

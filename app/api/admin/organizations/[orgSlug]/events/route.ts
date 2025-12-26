@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertCommunityRole } from "@/src/lib/auth";
 import { adminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID } from "@/src/lib/community";
 import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
-import { logAudit } from "@/src/lib/audit";
+import { logAuditEvent } from "@/src/lib/audit";
+import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest, { params }: { params: { orgSlug: string } }) {
   if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const admin = await assertCommunityRole("admin");
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await enforceActiveAdmin(req, params.orgSlug);
+  if ("response" in guard) return guard.response;
+  const { actor } = guard;
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -27,8 +28,9 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
 
 export async function POST(req: NextRequest, { params }: { params: { orgSlug: string } }) {
   if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const admin = await assertCommunityRole("admin");
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await enforceActiveAdmin(req, params.orgSlug);
+  if ("response" in guard) return guard.response;
+  const { actor } = guard;
 
   const body = await req.json();
   const now = new Date();
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: { orgSlug: st
     announcementPdfSource: body.announcementPdfSource || null,
     createdAt: now,
     updatedAt: now,
-    createdByUid: admin.uid
+    createdByUid: actor.uid
   };
 
   if (!payload.title || !payload.body) {
@@ -55,13 +57,18 @@ export async function POST(req: NextRequest, { params }: { params: { orgSlug: st
 
   const ref = await adminDb.collection(eventsCollectionPath(COMMUNITY_ID)).add(payload);
   const doc = await ref.get();
-  await logAudit({
-    communityId: COMMUNITY_ID,
-    type: "event_created",
-    summary: `Created event: ${payload.title}`,
-    actorUid: admin.uid,
-    role: admin.role,
-    metadata: { eventId: ref.id, title: payload.title, status: payload.status }
+  await logAuditEvent({
+    orgSlug: params.orgSlug,
+    action: "event_created",
+    actor: {
+      uid: actor.uid,
+      adminId: actor.adminDocId,
+      name: actor.name,
+      email: actor.email,
+      role: actor.roles[0] ?? "admin"
+    },
+    resource: { type: "event", id: ref.id, summary: `Created event: ${payload.title}` },
+    meta: { eventId: ref.id, title: payload.title, status: payload.status, route: "/api/admin/organizations/[orgSlug]/events" }
   });
   return NextResponse.json({ ok: true, event: normalizeEvent(doc) });
 }

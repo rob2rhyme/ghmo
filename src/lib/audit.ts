@@ -1,4 +1,3 @@
-//src/lib/audit.ts
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
@@ -21,13 +20,36 @@ type AuditType =
   | "reconcile"
   | "admin_action";
 
+type AuditActor = {
+  uid?: string;
+  adminId?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+};
+
+type AuditResource = {
+  type?: string;
+  id?: string;
+  path?: string;
+  summary?: string;
+};
+
+type AuditMeta = {
+  ip?: string;
+  userAgent?: string | null;
+  route?: string;
+  requestId?: string;
+  [key: string]: unknown;
+};
+
 function sanitizeFirestorePayload<T>(value: T): T {
   if (value === undefined) return value;
 
   if (Array.isArray(value)) {
     const sanitizedArray = value
-      .map((item) => sanitizeFirestorePayload(item))
-      .filter((item) => item !== undefined) as unknown as T;
+      .map(item => sanitizeFirestorePayload(item))
+      .filter(item => item !== undefined) as unknown as T;
     return sanitizedArray;
   }
 
@@ -50,24 +72,51 @@ function sanitizeFirestorePayload<T>(value: T): T {
   return value;
 }
 
+export async function logAuditEvent(params: {
+  orgSlug: string;
+  action: string;
+  actor?: AuditActor;
+  resource?: AuditResource;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  meta?: AuditMeta;
+}) {
+  const ref = adminDb.collection(orgAuditLogsCollectionPath(params.orgSlug));
+  const payload = sanitizeFirestorePayload({
+    action: params.action,
+    actor: params.actor,
+    resource: params.resource,
+    before: params.before,
+    after: params.after,
+    meta: params.meta,
+    createdAt: Timestamp.now()
+  });
+  await ref.add(payload);
+}
+
 export async function logAudit(params: {
   communityId?: string;
   orgSlug?: string;
   type: AuditType;
   summary?: string;
   actorUid?: string;
+  adminId?: string;
+  name?: string;
+  email?: string;
   role?: string;
   ip?: string;
   userAgent?: string | null;
   metadata?: Record<string, unknown>;
 }) {
-  const { communityId, orgSlug, ...rest } = params;
+  const { communityId, orgSlug, metadata, ip, userAgent, ...rest } = params;
   const resolvedOrg = orgSlug || (communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG);
-  const ref = adminDb.collection(orgAuditLogsCollectionPath(resolvedOrg));
-  const payload = sanitizeFirestorePayload({
-    ...rest,
-    createdAt: Timestamp.now()
+  await logAuditEvent({
+    orgSlug: resolvedOrg,
+    action: rest.type,
+    actor: rest.actorUid
+      ? { uid: rest.actorUid, adminId: rest.adminId, name: rest.name, email: rest.email, role: rest.role }
+      : undefined,
+    resource: rest.summary ? { summary: rest.summary } : undefined,
+    meta: { ip, userAgent, ...metadata }
   });
-
-  await ref.add(payload);
 }

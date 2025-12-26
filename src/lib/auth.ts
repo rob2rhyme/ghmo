@@ -5,6 +5,7 @@ import { adminAuth, adminDb } from "./firebaseAdmin";
 import { logAudit } from "./audit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { orgMembersCollectionPath } from "./firestorePaths";
+import { normalizeMemberEmail } from "./members";
 
 export type Role = "member" | "admin";
 
@@ -19,8 +20,8 @@ export async function verifyPin(pin: string, hash: string) {
   return bcrypt.compare(pin, hash);
 }
 
-export async function issueCustomToken(uid: string, role: Role) {
-  return adminAuth.createCustomToken(uid, { communityId: COMMUNITY_ID, role });
+export async function issueCustomToken(uid: string, role: Role, claims?: Record<string, unknown>) {
+  return adminAuth.createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, ...claims });
 }
 
 export async function verifyIdToken(idToken: string) {
@@ -29,8 +30,11 @@ export async function verifyIdToken(idToken: string) {
 
 export type AuthContext = {
   uid: string;
-  communityId: string;
+  orgSlug: string;
   role: Role;
+  pinId?: string;
+  email?: string;
+  emailLower?: string;
 };
 
 export type MemberAuthContext = {
@@ -57,13 +61,18 @@ export async function getAuthContextFromRequest(req?: NextRequest): Promise<Auth
   if (!token) return null;
   try {
     const decoded = await verifyIdToken(token);
-    const communityId = (decoded as any).communityId || (decoded as any).orgId;
+    const orgSlug = (decoded as any).orgSlug || (decoded as any).communityId || (decoded as any).orgId;
     const role = (decoded as any).role;
-    if (!communityId || !role || communityId !== COMMUNITY_ID) return null;
+    if (!orgSlug || !role || orgSlug !== COMMUNITY_SLUG) return null;
+    const email = (decoded as any).email;
+    const emailLower = normalizeMemberEmail(email);
     const context: AuthContext = {
       uid: decoded.uid,
-      communityId,
-      role
+      orgSlug,
+      role,
+      pinId: (decoded as any).pinId,
+      email,
+      emailLower
     };
     return context;
   } catch (err) {
@@ -75,12 +84,17 @@ export async function assertCommunityRole(requiredRole: Role) {
   const token = extractBearerOrCookieToken();
   if (!token) return null;
   const decoded = await verifyIdToken(token);
+  const email = (decoded as any).email;
+  const emailLower = normalizeMemberEmail(email);
   const ctx: AuthContext = {
     uid: decoded.uid,
-    communityId: (decoded as any).communityId || (decoded as any).orgId,
-    role: (decoded as any).role
+    orgSlug: (decoded as any).orgSlug || (decoded as any).communityId || (decoded as any).orgId,
+    role: (decoded as any).role,
+    pinId: (decoded as any).pinId,
+    email,
+    emailLower
   };
-  if (ctx.communityId !== COMMUNITY_ID || (requiredRole === "admin" && ctx.role !== "admin")) {
+  if (ctx.orgSlug !== COMMUNITY_SLUG || (requiredRole === "admin" && ctx.role !== "admin")) {
     return null;
   }
   return ctx;
@@ -128,23 +142,14 @@ export async function assertMember(req?: NextRequest): Promise<MemberAuthContext
   if (!token) return null;
   try {
     const decoded = await verifyIdToken(token);
-    const emailLower = decoded.email?.toLowerCase();
+    const emailLower = normalizeMemberEmail(decoded.email);
     if (!emailLower) return null;
-    const orgMembersRef = adminDb
+    const memberSnap = await adminDb
       .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
       .where("emailLower", "==", emailLower)
       .where("status", "==", "active")
-      .limit(1);
-    const primarySnap = await orgMembersRef.get();
-    const memberSnap =
-      primarySnap.empty
-        ? await adminDb
-            .collection(`community/${COMMUNITY_ID}/members`)
-            .where("emailLower", "==", emailLower)
-            .where("status", "==", "active")
-            .limit(1)
-            .get()
-        : primarySnap;
+      .limit(1)
+      .get();
     if (memberSnap.empty) return null;
     const doc = memberSnap.docs[0];
     const data = doc.data() as Record<string, any>;

@@ -4,6 +4,8 @@ import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { adminDb } from "@/src/lib/firebaseAdmin";
 import { hashPin } from "@/src/lib/auth";
 import { logAudit } from "@/src/lib/audit";
+import { normalizeMemberEmail } from "@/src/lib/members";
+import { orgAdminDocPath } from "@/src/lib/firestorePaths";
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.ip || "unknown";
@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many attempts", retryInMs: rate.retryInMs }, { status: 429 });
   }
 
-  let body: { secret?: string; pin?: string; label?: string };
+  let body: { secret?: string; pin?: string; label?: string; email?: string; name?: string };
   try {
     body = await req.json();
   } catch {
@@ -65,13 +67,27 @@ export async function POST(req: NextRequest) {
     createdAt: new Date(),
     createdBy: "bootstrap"
   });
+  const emailLower = normalizeMemberEmail(body.email);
+  if (!emailLower) {
+    return NextResponse.json({ error: "Email is required for admin bootstrap" }, { status: 400 });
+  }
+  await adminDb.doc(orgAdminDocPath(COMMUNITY_SLUG, pinDoc.id)).set({
+    name: body.name || label || "Bootstrap Admin",
+    email: body.email,
+    emailLower,
+    roles: ["super_admin"],
+    status: "active",
+    createdAt: new Date(),
+    createdBy: "bootstrap",
+    pinId: pinDoc.id
+  });
 
   await bootstrapConfigRef.set({ completedAt: new Date() });
 
   await logAudit({
     communityId: COMMUNITY_ID,
     type: "admin_action",
-    metadata: { action: "bootstrap_create_pin", pinId: pinDoc.id },
+    metadata: { action: "bootstrap_create_pin", pinId: pinDoc.id, email: body.email },
     actorUid: "bootstrap",
     role: "admin"
   });

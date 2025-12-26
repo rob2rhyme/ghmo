@@ -1,27 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { getHomeBlocks, upsertHomeBlocks } from "@/src/lib/community";
-import { logAudit } from "@/src/lib/audit";
+import { logAuditEvent } from "@/src/lib/audit";
+import { enforceActiveAdmin } from "@/src/lib/adminHttp";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 
 export async function GET(req: NextRequest) {
-  const auth = await getAuthContextFromRequest(req);
-  if (!auth || auth.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
+  if ("response" in guard) return guard.response;
   const blocks = await getHomeBlocks();
   return NextResponse.json({ blocks });
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await getAuthContextFromRequest(req);
-  if (!auth || auth.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
+  if ("response" in guard) return guard.response;
+  const { actor } = guard;
   const { blocks } = await req.json();
   await upsertHomeBlocks(blocks || []);
-  await logAudit({
-    communityId: auth.communityId,
-    type: "home_blocks_updated",
-    summary: "Updated home content blocks",
-    actorUid: auth.uid,
-    role: auth.role,
-    metadata: { blockCount: Array.isArray(blocks) ? blocks.length : 0 }
+  await logAuditEvent({
+    orgSlug: COMMUNITY_SLUG,
+    action: "home_blocks_updated",
+    actor: {
+      uid: actor.uid,
+      adminId: actor.adminDocId,
+      name: actor.name,
+      email: actor.email,
+      role: actor.roles[0] ?? "admin"
+    },
+    resource: { type: "home_blocks", summary: "Updated home content blocks" },
+    meta: { blockCount: Array.isArray(blocks) ? blocks.length : 0, route: "/api/admin/content" }
   });
   return NextResponse.json({ ok: true });
 }

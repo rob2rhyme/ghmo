@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthContextFromRequest, assertMember, type Role } from "@/src/lib/auth";
 import { adminDb } from "@/src/lib/firebaseAdmin";
 import { logAudit } from "@/src/lib/audit";
-import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgDocgenGenerationsCollectionPath } from "@/src/lib/firestorePaths";
+import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 
 export async function POST(req: NextRequest) {
-  const { templateId, inputs, outputRefs, orgId, communityId } = await req.json();
-  const targetOrgSlug = communityId === COMMUNITY_ID || orgId === COMMUNITY_SLUG || orgId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
+  const { templateId, inputs, outputRefs } = await req.json();
+  let actor;
+  try {
+    const guard = await requireActiveAdmin(req, COMMUNITY_SLUG);
+    actor = guard.actor;
+  } catch (error) {
+    if (error instanceof AdminAccessError) {
+      return NextResponse.json({ error: "Unauthorized", reason: error.reason }, { status: error.status });
+    }
+    throw error;
+  }
 
-  const member = await assertMember(req);
-  const adminAuth = member ? null : await getAuthContextFromRequest(req);
-  const authorized =
-    member || (adminAuth && adminAuth.role === "admin" && (adminAuth.communityId === COMMUNITY_ID || adminAuth.communityId === COMMUNITY_SLUG));
-  if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const actorUid = member ? member.uid : (adminAuth as any).uid;
-  const actorRole: Role = member ? "member" : "admin";
-
-  const ref = adminDb.collection(orgDocgenGenerationsCollectionPath(targetOrgSlug));
+  const actorUid = actor.uid;
+  const actorRole = actor.roles[0] ?? "admin";
+  const ref = adminDb.collection(orgDocgenGenerationsCollectionPath(COMMUNITY_SLUG));
   const doc = await ref.add({
     templateId,
     inputs,
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
     outputRefs
   });
   await logAudit({
-    communityId: targetOrgSlug,
+    communityId: COMMUNITY_SLUG,
     type: "doc_generated",
     actorUid,
     role: actorRole,

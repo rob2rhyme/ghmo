@@ -9,7 +9,7 @@ export async function internalFetch(path: string, init: RequestInit = {}) {
   const incomingHeaders = headers();
 
   const mergedHeaders = new Headers(init.headers || undefined);
-  if (cookieHeader) mergedHeaders.set("cookie", cookieHeader);
+  if (cookieHeader && !mergedHeaders.has("cookie")) mergedHeaders.set("cookie", cookieHeader);
   const userAgent = incomingHeaders.get("user-agent");
   if (userAgent && !mergedHeaders.has("user-agent")) mergedHeaders.set("user-agent", userAgent);
 

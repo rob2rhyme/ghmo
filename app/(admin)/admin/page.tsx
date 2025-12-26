@@ -1,4 +1,4 @@
-import { assertCommunityRole } from "@/src/lib/auth";
+import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { redirect } from "next/navigation";
 import AdminDashboardClient from "@/src/modules/admin/AdminDashboardClient";
@@ -10,8 +10,14 @@ export const revalidate = 0;
 
 export default async function AdminPage() {
   const community = await getCommunity();
-  const auth = await assertCommunityRole("admin");
-  if (!auth) redirect(`/admin/login`);
+  try {
+    await requireActiveAdmin(undefined, COMMUNITY_SLUG);
+  } catch (error) {
+    if (error instanceof AdminAccessError) {
+      redirect(`/admin/login`);
+    }
+    redirect(`/admin/login`);
+  }
 
   const res = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/admin/dashboard`);
   if (!res.ok) {

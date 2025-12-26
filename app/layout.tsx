@@ -9,7 +9,10 @@ import { getCommunity } from "@/src/lib/community";
 export const metadata: Metadata = {
   title: "Greater Harrisburg Magar Organization",
   description:
-    "Community hub for the Greater Harrisburg Magar Organization with fundraising, member access, and document generation."
+    "Community hub for the Greater Harrisburg Magar Organization with fundraising, multi-media, and admin tools.",
+  icons: {
+    icon: "/assets/favicon.ico"
+  }
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

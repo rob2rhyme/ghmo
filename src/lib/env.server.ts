@@ -12,7 +12,13 @@ const serverSchema = z.object({
   GOFUNDME_PRO_CLIENT_ID: z.string().optional(),
   GOFUNDME_PRO_CLIENT_SECRET: z.string().optional(),
   GOFUNDME_PRO_API_BASE: z.string().default("https://api.gofundme.com"),
-  APP_ENV: z.string().default("dev")
+  APP_ENV: z.string().default("dev"),
+  FEATURE_EMAIL_ADMIN_LOGIN: z
+    .preprocess(val => val === "true" || val === true, z.boolean())
+    .default(false),
+  FEATURE_PIN_LOGIN: z
+    .preprocess(val => val === "false" ? false : val === "true" || val === true, z.boolean())
+    .default(true)
 });
 
 export const serverEnv = serverSchema.parse({
@@ -23,5 +29,7 @@ export const serverEnv = serverSchema.parse({
   GOFUNDME_PRO_CLIENT_ID: process.env.GOFUNDME_PRO_CLIENT_ID,
   GOFUNDME_PRO_CLIENT_SECRET: process.env.GOFUNDME_PRO_CLIENT_SECRET,
   GOFUNDME_PRO_API_BASE: process.env.GOFUNDME_PRO_API_BASE,
-  APP_ENV: process.env.APP_ENV
+  APP_ENV: process.env.APP_ENV,
+  FEATURE_EMAIL_ADMIN_LOGIN: process.env.FEATURE_EMAIL_ADMIN_LOGIN,
+  FEATURE_PIN_LOGIN: process.env.FEATURE_PIN_LOGIN
 });

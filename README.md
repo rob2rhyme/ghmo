@@ -22,27 +22,36 @@ Single-community App Router site for GHMO with whitelist member access, admin PI
 
 ## Routes
 - Public: `/`, `/donate`, `/multimedia`
-- Member-gated: `/gumba-project`, `/document-generator`
+- Admin-only: `/admin`, `/admin/events`, `/admin/gumba-project`, `/admin/document-generator`
 - Auth: `/login` (magic link), `/admin/login` (PIN)
-- Admin dashboard: `/admin`
-- API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/auth/pin`, `/api/auth/session`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
+- API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/auth/pin`, `/api/auth/session`, `/api/auth/dev/admin-session`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
 
 ## Auth Flow
 - Members: whitelist-only magic link. `/login` → `POST /api/auth/send-login-link` (generic response) → email link → `POST /api/auth/post-auth` re-checks whitelist and links `uid/emailLower` → session cookie via `/api/auth/session`.
 - Admins: submit PIN to `POST /api/auth/pin` → receive custom token with `{ communityId, role }` → `/api/auth/session` sets cookies.
-- Protected pages/APIs verify Firebase ID token server-side; member routes query `community/ghmo-site/members` for `emailLower/status="active"`.
+- Protected pages/APIs verify Firebase ID token server-side; member/admin routes query `organizations/ghmo/members` for `emailLower/status="active"`.
 - Middleware only guards `/admin*` for presence of a session cookie; server components perform the real checks.
 
-## Data Model (single community)
-- `community/ghmo-site` document: metadata, theme, GoFundMe config.
-- Subcollections under `community/ghmo-site`:
-  - `members/{memberId}`: `emailLower` (lowercased), `email`, `uid`, `status`, `roles`.
-  - `pins/{pinId}`: `{ role, pinHash, status, failedAttempts, lockedUntil }`.
-  - `content/pages/home`: `{ blocks[] }`.
-  - `gumba/timeline/{entryId}`: timeline entries.
-  - `docgen/templates/{templateId}` and `docgen/generations/{genId}`.
-  - `donations/stats` + `donations/webhookEvents/{eventId}`.
-  - `auditLogs/{logId}`.
+-## Data Model (single community)
+- `organizations/ghmo` document: metadata, theme, GoFundMe config.
+- Subcollections under `organizations/ghmo`:
+-  - `members/{memberId}`: `emailLower`, optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
+-  - `pins/{pinId}`: `{ role, pinHash, status, failedAttempts, lockedUntil }`.
+-  - `content/pages/home`: `{ blocks[] }`.
+-  - `gumba/timeline/{entryId}`: timeline entries.
+-  - `docgen/{templateId}` (Document Generator templates) and `docgen/generations/{genId}`.
+-  - Seed templates by writing documents under `organizations/{orgSlug}/docgen` (e.g., `{ name: "Default Letter", letterhead: {...}, fields: ["Recipient", "Body"] }`) so the admin UI has options.
+-  - `donations/stats` + `donations/webhookEvents/{eventId}`.
+-  - `auditLogs/{logId}`.
+- Legacy community paths are no longer supported; please migrate any old data into `organizations/{orgSlug}`.
+
+## Multi-Admin + Email Login Plan
+
+- **Stage 1 (Admins):** Extend `/api/auth/pin` + `/api/auth/session` while introducing `/api/auth/email/start` and `/api/auth/email/verify` for allowlisted `organizations/{orgSlug}/admins`. Implement `requireActiveAdmin(orgSlug)` guards, keep `FEATURE_PIN_LOGIN` fallback, and log everything via `logAuditEvent`.
+- **Dev login (local only):** Firebase email-link quotas can trip during development. Keep `FEATURE_PIN_LOGIN=true` for a fallback, and enable `NEXT_PUBLIC_DEV_LOGIN=true` + `DEV_LOGIN_SECRET` (and optionally share it via `NEXT_PUBLIC_DEV_LOGIN_SECRET` locally) so you can call `POST /api/auth/dev/admin-session` to mint a session on demand. This route only runs when `NODE_ENV !== "production"`, requires the secret, and should never be enabled in production.
+- **Stage 2 (Members schema readiness):** Ensure `organizations/{orgSlug}/members` docs expose name/status/uid fields, keep admin CRUD, and reuse the same email start/verify endpoints (feature-gated for members). No member-only routes yet.
+- **Stage 3 (Future):** Wire member-only pages/routes, enforce member guards, expand member audit logging, and phase out PIN login once email flows stabilize.
+- **Environments:** Stage 1 requires `FEATURE_EMAIL_ADMIN_LOGIN=true` (plus `NEXT_PUBLIC_FEATURE_EMAIL_ADMIN_LOGIN=true` for the login UI) and the existing Firebase client keys (`NEXT_PUBLIC_FIREBASE_API_KEY`, etc.). Keep `FEATURE_PIN_LOGIN`/`NEXT_PUBLIC_FEATURE_PIN_LOGIN` toggled to control whether PIN login remains available while the email flow rolls out. Admin login now hits `/api/auth/email/start` and `/api/auth/email/verify` as part of the email link flow.
 
 ## GoFundMe Pro
 - Set `NEXT_PUBLIC_GOFUNDME_PRO_INSTALL_SNIPPET` to inject the install script when enabled.
@@ -63,14 +72,15 @@ Single-community App Router site for GHMO with whitelist member access, admin PI
 1) Install deps: `npm install`
 2) Copy envs: `cp .env.example .env.local` and fill Firebase client config, Admin service account fields, GoFundMe secrets, social handles.
 3) Run dev server: `npm run dev`
-4) Seed admin PINs via `/api/admin/pins` (or add a UI hook). Whitelist members in `community/ghmo-site/members` with `emailLower` set.
+4) Seed admin PINs via `/api/admin/pins` (or add a UI hook). Whitelist members in `organizations/ghmo/members` with `emailLower` set.
 5) Configure GoFundMe Pro webhook + reconcile schedule when ready.
 
 ## Security Notes
 - PINs are bcrypt-hashed; lockout enforced on `/api/auth/pin`.
 - Magic-link endpoints are rate-limited and always return generic responses to avoid enumeration.
+- Firebase email-link quotas can also block a developer’s ability to test the admin UI; keep `FEATURE_PIN_LOGIN` active and optionally use the local `POST /api/auth/dev/admin-session` route with `DEV_LOGIN_SECRET` + `NEXT_PUBLIC_DEV_LOGIN` until the quota resets. This route is disabled in production—do not expose the secret outside of a trusted dev environment.
 - Webhooks validated via shared-secret HMAC placeholder; replace with provider verification if supplied.
-- Firebase rules: see `firestore.rules` for a draft locked to `community/ghmo-site` paths.
+- Firebase rules: see `firestore.rules` for a draft locked to `organizations/ghmo` paths.
 
 ## Reset Build Artifacts & Start Dev Server
 

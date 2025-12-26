@@ -9,7 +9,10 @@ export default function OnboardingDocPage() {
         <li>Define environment variables before running the app (Firebase client + admin, GoFundMe Pro secrets, social URLs).</li>
         <li>Login as admin with the configured PIN to access dashboard, content blocks, PINs, and timeline tools.</li>
         <li>Use the manual reconcile action to sync donation totals after webhook setup.</li>
-        <li>Whitelist members by adding docs under `community/ghmo-site/members` with `emailLower` set.</li>
+        <li>
+          Whitelist members by adding docs under `organizations/ghmo/members` with `emailLower`
+          (and optional `name`/`status`) set.
+        </li>
       </ul>
     </main>
   );

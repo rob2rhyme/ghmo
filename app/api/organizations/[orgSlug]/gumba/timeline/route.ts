@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMember, assertCommunityRole } from "@/src/lib/auth";
 import { adminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgTimelineCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlainJson } from "@/src/lib/json";
 
@@ -19,17 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
     .orderBy("timestamp", "desc")
     .limit(50)
     .get();
-
-  const fallbackSnap =
-    snap.empty
-      ? await adminDb
-          .collection(`community/${COMMUNITY_ID}/timeline`)
-          .orderBy("timestamp", "desc")
-          .limit(50)
-          .get()
-      : null;
-
-  const sourceDocs = snap.empty && fallbackSnap ? fallbackSnap.docs : snap.docs;
+  const sourceDocs = snap.docs;
 
   const timeline = sourceDocs.map(doc => {
     const data = doc.data() as Record<string, any>;

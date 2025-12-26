@@ -4,7 +4,7 @@ import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer
 import * as htmlToImage from "html-to-image";
 import { useRef, useState } from "react";
 
-type Template = {
+export type DocumentGeneratorTemplate = {
   id: string;
   name: string;
   letterhead?: { title?: string; subtitle?: string };
@@ -34,7 +34,7 @@ export default function DocumentGeneratorClient({
 }: {
   communityId: string;
   communitySlug: string;
-  templates: Template[];
+  templates: DocumentGeneratorTemplate[];
 }) {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [selectedId, setSelectedId] = useState(templates[0]?.id);
@@ -42,7 +42,7 @@ export default function DocumentGeneratorClient({
   const [status, setStatus] = useState<string | null>(null);
 
   const selected = templates.find(t => t.id === selectedId) || templates[0];
-  const fields = selected?.fields?.length ? selected.fields : ["Recipient", "Subject", "Body"];
+  const fields: string[] = selected?.fields?.length ? selected.fields : ["Recipient", "Subject", "Body"];
 
   const handleGenerate = async () => {
     setStatus("Generating...");
