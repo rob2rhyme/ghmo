@@ -42,12 +42,6 @@ export default async function CommunityLanding() {
           Donate
         </Link>
         <Link
-          href="/login"
-          className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
-        >
-          Member Login
-        </Link>
-        <Link
           href="/docs/onboarding"
           className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
         >
