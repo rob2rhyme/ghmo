@@ -394,7 +394,7 @@ export default function AdminLoginClient({
               Check your email
             </h2>
             <p className="mt-4 text-sm text-slate-300 leading-relaxed">
-              If your admin access is enabled, you'll receive an email with a
+              If your admin access is enabled, you&apos;ll receive an email with a
               sign-in link shortly. Please check your email.
             </p>
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200/90 shadow-inner shadow-black/10">
