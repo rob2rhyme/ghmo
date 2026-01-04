@@ -19,21 +19,20 @@ function buildMeta(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (process.env.ALLOW_DEV_ADMIN_LOGIN !== "true") {
+    return new Response("Not Found", { status: 404 });
   }
 
-  const secret = process.env.DEV_LOGIN_SECRET;
-  if (!secret) {
-    console.error("DEV_LOGIN_SECRET missing while attempting dev admin session");
-    return NextResponse.json({ error: "Dev login misconfigured" }, { status: 500 });
+  const tokenGate = process.env.DEV_ADMIN_LOGIN_TOKEN?.trim();
+  if (tokenGate) {
+    const providedToken =
+      req.headers.get("x-dev-login-token") ?? new URL(req.url).searchParams.get("token");
+    if (!providedToken || providedToken !== tokenGate) {
+      return new Response("Not Found", { status: 404 });
+    }
   }
 
-  const body = (await req.json()) as { orgSlug?: string; email?: string; devLoginSecret?: string };
-  const providedSecret = req.headers.get("x-dev-login-secret") || body.devLoginSecret;
-  if (!providedSecret || providedSecret !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const body = (await req.json()) as { orgSlug?: string; email?: string };
 
   const orgSlug = body.orgSlug?.trim();
   if (!orgSlug) {
@@ -121,6 +120,10 @@ export async function POST(req: NextRequest) {
     adminId: adminDoc.id,
     emailLower,
     cookiesAttached: true
+  });
+  console.warn("[AUTH] Dev admin-session endpoint used", {
+    orgSlug,
+    adminId: adminDoc.id
   });
   return sessionResponse;
 }

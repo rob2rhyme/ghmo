@@ -18,7 +18,11 @@ const serverSchema = z.object({
     .default(false),
   FEATURE_PIN_LOGIN: z
     .preprocess(val => val === "false" ? false : val === "true" || val === true, z.boolean())
-    .default(true)
+    .default(true),
+  ALLOW_DEV_ADMIN_LOGIN: z
+    .preprocess(val => val === "true" || val === true, z.boolean())
+    .default(false),
+  DEV_ADMIN_LOGIN_TOKEN: z.string().optional()
 });
 
 export const serverEnv = serverSchema.parse({
@@ -31,5 +35,7 @@ export const serverEnv = serverSchema.parse({
   GOFUNDME_PRO_API_BASE: process.env.GOFUNDME_PRO_API_BASE,
   APP_ENV: process.env.APP_ENV,
   FEATURE_EMAIL_ADMIN_LOGIN: process.env.FEATURE_EMAIL_ADMIN_LOGIN,
-  FEATURE_PIN_LOGIN: process.env.FEATURE_PIN_LOGIN
+  FEATURE_PIN_LOGIN: process.env.FEATURE_PIN_LOGIN,
+  ALLOW_DEV_ADMIN_LOGIN: process.env.ALLOW_DEV_ADMIN_LOGIN,
+  DEV_ADMIN_LOGIN_TOKEN: process.env.DEV_ADMIN_LOGIN_TOKEN
 });
