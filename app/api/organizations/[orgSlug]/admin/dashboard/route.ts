@@ -7,7 +7,7 @@ import {
   orgDonationsWebhookEventsCollectionPath,
   orgDonationsStatsDocPath,
   orgHomeBlocksDocPath,
-  orgTimelineCollectionPath
+  orgMinutesCollectionPath
 } from "@/src/lib/firestorePaths";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 
@@ -29,7 +29,6 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const webhookPath = orgDonationsWebhookEventsCollectionPath(orgSlug);
   const auditPath = orgAuditLogsCollectionPath(orgSlug);
   const homeBlocksPath = orgHomeBlocksDocPath(orgSlug);
-  const timelinePath = orgTimelineCollectionPath(orgSlug);
 
   const warnings: string[] = [];
 
@@ -82,26 +81,17 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
     warnings.push(`blocks: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  let timeline: any[] = [];
+  let minutes: any[] = [];
   try {
-    const timelineSnap = await adminDb.collection(timelinePath).orderBy("timestamp", "desc").limit(20).get();
-    const docs = timelineSnap.docs;
-    timeline = docs.map(doc => {
-      const data = doc.data() as Record<string, any>;
-      const ts = data.timestamp;
-      const timestamp =
-        typeof ts?.toMillis === "function"
-          ? ts.toMillis()
-          : ts instanceof Date
-            ? ts.getTime()
-            : typeof ts === "number"
-              ? ts
-              : null;
-      return { id: doc.id, ...data, timestamp };
-    });
+    const minutesSnap = await adminDb
+      .collection(orgMinutesCollectionPath(orgSlug))
+      .orderBy("eventDate", "desc")
+      .limit(50)
+      .get();
+    minutes = minutesSnap.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }));
   } catch (err) {
-    warnings.push(`timeline: ${err instanceof Error ? err.message : String(err)}`);
+    warnings.push(`minutes: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  return NextResponse.json(toPlain({ ok: true, stats, webhookEvents, auditLogs, blocks, timeline, warnings }));
+  return NextResponse.json(toPlain({ ok: true, stats, webhookEvents, auditLogs, blocks, minutes, warnings }));
 }

@@ -4,6 +4,8 @@ import "server-only";
 import { adminDb } from "./firebaseAdmin";
 import { orgDocPath, orgHomeBlocksDocPath } from "./firestorePaths";
 import { toPlain } from "./serialize.server";
+import { COMMUNITY_SLUG } from "./community.constants";
+export { COMMUNITY_SLUG };
 
 export type Community = {
   id: string;
@@ -32,7 +34,6 @@ export type Community = {
   };
 };
 
-export const COMMUNITY_SLUG = "ghmo";
 export const COMMUNITY_ID = "ghmo-site";
 export const COMMUNITY_NAME = "Greater Harrisburg Magar Organization";
 

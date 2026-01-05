@@ -63,10 +63,10 @@ export default async function CommunityLanding() {
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase text-slate-500">Admins</p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-            PIN-based login, content blocks, timeline updates, and GoFundMe
-            reconciliation.
-          </p>
+        <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+          PIN-based login, content blocks, meeting minutes, and GoFundMe
+          reconciliation.
+        </p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase text-slate-500">Docs & Guides</p>

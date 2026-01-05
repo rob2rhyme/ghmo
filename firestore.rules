@@ -49,7 +49,13 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Deprecated: Timeline entries are being replaced by meeting minutes.
     match /organizations/{orgSlug}/timeline/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /organizations/{orgSlug}/minutes/{doc=**} {
       allow read: if isAdmin();
       allow write: if isAdmin();
     }
