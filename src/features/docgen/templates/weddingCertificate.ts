@@ -74,8 +74,38 @@ export const weddingCertificate: DocTemplate = {
     {
       id: "maitiRepresentativeRole",
       label: "Maiti Role / माईतीको भूमिका",
+      type: "select",
+      options: [
+        { label: "President / अध्यक्ष", value: "President|अध्यक्ष" },
+        { label: "Vice President / उपाध्यक्ष", value: "Vice President|उपाध्यक्ष" },
+        { label: "Senior Vice President / वरिष्ठ उपाध्यक्ष", value: "Senior Vice President|वरिष्ठ उपाध्यक्ष" },
+        { label: "General Secretary / महासचिव", value: "General Secretary|महासचिव" },
+        { label: "Secretary / सचिव", value: "Secretary|सचिव" },
+        { label: "Joint Secretary / सह–सचिव", value: "Joint Secretary|सह–सचिव" },
+        { label: "Treasurer / कोषाध्यक्ष", value: "Treasurer|कोषाध्यक्ष" },
+        { label: "Joint Treasurer / सह–कोषाध्यक्ष", value: "Joint Treasurer|सह–कोषाध्यक्ष" },
+        { label: "Chief Advisor / मुख्य सल्लाहकार", value: "Chief Advisor|मुख्य सल्लाहकार" },
+        { label: "Advisor / सल्लाहकार", value: "Advisor|सल्लाहकार" },
+        { label: "Executive Member / कार्यसमिति सदस्य", value: "Executive Member|कार्यसमिति सदस्य" },
+        { label: "Board Member / बोर्ड सदस्य", value: "Board Member|बोर्ड सदस्य" },
+        { label: "Program Coordinator / कार्यक्रम संयोजक", value: "Program Coordinator|कार्यक्रम संयोजक" },
+        { label: "Cultural Coordinator / सांस्कृतिक संयोजक", value: "Cultural Coordinator|सांस्कृतिक संयोजक" },
+        { label: "Youth Coordinator / युवा संयोजक", value: "Youth Coordinator|युवा संयोजक" },
+        { label: "Women’s Coordinator / महिला संयोजक", value: "Women’s Coordinator|महिला संयोजक" },
+        { label: "Community Elder / समुदायका जेष्ठ", value: "Community Elder|समुदायका जेष्ठ" },
+        { label: "Guardian / अभिभावक", value: "Guardian|अभिभावक" },
+        { label: "Religious/Cultural Priest / पुजारी/धार्मिक अगुवा", value: "Religious/Cultural Priest|पुजारी/धार्मिक अगुवा" },
+        { label: "Event Chair / कार्यक्रम संयोजक (Chair)", value: "Event Chair|कार्यक्रम संयोजक (Chair)" },
+        { label: "Volunteer Lead / स्वयंसेवक संयोजक", value: "Volunteer Lead|स्वयंसेवक संयोजक" },
+        { label: "Other / अन्य", value: "Other|अन्य" }
+      ],
+      defaultValue: "Community Elder|समुदायका जेष्ठ"
+    },
+    {
+      id: "maitiRepresentativeRoleOther",
+      label: "If Other Role, specify / अन्य भूमिका भए लेख्नुहोस्",
       type: "text",
-      placeholder: "Community Elder / Guardian / प्रतिनिधि"
+      placeholder: "उदाहरण: Cultural Advisor / सांस्कृतिक सल्लाहकार"
     },
     {
       id: "maitiWitnessNote",
@@ -124,7 +154,8 @@ export const weddingCertificate: DocTemplate = {
     const brideEthnicityRaw = escapeHtml(inputs.brideEthnicity) || "";
     const brideEthnicityOther = escapeHtml(inputs.brideEthnicityOther) || "";
     const maitiRepresentativeName = escapeHtml(inputs.maitiRepresentativeName) || emptyLine;
-    const maitiRepresentativeRole = escapeHtml(inputs.maitiRepresentativeRole) || emptyLine;
+    const maitiRoleRaw = escapeHtml(inputs.maitiRepresentativeRole) || "";
+    const maitiRoleOther = escapeHtml(inputs.maitiRepresentativeRoleOther) || "";
     const maitiWitnessNoteRaw = escapeHtml(inputs.maitiWitnessNote || "").trim();
     const maitiWitnessNoteHtml = maitiWitnessNoteRaw ? maitiWitnessNoteRaw.replace(/\n/g, "<br />") : "";
     const marriageDate = formatDate(inputs.marriageDate) || emptyLine;
@@ -168,6 +199,20 @@ export const weddingCertificate: DocTemplate = {
     if (brideEthnicityRaw === "Other|अन्य" && brideEthnicityOther) {
       brideEthnicityEn = brideEthnicityOther;
       brideEthnicityNp = brideEthnicityOther;
+    }
+    let maitiRoleEn = emptyLine;
+    let maitiRoleNp = emptyLine;
+    if (maitiRoleRaw.includes("|")) {
+      const [en, np] = maitiRoleRaw.split("|");
+      maitiRoleEn = en?.trim() || emptyLine;
+      maitiRoleNp = np?.trim() || emptyLine;
+    } else if (maitiRoleRaw) {
+      maitiRoleEn = maitiRoleRaw;
+      maitiRoleNp = maitiRoleRaw;
+    }
+    if (maitiRoleRaw === "Other|अन्य" && maitiRoleOther.trim()) {
+      maitiRoleEn = maitiRoleOther.trim();
+      maitiRoleNp = maitiRoleOther.trim();
     }
 
     return `
@@ -370,7 +415,7 @@ export const weddingCertificate: DocTemplate = {
             </p>
             <p class="ghmo-cert-paragraph">
               This acknowledgment was witnessed in the presence of the designated ‘Maiti’ representative from the Magar
-              community: ${maitiRepresentativeName} (${maitiRepresentativeRole}).
+              community: ${maitiRepresentativeName} (${maitiRoleEn}).
             </p>
             <p class="ghmo-cert-paragraph ghmo-cert-note">
               Note: ‘Maiti’ refers to the bride’s parental home; in community ceremonies, a respected representative may
@@ -427,7 +472,7 @@ export const weddingCertificate: DocTemplate = {
               यस अन्तरजातीय/अन्तरसमुदाय विवाहको सन्दर्भमा, Greater Harrisburg Magar Organization (GHMO) ले ${brideEthnicityNp} समुदायकी दुलहीलाई विवाहपश्चात मगर समुदायमा सम्मानपूर्वक स्वागत तथा सांस्कृतिक मान्यता प्रदान गरिएको प्रमाणित गर्दछ, जुन मगर परम्परा, आपसी सहमति र समुदायिक स्वीकारोक्तिअनुसार सम्पन्न भएको हो।
             </p>
             <p class="ghmo-cert-paragraph">
-              यो मान्यता मगर समुदायका ‘माईती’ प्रतिनिधि ${maitiRepresentativeName} (${maitiRepresentativeRole}) को
+              यो मान्यता मगर समुदायका ‘माईती’ प्रतिनिधि ${maitiRepresentativeName} (${maitiRoleNp}) को
               उपस्थितिमा सम्पन्न गरिएको हो।
             </p>
             <p class="ghmo-cert-paragraph ghmo-cert-note">
