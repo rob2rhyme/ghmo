@@ -1,4 +1,4 @@
-export type DocFieldType = "text" | "date" | "select" | "textarea";
+export type DocFieldType = "text" | "date" | "select" | "textarea" | "checkbox";
 
 export type DocFieldOption = {
   label: string;
@@ -14,6 +14,7 @@ export type DocField = {
   required?: boolean;
   options?: DocFieldOption[];
   rows?: number;
+  defaultValue?: string;
 };
 
 export type DocTemplateMeta = {

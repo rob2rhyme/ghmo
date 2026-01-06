@@ -12,7 +12,7 @@ export default function DocForm({ fields, values, onChange }: DocFormProps) {
   return (
     <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/60 p-5 shadow-inner">
       {fields.map(field => {
-        const value = values[field.id] ?? "";
+        const value = values[field.id] ?? field.defaultValue ?? "";
         return (
           <div key={field.id} className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -39,6 +39,16 @@ export default function DocForm({ fields, values, onChange }: DocFormProps) {
                   </option>
                 ))}
               </select>
+            ) : field.type === "checkbox" ? (
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={value === "true"}
+                  onChange={e => onChange(field.id, e.target.checked ? "true" : "false")}
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <span>{field.placeholder ?? "Enabled"}</span>
+              </label>
             ) : (
               <input
                 type={field.type === "date" ? "date" : "text"}
