@@ -35,6 +35,21 @@ const SIGNATURE_ROLES: Array<{ role: SignatureRole; label: string; inputKey: str
   { role: "officiant", label: "Officiant", inputKey: "officiantSignatureImage" },
   { role: "issuingAuthority", label: "Issuing Authority", inputKey: "issuingAuthoritySignatureImage" }
 ];
+const SIGNATURE_FIELDS: Record<SignatureRole, string> = {
+  witness1: "witness1Signature",
+  witness2: "witness2Signature",
+  officiant: "officiantSignature",
+  issuingAuthority: "officialSeal"
+};
+const SIGNATURE_IMAGE_BY_ROLE: Record<SignatureRole, string> = {
+  witness1: "witness1SignatureImage",
+  witness2: "witness2SignatureImage",
+  officiant: "officiantSignatureImage",
+  issuingAuthority: "issuingAuthoritySignatureImage"
+};
+const SIGNATURE_IMAGE_KEYS = new Set(
+  SIGNATURE_ROLES.map(role => role.inputKey)
+);
 
 export default function DocBuilder({
   templatesMeta,
@@ -61,12 +76,6 @@ export default function DocBuilder({
     officiant: undefined,
     issuingAuthority: undefined
   });
-  const [signatureImages, setSignatureImages] = useState<Record<SignatureRole, string | undefined>>({
-    witness1: undefined,
-    witness2: undefined,
-    officiant: undefined,
-    issuingAuthority: undefined
-  });
   const [activeQrRole, setActiveQrRole] = useState<SignatureRole | null>(null);
 
   const selectedTemplateMeta = useMemo(
@@ -75,14 +84,6 @@ export default function DocBuilder({
   );
   const selectedTemplate = useMemo(() => getTemplateById(selectedTemplateId), [selectedTemplateId]);
   const currentInputs = inputsByTemplate[selectedTemplateId] ?? {};
-  const previewInputs = useMemo(() => {
-    const signatureOverrides: Record<string, string> = {};
-    SIGNATURE_ROLES.forEach(({ role, inputKey }) => {
-      const dataUrl = signatureImages[role];
-      if (dataUrl) signatureOverrides[inputKey] = dataUrl;
-    });
-    return { ...currentInputs, ...signatureOverrides };
-  }, [currentInputs, signatureImages]);
 
   const handleFieldChange = (fieldId: string, value: string) => {
     setInputsByTemplate(prev => ({
@@ -100,12 +101,6 @@ export default function DocBuilder({
 
   useEffect(() => {
     setSignatureSessions({
-      witness1: undefined,
-      witness2: undefined,
-      officiant: undefined,
-      issuingAuthority: undefined
-    });
-    setSignatureImages({
       witness1: undefined,
       witness2: undefined,
       officiant: undefined,
@@ -137,17 +132,17 @@ export default function DocBuilder({
                 expiresAt: payload.expiresAt ?? session.expiresAt
               }
             }));
-            if (payload.status === "signed" && !signatureImages[session.role]) {
+            if (payload.status === "signed" && !currentInputs[SIGNATURE_IMAGE_BY_ROLE[session.role]]) {
               const signedResponse = await fetch(
                 `/api/admin/signing-sessions/${session.sessionId}?includeSignature=1`
               );
               if (!signedResponse.ok) return;
               const signedPayload = await signedResponse.json();
               if (signedPayload.signatureDataUrl) {
-                setSignatureImages(prev => ({
-                  ...prev,
-                  [session.role]: signedPayload.signatureDataUrl as string
-                }));
+                handleFieldChange(
+                  SIGNATURE_IMAGE_BY_ROLE[session.role],
+                  signedPayload.signatureDataUrl as string
+                );
               }
             }
           } catch (error) {
@@ -157,13 +152,13 @@ export default function DocBuilder({
       );
     };
 
-    const interval = window.setInterval(poll, 4000);
+    const interval = window.setInterval(poll, 2000);
     poll();
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [signatureSessions, signatureImages]);
+  }, [signatureSessions, currentInputs]);
 
   const handleExport = async (format: ExportFormat) => {
     if (!previewRef.current || !selectedTemplate || !selectedTemplateMeta || !letterheadReady) return;
@@ -206,6 +201,12 @@ export default function DocBuilder({
     setStatusMessage("Saving to gallery...");
     setIsSaving(true);
     try {
+      const sanitizedInputs = Object.keys(currentInputs).reduce<Record<string, string>>((acc, key) => {
+        if (!SIGNATURE_IMAGE_KEYS.has(key)) {
+          acc[key] = currentInputs[key];
+        }
+        return acc;
+      }, {});
       const response = await fetch("/api/admin/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -213,7 +214,7 @@ export default function DocBuilder({
           templateId: selectedTemplateMeta.id,
           templateTitle: selectedTemplateMeta.title,
           category: selectedTemplateMeta.category,
-          inputs: currentInputs,
+          inputs: sanitizedInputs,
           docId: initialDocId
         })
       });
@@ -262,7 +263,7 @@ export default function DocBuilder({
         expiresAt: payload.expiresAt
       };
       setSignatureSessions(prev => ({ ...prev, [role]: session }));
-      setSignatureImages(prev => ({ ...prev, [role]: undefined }));
+      handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[role], "");
       setActiveQrRole(role);
       setStatusMessage("Signature session created");
     } catch (error) {
@@ -295,6 +296,12 @@ export default function DocBuilder({
         acc[session.role] = session.sessionId;
         return acc;
       }, {});
+      const sanitizedInputs = Object.keys(currentInputs).reduce<Record<string, string>>((acc, key) => {
+        if (!SIGNATURE_IMAGE_KEYS.has(key)) {
+          acc[key] = currentInputs[key];
+        }
+        return acc;
+      }, {});
       const response = await fetch(
         `/api/admin/signing-sessions/${signedSessions[0].sessionId}/finalize`,
         {
@@ -305,7 +312,7 @@ export default function DocBuilder({
               templateId: selectedTemplateMeta.id,
               templateTitle: selectedTemplateMeta.title,
               category: selectedTemplateMeta.category,
-              inputs: currentInputs,
+              inputs: sanitizedInputs,
               certificateId: currentInputs.certificateNumber || "",
               pngDataUrl: dataUrl
             },
@@ -325,12 +332,7 @@ export default function DocBuilder({
         officiant: undefined,
         issuingAuthority: undefined
       });
-      setSignatureImages({
-        witness1: undefined,
-        witness2: undefined,
-        officiant: undefined,
-        issuingAuthority: undefined
-      });
+      SIGNATURE_ROLES.forEach(({ role }) => handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[role], ""));
       setActiveQrRole(null);
     } catch (error) {
       console.error("Failed to finalize signed certificate", error);
@@ -343,6 +345,28 @@ export default function DocBuilder({
   const statusColor = statusMessage?.toLowerCase().includes("failed") ? "text-rose-600" : "text-slate-500";
   const signatureEnabled = selectedTemplateId === "wedding-certificate";
   const activeSession = activeQrRole ? signatureSessions[activeQrRole] : undefined;
+  const signatureActions = signatureEnabled
+    ? SIGNATURE_ROLES.reduce<Record<string, { label: string; onClick: () => void; status?: string; badge?: string }>>(
+        (acc, roleConfig) => {
+          const session = signatureSessions[roleConfig.role];
+          const status = session?.status;
+          let statusLabel = "No session";
+          if (status === "pending") statusLabel = "Pending";
+          if (status === "signed") statusLabel = "Signed";
+          if (status === "expired") statusLabel = "Expired";
+          if (status === "cancelled") statusLabel = "Cancelled";
+          const hasImage = Boolean(currentInputs[SIGNATURE_IMAGE_BY_ROLE[roleConfig.role]]);
+          acc[SIGNATURE_FIELDS[roleConfig.role]] = {
+            label: status === "signed" || hasImage ? "Re-request" : "Request",
+            onClick: () => handleRequestSignature(roleConfig.role),
+            status: statusLabel,
+            badge: status === "signed" || hasImage ? "Signed ✓" : undefined
+          };
+          return acc;
+        },
+        {}
+      )
+    : undefined;
 
   return (
     <section className="space-y-6">
@@ -368,7 +392,12 @@ export default function DocBuilder({
               <>
                 <p className="text-xs uppercase tracking-wide text-slate-400">{selectedTemplateMeta.category}</p>
                 <p className="text-sm text-slate-500">{selectedTemplateMeta.description}</p>
-                <DocForm fields={selectedTemplateMeta.fields} values={currentInputs} onChange={handleFieldChange} />
+                <DocForm
+                  fields={selectedTemplateMeta.fields}
+                  values={currentInputs}
+                  onChange={handleFieldChange}
+                  fieldActions={signatureActions}
+                />
               </>
             ) : (
               <p className="text-sm text-slate-500">No template selected.</p>
@@ -380,7 +409,7 @@ export default function DocBuilder({
               {selectedTemplate ? (
                 <DocPreview
                   template={selectedTemplate}
-                  inputs={previewInputs}
+                  inputs={currentInputs}
                   ref={previewRef}
                   onBackgroundLoad={() => setLetterheadReady(true)}
                 />
@@ -429,66 +458,6 @@ export default function DocBuilder({
                 ) : null}
               </div>
               {statusMessage ? <p className={`text-xs ${statusColor}`}>{statusMessage}</p> : null}
-              {signatureEnabled ? (
-                <div className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-inner">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Signature Requests
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {SIGNATURE_ROLES.map(({ role, label }) => {
-                      const session = signatureSessions[role];
-                      const status = session?.status ?? "idle";
-                      const isSigned = status === "signed";
-                      return (
-                        <div
-                          key={role}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
-                        >
-                          <div>
-                            <p className="font-semibold text-slate-700">{label}</p>
-                            <p className="text-[0.7rem] text-slate-400">
-                              {status === "idle"
-                                ? "No session created"
-                                : status === "pending"
-                                ? "Awaiting signature"
-                                : status === "signed"
-                                ? "Signed"
-                                : status === "expired"
-                                ? "Expired"
-                                : status}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleRequestSignature(role)}
-                              className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
-                            >
-                              {status === "idle" ? "Request" : "Re-request"}
-                            </button>
-                            {session?.signUrl ? (
-                              <button
-                                type="button"
-                                onClick={() => setActiveQrRole(role)}
-                                className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
-                              >
-                                View QR
-                              </button>
-                            ) : null}
-                            {isSigned ? (
-                              <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                                Ready
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
