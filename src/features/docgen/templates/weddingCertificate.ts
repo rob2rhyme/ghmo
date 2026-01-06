@@ -10,6 +10,37 @@ export const weddingCertificate: DocTemplate = {
   fields: [
     { id: "groomName", label: "Groom Name / दुलहाको नाम", type: "text", placeholder: "Saurav Rai", required: true },
     { id: "brideName", label: "Bride Name / दुलहीको नाम", type: "text", placeholder: "Amrita Gurung", required: true },
+    {
+      id: "groomEthnicity",
+      label: "Groom Ethnicity / दुलहाको जात/समुदाय",
+      type: "text",
+      defaultValue: "Magar",
+      required: true
+    },
+    {
+      id: "brideEthnicity",
+      label: "Bride Ethnicity / Bride Community / दुलहीको जात/समुदाय",
+      type: "text",
+      placeholder: "Gurung"
+    },
+    {
+      id: "maitiRepresentativeName",
+      label: "Maiti Representative Name / माईती प्रतिनिधि नाम",
+      type: "text",
+      placeholder: "Elder Name"
+    },
+    {
+      id: "maitiRepresentativeRole",
+      label: "Maiti Role / माईतीको भूमिका",
+      type: "text",
+      placeholder: "Community Elder / Guardian / प्रतिनिधि"
+    },
+    {
+      id: "maitiWitnessNote",
+      label: "Maiti Acknowledgement (Optional) / माईती स्वीकृति (वैकल्पिक)",
+      type: "textarea",
+      rows: 3
+    },
     { id: "marriageDate", label: "Marriage Date / विवाह मिति", type: "date", required: true },
     { id: "ceremonyPlace", label: "Place of Ceremony / विवाह स्थान", type: "text", placeholder: "Glenwood Garden" },
     {
@@ -48,6 +79,12 @@ export const weddingCertificate: DocTemplate = {
     const emptyLine = "____________________________________";
     const groomName = escapeHtml(inputs.groomName) || emptyLine;
     const brideName = escapeHtml(inputs.brideName) || emptyLine;
+    const groomEthnicity = escapeHtml(inputs.groomEthnicity) || "Magar";
+    const brideEthnicity = escapeHtml(inputs.brideEthnicity) || emptyLine;
+    const maitiRepresentativeName = escapeHtml(inputs.maitiRepresentativeName) || emptyLine;
+    const maitiRepresentativeRole = escapeHtml(inputs.maitiRepresentativeRole) || emptyLine;
+    const maitiWitnessNoteRaw = escapeHtml(inputs.maitiWitnessNote || "").trim();
+    const maitiWitnessNoteHtml = maitiWitnessNoteRaw ? maitiWitnessNoteRaw.replace(/\n/g, "<br />") : "";
     const marriageDate = formatDate(inputs.marriageDate) || emptyLine;
     const ceremonyPlace = escapeHtml(inputs.ceremonyPlace) || emptyLine;
     const issuingAuthority =
@@ -241,17 +278,25 @@ export const weddingCertificate: DocTemplate = {
                 This is to formally certify that, in accordance with the <strong>customs, traditions, and ancestral
                 practices of the Magar Community</strong>, the marriage union between:
               </p>
-              <div class="ghmo-cert-row">
-                <span class="ghmo-cert-label">Name of Groom:</span>
-                <span class="ghmo-cert-value">${groomName}</span>
-              </div>
-              <div class="ghmo-cert-row">
-                <span class="ghmo-cert-label">Name of Bride:</span>
-                <span class="ghmo-cert-value">${brideName}</span>
-              </div>
-              <p class="ghmo-cert-paragraph">
-                was solemnized and accepted as a lawful and honorable union within the Magar cultural tradition.
-              </p>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">Name of Groom:</span>
+              <span class="ghmo-cert-value">${groomName}</span>
+            </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">Name of Bride:</span>
+              <span class="ghmo-cert-value">${brideName}</span>
+            </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">Groom Community/Ethnicity:</span>
+              <span class="ghmo-cert-value">${groomEthnicity}</span>
+            </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">Bride Community/Ethnicity:</span>
+              <span class="ghmo-cert-value">${brideEthnicity}</span>
+            </div>
+            <p class="ghmo-cert-paragraph">
+              was solemnized and accepted as a lawful and honorable union within the Magar cultural tradition.
+            </p>
               <div class="ghmo-cert-row">
                 <span class="ghmo-cert-label">Date of Marriage:</span>
                 <span class="ghmo-cert-value">${marriageDate}</span>
@@ -261,15 +306,32 @@ export const weddingCertificate: DocTemplate = {
                 <span class="ghmo-cert-value">${ceremonyPlace}</span>
               </div>
               <p class="ghmo-cert-paragraph">
-                The marriage was conducted in the presence of <strong>family members, community elders, and respected
-                witnesses</strong>, following Magar rites, mutual consent, and cultural responsibilities. The Magar
-                community recognizes this union as a sacred lifelong partnership based on respect, cooperation, and
-                shared duty.
-              </p>
-              <p class="ghmo-cert-paragraph ghmo-cert-note">
-                This certificate serves as an <strong>official record of community recognition</strong> and does not
-                replace civil or governmental marriage registration unless permitted by law.
-              </p>
+              The marriage was conducted in the presence of <strong>family members, community elders, and respected
+              witnesses</strong>, following Magar rites, mutual consent, and cultural responsibilities. The Magar
+              community recognizes this union as a sacred lifelong partnership based on respect, cooperation, and
+              shared duty.
+            </p>
+            <p class="ghmo-cert-subheading">Community Recognition (Interethnic Marriage)</p>
+            <p class="ghmo-cert-paragraph">
+              In recognition of this interethnic union, the Greater Harrisburg Magar Organization acknowledges and affirms that the Bride, originally from the ${brideEthnicity} community, is welcomed and culturally recognized within the Magar community through this marriage, in accordance with Magar customs, mutual consent, and community acceptance.
+            </p>
+            <p class="ghmo-cert-paragraph">
+              This acknowledgment was witnessed in the presence of the designated ‘Maiti’ representative from the Magar
+              community: ${maitiRepresentativeName} (${maitiRepresentativeRole}).
+            </p>
+            <p class="ghmo-cert-paragraph ghmo-cert-note">
+              Note: ‘Maiti’ refers to the bride’s parental home; in community ceremonies, a respected representative may
+              stand in that role.
+            </p>
+            ${
+              maitiWitnessNoteHtml
+                ? `<p class="ghmo-cert-paragraph ghmo-cert-note">${maitiWitnessNoteHtml}</p>`
+                : ""
+            }
+            <p class="ghmo-cert-paragraph ghmo-cert-note">
+              This certificate serves as an <strong>official record of community recognition</strong> and does not
+              replace civil or governmental marriage registration unless permitted by law.
+            </p>
             </section>
 
             <section class="ghmo-cert-section">
@@ -278,15 +340,23 @@ export const weddingCertificate: DocTemplate = {
                 यो प्रमाणित गरिन्छ कि मगर समुदायका <strong>परम्परा, संस्कार, र पुर्ख्यौली चलनअनुसार</strong>, निम्न
                 दम्पतीको विवाह सम्पन्न भएको छ:
               </p>
-              <div class="ghmo-cert-row">
-                <span class="ghmo-cert-label">दुलहाको नाम:</span>
-                <span class="ghmo-cert-value">${groomName}</span>
-              </div>
-              <div class="ghmo-cert-row">
-                <span class="ghmo-cert-label">दुलहीको नाम:</span>
-                <span class="ghmo-cert-value">${brideName}</span>
-              </div>
-              <p class="ghmo-cert-paragraph">उक्त विवाह:</p>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">दुलहाको नाम:</span>
+              <span class="ghmo-cert-value">${groomName}</span>
+            </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">दुलहीको नाम:</span>
+              <span class="ghmo-cert-value">${brideName}</span>
+            </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">दुलहाको जात/समुदाय:</span>
+              <span class="ghmo-cert-value">${groomEthnicity}</span>
+            </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">दुलहीको जात/समुदाय:</span>
+              <span class="ghmo-cert-value">${brideEthnicity}</span>
+            </div>
+            <p class="ghmo-cert-paragraph">उक्त विवाह:</p>
               <div class="ghmo-cert-row">
                 <span class="ghmo-cert-label">विवाह मिति:</span>
                 <span class="ghmo-cert-value">${marriageDate}</span>
@@ -299,14 +369,31 @@ export const weddingCertificate: DocTemplate = {
                 मा <strong>परिवारका सदस्यहरू, समाजका जेष्ठ अगुवा तथा साक्षीहरूको उपस्थितिमा</strong>, मगर जातीय संस्कार र
                 आपसी सहमतिअनुसार सम्पन्न गरिएको हो।
               </p>
-              <p class="ghmo-cert-paragraph">
-                मगर समुदायले यस वैवाहिक सम्बन्धलाई <strong>पवित्र, सम्मानजनक र आजीवन साथ–सहयोगको बन्धन</strong>का रूपमा
-                स्वीकार गरेको छ।
-              </p>
-              <p class="ghmo-cert-paragraph ghmo-cert-note">
-                यो प्रमाणपत्र <strong>सामुदायिक तथा सांस्कृतिक मान्यताको अभिलेख</strong> हो। यसले कानुनी वा सरकारी विवाह
-                दर्तालाई प्रतिस्थापन गर्दैन।
-              </p>
+            <p class="ghmo-cert-paragraph">
+              मगर समुदायले यस वैवाहिक सम्बन्धलाई <strong>पवित्र, सम्मानजनक र आजीवन साथ–सहयोगको बन्धन</strong>का रूपमा
+              स्वीकार गरेको छ।
+            </p>
+            <p class="ghmo-cert-subheading">सामुदायिक मान्यता (अन्तरजातीय/अन्तरसमुदाय विवाह)</p>
+            <p class="ghmo-cert-paragraph">
+              यस अन्तरजातीय/अन्तरसमुदाय विवाहको सन्दर्भमा, Greater Harrisburg Magar Organization (GHMO) ले ${brideEthnicity} समुदायकी दुलहीलाई विवाहपश्चात मगर समुदायमा सम्मानपूर्वक स्वागत तथा सांस्कृतिक मान्यता प्रदान गरिएको प्रमाणित गर्दछ, जुन मगर परम्परा, आपसी सहमति र समुदायिक स्वीकारोक्तिअनुसार सम्पन्न भएको हो।
+            </p>
+            <p class="ghmo-cert-paragraph">
+              यो मान्यता मगर समुदायका ‘माईती’ प्रतिनिधि ${maitiRepresentativeName} (${maitiRepresentativeRole}) को
+              उपस्थितिमा सम्पन्न गरिएको हो।
+            </p>
+            <p class="ghmo-cert-paragraph ghmo-cert-note">
+              टिप्पणी: ‘माईती’ भन्नाले दुलहीको मायतीघर/जन्मघर जनाउँछ; समुदायिक समारोहमा प्रतिनिधि व्यक्तिले सो भूमिका
+              निर्वाह गर्न सक्छ।
+            </p>
+            ${
+              maitiWitnessNoteHtml
+                ? `<p class="ghmo-cert-paragraph ghmo-cert-note">${maitiWitnessNoteHtml}</p>`
+                : ""
+            }
+            <p class="ghmo-cert-paragraph ghmo-cert-note">
+              यो प्रमाणपत्र <strong>सामुदायिक तथा सांस्कृतिक मान्यताको अभिलेख</strong> हो। यसले कानुनी वा सरकारी विवाह
+              दर्तालाई प्रतिस्थापन गर्दैन।
+            </p>
             </section>
 
             <section class="ghmo-cert-section ghmo-cert-blessing avoid-break">
