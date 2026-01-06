@@ -57,8 +57,8 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
       context.scale(ratio, ratio);
       context.lineWidth = 2;
       context.lineCap = "round";
-      context.strokeStyle = "#0f172a";
-      context.fillStyle = "#ffffff";
+      context.strokeStyle = "#f8fafc";
+      context.fillStyle = "#0b1220";
       context.fillRect(0, 0, width, height);
     };
 
@@ -115,7 +115,7 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#ffffff";
+    context.fillStyle = "#0b1220";
     context.fillRect(0, 0, canvas.width, canvas.height);
   };
 
@@ -149,46 +149,46 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
   const isSigned = status === "signed" || status === "finalized";
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto max-w-lg space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="mx-auto w-full max-w-md">
+      <div className="space-y-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">GHMO signing</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Signature for {roleLabel}</h1>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Signature request</p>
+          <h1 className="text-2xl font-semibold text-slate-100">Signature for {roleLabel}</h1>
           {expiresAt ? (
-            <p className="text-xs text-slate-400">Session expires at {new Date(expiresAt).toLocaleString()}</p>
+            <p className="text-xs text-slate-500">Session expires at {new Date(expiresAt).toLocaleString()}</p>
           ) : null}
         </div>
-        {message ? <p className="text-sm text-slate-600">{message}</p> : null}
+        {message ? <p className="text-sm text-slate-300">{message}</p> : null}
         {isExpired ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-            This signing session has expired. Please request a new link from GHMO.
+          <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 p-4 text-sm text-rose-200">
+            This signing session has expired. Please request a new link.
           </div>
         ) : isSigned ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-4 text-sm text-emerald-200">
             Signature received. Thank you.
           </div>
         ) : (
           <>
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Signer name (optional)
               </label>
               <input
                 type="text"
                 value={signerName}
                 onChange={event => setSignerName(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
                 placeholder="Name"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Signature
               </label>
-              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3">
                 <canvas
                   ref={canvasRef}
-                  className="h-48 w-full touch-none rounded-xl border border-dashed border-slate-300 bg-white"
+                  className="h-48 w-full touch-none rounded-xl border border-dashed border-slate-700 bg-slate-950"
                 />
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
               <button
                 type="button"
                 onClick={handleClear}
-                className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary"
+                className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-primary"
               >
                 Clear
               </button>

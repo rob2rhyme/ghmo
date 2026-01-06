@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    const signUrl = `${baseUrl}/admin/docgen/sign/${sessionId}`;
+    const signUrl = `${baseUrl}/sign/${sessionId}`;
     return NextResponse.json({
       sessionId,
       signUrl,
