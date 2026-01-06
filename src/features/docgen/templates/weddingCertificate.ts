@@ -11,17 +11,59 @@ export const weddingCertificate: DocTemplate = {
     { id: "groomName", label: "Groom Name / दुलहाको नाम", type: "text", placeholder: "Saurav Rai", required: true },
     { id: "brideName", label: "Bride Name / दुलहीको नाम", type: "text", placeholder: "Amrita Gurung", required: true },
     {
-      id: "groomEthnicity",
-      label: "Groom Ethnicity / दुलहाको जात/समुदाय",
-      type: "text",
-      defaultValue: "Magar",
-      required: true
-    },
-    {
       id: "brideEthnicity",
       label: "Bride Ethnicity / Bride Community / दुलहीको जात/समुदाय",
+      type: "select",
+      options: [
+        { label: "Gurung / गुरुङ", value: "Gurung|गुरुङ" },
+        { label: "Tamang / तामाङ", value: "Tamang|तामाङ" },
+        { label: "Sherpa / शेर्पा", value: "Sherpa|शेर्पा" },
+        { label: "Rai / राई", value: "Rai|राई" },
+        { label: "Limbu / लिम्बु", value: "Limbu|लिम्बु" },
+        { label: "Sunuwar / सुनुवार", value: "Sunuwar|सुनुवार" },
+        { label: "Yakkha / याक्खा", value: "Yakkha|याक्खा" },
+        { label: "Lepcha / लेप्चा", value: "Lepcha|लेप्चा" },
+        { label: "Ghale / घले", value: "Ghale|घले" },
+        { label: "Thakali / थकाली", value: "Thakali|थकाली" },
+        { label: "Newar / नेवार", value: "Newar|नेवार" },
+        { label: "Chetri / क्षेत्री", value: "Chetri|क्षेत्री" },
+        { label: "Bahun / ब्राह्मण", value: "Bahun|ब्राह्मण" },
+        { label: "Tharu / थारु", value: "Tharu|थारु" },
+        { label: "Madhesi / मधेसी", value: "Madhesi|मधेसी" },
+        { label: "Yadav / यादव", value: "Yadav|यादव" },
+        { label: "Teli / तेली", value: "Teli|तेली" },
+        { label: "Kurmi / कुर्मी", value: "Kurmi|कुर्मी" },
+        { label: "Musahar / मुसहर", value: "Musahar|मुसहर" },
+        { label: "Chamar / चमार", value: "Chamar|चमार" },
+        { label: "Dusadh/Paswan / दुसाध/पासवान", value: "Dusadh/Paswan|दुसाध/पासवान" },
+        { label: "Sarki / सार्की", value: "Sarki|सार्की" },
+        { label: "Kami / कामी", value: "Kami|कामी" },
+        { label: "Damai/Darji / दमाई/दर्जी", value: "Damai/Darji|दमाई/दर्जी" },
+        { label: "Bishwakarma / विश्वकर्मा", value: "Bishwakarma|विश्वकर्मा" },
+        { label: "Dhanuk / धानुक", value: "Dhanuk|धानुक" },
+        { label: "Hajam/Thakur / हजाम/ठाकुर", value: "Hajam/Thakur|हजाम/ठाकुर" },
+        { label: "Jogi / जोगी", value: "Jogi|जोगी" },
+        { label: "Bote / बोटे", value: "Bote|बोटे" },
+        { label: "Majhi / माझी", value: "Majhi|माझी" },
+        { label: "Kumal / कुमाल", value: "Kumal|कुमाल" },
+        { label: "Danuwar / दानुवार", value: "Danuwar|दानुवार" },
+        { label: "Chepang / चेपाङ", value: "Chepang|चेपाङ" },
+        { label: "Raji / राजी", value: "Raji|राजी" },
+        { label: "Hayu / हायु", value: "Hayu|हायु" },
+        { label: "Thami / थामी", value: "Thami|थामी" },
+        { label: "Bhujel / भुजेल", value: "Bhujel|भुजेल" },
+        { label: "Pahari / पहाडी", value: "Pahari|पहाडी" },
+        { label: "Jirel / जिरेल", value: "Jirel|जिरेल" },
+        { label: "Walung / वालुङ", value: "Walung|वालुङ" },
+        { label: "Khas / खस", value: "Khas|खस" },
+        { label: "Other / अन्य", value: "Other|अन्य" }
+      ]
+    },
+    {
+      id: "brideEthnicityOther",
+      label: "If Other, specify / अन्य भए लेख्नुहोस्",
       type: "text",
-      placeholder: "Gurung"
+      placeholder: "उदाहरण: थकाली / Thakali"
     },
     {
       id: "maitiRepresentativeName",
@@ -79,8 +121,8 @@ export const weddingCertificate: DocTemplate = {
     const emptyLine = "____________________________________";
     const groomName = escapeHtml(inputs.groomName) || emptyLine;
     const brideName = escapeHtml(inputs.brideName) || emptyLine;
-    const groomEthnicity = escapeHtml(inputs.groomEthnicity) || "Magar";
-    const brideEthnicity = escapeHtml(inputs.brideEthnicity) || emptyLine;
+    const brideEthnicityRaw = escapeHtml(inputs.brideEthnicity) || "";
+    const brideEthnicityOther = escapeHtml(inputs.brideEthnicityOther) || "";
     const maitiRepresentativeName = escapeHtml(inputs.maitiRepresentativeName) || emptyLine;
     const maitiRepresentativeRole = escapeHtml(inputs.maitiRepresentativeRole) || emptyLine;
     const maitiWitnessNoteRaw = escapeHtml(inputs.maitiWitnessNote || "").trim();
@@ -112,6 +154,21 @@ export const weddingCertificate: DocTemplate = {
       : `यस दाम्पत्य जीवनमा <strong>सुख, शान्ति, स्वास्थ्य र समृद्धि</strong> सधैं रहोस्।<br />
         पुर्ख्यौली आशीर्वादले मार्गदर्शन गरून्,<br />
         र तपाईंहरूको घर–परिवारमा <strong>एकता, समझदारी र सम्मान</strong> सधैं कायम रहोस्।`;
+
+    let brideEthnicityEn = emptyLine;
+    let brideEthnicityNp = emptyLine;
+    if (brideEthnicityRaw.includes("|")) {
+      const [en, np] = brideEthnicityRaw.split("|");
+      brideEthnicityEn = en?.trim() || emptyLine;
+      brideEthnicityNp = np?.trim() || emptyLine;
+    } else if (brideEthnicityRaw) {
+      brideEthnicityEn = brideEthnicityRaw;
+      brideEthnicityNp = brideEthnicityRaw;
+    }
+    if (brideEthnicityRaw === "Other|अन्य" && brideEthnicityOther) {
+      brideEthnicityEn = brideEthnicityOther;
+      brideEthnicityNp = brideEthnicityOther;
+    }
 
     return `
       <div class="doc-page">
@@ -287,12 +344,8 @@ export const weddingCertificate: DocTemplate = {
               <span class="ghmo-cert-value">${brideName}</span>
             </div>
             <div class="ghmo-cert-row">
-              <span class="ghmo-cert-label">Groom Community/Ethnicity:</span>
-              <span class="ghmo-cert-value">${groomEthnicity}</span>
-            </div>
-            <div class="ghmo-cert-row">
               <span class="ghmo-cert-label">Bride Community/Ethnicity:</span>
-              <span class="ghmo-cert-value">${brideEthnicity}</span>
+              <span class="ghmo-cert-value">${brideEthnicityEn}</span>
             </div>
             <p class="ghmo-cert-paragraph">
               was solemnized and accepted as a lawful and honorable union within the Magar cultural tradition.
@@ -313,7 +366,7 @@ export const weddingCertificate: DocTemplate = {
             </p>
             <p class="ghmo-cert-subheading">Community Recognition (Interethnic Marriage)</p>
             <p class="ghmo-cert-paragraph">
-              In recognition of this interethnic union, the Greater Harrisburg Magar Organization acknowledges and affirms that the Bride, originally from the ${brideEthnicity} community, is welcomed and culturally recognized within the Magar community through this marriage, in accordance with Magar customs, mutual consent, and community acceptance.
+              In recognition of this interethnic union, the Greater Harrisburg Magar Organization acknowledges and affirms that the Bride, originally from the ${brideEthnicityEn} community, is welcomed and culturally recognized within the Magar community through this marriage, in accordance with Magar customs, mutual consent, and community acceptance.
             </p>
             <p class="ghmo-cert-paragraph">
               This acknowledgment was witnessed in the presence of the designated ‘Maiti’ representative from the Magar
@@ -349,12 +402,8 @@ export const weddingCertificate: DocTemplate = {
               <span class="ghmo-cert-value">${brideName}</span>
             </div>
             <div class="ghmo-cert-row">
-              <span class="ghmo-cert-label">दुलहाको जात/समुदाय:</span>
-              <span class="ghmo-cert-value">${groomEthnicity}</span>
-            </div>
-            <div class="ghmo-cert-row">
               <span class="ghmo-cert-label">दुलहीको जात/समुदाय:</span>
-              <span class="ghmo-cert-value">${brideEthnicity}</span>
+              <span class="ghmo-cert-value">${brideEthnicityNp}</span>
             </div>
             <p class="ghmo-cert-paragraph">उक्त विवाह:</p>
               <div class="ghmo-cert-row">
@@ -375,7 +424,7 @@ export const weddingCertificate: DocTemplate = {
             </p>
             <p class="ghmo-cert-subheading">सामुदायिक मान्यता (अन्तरजातीय/अन्तरसमुदाय विवाह)</p>
             <p class="ghmo-cert-paragraph">
-              यस अन्तरजातीय/अन्तरसमुदाय विवाहको सन्दर्भमा, Greater Harrisburg Magar Organization (GHMO) ले ${brideEthnicity} समुदायकी दुलहीलाई विवाहपश्चात मगर समुदायमा सम्मानपूर्वक स्वागत तथा सांस्कृतिक मान्यता प्रदान गरिएको प्रमाणित गर्दछ, जुन मगर परम्परा, आपसी सहमति र समुदायिक स्वीकारोक्तिअनुसार सम्पन्न भएको हो।
+              यस अन्तरजातीय/अन्तरसमुदाय विवाहको सन्दर्भमा, Greater Harrisburg Magar Organization (GHMO) ले ${brideEthnicityNp} समुदायकी दुलहीलाई विवाहपश्चात मगर समुदायमा सम्मानपूर्वक स्वागत तथा सांस्कृतिक मान्यता प्रदान गरिएको प्रमाणित गर्दछ, जुन मगर परम्परा, आपसी सहमति र समुदायिक स्वीकारोक्तिअनुसार सम्पन्न भएको हो।
             </p>
             <p class="ghmo-cert-paragraph">
               यो मान्यता मगर समुदायका ‘माईती’ प्रतिनिधि ${maitiRepresentativeName} (${maitiRepresentativeRole}) को
