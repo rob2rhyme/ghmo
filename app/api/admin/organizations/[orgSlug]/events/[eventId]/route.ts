@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID } from "@/src/lib/community";
 import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -42,7 +42,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { orgSlug: s
     }
   });
 
-  const ref = adminDb.collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId);
+  const db = getAdminDb();
+  const ref = db.collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId);
   await ref.set(updates, { merge: true });
   const doc = await ref.get();
   await logAuditEvent({
@@ -67,7 +68,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { orgSlug: 
   if ("response" in guard) return guard.response;
   const { actor } = guard;
 
-  await adminDb.collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId).delete();
+  await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId).delete();
   await logAuditEvent({
     orgSlug: params.orgSlug,
     action: "event_deleted",

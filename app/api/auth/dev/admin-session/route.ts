@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { issueCustomToken, verifyIdToken, type Role } from "@/src/lib/auth";
 import { createSessionResponse } from "@/src/lib/sessionCookies";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
 
-  const snapshot = await adminDb
+  const db = getAdminDb();
+  const snapshot = await db
     .collection(orgAdminsCollectionPath(orgSlug))
     .where("emailLower", "==", emailLower)
     .limit(1)
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   const decoded = await verifyIdToken(idToken);
 
-  await adminDb.doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
+  await db.doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
     {
       lastLoginAt: Timestamp.now(),
       authUid: decoded.uid

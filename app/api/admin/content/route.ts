@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getHomeBlocks, upsertHomeBlocks } from "@/src/lib/community";
+import { getHomeBlocks, upsertHomeBlocks } from "@/src/lib/adminCommunity";
 import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { COMMUNITY_SLUG } from "@/src/lib/community";

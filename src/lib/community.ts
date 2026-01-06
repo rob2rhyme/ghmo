@@ -1,9 +1,6 @@
 import "server-only";
 
 //src/lib/community.ts
-import { adminDb } from "./firebaseAdmin";
-import { orgDocPath, orgHomeBlocksDocPath } from "./firestorePaths";
-import { toPlain } from "./serialize.server";
 import { COMMUNITY_SLUG } from "./community.constants";
 export { COMMUNITY_SLUG };
 
@@ -47,19 +44,5 @@ const DEFAULT_COMMUNITY: Community = {
 };
 
 export async function getCommunity(): Promise<Community> {
-  const orgDoc = await adminDb.doc(orgDocPath(COMMUNITY_SLUG)).get();
-  if (orgDoc.exists) {
-    const data = toPlain(orgDoc.data() || {}) as Omit<Community, "id" | "slug">;
-    return { id: COMMUNITY_ID, slug: COMMUNITY_SLUG, ...data };
-  }
   return DEFAULT_COMMUNITY;
-}
-
-export async function getHomeBlocks() {
-  const doc = await adminDb.doc(orgHomeBlocksDocPath(COMMUNITY_SLUG)).get();
-  return doc.exists ? doc.data()?.blocks || [] : [];
-}
-
-export async function upsertHomeBlocks(blocks: unknown[]) {
-  await adminDb.doc(orgHomeBlocksDocPath(COMMUNITY_SLUG)).set({ blocks }, { merge: true });
 }

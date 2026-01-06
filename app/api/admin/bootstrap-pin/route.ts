@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { hashPin } from "@/src/lib/auth";
 import { logAudit } from "@/src/lib/audit";
 import { normalizeMemberEmail } from "@/src/lib/members";
@@ -10,6 +10,7 @@ import { orgAdminDocPath } from "@/src/lib/firestorePaths";
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.ip || "unknown";
   const bootstrapSecret = process.env.BOOTSTRAP_ADMIN_SECRET;
+  const db = getAdminDb();
 
   if (!bootstrapSecret) {
     return NextResponse.json({ error: "BOOTSTRAP_ADMIN_SECRET not configured" }, { status: 500 });
@@ -38,13 +39,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const bootstrapConfigRef = adminDb.doc(`organizations/${COMMUNITY_SLUG}/config/bootstrap`);
+  const bootstrapConfigRef = db.doc(`organizations/${COMMUNITY_SLUG}/config/bootstrap`);
   const bootstrapConfigSnap = await bootstrapConfigRef.get();
   if (bootstrapConfigSnap.exists) {
     return NextResponse.json({ error: "Bootstrap already completed" }, { status: 409 });
   }
 
-  const activeAdminPins = await adminDb
+  const activeAdminPins = await db
     .collection(`organizations/${COMMUNITY_SLUG}/pins`)
     .where("role", "==", "admin")
     .where("status", "==", "active")
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   const pinHash = await hashPin(pin);
 
-  const pinDoc = await adminDb.collection(`organizations/${COMMUNITY_SLUG}/pins`).add({
+  const pinDoc = await db.collection(`organizations/${COMMUNITY_SLUG}/pins`).add({
     role: "admin",
     label: label || "Bootstrap Admin PIN",
     pinHash,
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   if (!emailLower) {
     return NextResponse.json({ error: "Email is required for admin bootstrap" }, { status: 400 });
   }
-  await adminDb.doc(orgAdminDocPath(COMMUNITY_SLUG, pinDoc.id)).set({
+  await db.doc(orgAdminDocPath(COMMUNITY_SLUG, pinDoc.id)).set({
     name: body.name || label || "Bootstrap Admin",
     email: body.email,
     emailLower,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID } from "@/src/lib/community";
 import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -16,7 +16,8 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
 
-  let query: FirebaseFirestore.Query = adminDb.collection(eventsCollectionPath(COMMUNITY_ID));
+  const db = getAdminDb();
+  let query: FirebaseFirestore.Query = db.collection(eventsCollectionPath(COMMUNITY_ID));
   if (status === "published" || status === "draft") {
     query = query.where("status", "==", status);
   }
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { orgSlug: st
     return NextResponse.json({ error: "Missing title/body" }, { status: 400 });
   }
 
-  const ref = await adminDb.collection(eventsCollectionPath(COMMUNITY_ID)).add(payload);
+  const ref = await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).add(payload);
   const doc = await ref.get();
   await logAuditEvent({
     orgSlug: params.orgSlug,

@@ -1,11 +1,14 @@
 import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { NextRequest } from "next/server";
-import { adminAuth, adminDb } from "./firebaseAdmin";
+import { getAdminAuth, getAdminDb } from "./firebaseAdmin";
 import { logAudit } from "./audit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { orgMembersCollectionPath } from "./firestorePaths";
 import { normalizeMemberEmail } from "./members";
+
+const adminAuth = getAdminAuth();
+const adminDb = getAdminDb();
 
 export type Role = "member" | "admin";
 

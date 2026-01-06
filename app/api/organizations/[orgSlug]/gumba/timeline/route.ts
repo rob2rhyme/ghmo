@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMember, assertCommunityRole } from "@/src/lib/auth";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgTimelineCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlainJson } from "@/src/lib/json";
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const admin = member ? null : await assertCommunityRole("admin");
   if (!member && !admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const snap = await adminDb
+  const snap = await getAdminDb()
     .collection(orgTimelineCollectionPath(params.orgSlug))
     .orderBy("timestamp", "desc")
     .limit(50)

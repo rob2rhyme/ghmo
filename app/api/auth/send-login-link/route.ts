@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, message: genericMessage() });
   }
 
+  const db = getAdminDb();
+
   const body = (await req.json()) as Body;
   const emailRaw = body.email?.trim() || "";
   const emailLower = emailRaw.toLowerCase();
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, message: genericMessage() });
   }
 
-  const memberSnapshot = await adminDb
+  const memberSnapshot = await db
     .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
     .where("emailLower", "==", emailLower)
     .where("status", "==", "active")
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
     .get();
   const fallbackSnapshot =
     memberSnapshot.empty
-      ? await adminDb
+      ? await db
           .collection(`community/${COMMUNITY_ID}/members`)
           .where("emailLower", "==", emailLower)
           .where("status", "==", "active")

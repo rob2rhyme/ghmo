@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const guard = await enforceActiveAdmin(req, params.orgSlug);
   if ("response" in guard) return guard.response;
 
-  const snapshot = await adminDb.collection(orgMembersCollectionPath(COMMUNITY_SLUG)).orderBy("emailLower").get();
+  const snapshot = await getAdminDb().collection(orgMembersCollectionPath(COMMUNITY_SLUG)).orderBy("emailLower").get();
   const members = snapshot.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }));
   return NextResponse.json({ members });
 }
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: { orgSlug: st
   const sanitizedRoles = sanitizeMemberRoles(body.roles);
   const roles = sanitizedRoles.length > 0 ? sanitizedRoles : ["member"];
   const now = new Date();
-  const docRef = adminDb.collection(orgMembersCollectionPath(COMMUNITY_SLUG)).doc();
+  const db = getAdminDb();
+  const docRef = db.collection(orgMembersCollectionPath(COMMUNITY_SLUG)).doc();
   const payload: Record<string, unknown> = {
     email: emailInput,
     emailLower,

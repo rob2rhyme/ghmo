@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMember } from "@/src/lib/auth";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID } from "@/src/lib/community";
 import { ensureOrgSlug, eventsCollectionPath, normalizeEvent } from "@/src/lib/events";
 
@@ -17,7 +17,8 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const rangeStart = searchParams.get("rangeStart");
   const rangeEnd = searchParams.get("rangeEnd");
 
-  let query = adminDb.collection(eventsCollectionPath(params.orgSlug)).where("status", "==", "published");
+  const db = getAdminDb();
+  let query = db.collection(eventsCollectionPath(params.orgSlug)).where("status", "==", "published");
 
   if (rangeStart) {
     query = query.where("startsAt", ">=", new Date(rangeStart));
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const snap = await query.limit(200).get();
   const fallbackSnap =
     snap.empty
-      ? await adminDb
+    ? await db
           .collection(`community/${COMMUNITY_ID}/events`)
           .where("status", "==", "published")
           .orderBy("startsAt", "asc")

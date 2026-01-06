@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/src/lib/rateLimit";
-import { adminDb } from "@/src/lib/firebaseAdmin";
-import { serverEnv } from "@/src/lib/env.server";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
+import { getServerEnv } from "@/src/lib/env.server";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
@@ -17,7 +17,8 @@ function buildAuditMeta(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!serverEnv.FEATURE_EMAIL_ADMIN_LOGIN) {
+  const { FEATURE_EMAIL_ADMIN_LOGIN } = getServerEnv();
+  if (!FEATURE_EMAIL_ADMIN_LOGIN) {
     return NextResponse.json({ error: "Email login disabled" }, { status: 404 });
   }
   const payload = (await req.json()) as { orgSlug?: string; email?: string };
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const snapshot = await adminDb
+  const snapshot = await getAdminDb()
     .collection(orgAdminsCollectionPath(orgSlug))
     .where("emailLower", "==", emailLower)
     .limit(1)

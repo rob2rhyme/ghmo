@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgDocgenCollectionPath } from "@/src/lib/firestorePaths";
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   }
 
   try {
-    const docgenCollection = adminDb.collection(orgDocgenCollectionPath(params.orgSlug));
+    const docgenCollection = getAdminDb().collection(orgDocgenCollectionPath(params.orgSlug));
     const snapshot = await docgenCollection.limit(20).get();
     const templates =
       snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Record<string, unknown>) }));

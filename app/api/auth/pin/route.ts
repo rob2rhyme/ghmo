@@ -3,14 +3,15 @@ import { Timestamp } from "firebase-admin/firestore";
 import { logAuditEvent } from "@/src/lib/audit";
 import { verifyPin, issueCustomToken, logAuthAttempt, loadPinByRole, Role } from "@/src/lib/auth";
 import { checkRateLimit } from "@/src/lib/rateLimit";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminProfile } from "@/src/lib/admin";
 import { orgAdminDocPath } from "@/src/lib/firestorePaths";
-import { serverEnv } from "@/src/lib/env.server";
+import { getServerEnv } from "@/src/lib/env.server";
 
 export async function POST(req: NextRequest) {
-  if (!serverEnv.FEATURE_PIN_LOGIN) {
+  const { FEATURE_PIN_LOGIN } = getServerEnv();
+  if (!FEATURE_PIN_LOGIN) {
     return NextResponse.json({ error: "PIN login disabled" }, { status: 404 });
   }
   const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
   if (!rate.success) {
     return NextResponse.json({ error: "Too many attempts", retryInMs: rate.retryInMs }, { status: 429 });
   }
+
+  const db = getAdminDb();
 
   type PinDoc = {
     id: string;
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
   if (!ok) {
     const failedAttempts = (pinDoc.failedAttempts || 0) + 1;
     const lockedUntil = failedAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
-    await adminDb.doc(`organizations/${COMMUNITY_SLUG}/pins/${pinDoc.id}`).set(
+    await db.doc(`organizations/${COMMUNITY_SLUG}/pins/${pinDoc.id}`).set(
       {
         failedAttempts,
         lockedUntil
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid PIN" }, { status: 401 });
   }
 
-  await adminDb.doc(`organizations/${COMMUNITY_SLUG}/pins/${pinDoc.id}`).set(
+  await db.doc(`organizations/${COMMUNITY_SLUG}/pins/${pinDoc.id}`).set(
     {
       failedAttempts: 0,
       lockedUntil: null,
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Admin not authorized" }, { status: 403 });
   }
 
-  await adminDb.doc(orgAdminDocPath(COMMUNITY_SLUG, pinDoc.id)).set(
+  await db.doc(orgAdminDocPath(COMMUNITY_SLUG, pinDoc.id)).set(
     {
       lastLoginAt: Timestamp.now()
     },

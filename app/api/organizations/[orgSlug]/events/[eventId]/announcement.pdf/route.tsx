@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMember } from "@/src/lib/auth";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { eventsCollectionPath, ensureOrgSlug, normalizeEvent, DEFAULT_TIMEZONE } from "@/src/lib/events";
 import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
@@ -12,11 +12,12 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const member = await assertMember(req);
   if (!member) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const primaryRef = adminDb.collection(eventsCollectionPath(params.orgSlug)).doc(params.eventId);
+  const db = getAdminDb();
+  const primaryRef = db.collection(eventsCollectionPath(params.orgSlug)).doc(params.eventId);
   const primarySnap = await primaryRef.get();
   const fallbackSnap = primarySnap.exists
     ? null
-    : await adminDb.collection(`community/${COMMUNITY_ID}/events`).doc(params.eventId).get();
+    : await db.collection(`community/${COMMUNITY_ID}/events`).doc(params.eventId).get();
   const docSnap = primarySnap.exists ? primarySnap : fallbackSnap;
   if (!docSnap?.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const event = normalizeEvent(docSnap);

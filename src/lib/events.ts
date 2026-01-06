@@ -1,6 +1,5 @@
 import "server-only";
 
-import { adminDb } from "./firebaseAdmin";
 import { COMMUNITY_SLUG } from "./community";
 import { DEFAULT_TIMEZONE, type EventRecord } from "./events.shared";
 import { orgDocPath } from "./firestorePaths";

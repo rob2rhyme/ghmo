@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import { adminDb } from "./firebaseAdmin";
-import { serverEnv } from "./env.server";
+import { getAdminDb } from "./firebaseAdmin";
+import { getServerEnv } from "./env.server";
 import { logAudit } from "./audit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { orgDonationsWebhookEventsCollectionPath, orgDonationsStatsDocPath } from "./firestorePaths";
@@ -13,8 +13,9 @@ type WebhookPayload = {
 };
 
 export function verifyGfmWebhookSignature(rawBody: string, signatureHeader?: string) {
-  if (!signatureHeader || !serverEnv.GOFUNDME_PRO_WEBHOOK_SECRET) return false;
-  const hmac = crypto.createHmac("sha256", serverEnv.GOFUNDME_PRO_WEBHOOK_SECRET);
+  const env = getServerEnv();
+  if (!signatureHeader || !env.GOFUNDME_PRO_WEBHOOK_SECRET) return false;
+  const hmac = crypto.createHmac("sha256", env.GOFUNDME_PRO_WEBHOOK_SECRET);
   hmac.update(rawBody);
   const expected = hmac.digest("hex");
   return signatureHeader === expected;
@@ -22,7 +23,7 @@ export function verifyGfmWebhookSignature(rawBody: string, signatureHeader?: str
 
 export async function recordWebhookEvent(communityId: string, eventId: string, payload: WebhookPayload) {
   const orgSlug = communityId === COMMUNITY_SLUG || communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
-  const ref = adminDb.doc(`${orgDonationsWebhookEventsCollectionPath(orgSlug)}/${eventId}`);
+  const ref = getAdminDb().doc(`${orgDonationsWebhookEventsCollectionPath(orgSlug)}/${eventId}`);
   const existing = await ref.get();
   if (existing.exists) {
     return { duplicate: true };
@@ -37,8 +38,9 @@ export async function recordWebhookEvent(communityId: string, eventId: string, p
 
 export async function applyDonationStatsUpdate(communityId: string, deltaAmount: number, metadata?: Record<string, any>) {
   const orgSlug = communityId === COMMUNITY_SLUG || communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
-  const statsRef = adminDb.doc(orgDonationsStatsDocPath(orgSlug));
-  await adminDb.runTransaction(async tx => {
+  const db = getAdminDb();
+  const statsRef = db.doc(orgDonationsStatsDocPath(orgSlug));
+  await db.runTransaction(async tx => {
     const doc = await tx.get(statsRef);
     const prev = doc.exists ? doc.data() : {};
     const totalRaised = (prev?.totalRaised || 0) + deltaAmount;
@@ -58,7 +60,7 @@ export async function applyDonationStatsUpdate(communityId: string, deltaAmount:
 
 export async function reconcileDonationTotals(communityId: string, totals: { totalRaised: number; goal?: number; donorCount?: number }) {
   const orgSlug = communityId === COMMUNITY_SLUG || communityId === COMMUNITY_ID ? COMMUNITY_SLUG : COMMUNITY_SLUG;
-  const statsRef = adminDb.doc(orgDonationsStatsDocPath(orgSlug));
+  const statsRef = getAdminDb().doc(orgDonationsStatsDocPath(orgSlug));
   await statsRef.set(
     {
       ...totals,
@@ -70,7 +72,8 @@ export async function reconcileDonationTotals(communityId: string, totals: { tot
 }
 
 export async function fetchCampaignTotals() {
-  if (!serverEnv.GOFUNDME_PRO_CLIENT_ID || !serverEnv.GOFUNDME_PRO_CLIENT_SECRET) {
+  const env = getServerEnv();
+  if (!env.GOFUNDME_PRO_CLIENT_ID || !env.GOFUNDME_PRO_CLIENT_SECRET) {
     return null;
   }
   // Placeholder for GoFundMe Pro OAuth exchange + totals fetch. Replace with real API calls.

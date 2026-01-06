@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hashPin } from "@/src/lib/auth";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
@@ -8,7 +8,7 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 export async function GET(req: NextRequest) {
   const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
   if ("response" in guard) return guard.response;
-  const snapshot = await adminDb.collection(`organizations/${COMMUNITY_SLUG}/pins`).get();
+  const snapshot = await getAdminDb().collection(`organizations/${COMMUNITY_SLUG}/pins`).get();
   const pins = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), pinHash: undefined }));
   return NextResponse.json({ pins });
 }
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { pin, role, label } = await req.json();
   if (!pin || !role) return NextResponse.json({ error: "Missing pin or role" }, { status: 400 });
   const pinHash = await hashPin(pin);
-  const ref = adminDb.collection(`organizations/${COMMUNITY_SLUG}/pins`);
+  const ref = getAdminDb().collection(`organizations/${COMMUNITY_SLUG}/pins`);
   const doc = await ref.add({
     role,
     label,

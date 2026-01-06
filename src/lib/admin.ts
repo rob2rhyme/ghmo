@@ -1,7 +1,7 @@
 //src/lib/admin.ts
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
-import { adminDb } from "./firebaseAdmin";
+import { getAdminDb } from "./firebaseAdmin";
 import { AuthContext, getAuthContextFromRequest, SESSION_COOKIE_NAME, SESSION_COOKIE_NAME_FALLBACK } from "./auth";
 import { COMMUNITY_SLUG } from "./community";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "./firestorePaths";
@@ -100,7 +100,7 @@ export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string
   if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "Organization mismatch", "ORGSLUG_MISMATCH");
   const docPath = orgAdminDocPath(orgSlug, ctx.uid);
   console.debug("requireActiveAdmin checking doc", { docPath, uid: ctx.uid });
-  const doc = await adminDb.doc(docPath).get();
+  const doc = await getAdminDb().doc(docPath).get();
   if (!doc || !doc.exists) throw new AdminAccessError(403, "Admin profile not found", "ADMIN_DOC_NOT_FOUND");
   const profile = mapAdminDoc(doc.id, doc.data() as Record<string, unknown>);
   if (profile.status !== "active")
@@ -119,13 +119,16 @@ export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string
 }
 
 export async function getAdminProfile(orgSlug: string, adminId: string) {
-  const doc = await adminDb.doc(orgAdminDocPath(orgSlug, adminId)).get();
+  const doc = await getAdminDb().doc(orgAdminDocPath(orgSlug, adminId)).get();
   if (!doc.exists) return null;
   return mapAdminDoc(doc.id, doc.data() as Record<string, unknown>);
 }
 
 export async function listAdmins(orgSlug: string) {
-  const snapshot = await adminDb.collection(orgAdminsCollectionPath(orgSlug)).orderBy("createdAt", "asc").get();
+  const snapshot = await getAdminDb()
+    .collection(orgAdminsCollectionPath(orgSlug))
+    .orderBy("createdAt", "asc")
+    .get();
   return snapshot.docs.map(doc => mapAdminDoc(doc.id, doc.data() as Record<string, unknown>));
 }
 

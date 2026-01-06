@@ -1,7 +1,6 @@
- "use client";
+"use client";
 
 import Link, { type LinkProps } from "next/link";
-import SignOutButton from "@/src/components/SignOutButton";
 
 type NextLinkProps = LinkProps<string>;
 
@@ -31,7 +30,6 @@ export default function AdminNavControls() {
           );
         })}
       </nav>
-      <SignOutButton />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgMinutesCollectionPath } from "@/src/lib/firestorePaths";
@@ -91,10 +91,11 @@ function sanitizeAttendancePayload(value?: unknown): MeetingAttendance | undefin
 }
 
 async function resolveEventDocument(eventId: string) {
+  const db = getAdminDb();
   const candidates = [
-    adminDb.collection(eventsCollectionPath(COMMUNITY_SLUG)).doc(eventId),
-    adminDb.collection(eventsCollectionPath(COMMUNITY_ID)).doc(eventId),
-    adminDb.collection(`community/${COMMUNITY_ID}/events`).doc(eventId)
+    db.collection(eventsCollectionPath(COMMUNITY_SLUG)).doc(eventId),
+    db.collection(eventsCollectionPath(COMMUNITY_ID)).doc(eventId),
+    db.collection(`community/${COMMUNITY_ID}/events`).doc(eventId)
   ];
   for (const ref of candidates) {
     const snap = await ref.get();
@@ -112,7 +113,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const filterEventId = searchParams.get("eventId");
   const minutesPath = orgMinutesCollectionPath(COMMUNITY_SLUG);
-  let query: FirebaseFirestore.Query = adminDb.collection(minutesPath);
+  const db = getAdminDb();
+  let query: FirebaseFirestore.Query = db.collection(minutesPath);
   if (filterEventId) {
     query = query.where("eventId", "==", filterEventId);
   }
@@ -128,6 +130,7 @@ export async function POST(req: NextRequest) {
   if ("response" in guard) return guard.response;
   const { actor } = guard;
   const payload = await req.json();
+  const db = getAdminDb();
 
   const eventId = typeof payload.eventId === "string" ? payload.eventId.trim() : "";
   if (!eventId) {
@@ -145,7 +148,7 @@ export async function POST(req: NextRequest) {
   }
   const eventData = eventSnap.data() || {};
 
-  const existingSnap = await adminDb
+  const existingSnap = await db
     .collection(orgMinutesCollectionPath(COMMUNITY_SLUG))
     .where("eventId", "==", eventId)
     .limit(1)
@@ -160,7 +163,7 @@ export async function POST(req: NextRequest) {
   const actionItems = sanitizeActionItems(Array.isArray(payload.actionItems) ? payload.actionItems : []);
   const signatures = sanitizeSignatures(payload.signatures);
 
-  const minutesRef = adminDb.collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
+  const minutesRef = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
   const now = new Date();
   const document: Record<string, unknown> = {
     eventId,
@@ -216,6 +219,7 @@ export async function PATCH(req: NextRequest) {
   if ("response" in guard) return guard.response;
   const { actor } = guard;
   const payload = await req.json();
+  const db = getAdminDb();
 
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
   if (!id) {
@@ -226,7 +230,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid meetingType" }, { status: 400 });
   }
 
-  const ref = adminDb.collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).doc(id);
+  const ref = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).doc(id);
   const snap = await ref.get();
   if (!snap.exists) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

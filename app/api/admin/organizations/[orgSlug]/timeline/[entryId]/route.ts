@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgTimelineCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlain } from "@/src/lib/serialize.server";
@@ -21,7 +21,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { orgSlug: s
     return NextResponse.json({ error: "Body must be a string" }, { status: 400 });
   }
 
-  const ref = adminDb.collection(orgTimelineCollectionPath(params.orgSlug)).doc(params.entryId);
+  const db = getAdminDb();
+  const ref = db.collection(orgTimelineCollectionPath(params.orgSlug)).doc(params.entryId);
   const docSnap = await ref.get();
   if (!docSnap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
 

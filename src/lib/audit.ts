@@ -1,5 +1,5 @@
 import { Timestamp } from "firebase-admin/firestore";
-import { adminDb } from "./firebaseAdmin";
+import { getAdminDb } from "./firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { orgAuditLogsCollectionPath } from "./firestorePaths";
 
@@ -81,7 +81,7 @@ export async function logAuditEvent(params: {
   after?: Record<string, unknown>;
   meta?: AuditMeta;
 }) {
-  const ref = adminDb.collection(orgAuditLogsCollectionPath(params.orgSlug));
+  const ref = getAdminDb().collection(orgAuditLogsCollectionPath(params.orgSlug));
   const payload = sanitizeFirestorePayload({
     action: params.action,
     actor: params.actor,

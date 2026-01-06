@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { serverEnv } from "@/src/lib/env.server";
+import { getServerEnv } from "@/src/lib/env.server";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
 import AdminLoginClient from "./AdminLoginClient";
 
@@ -29,11 +29,12 @@ export default async function AdminLoginPage({
     }
   }
 
+  const env = getServerEnv();
   return (
     <AdminLoginClient
       orgSlug={COMMUNITY_SLUG}
-      featureEmailLogin={serverEnv.FEATURE_EMAIL_ADMIN_LOGIN}
-      featurePinLogin={serverEnv.FEATURE_PIN_LOGIN}
+      featureEmailLogin={env.FEATURE_EMAIL_ADMIN_LOGIN}
+      featurePinLogin={env.FEATURE_PIN_LOGIN}
     />
   );
 }

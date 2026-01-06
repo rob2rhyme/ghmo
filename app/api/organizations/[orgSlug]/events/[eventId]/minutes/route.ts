@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { ensureOrgSlug } from "@/src/lib/events";
 import { eventsCollectionPath } from "@/src/lib/events";
 import { COMMUNITY_ID } from "@/src/lib/community";
@@ -9,10 +9,11 @@ import { toPlain } from "@/src/lib/serialize.server";
 export const dynamic = "force-dynamic";
 
 async function findEventDoc(orgSlug: string, eventId: string) {
-  const slugRef = adminDb.collection(eventsCollectionPath(orgSlug)).doc(eventId);
+  const db = getAdminDb();
+  const slugRef = db.collection(eventsCollectionPath(orgSlug)).doc(eventId);
   const slugSnap = await slugRef.get();
   if (slugSnap.exists) return slugSnap;
-  const fallbackRef = adminDb.collection(`community/${COMMUNITY_ID}/events`).doc(eventId);
+  const fallbackRef = db.collection(`community/${COMMUNITY_ID}/events`).doc(eventId);
   const fallbackSnap = await fallbackRef.get();
   if (fallbackSnap.exists) return fallbackSnap;
   return null;
@@ -29,7 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const minutesSnap = await adminDb
+  const db = getAdminDb();
+  const minutesSnap = await db
     .collection(orgMinutesCollectionPath(params.orgSlug))
     .where("eventId", "==", params.eventId)
     .limit(1)

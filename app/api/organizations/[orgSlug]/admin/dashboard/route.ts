@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { toPlain } from "@/src/lib/serialize.server";
 import {
@@ -33,8 +33,9 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
   const warnings: string[] = [];
 
   let stats: Record<string, any> = { totalRaised: 0, goal: 0, donorCount: 0 };
+  const db = getAdminDb();
   try {
-    const statsSnap = await adminDb.doc(statsPath).get();
+    const statsSnap = await db.doc(statsPath).get();
     stats = statsSnap.exists ? statsSnap.data() || stats : stats;
   } catch (err) {
     warnings.push(`stats: ${err instanceof Error ? err.message : String(err)}`);
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
 
   let webhookEvents: any[] = [];
   try {
-    const webhookSnap = await adminDb.collection(webhookPath).orderBy("receivedAt", "desc").limit(5).get();
+    const webhookSnap = await db.collection(webhookPath).orderBy("receivedAt", "desc").limit(5).get();
     webhookEvents = webhookSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {
     warnings.push(`webhookEvents: ${err instanceof Error ? err.message : String(err)}`);
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
 
   let auditLogs: any[] = [];
   try {
-    const auditSnap = await adminDb.collection(auditPath).orderBy("createdAt", "desc").limit(10).get();
+    const auditSnap = await db.collection(auditPath).orderBy("createdAt", "desc").limit(10).get();
     const source = auditSnap.docs;
     auditLogs = source.map(doc => {
       const data = doc.data() as Record<string, any>;
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
 
   let blocks: any[] = [];
   try {
-    const contentBlocksDoc = await adminDb.doc(homeBlocksPath).get();
+    const contentBlocksDoc = await db.doc(homeBlocksPath).get();
     if (contentBlocksDoc.exists) {
       blocks = contentBlocksDoc.data()?.blocks || [];
     } else {
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest, { params }: { params: { orgSlug: str
 
   let minutes: any[] = [];
   try {
-    const minutesSnap = await adminDb
+    const minutesSnap = await db
       .collection(orgMinutesCollectionPath(orgSlug))
       .orderBy("eventDate", "desc")
       .limit(50)

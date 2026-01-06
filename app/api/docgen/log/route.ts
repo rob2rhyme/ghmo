@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { logAudit } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgDocgenGenerationsCollectionPath } from "@/src/lib/firestorePaths";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const actorUid = actor.uid;
   const actorRole = actor.roles[0] ?? "admin";
-  const ref = adminDb.collection(orgDocgenGenerationsCollectionPath(COMMUNITY_SLUG));
+  const ref = getAdminDb().collection(orgDocgenGenerationsCollectionPath(COMMUNITY_SLUG));
   const doc = await ref.add({
     templateId,
     inputs,

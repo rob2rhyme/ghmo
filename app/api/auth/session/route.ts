@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { verifyIdToken, SESSION_COOKIE_NAME, SESSION_COOKIE_NAME_FALLBACK } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { requireActiveAdmin } from "@/src/lib/admin";
 import { orgAdminDocPath } from "@/src/lib/firestorePaths";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -23,7 +23,8 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
-    await adminDb.doc(orgAdminDocPath(COMMUNITY_SLUG, admin.id)).set(
+    const db = getAdminDb();
+    await db.doc(orgAdminDocPath(COMMUNITY_SLUG, admin.id)).set(
       {
         lastLogoutAt: Timestamp.now()
       },

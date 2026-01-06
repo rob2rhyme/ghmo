@@ -1,9 +1,13 @@
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgDocumentsCollectionPath } from "@/src/lib/firestorePaths";
 
-const documentsCollection = adminDb.collection(orgDocumentsCollectionPath(COMMUNITY_SLUG));
+const documentsCollectionPath = orgDocumentsCollectionPath(COMMUNITY_SLUG);
+
+function getDocumentsCollection() {
+  return getAdminDb().collection(documentsCollectionPath);
+}
 
 function toDate(value: unknown): Date | undefined {
   if (!value) return undefined;
@@ -55,10 +59,10 @@ export async function createDocument(payload: CreateDocumentInput) {
 
   let docRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
   if (payload.docId) {
-    docRef = documentsCollection.doc(payload.docId);
+    docRef = getDocumentsCollection().doc(payload.docId);
     await docRef.set(documentData, { merge: true });
   } else {
-    docRef = await documentsCollection.add(documentData);
+    docRef = await getDocumentsCollection().add(documentData);
   }
 
   const snapshot = await docRef.get();
@@ -66,12 +70,12 @@ export async function createDocument(payload: CreateDocumentInput) {
 }
 
 export async function listDocuments() {
-  const snapshot = await documentsCollection.orderBy("createdAt", "desc").limit(100).get();
+  const snapshot = await getDocumentsCollection().orderBy("createdAt", "desc").limit(100).get();
   return snapshot.docs.map(mapDocRecord);
 }
 
 export async function getDocument(docId: string) {
-  const snapshot = await documentsCollection.doc(docId).get();
+  const snapshot = await getDocumentsCollection().doc(docId).get();
   if (!snapshot.exists) {
     return null;
   }

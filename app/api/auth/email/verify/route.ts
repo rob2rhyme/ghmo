@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { issueCustomToken, verifyIdToken } from "@/src/lib/auth";
-import { serverEnv } from "@/src/lib/env.server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getServerEnv } from "@/src/lib/env.server";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -18,7 +18,8 @@ function buildAuditMeta(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!serverEnv.FEATURE_EMAIL_ADMIN_LOGIN) {
+  const { FEATURE_EMAIL_ADMIN_LOGIN } = getServerEnv();
+  if (!FEATURE_EMAIL_ADMIN_LOGIN) {
     return NextResponse.json({ error: "Email login disabled" }, { status: 404 });
   }
   const body = (await req.json()) as {
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing oobCode" }, { status: 400 });
   }
 
-  const snapshot = await adminDb
+  const snapshot = await getAdminDb()
     .collection(orgAdminsCollectionPath(orgSlug))
     .where("emailLower", "==", emailLower)
     .limit(1)
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
   if (!idToken) return NextResponse.json({ error: "Invalid token" }, { status: 500 });
 
   const decoded = await verifyIdToken(idToken);
-  await adminDb.doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
+  await getAdminDb().doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
     {
       lastLoginAt: Timestamp.now(),
       authUid: adminDoc.id

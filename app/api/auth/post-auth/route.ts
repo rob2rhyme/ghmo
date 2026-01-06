@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminAuth, getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail, normalizeMemberName } from "@/src/lib/members";
@@ -9,11 +9,12 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ ok: false });
 
   try {
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = await getAdminAuth().verifyIdToken(token);
     const emailLower = normalizeMemberEmail(decoded.email);
     if (!emailLower) return NextResponse.json({ ok: false });
 
-    const memberSnapshot = await adminDb
+    const db = getAdminDb();
+    const memberSnapshot = await db
       .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
       .where("emailLower", "==", emailLower)
       .where("status", "==", "active")

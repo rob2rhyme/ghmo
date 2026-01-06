@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { orgSlug: s
   const { memberId } = params;
   if (!memberId) return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
 
-  const memberRef = adminDb.doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${memberId}`);
+  const memberRef = getAdminDb().doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${memberId}`);
   const snapshot = await memberRef.get();
   if (!snapshot.exists) return NextResponse.json({ error: "Member not found" }, { status: 404 });
 

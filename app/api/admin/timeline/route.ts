@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
@@ -9,7 +9,7 @@ import { toPlain } from "@/src/lib/serialize.server";
 export async function GET(req: NextRequest) {
   const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
   if ("response" in guard) return guard.response;
-  const primarySnap = await adminDb
+  const primarySnap = await getAdminDb()
     .collection(orgTimelineCollectionPath(COMMUNITY_SLUG))
     .orderBy("timestamp", "desc")
     .limit(100)
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if ("response" in guard) return guard.response;
   const { actor } = guard;
   const data = await req.json();
-  const ref = adminDb.collection(orgTimelineCollectionPath(COMMUNITY_SLUG));
+  const ref = getAdminDb().collection(orgTimelineCollectionPath(COMMUNITY_SLUG));
   const doc = await ref.add({
     title: data.title,
     body: data.body,
@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (title !== undefined && !title.trim()) return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });
 
-  const ref = adminDb.collection(orgTimelineCollectionPath(COMMUNITY_SLUG)).doc(id);
+  const ref = getAdminDb().collection(orgTimelineCollectionPath(COMMUNITY_SLUG)).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const beforeData = snap.data() || {};
