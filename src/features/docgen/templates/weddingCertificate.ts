@@ -86,6 +86,7 @@ export const weddingCertificate: DocTemplate = {
         { label: "Joint Treasurer / सह–कोषाध्यक्ष", value: "Joint Treasurer|सह–कोषाध्यक्ष" },
         { label: "Chief Advisor / मुख्य सल्लाहकार", value: "Chief Advisor|मुख्य सल्लाहकार" },
         { label: "Advisor / सल्लाहकार", value: "Advisor|सल्लाहकार" },
+        { label: "General Member / साधारण सदस्य", value: "General Member|साधारण सदस्य" },
         { label: "Executive Member / कार्यसमिति सदस्य", value: "Executive Member|कार्यसमिति सदस्य" },
         { label: "Board Member / बोर्ड सदस्य", value: "Board Member|बोर्ड सदस्य" },
         { label: "Program Coordinator / कार्यक्रम संयोजक", value: "Program Coordinator|कार्यक्रम संयोजक" },
@@ -168,11 +169,15 @@ export const weddingCertificate: DocTemplate = {
     const officialSeal = escapeHtml(inputs.officialSeal) || emptyLine;
     const witness1Name = escapeHtml(inputs.witness1Name) || emptyLine;
     const witness1Signature = escapeHtml(inputs.witness1Signature) || emptyLine;
+    const witness1SignatureImage = escapeHtml(inputs.witness1SignatureImage);
     const witness2Name = escapeHtml(inputs.witness2Name) || emptyLine;
     const witness2Signature = escapeHtml(inputs.witness2Signature) || emptyLine;
+    const witness2SignatureImage = escapeHtml(inputs.witness2SignatureImage);
     const officiantName = escapeHtml(inputs.officiantName) || emptyLine;
     const officiantTitle = escapeHtml(inputs.officiantTitle) || emptyLine;
     const officiantSignature = escapeHtml(inputs.officiantSignature) || emptyLine;
+    const officiantSignatureImage = escapeHtml(inputs.officiantSignatureImage);
+    const issuingAuthoritySignatureImage = escapeHtml(inputs.issuingAuthoritySignatureImage);
     const optionalVowsEnabled = inputs.optionalVowsEnabled !== "false";
     const customBlessing = escapeHtml(inputs.customBlessing).trim();
     const customBlessingHtml = customBlessing ? customBlessing.replace(/\n/g, "<br />") : "";
@@ -214,6 +219,18 @@ export const weddingCertificate: DocTemplate = {
       maitiRoleEn = maitiRoleOther.trim();
       maitiRoleNp = maitiRoleOther.trim();
     }
+    const witness1SignatureContent = witness1SignatureImage
+      ? `<img class="ghmo-cert-signature-image" src="${witness1SignatureImage}" alt="Witness 1 signature" />`
+      : witness1Signature;
+    const witness2SignatureContent = witness2SignatureImage
+      ? `<img class="ghmo-cert-signature-image" src="${witness2SignatureImage}" alt="Witness 2 signature" />`
+      : witness2Signature;
+    const officiantSignatureContent = officiantSignatureImage
+      ? `<img class="ghmo-cert-signature-image" src="${officiantSignatureImage}" alt="Officiant signature" />`
+      : officiantSignature;
+    const issuingAuthoritySealContent = issuingAuthoritySignatureImage
+      ? `<img class="ghmo-cert-signature-image" src="${issuingAuthoritySignatureImage}" alt="Issuing authority seal" />`
+      : officialSeal;
 
     return `
       <div class="doc-page">
@@ -323,6 +340,12 @@ export const weddingCertificate: DocTemplate = {
             border-bottom: 1px solid #3e4c59;
             min-height: 1.2rem;
             padding-bottom: 0.15rem;
+          }
+          .ghmo-cert-signature-image {
+            display: block;
+            max-height: 1.6rem;
+            max-width: 100%;
+            object-fit: contain;
           }
           .page-break {
             break-before: page;
@@ -525,18 +548,18 @@ export const weddingCertificate: DocTemplate = {
               <div class="ghmo-cert-signature-grid">
                 <div class="ghmo-cert-signature-block">
                   <p class="ghmo-cert-paragraph"><strong>1.</strong> Name / नाम:</p>
-                  <div class="ghmo-cert-line">${witness1Name}</div>
-                  <p class="ghmo-cert-paragraph" style="margin-top:0.6rem;">Signature / हस्ताक्षर:</p>
-                  <div class="ghmo-cert-line">${witness1Signature}</div>
-                </div>
-                <div class="ghmo-cert-signature-block">
-                  <p class="ghmo-cert-paragraph"><strong>2.</strong> Name / नाम:</p>
-                  <div class="ghmo-cert-line">${witness2Name}</div>
-                  <p class="ghmo-cert-paragraph" style="margin-top:0.6rem;">Signature / हस्ताक्षर:</p>
-                  <div class="ghmo-cert-line">${witness2Signature}</div>
-                </div>
+                <div class="ghmo-cert-line">${witness1Name}</div>
+                <p class="ghmo-cert-paragraph" style="margin-top:0.6rem;">Signature / हस्ताक्षर:</p>
+                <div class="ghmo-cert-line">${witness1SignatureContent}</div>
               </div>
-            </section>
+              <div class="ghmo-cert-signature-block">
+                <p class="ghmo-cert-paragraph"><strong>2.</strong> Name / नाम:</p>
+                <div class="ghmo-cert-line">${witness2Name}</div>
+                <p class="ghmo-cert-paragraph" style="margin-top:0.6rem;">Signature / हस्ताक्षर:</p>
+                <div class="ghmo-cert-line">${witness2SignatureContent}</div>
+              </div>
+            </div>
+          </section>
 
             <section class="ghmo-cert-section avoid-break">
               <p class="ghmo-cert-heading">Officiant / Cultural Authority</p>
@@ -549,11 +572,11 @@ export const weddingCertificate: DocTemplate = {
                 <span class="ghmo-cert-label">Title / पद (जेष्ठ, अगुवा, पुजारी):</span>
                 <span class="ghmo-cert-value">${officiantTitle}</span>
               </div>
-              <div class="ghmo-cert-row">
-                <span class="ghmo-cert-label">Signature / हस्ताक्षर:</span>
-                <span class="ghmo-cert-value">${officiantSignature}</span>
-              </div>
-            </section>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">Signature / हस्ताक्षर:</span>
+              <span class="ghmo-cert-value">${officiantSignatureContent}</span>
+            </div>
+          </section>
 
             <section class="ghmo-cert-section avoid-break">
               <p class="ghmo-cert-heading">Issuing Authority</p>
@@ -562,10 +585,10 @@ export const weddingCertificate: DocTemplate = {
                 <span class="ghmo-cert-label">Issued by / जारीकर्ता:</span>
                 <span class="ghmo-cert-value">${issuingAuthority}</span>
               </div>
-              <div class="ghmo-cert-row">
-                <span class="ghmo-cert-label">Official Seal / Stamp:</span>
-                <span class="ghmo-cert-value">${officialSeal}</span>
-              </div>
+            <div class="ghmo-cert-row">
+              <span class="ghmo-cert-label">Official Seal / Stamp:</span>
+              <span class="ghmo-cert-value">${issuingAuthoritySealContent}</span>
+            </div>
               <div class="ghmo-cert-row">
                 <span class="ghmo-cert-label">Date of Issue / जारी मिति:</span>
                 <span class="ghmo-cert-value">${issueDate}</span>

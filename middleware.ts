@@ -6,6 +6,7 @@ export function middleware(req: NextRequest) {
 
   if (
     pathname === "/admin/login" ||
+    pathname.startsWith("/admin/docgen/sign") ||
     pathname === "/favicon.ico" ||
     pathname.startsWith("/.well-known") ||
     pathname.startsWith("/api") ||

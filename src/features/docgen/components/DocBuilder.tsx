@@ -2,7 +2,7 @@
 
 import { jsPDF } from "jspdf";
 import * as htmlToImage from "html-to-image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DocForm from "./DocForm";
 import DocPreview from "./DocPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "./LetterheadPage";
@@ -18,8 +18,23 @@ type DocBuilderProps = {
 };
 
 type ExportFormat = "pdf" | "jpeg";
+type SignatureRole = "witness1" | "witness2" | "officiant" | "issuingAuthority";
+
+type SignatureSession = {
+  role: SignatureRole;
+  sessionId: string;
+  status: "pending" | "signed" | "expired" | "finalized" | "cancelled";
+  signUrl: string;
+  expiresAt?: string;
+};
 
 const PIXEL_RATIO = 2;
+const SIGNATURE_ROLES: Array<{ role: SignatureRole; label: string; inputKey: string }> = [
+  { role: "witness1", label: "Witness 1", inputKey: "witness1SignatureImage" },
+  { role: "witness2", label: "Witness 2", inputKey: "witness2SignatureImage" },
+  { role: "officiant", label: "Officiant", inputKey: "officiantSignatureImage" },
+  { role: "issuingAuthority", label: "Issuing Authority", inputKey: "issuingAuthoritySignatureImage" }
+];
 
 export default function DocBuilder({
   templatesMeta,
@@ -37,8 +52,22 @@ export default function DocBuilder({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [letterheadReady, setLetterheadReady] = useState(false);
+  const [signatureSessions, setSignatureSessions] = useState<Record<SignatureRole, SignatureSession | undefined>>({
+    witness1: undefined,
+    witness2: undefined,
+    officiant: undefined,
+    issuingAuthority: undefined
+  });
+  const [signatureImages, setSignatureImages] = useState<Record<SignatureRole, string | undefined>>({
+    witness1: undefined,
+    witness2: undefined,
+    officiant: undefined,
+    issuingAuthority: undefined
+  });
+  const [activeQrRole, setActiveQrRole] = useState<SignatureRole | null>(null);
 
   const selectedTemplateMeta = useMemo(
     () => templatesMeta.find(meta => meta.id === selectedTemplateId),
@@ -46,6 +75,14 @@ export default function DocBuilder({
   );
   const selectedTemplate = useMemo(() => getTemplateById(selectedTemplateId), [selectedTemplateId]);
   const currentInputs = inputsByTemplate[selectedTemplateId] ?? {};
+  const previewInputs = useMemo(() => {
+    const signatureOverrides: Record<string, string> = {};
+    SIGNATURE_ROLES.forEach(({ role, inputKey }) => {
+      const dataUrl = signatureImages[role];
+      if (dataUrl) signatureOverrides[inputKey] = dataUrl;
+    });
+    return { ...currentInputs, ...signatureOverrides };
+  }, [currentInputs, signatureImages]);
 
   const handleFieldChange = (fieldId: string, value: string) => {
     setInputsByTemplate(prev => ({
@@ -60,6 +97,73 @@ export default function DocBuilder({
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId);
   };
+
+  useEffect(() => {
+    setSignatureSessions({
+      witness1: undefined,
+      witness2: undefined,
+      officiant: undefined,
+      issuingAuthority: undefined
+    });
+    setSignatureImages({
+      witness1: undefined,
+      witness2: undefined,
+      officiant: undefined,
+      issuingAuthority: undefined
+    });
+    setActiveQrRole(null);
+  }, [selectedTemplateId]);
+
+  useEffect(() => {
+    const pendingSessions = Object.values(signatureSessions).filter(
+      session => session && session.status === "pending"
+    ) as SignatureSession[];
+    if (pendingSessions.length === 0) return undefined;
+
+    let cancelled = false;
+    const poll = async () => {
+      await Promise.all(
+        pendingSessions.map(async session => {
+          try {
+            const response = await fetch(`/api/admin/signing-sessions/${session.sessionId}`);
+            if (!response.ok) return;
+            const payload = await response.json();
+            if (cancelled) return;
+            setSignatureSessions(prev => ({
+              ...prev,
+              [session.role]: {
+                ...session,
+                status: payload.status ?? session.status,
+                expiresAt: payload.expiresAt ?? session.expiresAt
+              }
+            }));
+            if (payload.status === "signed" && !signatureImages[session.role]) {
+              const signedResponse = await fetch(
+                `/api/admin/signing-sessions/${session.sessionId}?includeSignature=1`
+              );
+              if (!signedResponse.ok) return;
+              const signedPayload = await signedResponse.json();
+              if (signedPayload.signatureDataUrl) {
+                setSignatureImages(prev => ({
+                  ...prev,
+                  [session.role]: signedPayload.signatureDataUrl as string
+                }));
+              }
+            }
+          } catch (error) {
+            console.error("Failed to poll signing session", error);
+          }
+        })
+      );
+    };
+
+    const interval = window.setInterval(poll, 4000);
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [signatureSessions, signatureImages]);
 
   const handleExport = async (format: ExportFormat) => {
     if (!previewRef.current || !selectedTemplate || !selectedTemplateMeta || !letterheadReady) return;
@@ -134,7 +238,111 @@ export default function DocBuilder({
     }
   };
 
+  const handleRequestSignature = async (role: SignatureRole) => {
+    if (!selectedTemplateMeta) return;
+    setStatusMessage("Creating signing session...");
+    try {
+      const certificateId =
+        currentInputs.certificateNumber || currentInputs.certificateId || selectedTemplateMeta.id;
+      const response = await fetch("/api/admin/signing-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, certificateId })
+      });
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.error ?? `Unexpected response (${response.status})`);
+      }
+      const payload = await response.json();
+      const session: SignatureSession = {
+        role,
+        sessionId: payload.sessionId,
+        status: "pending",
+        signUrl: payload.signUrl,
+        expiresAt: payload.expiresAt
+      };
+      setSignatureSessions(prev => ({ ...prev, [role]: session }));
+      setSignatureImages(prev => ({ ...prev, [role]: undefined }));
+      setActiveQrRole(role);
+      setStatusMessage("Signature session created");
+    } catch (error) {
+      console.error("Failed to create signing session", error);
+      setStatusMessage(error instanceof Error ? error.message : "Failed to create signing session");
+    }
+  };
+
+  const handleFinalizeSigned = async () => {
+    if (!previewRef.current || !selectedTemplateMeta || !letterheadReady) return;
+    const signedSessions = Object.values(signatureSessions).filter(
+      session => session && session.status === "signed"
+    ) as SignatureSession[];
+    if (signedSessions.length === 0) {
+      setStatusMessage("No signed sessions to finalize yet");
+      return;
+    }
+    setIsFinalizing(true);
+    setStatusMessage("Finalizing signed certificate...");
+    try {
+      const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
+      const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
+      const dataUrl = await htmlToImage.toPng(previewRef.current, {
+        width: exportWidth,
+        height: exportHeight,
+        pixelRatio: PIXEL_RATIO,
+        backgroundColor: "#ffffff"
+      });
+      const signatureMap = signedSessions.reduce<Record<string, string>>((acc, session) => {
+        acc[session.role] = session.sessionId;
+        return acc;
+      }, {});
+      const response = await fetch(
+        `/api/admin/signing-sessions/${signedSessions[0].sessionId}/finalize`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            certificatePayload: {
+              templateId: selectedTemplateMeta.id,
+              templateTitle: selectedTemplateMeta.title,
+              category: selectedTemplateMeta.category,
+              inputs: currentInputs,
+              certificateId: currentInputs.certificateNumber || "",
+              pngDataUrl: dataUrl
+            },
+            signatures: signatureMap
+          })
+        }
+      );
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload?.error ?? `Unexpected response (${response.status})`);
+      }
+      const payload = await response.json();
+      setStatusMessage(payload?.documentId ? `Signed PDF saved (ID: ${payload.documentId})` : "Signed PDF saved");
+      setSignatureSessions({
+        witness1: undefined,
+        witness2: undefined,
+        officiant: undefined,
+        issuingAuthority: undefined
+      });
+      setSignatureImages({
+        witness1: undefined,
+        witness2: undefined,
+        officiant: undefined,
+        issuingAuthority: undefined
+      });
+      setActiveQrRole(null);
+    } catch (error) {
+      console.error("Failed to finalize signed certificate", error);
+      setStatusMessage(error instanceof Error ? error.message : "Failed to finalize signed certificate");
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
   const statusColor = statusMessage?.toLowerCase().includes("failed") ? "text-rose-600" : "text-slate-500";
+  const signatureEnabled = selectedTemplateId === "wedding-certificate";
+  const activeSession = activeQrRole ? signatureSessions[activeQrRole] : undefined;
 
   return (
     <section className="space-y-6">
@@ -172,7 +380,7 @@ export default function DocBuilder({
               {selectedTemplate ? (
                 <DocPreview
                   template={selectedTemplate}
-                  inputs={currentInputs}
+                  inputs={previewInputs}
                   ref={previewRef}
                   onBackgroundLoad={() => setLetterheadReady(true)}
                 />
@@ -209,12 +417,134 @@ export default function DocBuilder({
                 >
                   Save to Gallery
                 </button>
+                {signatureEnabled ? (
+                  <button
+                    type="button"
+                    onClick={handleFinalizeSigned}
+                    disabled={!selectedTemplate || isFinalizing || !letterheadReady}
+                    className="rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                  >
+                    Finalize & Save Signed Certificate
+                  </button>
+                ) : null}
               </div>
               {statusMessage ? <p className={`text-xs ${statusColor}`}>{statusMessage}</p> : null}
+              {signatureEnabled ? (
+                <div className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-inner">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Signature Requests
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {SIGNATURE_ROLES.map(({ role, label }) => {
+                      const session = signatureSessions[role];
+                      const status = session?.status ?? "idle";
+                      const isSigned = status === "signed";
+                      return (
+                        <div
+                          key={role}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-700">{label}</p>
+                            <p className="text-[0.7rem] text-slate-400">
+                              {status === "idle"
+                                ? "No session created"
+                                : status === "pending"
+                                ? "Awaiting signature"
+                                : status === "signed"
+                                ? "Signed"
+                                : status === "expired"
+                                ? "Expired"
+                                : status}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleRequestSignature(role)}
+                              className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
+                            >
+                              {status === "idle" ? "Request" : "Re-request"}
+                            </button>
+                            {session?.signUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => setActiveQrRole(role)}
+                                className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
+                              >
+                                View QR
+                              </button>
+                            ) : null}
+                            {isSigned ? (
+                              <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+                                Ready
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
       </div>
+      {activeSession ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Signature link</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {SIGNATURE_ROLES.find(role => role.role === activeSession.role)?.label}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveQrRole(null)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                  activeSession.signUrl
+                )}`}
+                alt="QR code for signing link"
+                className="h-48 w-48 rounded-lg border border-slate-200 bg-white p-2"
+              />
+              <p className="text-xs text-slate-500">Scan on phone to sign</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Direct link</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                {activeSession.signUrl}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(activeSession.signUrl);
+                    setStatusMessage("Signing link copied");
+                  } catch (error) {
+                    console.error("Failed to copy link", error);
+                    setStatusMessage("Unable to copy link");
+                  }
+                }}
+                className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary"
+              >
+                Copy link
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
