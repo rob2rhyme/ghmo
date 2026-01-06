@@ -36,7 +36,19 @@ export async function POST(req: NextRequest) {
         createdByUid: actor.uid,
         createdByEmail: actor.email ?? null
       });
-    const signUrl = `${req.nextUrl.origin}/admin/docgen/sign/${sessionId}`;
+    const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_PUBLIC_URL || "";
+    let baseUrl = envBaseUrl.trim().replace(/\/+$/, "");
+    if (!baseUrl) {
+      const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+      const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
+      baseUrl = `${proto}://${host}`;
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "NEXT_PUBLIC_APP_URL is not set. Signing links may not work on mobile during local dev."
+        );
+      }
+    }
+    const signUrl = `${baseUrl}/admin/docgen/sign/${sessionId}`;
     return NextResponse.json({
       sessionId,
       signUrl,
