@@ -1,6 +1,7 @@
 //src/components/community/CommunityHeader.tsx
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import ThemeToggle from "@/src/components/ThemeToggle";
 import SignOutButton from "@/src/components/SignOutButton";
@@ -17,8 +18,25 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
   return (
     <header className="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-lg font-semibold text-primary">
-          {label}
+        <Link href="/" className="flex items-center gap-3 text-primary">
+          <Image
+            src="/assets/logo-light.png"
+            alt="GHMO Logo"
+            width={36}
+            height={36}
+            className="h-8 w-auto dark:hidden"
+            priority
+          />
+          <Image
+            src="/assets/logo-dark.png"
+            alt="GHMO Logo"
+            width={36}
+            height={36}
+            className="hidden h-8 w-auto dark:block"
+            priority
+          />
+          <span className="hidden text-lg font-semibold md:inline">{label}</span>
+          <span className="sr-only">Greater Harrisburg Magar Organization</span>
         </Link>
         <nav className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-200">
           <Link href="/">Home</Link>
