@@ -33,7 +33,7 @@ export function MediaSection({ title, feed }: Props) {
       {hasCards ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {feed.items.map(item => (
-            <article key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800">
+            <article key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800 md:p-4">
               {item.thumbnail ? (
                 <img src={item.thumbnail} alt={item.title} className="mb-3 h-40 w-full rounded-md object-cover" />
               ) : null}

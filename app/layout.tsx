@@ -25,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers>
           <GoFundMeProInstallSnippet enabled={community.gofundmePro?.enabled} installSnippet={installSnippet} />
           <CommunityHeader name={community.name} />
-          <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+          <main className="mx-auto max-w-6xl px-2.5 py-3 md:px-6 md:py-8">{children}</main>
         </Providers>
       </body>
     </html>

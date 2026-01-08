@@ -4,7 +4,7 @@ type Props = {
 
 export function GoFundMeProDonationEmbed({ campaignId }: Props) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm md:p-4">
       <div
         className="gfm-embed"
         data-campaign-id={campaignId}
