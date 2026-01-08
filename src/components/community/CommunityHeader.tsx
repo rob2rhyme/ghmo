@@ -38,10 +38,12 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
           <span className="hidden text-lg font-semibold md:inline">{label}</span>
           <span className="sr-only">Greater Harrisburg Magar Organization</span>
         </Link>
-        <nav className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-200">
-          <Link href="/">Home</Link>
-          <Link href="/donate">Donate</Link>
-          <Link href="/multimedia">Multimedia</Link>
+        <nav className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-200 md:hidden">
+          <div className="hidden">
+            <Link href="/">Home</Link>
+            <Link href="/donate">Donate</Link>
+            <Link href="/multimedia">Multimedia</Link>
+          </div>
           <Link href="/admin" className="font-semibold text-primary">
             Admin
           </Link>
