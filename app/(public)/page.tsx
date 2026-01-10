@@ -8,7 +8,7 @@ import MultimediaHomeContent from "@/src/components/Multimedia/MultimediaHomeCon
 export default async function CommunityLanding() {
   const community = await getCommunity();
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-5xl flex-col items-center justify-center gap-6 px-6 py-12 text-center">
+    <main className="mx-auto flex min-h-[70vh] max-w-5xl flex-col items-center justify-center gap-6 px-1 py-12 text-center md:px-6">
       <div className="inline-flex items-center justify-center">
         <ThemeLogo />
       </div>

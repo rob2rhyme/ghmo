@@ -11,6 +11,8 @@ export default async function DonatePage() {
   const community = await getCommunity();
   let totalRaised = 0;
   let goal: number | null | undefined;
+  let donorCount: number | null | undefined;
+  let endAt: number | string | Date | null | undefined;
   let statsWarning: string | null = null;
 
   try {
@@ -21,14 +23,32 @@ export default async function DonatePage() {
       statsWarning = "Donation totals are temporarily unavailable.";
     } else {
       const { stats } = (await statsRes.json()) as {
-        stats: { totalRaised?: number; goal?: number | null };
+        stats: {
+          totalRaised?: number;
+          goal?: number | null;
+          donorCount?: number | null;
+          endAt?: number | string | Date | null;
+        };
       };
       totalRaised = stats?.totalRaised ?? 0;
       goal = stats?.goal;
+      donorCount = stats?.donorCount;
+      endAt = stats?.endAt ?? null;
     }
   } catch {
     statsWarning = "Donation totals are temporarily unavailable.";
   }
+
+  const currencyFormatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0
+  });
+  const numberFormatter = new Intl.NumberFormat("en-US");
+
+  const goalLabel = goal != null ? currencyFormatter.format(goal) : "—";
+  const donorsLabel = donorCount != null ? numberFormatter.format(donorCount) : "—";
+  const timeLeftLabel = formatTimeLeft(endAt);
 
   const campaigns = community.gofundmePro?.campaignIds || [];
   const GOFUNDME_PUBLIC_URL =
@@ -83,15 +103,32 @@ export default async function DonatePage() {
             </p>
           </div>
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:mt-6 sm:p-5">
-            <p className="text-sm font-medium text-slate-600">Total Raised</p>
-            <div className="mt-2 text-3xl font-bold text-primary">
-              ${totalRaised.toLocaleString()}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Raised</p>
+                <p className="mt-2 text-2xl font-semibold text-primary">
+                  {currencyFormatter.format(totalRaised)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Goal</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {goalLabel}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Donors</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {donorsLabel}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Time Left</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {timeLeftLabel}
+                </p>
+              </div>
             </div>
-            {goal ? (
-              <p className="text-sm text-slate-500">
-                Goal ${goal.toLocaleString()}
-              </p>
-            ) : null}
             {statsWarning ? (
               <p className="mt-2 text-xs text-amber-700">{statsWarning}</p>
             ) : null}
@@ -217,4 +254,27 @@ export default async function DonatePage() {
       </div>
     </main>
   );
+}
+
+function formatTimeLeft(value?: number | string | Date | null) {
+  if (!value) return "Ongoing";
+  let timestamp: number | null = null;
+  if (value instanceof Date) {
+    timestamp = value.getTime();
+  } else if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    timestamp = Number.isNaN(parsed) ? null : parsed;
+  } else if (typeof value === "number") {
+    timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
+  }
+  if (!timestamp) return "Ongoing";
+  const diffMs = timestamp - Date.now();
+  if (diffMs <= 0) return "Ended";
+  const totalMinutes = Math.ceil(diffMs / (1000 * 60));
+  const totalHours = Math.floor(totalMinutes / 60);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days > 0) return `${days}d${hours ? ` ${hours}h` : ""}`;
+  if (hours > 0) return `${hours}h`;
+  return `${totalMinutes}m`;
 }

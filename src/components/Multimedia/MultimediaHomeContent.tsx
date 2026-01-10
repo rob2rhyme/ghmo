@@ -1,15 +1,33 @@
 import { MediaSection } from "@/src/components/MediaSection";
-import { loadFacebookMedia, loadInstagramFeature, loadTikTokFeature, loadYouTubeMedia } from "@/src/lib/media";
+import { internalFetch } from "@/src/lib/internalFetch";
+import { loadFacebookMedia, loadInstagramFeature, loadTikTokFeature, loadYouTubeMedia, MediaFeed } from "@/src/lib/media";
 
 type Feed = Awaited<ReturnType<typeof loadFacebookMedia>>;
 
+async function fetchYouTubeFeed(): Promise<MediaFeed> {
+  try {
+    const res = await internalFetch("/api/media/youtube");
+    if (!res.ok) {
+      return loadYouTubeMedia();
+    }
+    return (await res.json()) as MediaFeed;
+  } catch {
+    return loadYouTubeMedia();
+  }
+}
+
 export default async function MultimediaHomeContent() {
+  const channelUrlFallback = "https://www.youtube.com/@greaterharrisburgmagarorga4597";
   const [facebook, youtube, tiktok, instagram] = await Promise.all([
     loadFacebookMedia(),
-    loadYouTubeMedia(),
+    fetchYouTubeFeed(),
     loadTikTokFeature(),
     loadInstagramFeature()
   ]);
+  const youtubeFeed = {
+    ...youtube,
+    profileUrl: youtube.profileUrl || channelUrlFallback
+  };
 
   return (
     <div className="space-y-8">
@@ -23,7 +41,7 @@ export default async function MultimediaHomeContent() {
       </header>
 
       <MediaSection title="Facebook" feed={facebook as Feed} />
-      <MediaSection title="YouTube" feed={youtube as Feed} />
+      <MediaSection title="YouTube" feed={youtubeFeed as Feed} variant="youtube" />
       <MediaSection title="TikTok" feed={tiktok as Feed} />
       <MediaSection title="Instagram" feed={instagram as Feed} />
     </div>

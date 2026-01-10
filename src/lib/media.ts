@@ -1,3 +1,4 @@
+//src/lib/media.ts
 export type MediaItem = {
   id: string;
   title: string;
@@ -6,6 +7,7 @@ export type MediaItem = {
   publishedAt?: string;
   type?: "video" | "image" | "post";
   description?: string;
+  viewCount?: number;
 };
 
 export type MediaFeed = {
@@ -85,31 +87,69 @@ export async function loadYouTubeMedia(): Promise<MediaFeed> {
     const apiKey = process.env.YOUTUBE_API_KEY;
     const channelId = process.env.YOUTUBE_CHANNEL_ID;
     const channelUrl = process.env.YOUTUBE_CHANNEL_URL;
+    const channelUrlFallback = "https://www.youtube.com/@greaterharrisburgmagarorga4597";
+    const channelLink = channelUrl || channelUrlFallback;
 
     if (apiKey && channelId) {
       try {
         const res = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&part=snippet&order=date&maxResults=6&type=video`
+          `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&part=snippet&order=date&maxResults=4&type=video`
         );
         if (res.ok) {
           const json = await res.json();
-          const items: MediaItem[] = (json.items || []).map((item: any) => ({
-            id: item.id?.videoId || item.id,
-            title: item.snippet?.title || "YouTube video",
-            url: `https://www.youtube.com/watch?v=${item.id?.videoId || item.id}`,
-            thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url,
-            publishedAt: item.snippet?.publishedAt,
-            type: "video",
-            description: item.snippet?.description
-          }));
-          return { source: "youtube", mode: "api", items, profileUrl: channelUrl };
+          const rawItems = json.items || [];
+          const videoIds = rawItems
+            .map((item: any) => item.id?.videoId || item.id)
+            .filter((id: string | undefined) => Boolean(id)) as string[];
+          const viewCounts = new Map<string, number>();
+          let statsError: string | undefined;
+          if (videoIds.length) {
+            try {
+              const statsRes = await fetch(
+                `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&part=statistics&id=${videoIds.join(",")}`
+              );
+              if (statsRes.ok) {
+                const statsJson = await statsRes.json();
+                for (const stat of statsJson.items || []) {
+                  const count = Number(stat.statistics?.viewCount);
+                  if (Number.isFinite(count)) {
+                    viewCounts.set(stat.id, count);
+                  }
+                }
+              } else {
+                statsError = "Unable to load YouTube statistics";
+              }
+            } catch (err: any) {
+              statsError = err?.message || "YouTube statistics fetch failed";
+            }
+          }
+          const items: MediaItem[] = rawItems.map((item: any) => {
+            const id = item.id?.videoId || item.id;
+            return {
+              id,
+              title: item.snippet?.title || "YouTube video",
+              url: `https://www.youtube.com/watch?v=${id}`,
+              thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url,
+              publishedAt: item.snippet?.publishedAt,
+              type: "video",
+              description: item.snippet?.description,
+              viewCount: viewCounts.get(id)
+            };
+          });
+          return {
+            source: "youtube",
+            mode: "api",
+            items,
+            profileUrl: channelLink,
+            error: statsError
+          };
         }
       } catch (err: any) {
         return {
           source: "youtube",
           mode: "links",
           items: youtubeFallbackItems(channelUrl),
-          profileUrl: channelUrl,
+          profileUrl: channelLink,
           error: err?.message || "YouTube fetch failed"
         };
       }
@@ -119,7 +159,7 @@ export async function loadYouTubeMedia(): Promise<MediaFeed> {
       source: "youtube",
       mode: channelUrl ? "embed" : "links",
       embedUrl: channelUrl ? `${channelUrl}/videos` : undefined,
-      profileUrl: channelUrl,
+      profileUrl: channelLink,
       items: youtubeFallbackItems(channelUrl),
       error: channelUrl ? undefined : "Configure YOUTUBE_API_KEY + YOUTUBE_CHANNEL_ID for live videos"
     };

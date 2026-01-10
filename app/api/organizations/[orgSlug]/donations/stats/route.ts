@@ -16,6 +16,8 @@ export async function GET(_: Request, { params }: { params: { orgSlug: string } 
   const stats = {
     totalRaised: data.totalRaised ?? 0,
     goal: data.goal ?? null,
+    donorCount: typeof data.donorCount === "number" ? data.donorCount : null,
+    endAt: data.endAt ?? null,
     lastUpdatedAt: data.lastUpdatedAt ?? null
   };
 
