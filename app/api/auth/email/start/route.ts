@@ -1,3 +1,4 @@
+//app/api/auth/email/start/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           requestType,
-          email: emailValue,
+          email: emailLower,
           continueUrl,
           canHandleCodeInApp: true
         })
@@ -91,31 +92,40 @@ export async function POST(req: NextRequest) {
     if (!identityRes.ok) {
       const identityBodyAny = identityResponseBody as Record<string, any>;
       const identityError = identityBodyAny?.error;
-      const errorCode =
+      const errorMessage =
         identityError?.message ||
         identityError?.errors?.[0]?.message ||
         identityBodyAny?.error?.code ||
         "UNKNOWN";
-      if (errorCode === "QUOTA_EXCEEDED") {
+      const errorMessageString = String(errorMessage);
+      if (
+        errorMessageString === "QUOTA_EXCEEDED" ||
+        errorMessageString.startsWith("QUOTA_EXCEEDED")
+      ) {
         console.warn("Identity Toolkit sendOobCode quota exceeded", {
           emailLower,
-          continueUrl
+          continueUrl,
+          message: errorMessageString
         });
         return NextResponse.json(
-          { ok: false, code: "QUOTA_EXCEEDED" },
+          {
+            ok: false,
+            code: "QUOTA_EXCEEDED",
+            message: "Daily email sign-in quota exceeded. Try again tomorrow or enable billing."
+          },
           { status: 429 }
         );
       }
       console.error("Identity Toolkit sendOobCode failed", {
         status: identityRes.status,
-        code: errorCode,
+        code: errorMessageString,
         body: identityResponseBody,
         emailLower,
         continueUrl
       });
       return NextResponse.json(
-        { error: "Unable to send sign-in link right now" },
-        { status: 500 }
+        { ok: false, code: "SEND_FAILED", message: "Unable to send sign-in link right now." },
+        { status: 503 }
       );
     }
   } catch (error) {
