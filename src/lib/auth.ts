@@ -24,7 +24,8 @@ export async function verifyPin(pin: string, hash: string) {
 }
 
 export async function issueCustomToken(uid: string, role: Role, claims?: Record<string, unknown>) {
-  return adminAuth.createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, ...claims });
+  const admin = role === "admin";
+  return adminAuth.createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, admin, ...claims });
 }
 
 export async function verifyIdToken(idToken: string) {

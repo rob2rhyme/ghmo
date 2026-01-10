@@ -11,7 +11,7 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 ## Highlights
 - One community (`ghmo-site`) backed by Firebase + GoFundMe Pro; no multi-tenant routing.
 - Admins authenticate via whitelist-only email magic links (OTP); `sessionToken` (with `__session` fallback) is the source of truth for guarded pages/API routes.
-- Modules: Meeting Minutes (agenda/decisions/action items + structured attendance), Document Generator (GHMO letterhead preview + PDF/JPEG export), Admin dashboard (content/minutes/webhooks/audit), Multimedia hub.
+- Modules: Plans & Issues (Admin Communication Log) for governed admin-only decision threads (conclusion required to close, append-only comments, read-only after closure, full auditability), Admin Chat (WhatsApp-style coordination for quick updates only; decisions belong in Plans & Issues), Meeting Minutes (agenda/decisions/action items + structured attendance), Document Generator (GHMO letterhead preview + PDF/JPEG export), Admin dashboard overview (KPIs/quick actions/recents/system status), Multimedia hub.
 - Audit logs cover auth attempts, admin actions, document generation, webhook receipts, and reconciliation runs.
 
 ## Document Generator
@@ -26,6 +26,14 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 - Each record stores structured agenda items, discussion summary, decisions, action items, and attendance split into present/absent/guest lists, giving the Admin dashboard/public view a consistent, searchable format.
 - Minutes export as Letter-size PDFs on the GHMO letterhead so the preview and the final file are identical.
 
+## Communication Log
+- Plans & Issues (`/admin/comms`) are governed threads for proposals, plans, and issues that need discussion and a documented conclusion.
+- Threads require a conclusion to close and become read-only once closed; comments are append-only for audit clarity.
+- Conclusion voting is isolated to the close workflow and retains full auditability.
+- Admin Chat (`/admin/chat`) is the WhatsApp-style channel for quick coordination and day-to-day updates, not for decisions.
+- A “Create sample threads” button appears when there are no existing threads to help onboard new admins.
+- No third-party UI dependencies were added for the communication log UI.
+
 ## Stack
 - Next.js 14 App Router, TypeScript, TailwindCSS
 - Firebase Client SDK (Auth/Firestore) + Firebase Admin SDK
@@ -34,9 +42,21 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 
 ## Routes
 - Public: `/`, `/donate`, `/multimedia`
-- Admin-only: `/admin`, `/admin/events`, `/admin/gumba-project`, `/admin/document-generator`, `/admin/minutes`
+- Admin-only:
+  - `/admin` (overview-only: KPIs, quick actions, recents, system status)
+  - `/admin/comms` (Plans & Issues)
+  - `/admin/chat` (Admin Chat)
+  - `/admin/minutes` (Create/Edit + Records tabs)
+  - `/admin/events`
+  - `/admin/gumba-project`
+  - `/admin/document-generator`
+  - `/admin/document-gallery`
 - Auth: `/login` (magic link request) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (gated and disabled in production).
 - API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
+
+## Admin Dashboard Search
+- The admin dashboard includes an inline command-palette style search bar that filters quick actions, recent minutes, and audit activity.
+- Shortcut: Cmd+K / Ctrl+K focuses the search input; Esc clears the query (or blurs if empty).
 
 ## Authentication
 - Admins request magic links via `/login`, and Firestore stores their email in a whitelist (e.g., `organizations/{orgSlug}/members` with `status: "active"`). Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
@@ -54,6 +74,11 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
   - Seed templates by writing documents under `organizations/{orgSlug}/docgen` (e.g., `{ name: "Default Letter", letterhead: {...}, fields: ["Recipient", "Body"] }`) so the admin UI has options.
   - `donations/stats` + `donations/webhookEvents/{eventId}`.
   - `auditLogs/{logId}`.
+- Communication log collections (all under `organizations/ghmo`):
+  - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.
+    - `comments/{commentId}`: append-only comment records.
+    - `votes/{uid}`: used only for conclusion voting when closing.
+  - `adminChatMessages/{messageId}`: `body`, `createdBy`, `createdAt`.
 Legacy community paths are no longer supported; please migrate any old data into `organizations/{orgSlug}`.
 
 ## GoFundMe Pro
@@ -110,7 +135,18 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Sessions are anchored to the `sessionToken` cookie (with `__session` fallback) and verified via `requireActiveAdmin` before any admin page/API executes logic.
 - The dev helper `/api/auth/dev/admin-session` is gated by `NODE_ENV !== "production"` plus `NEXT_PUBLIC_DEV_LOGIN` and `DEV_LOGIN_SECRET`, and it remains disabled unless those flags are explicitly set.
 - Webhooks are validated via the shared-secret HMAC placeholder; replace that check with a provider-backed verification when credentials are available.
-- Firebase rules stay locked to `organizations/ghmo` paths—see `firestore.rules` for the current draft.
+- Firestore rules are deny-by-default and access is controlled by the `admin: true` custom claim.
+- All communication log features are admin-only, and closed threads are immutable.
+
+## Feature Enhancements (Planned)
+- Admin Activity Analytics (Planned)
+  - Silent instrumentation (no UI yet).
+  - Tracks thread creation, comments posted, documents generated, meeting participation, and admin visits/interactions.
+- Admin Leaderboard (Future / Optional)
+  - Derived from analytics (not active).
+  - Time-boxed (monthly / quarterly).
+  - Category-based (participation, governance, documentation).
+  - Intended for insights, not competition; future and opt-in.
 
 ## Reset Build Artifacts & Start Dev Server
 

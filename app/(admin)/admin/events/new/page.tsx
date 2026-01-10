@@ -1,3 +1,4 @@
+//app/(admin)/admin/events/new/page.tsx
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ const defaultForm = {
   location: "",
   timezone: "America/New_York",
   featured: false,
-  announcementDocTemplate: ""
+  announcementDocTemplate: "",
 };
 
 export default function NewEventPage() {
@@ -31,7 +32,7 @@ export default function NewEventPage() {
       const res = await fetch("/api/admin/organizations/ghmo/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(form),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create event");
@@ -43,7 +44,8 @@ export default function NewEventPage() {
     }
   };
 
-  const update = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
+  const update = (key: string, value: any) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-8">
@@ -74,7 +76,7 @@ export default function NewEventPage() {
 
 function EventForm({
   form,
-  update
+  update,
 }: {
   form: typeof defaultForm;
   update: (key: string, value: any) => void;
@@ -86,7 +88,7 @@ function EventForm({
           Title
           <input
             value={form.title}
-            onChange={e => update("title", e.target.value)}
+            onChange={(e) => update("title", e.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             placeholder="Event title"
           />
@@ -95,7 +97,7 @@ function EventForm({
           Status
           <select
             value={form.status}
-            onChange={e => update("status", e.target.value)}
+            onChange={(e) => update("status", e.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           >
             <option value="draft">Draft</option>
@@ -107,7 +109,7 @@ function EventForm({
         Summary
         <textarea
           value={form.summary}
-          onChange={e => update("summary", e.target.value)}
+          onChange={(e) => update("summary", e.target.value)}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           placeholder="Short description"
         />
@@ -116,7 +118,7 @@ function EventForm({
         Body
         <textarea
           value={form.body}
-          onChange={e => update("body", e.target.value)}
+          onChange={(e) => update("body", e.target.value)}
           className="h-40 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           placeholder="Event details"
         />
@@ -127,7 +129,7 @@ function EventForm({
           <input
             type="datetime-local"
             value={form.startsAt}
-            onChange={e => update("startsAt", e.target.value)}
+            onChange={(e) => update("startsAt", e.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           />
         </label>
@@ -136,7 +138,7 @@ function EventForm({
           <input
             type="datetime-local"
             value={form.endsAt}
-            onChange={e => update("endsAt", e.target.value)}
+            onChange={(e) => update("endsAt", e.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           />
         </label>
@@ -146,7 +148,7 @@ function EventForm({
           Timezone
           <input
             value={form.timezone}
-            onChange={e => update("timezone", e.target.value)}
+            onChange={(e) => update("timezone", e.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             placeholder="America/New_York"
           />
@@ -155,21 +157,25 @@ function EventForm({
           Location
           <input
             value={form.location}
-            onChange={e => update("location", e.target.value)}
+            onChange={(e) => update("location", e.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             placeholder="Venue or link"
           />
         </label>
       </div>
       <div className="flex items-center gap-2">
-        <input type="checkbox" checked={form.featured} onChange={e => update("featured", e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={form.featured}
+          onChange={(e) => update("featured", e.target.checked)}
+        />
         <span className="text-sm text-slate-700">Featured</span>
       </div>
       <label className="space-y-1 text-sm font-semibold text-slate-800">
         Announcement Template (optional)
         <input
           value={form.announcementDocTemplate}
-          onChange={e => update("announcementDocTemplate", e.target.value)}
+          onChange={(e) => update("announcementDocTemplate", e.target.value)}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           placeholder="event_announcement_v1"
         />

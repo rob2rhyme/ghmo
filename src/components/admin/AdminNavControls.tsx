@@ -6,6 +6,9 @@ type NextLinkProps = LinkProps<string>;
 
 const NAV_LINKS: { href: NextLinkProps["href"]; label: string }[] = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/comms", label: "Plans & Issues" },
+  { href: "/admin/chat", label: "Admin Chat" },
+  { href: "/admin/minutes", label: "Meeting Minutes" },
   { href: "/admin/events", label: "Events" },
   { href: "/admin/gumba-project", label: "GUMBA Project" },
   { href: "/admin/document-generator", label: "Document Generator" },

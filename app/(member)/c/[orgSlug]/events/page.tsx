@@ -33,7 +33,7 @@ export default function EventsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/organizations/${orgSlug}/events?status=all`);
+        const res = await fetch(`/api/organizations/${orgSlug}/events`);
         const data = await res.json();
         setEvents(data.events || []);
       } finally {

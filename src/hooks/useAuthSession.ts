@@ -10,6 +10,10 @@ export type AuthSession = {
   orgSlug: string | null;
   adminId?: string | null;
   roles?: string[];
+  actor?: {
+    name?: string;
+    roles?: string[];
+  };
   error?: string;
   reason?: string;
 };

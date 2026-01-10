@@ -3,8 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {
       return request.auth != null &&
-        request.auth.token.communityId == "ghmo-site" &&
-        request.auth.token.role == "admin";
+        (request.auth.token.communityId == "ghmo-site" || request.auth.token.orgSlug == "ghmo") &&
+        (request.auth.token.role == "admin" || request.auth.token.admin == true);
     }
 
     function isMember() {
@@ -58,6 +58,119 @@ service cloud.firestore {
     match /organizations/{orgSlug}/minutes/{doc=**} {
       allow read: if isAdmin();
       allow write: if isAdmin();
+    }
+
+    function isNonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function commsThreadPath(threadId) {
+      return /databases/$(database)/documents/organizations/ghmo/commsThreads/$(threadId);
+    }
+
+    function isThreadOpen(threadId) {
+      return get(commsThreadPath(threadId)).data.status == "open";
+    }
+
+    function isValidThreadCreate() {
+      return isNonEmptyString(request.resource.data.title) &&
+        isNonEmptyString(request.resource.data.body) &&
+        request.resource.data.status == "open" &&
+        request.resource.data.createdBy.uid == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.lastActivityAt == request.time;
+    }
+
+    function hasConclusionText() {
+      return request.resource.data.conclusion is map &&
+        isNonEmptyString(request.resource.data.conclusion.text);
+    }
+
+    function isTransitioningToClosing() {
+      return resource.data.status == "open" &&
+        request.resource.data.status == "closing";
+    }
+
+    function isTransitioningToClosed() {
+      return resource.data.status == "closing" &&
+        request.resource.data.status == "closed";
+    }
+
+    function isValidThreadUpdate() {
+      return isNonEmptyString(request.resource.data.title) &&
+        isNonEmptyString(request.resource.data.body) &&
+        (request.resource.data.status == "open" ||
+          request.resource.data.status == "closing" ||
+          request.resource.data.status == "closed") &&
+        (resource.data.status == "closed" ? request.resource.data.status == "closed" : true) &&
+        request.resource.data.createdBy.uid == resource.data.createdBy.uid &&
+        (request.resource.data.status == "closing"
+          ? hasConclusionText()
+          : true) &&
+        (isTransitioningToClosing()
+          ? request.resource.data.conclusion.proposedBy.uid == request.auth.uid
+          : true) &&
+        (isTransitioningToClosed()
+          ? (hasConclusionText() &&
+            request.resource.data.finalizedBy.uid == request.auth.uid)
+          : true);
+    }
+
+    function isValidCommentCreate() {
+      return isNonEmptyString(request.resource.data.body) &&
+        (request.resource.data.parentId == null || isNonEmptyString(request.resource.data.parentId)) &&
+        request.resource.data.createdBy.uid == request.auth.uid &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    function isValidConclusionVote() {
+      return request.resource.data.value == "approve" ||
+        request.resource.data.value == "reject";
+    }
+
+    function isValidChatMessageCreate() {
+      return isNonEmptyString(request.resource.data.body) &&
+        request.resource.data.createdBy.uid == request.auth.uid &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    match /organizations/ghmo/commsThreads/{threadId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidThreadCreate();
+      allow update: if isAdmin() && isValidThreadUpdate();
+      allow delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if isAdmin();
+        allow create: if isAdmin() && isThreadOpen(threadId) && isValidCommentCreate();
+        allow update, delete: if false;
+
+        match /likes/{uid} {
+          allow read: if isAdmin();
+          allow create: if isAdmin() &&
+            request.auth.uid == uid &&
+            request.resource.data.createdAt is timestamp &&
+            request.resource.data.createdBy.uid == request.auth.uid &&
+            isNonEmptyString(request.resource.data.createdBy.name);
+          allow delete: if isAdmin() && request.auth.uid == uid;
+          allow update: if false;
+        }
+      }
+
+      match /conclusionVotes/{voteId} {
+        allow read: if isAdmin();
+        allow create, update: if isAdmin() &&
+          voteId == request.auth.uid &&
+          get(/databases/$(database)/documents/organizations/ghmo/commsThreads/$(threadId)).data.status == "closing" &&
+          isValidConclusionVote();
+        allow delete: if false;
+      }
+    }
+
+    match /organizations/ghmo/adminChatMessages/{messageId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidChatMessageCreate();
+      allow update, delete: if false;
     }
 
     match /organizations/{docId}/{any=**} {

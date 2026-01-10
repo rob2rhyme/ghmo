@@ -7,6 +7,7 @@ import { eventsCollectionPath } from "@/src/lib/events";
 import { COMMUNITY_SLUG, COMMUNITY_ID } from "@/src/lib/community";
 import { toPlain } from "@/src/lib/serialize.server";
 import { meetingTypes, MeetingAttendance } from "@/src/lib/minutes";
+import { resolveActorName } from "@/src/lib/actor";
 
 type MinutesActionItem = { task: string; assignedTo?: string; dueDate?: Date };
 
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
     eventDate: eventData.startsAt || null,
     meetingType,
     chairedBy: sanitizeText(payload.chairedBy),
-    recordedBy: actor.email || actor.uid,
+    recordedBy: resolveActorName(actor),
     agenda,
     discussionSummary: sanitizeText(payload.discussionSummary),
     decisions,

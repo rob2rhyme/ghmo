@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import ThemeToggle from "@/src/components/ThemeToggle";
 import SignOutButton from "@/src/components/SignOutButton";
+import AdminNavControls from "@/src/components/admin/AdminNavControls";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
 
 type CommunityHeaderProps = {
@@ -13,8 +14,11 @@ type CommunityHeaderProps = {
 
 export function CommunityHeader({ name }: CommunityHeaderProps) {
   const label = name || "Greater Harrisburg Magar Organization";
-  const { session } = useAuthSession();
-  const hasSession = !!session?.authenticated;
+  const { session, loading } = useAuthSession();
+  const isAuthenticated = !!session?.authenticated;
+  const isAdmin = !!session?.adminId;
+  const showAdmin = !loading && isAdmin;
+  const showSignOut = !loading && isAuthenticated;
   return (
     <header className="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-2.5 py-3 md:px-6 md:py-4">
@@ -43,16 +47,28 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
             <Link href="/">Home</Link>
             <Link href="/donate">Donate</Link>
             <Link href="/multimedia">Multimedia</Link>
+            <Link href="/admin" className="font-semibold text-primary">
+              Admin
+            </Link>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            {showAdmin ? <AdminNavControls /> : null}
+            <ThemeToggle />
+            {showSignOut ? <SignOutButton /> : null}
+          </div>
         </nav>
         <nav className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-200 md:hidden">
-          <Link href="/admin" className="font-semibold text-primary">
-            Admin
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/">Home</Link>
+            <Link href="/donate">Donate</Link>
+            <Link href="/multimedia">Multimedia</Link>
+            <Link href="/admin" className="font-semibold text-primary">
+              Admin
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {hasSession ? <SignOutButton /> : null}
+            {showSignOut ? <SignOutButton /> : null}
           </div>
         </nav>
       </div>

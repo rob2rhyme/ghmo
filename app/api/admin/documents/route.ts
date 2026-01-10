@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
       inputs,
       createdByUid: actor.uid,
       createdByEmail: actor.email,
+      createdByName: actor.name,
+      createdByRoles: actor.roles,
       docId: payload.docId
     });
     return NextResponse.json(saved);

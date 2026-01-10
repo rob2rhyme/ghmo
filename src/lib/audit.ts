@@ -26,6 +26,7 @@ type AuditActor = {
   name?: string;
   email?: string;
   role?: string;
+  roles?: string[];
 };
 
 type AuditResource = {
@@ -82,9 +83,15 @@ export async function logAuditEvent(params: {
   meta?: AuditMeta;
 }) {
   const ref = getAdminDb().collection(orgAuditLogsCollectionPath(params.orgSlug));
+  const actor = params.actor
+    ? {
+        ...params.actor,
+        roles: params.actor.roles ?? (params.actor.role ? [params.actor.role] : undefined)
+      }
+    : undefined;
   const payload = sanitizeFirestorePayload({
     action: params.action,
-    actor: params.actor,
+    actor,
     resource: params.resource,
     before: params.before,
     after: params.after,

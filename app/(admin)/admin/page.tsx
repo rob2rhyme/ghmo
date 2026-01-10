@@ -1,7 +1,8 @@
+//app/(admin)/admin/page.tsx
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { redirect } from "next/navigation";
-import AdminDashboardClient from "@/src/modules/admin/AdminDashboardClient";
+import AdminDashboardOverview from "@/src/components/admin/dashboard/AdminDashboardOverview";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { toPlain } from "@/src/lib/serialize.server";
 
@@ -10,7 +11,9 @@ export const revalidate = 0;
 
 export default async function AdminPage() {
   const community = await getCommunity();
-  let actorInfo: Awaited<ReturnType<typeof requireActiveAdmin>>["actor"] | null = null;
+  let actorInfo:
+    | Awaited<ReturnType<typeof requireActiveAdmin>>["actor"]
+    | null = null;
   try {
     const guard = await requireActiveAdmin(undefined, COMMUNITY_SLUG);
     actorInfo = guard.actor;
@@ -24,15 +27,26 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const res = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/admin/dashboard`);
+  const res = await internalFetch(
+    `/api/organizations/${COMMUNITY_SLUG}/admin/dashboard`
+  );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Failed to load admin dashboard data (${res.status}): ${body}`);
+    throw new Error(
+      `Failed to load admin dashboard data (${res.status}): ${body}`
+    );
   }
   const { stats, webhookEvents, auditLogs, blocks, minutes } = await res.json();
 
   if (process.env.NODE_ENV !== "production") {
-    const payload = { community, stats, webhookEvents, auditLogs, blocks, minutes };
+    const payload = {
+      community,
+      stats,
+      webhookEvents,
+      auditLogs,
+      blocks,
+      minutes,
+    };
     for (const [key, val] of Object.entries(payload)) {
       try {
         JSON.stringify(val);
@@ -43,14 +57,12 @@ export default async function AdminPage() {
   }
 
   return (
-    <AdminDashboardClient
+    <AdminDashboardOverview
       community={toPlain(community)}
       stats={toPlain(stats)}
       webhookEvents={toPlain(webhookEvents)}
       auditLogs={toPlain(auditLogs)}
-      blocks={toPlain(blocks)}
       minutes={toPlain(minutes)}
-      adminActor={toPlain(actorInfo)}
     />
   );
 }

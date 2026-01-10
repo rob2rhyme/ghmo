@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
-import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
+import { orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 
 export const dynamic = "force-dynamic";
+
+async function loadActorSnapshot(orgSlug: string, authUid?: string | null, emailLower?: string | null) {
+  const collection = getAdminDb().collection(orgAdminsCollectionPath(orgSlug));
+  if (authUid) {
+    const authSnap = await collection.where("authUid", "==", authUid).limit(1).get();
+    if (!authSnap.empty) {
+      const data = authSnap.docs[0].data() as Record<string, any>;
+      return { name: data.name as string | undefined, roles: Array.isArray(data.roles) ? (data.roles as string[]) : [] };
+    }
+    const directDoc = await collection.doc(authUid).get();
+    if (directDoc.exists) {
+      const data = directDoc.data() as Record<string, any>;
+      return { name: data.name as string | undefined, roles: Array.isArray(data.roles) ? (data.roles as string[]) : [] };
+    }
+  }
+  if (emailLower) {
+    const emailSnap = await collection.where("emailLower", "==", emailLower).limit(1).get();
+    if (!emailSnap.empty) {
+      const data = emailSnap.docs[0].data() as Record<string, any>;
+      return { name: data.name as string | undefined, roles: Array.isArray(data.roles) ? (data.roles as string[]) : [] };
+    }
+  }
+  return null;
+}
 
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContextFromRequest(req);
@@ -37,6 +62,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const { actor } = await requireActiveAdmin(req, ctx.orgSlug);
+    const actorSnapshot =
+      (await loadActorSnapshot(ctx.orgSlug, ctx.uid, ctx.emailLower)) ?? {
+        name: actor.name,
+        roles: actor.roles
+      };
     console.debug("Auth/me admin lookup succeeded", { uid: ctx.uid, emailLower: ctx.emailLower, adminDocId: actor.adminDocId });
     return NextResponse.json({
       authenticated: true,
@@ -45,7 +75,8 @@ export async function GET(req: NextRequest) {
       uid: ctx.uid,
       orgSlug: ctx.orgSlug,
       adminId: actor.adminDocId,
-      roles: actor.roles
+      roles: actor.roles,
+      actor: actorSnapshot ?? { roles: ["admin"] }
     });
   } catch (err) {
     if (err instanceof AdminAccessError) {

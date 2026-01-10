@@ -11,6 +11,7 @@ import {
   minutesStatusLabels,
   minutesStatusPillClasses
 } from "@/src/lib/minutes";
+import { resolveActorLabel } from "@/src/lib/actor";
 
 const adminStatusDescriptions: Record<MinutesStatus, string> = {
   draft: "Draft minutes are visible to admins only.",
@@ -36,7 +37,7 @@ export default function EventDetailPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/organizations/${orgSlug}/events?status=all`, { cache: "no-store" });
+        const res = await fetch(`/api/organizations/${orgSlug}/events`, { cache: "no-store" });
         const data = await res.json();
         const found = (data.events || []).find((e: EventRecord) => e.id === eventId) as EventRecord | undefined;
         if (!found || found.status !== "published") {
@@ -152,7 +153,7 @@ export default function EventDetailPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Meeting Minutes</h2>
             {!meetingMinutes && !minutesLoading && adminMinutesAccess ? (
-              <Link href={`/admin?tab=minutes&eventId=${event.id}`} className="text-sm font-semibold text-primary">
+              <Link href={`/admin/minutes?mode=new&eventId=${event.id}`} className="text-sm font-semibold text-primary">
                 Add minutes
               </Link>
             ) : null}
@@ -174,13 +175,13 @@ export default function EventDetailPage() {
                     <p>{adminStatusDescriptions[meetingMinutes.status]}</p>
                     {meetingMinutes.submittedAt ? (
                       <p>
-                        Submitted by {meetingMinutes.submittedByUid || "—"} •{" "}
+                        Submitted by {resolveActorLabel({ roles: ["admin"] })} •{" "}
                         {formatTimestamp(meetingMinutes.submittedAt)}
                       </p>
                     ) : null}
                     {meetingMinutes.approvedAt ? (
                       <p>
-                        Approved by {meetingMinutes.approvedByUid || "—"} •{" "}
+                        Approved by {resolveActorLabel({ roles: ["admin"] })} •{" "}
                         {formatTimestamp(meetingMinutes.approvedAt)}
                       </p>
                     ) : null}
@@ -250,7 +251,7 @@ export default function EventDetailPage() {
                 <p className="text-xs text-slate-500">Approval notes: {meetingMinutes.approvalNotes}</p>
               ) : null}
               <p className="text-xs text-slate-500">
-                Recorded by {meetingMinutes.recordedBy} • {formatTimestamp(meetingMinutes.createdAt)}
+                Recorded by {resolveActorLabel(meetingMinutes.recordedBy)} • {formatTimestamp(meetingMinutes.createdAt)}
               </p>
             </div>
           ) : (

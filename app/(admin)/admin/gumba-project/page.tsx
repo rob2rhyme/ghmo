@@ -1,11 +1,17 @@
+//app/(admin)/admin/gumba-project/page.tsx
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { MeetingAttendance } from "@/src/lib/minutes";
+import { resolveActorLabel } from "@/src/lib/actor";
 
-type MinutesActionItem = { task: string; assignedTo?: string; dueDate?: string | number | Date | null };
+type MinutesActionItem = {
+  task: string;
+  assignedTo?: string;
+  dueDate?: string | number | Date | null;
+};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,9 +26,17 @@ export default async function GumbaProjectPage() {
     throw error;
   }
 
-  const statsRes = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/donations/stats`);
+  const statsRes = await internalFetch(
+    `/api/organizations/${COMMUNITY_SLUG}/donations/stats`
+  );
   if (!statsRes.ok) throw new Error("Failed to load donation stats");
-  const { stats } = (await statsRes.json()) as { stats: { totalRaised?: number; goal?: number; lastUpdatedAt?: number | Date | null } };
+  const { stats } = (await statsRes.json()) as {
+    stats: {
+      totalRaised?: number;
+      goal?: number;
+      lastUpdatedAt?: number | Date | null;
+    };
+  };
 
   const minutesRes = await internalFetch(`/api/admin/minutes`);
   if (!minutesRes.ok) {
@@ -37,22 +51,28 @@ export default async function GumbaProjectPage() {
     stats?.lastUpdatedAt instanceof Date
       ? stats.lastUpdatedAt.getTime()
       : typeof stats?.lastUpdatedAt === "number"
-        ? stats.lastUpdatedAt
-        : null;
+      ? stats.lastUpdatedAt
+      : null;
 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h1 className="text-2xl font-semibold">GUMBA Project</h1>
-        <p className="text-slate-600 dark:text-slate-300">Project overview and fundraising progress.</p>
+        <p className="text-slate-600 dark:text-slate-300">
+          Project overview and fundraising progress.
+        </p>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-md bg-primary/10 px-4 py-3">
             <p className="text-xs uppercase text-slate-600">Raised</p>
-            <p className="text-2xl font-bold text-primary">${totalRaised.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-primary">
+              ${totalRaised.toLocaleString()}
+            </p>
           </div>
           <div className="rounded-md bg-secondary/10 px-4 py-3">
             <p className="text-xs uppercase text-slate-600">Goal</p>
-            <p className="text-2xl font-bold text-secondary">${goal.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-secondary">
+              ${goal.toLocaleString()}
+            </p>
           </div>
           <div className="rounded-md bg-slate-100 px-4 py-3 dark:bg-slate-800/70">
             <p className="text-xs uppercase text-slate-600">Last updated</p>
@@ -66,59 +86,90 @@ export default async function GumbaProjectPage() {
       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Meeting minutes</h2>
-          <Link href="/admin?tab=minutes" className="text-sm font-semibold text-primary">
+          <Link
+            href="/admin/minutes?mode=records"
+            className="text-sm font-semibold text-primary"
+          >
             Manage minutes
           </Link>
         </div>
         {Array.isArray(minutes) && minutes.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">No meeting minutes recorded yet.</p>
+          <p className="mt-4 text-sm text-slate-500">
+            No meeting minutes recorded yet.
+          </p>
         ) : (
           <div className="mt-4 space-y-3">
             {(Array.isArray(minutes) ? [...minutes] : [])
-              .sort((a, b) => Number(b.eventDate || 0) - Number(a.eventDate || 0))
+              .sort(
+                (a, b) => Number(b.eventDate || 0) - Number(a.eventDate || 0)
+              )
               .slice(0, 3)
-              .map(entry => {
-                const attendanceSummary = formatAdminAttendance(entry.attendance);
+              .map((entry) => {
+                const attendanceSummary = formatAdminAttendance(
+                  entry.attendance
+                );
                 return (
-                  <div key={entry.id} className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-slate-900">{entry.eventTitle}</p>
+                  <div
+                    key={entry.id}
+                    className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3 text-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {entry.eventTitle}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {entry.meetingType} •{" "}
+                          {entry.eventDate
+                            ? new Date(entry.eventDate).toLocaleString()
+                            : "Date unavailable"}
+                        </p>
+                      </div>
                       <p className="text-xs text-slate-500">
-                        {entry.meetingType} •{" "}
-                        {entry.eventDate ? new Date(entry.eventDate).toLocaleString() : "Date unavailable"}
+                        {entry.decisions.length} decision
+                        {entry.decisions.length === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <p className="text-xs text-slate-500">
-                      {entry.decisions.length} decision{entry.decisions.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  {entry.decisions.length ? (
+                    {entry.decisions.length ? (
                       <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-700">
-                        {entry.decisions.map((decision: string, idx: number) => (
-                          <li key={`${entry.id}-decision-${idx}`}>{decision}</li>
-                        ))}
+                        {entry.decisions.map(
+                          (decision: string, idx: number) => (
+                            <li key={`${entry.id}-decision-${idx}`}>
+                              {decision}
+                            </li>
+                          )
+                        )}
                       </ul>
                     ) : null}
-                  {entry.actionItems.length ? (
-                    <div className="mt-2 text-xs text-slate-700">
-                      <p className="font-semibold text-slate-600">Action items</p>
-                      <ul className="list-disc space-y-1 pl-5">
-                        {entry.actionItems.map((action: MinutesActionItem, idx: number) => (
-                          <li key={`${entry.id}-action-${idx}`}>
-                            {action.task}
-                            {action.assignedTo ? ` — ${action.assignedTo}` : ""}
-                            {action.dueDate ? ` (due ${new Date(action.dueDate).toLocaleDateString()})` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  <p className="mt-2 text-xs text-slate-500">
-                    Recorded by {entry.recordedBy}
-                    {attendanceSummary ? ` • ${attendanceSummary}` : ""}
-                  </p>
-                </div>
+                    {entry.actionItems.length ? (
+                      <div className="mt-2 text-xs text-slate-700">
+                        <p className="font-semibold text-slate-600">
+                          Action items
+                        </p>
+                        <ul className="list-disc space-y-1 pl-5">
+                          {entry.actionItems.map(
+                            (action: MinutesActionItem, idx: number) => (
+                              <li key={`${entry.id}-action-${idx}`}>
+                                {action.task}
+                                {action.assignedTo
+                                  ? ` — ${action.assignedTo}`
+                                  : ""}
+                                {action.dueDate
+                                  ? ` (due ${new Date(
+                                      action.dueDate
+                                    ).toLocaleDateString()})`
+                                  : ""}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <p className="mt-2 text-xs text-slate-500">
+                      Recorded by {resolveActorLabel(entry.recordedBy)}
+                      {attendanceSummary ? ` • ${attendanceSummary}` : ""}
+                    </p>
+                  </div>
                 );
               })}
           </div>
@@ -128,15 +179,23 @@ export default async function GumbaProjectPage() {
   );
 }
 
-function normalizeAdminAttendance(value?: MeetingAttendance | string[]): MeetingAttendance | undefined {
+function normalizeAdminAttendance(
+  value?: MeetingAttendance | string[]
+): MeetingAttendance | undefined {
   if (!value) return undefined;
   if (Array.isArray(value)) {
-    const present = value.map(item => item.trim()).filter(Boolean);
+    const present = value.map((item) => item.trim()).filter(Boolean);
     return present.length ? { present } : undefined;
   }
-  const present = (value.present || []).map(item => item.trim()).filter(Boolean);
-  const absent = (value.absent || []).map(item => item.trim()).filter(Boolean);
-  const guests = (value.guests || []).map(item => item.trim()).filter(Boolean);
+  const present = (value.present || [])
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const absent = (value.absent || [])
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const guests = (value.guests || [])
+    .map((item) => item.trim())
+    .filter(Boolean);
   if (!present.length && !absent.length && !guests.length) return undefined;
   const result: MeetingAttendance = { present };
   if (absent.length) result.absent = absent;
@@ -144,7 +203,9 @@ function normalizeAdminAttendance(value?: MeetingAttendance | string[]): Meeting
   return result;
 }
 
-function formatAdminAttendance(value?: MeetingAttendance | string[]): string | null {
+function formatAdminAttendance(
+  value?: MeetingAttendance | string[]
+): string | null {
   const normalized = normalizeAdminAttendance(value);
   if (!normalized) return null;
   const parts: string[] = [];

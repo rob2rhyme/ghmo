@@ -28,6 +28,8 @@ function mapDocRecord(doc: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.
     inputs: (data.inputs as Record<string, string>) ?? {},
     createdByUid: data.createdByUid as string,
     createdByEmail: data.createdByEmail as string | undefined,
+    createdByName: data.createdByName as string | undefined,
+    createdByRoles: Array.isArray(data.createdByRoles) ? (data.createdByRoles as string[]) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt)
   };
@@ -42,6 +44,8 @@ export type CreateDocumentInput = {
   inputs: Record<string, string>;
   createdByUid: string;
   createdByEmail?: string;
+  createdByName?: string;
+  createdByRoles?: string[];
   docId?: string;
 };
 
@@ -53,6 +57,8 @@ export async function createDocument(payload: CreateDocumentInput) {
     inputs: payload.inputs,
     createdByUid: payload.createdByUid,
     createdByEmail: payload.createdByEmail,
+    createdByName: payload.createdByName,
+    createdByRoles: payload.createdByRoles,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp()
   };

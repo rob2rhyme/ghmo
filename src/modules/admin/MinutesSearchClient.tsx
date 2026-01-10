@@ -9,6 +9,7 @@ import {
   minutesStatusLabels,
   minutesStatusPillClasses
 } from "@/src/lib/minutes";
+import { resolveActorLabel } from "@/src/lib/actor";
 
 const statusOptions: MinutesStatus[] = ["draft", "submitted", "approved"];
 
@@ -107,7 +108,7 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-slate-600">{filteredMinutes.length} result{filteredMinutes.length === 1 ? "" : "s"}</p>
-          <Link href="/admin?tab=minutes" className="text-sm font-semibold text-primary">
+          <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
             Go to minutes editor
           </Link>
         </div>
@@ -124,11 +125,19 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
                     {entry.meetingType} • {formatDateLabel(entry.eventDate ?? undefined)}
                     </p>
                   </div>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${minutesStatusPillClasses[entry.status]}`}
-                  >
-                    {minutesStatusLabels[entry.status]}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${minutesStatusPillClasses[entry.status]}`}
+                    >
+                      {minutesStatusLabels[entry.status]}
+                    </span>
+                    <Link
+                      href={`/admin/minutes?mode=new&minutesId=${entry.id}`}
+                      className="text-xs font-semibold text-primary"
+                    >
+                      Edit
+                    </Link>
+                  </div>
                 </div>
                 {entry.agenda.length ? (
                   <p className="text-xs text-slate-500">
@@ -150,7 +159,7 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
                   <p className="text-xs text-slate-500">{formatAttendanceSummary(entry.attendance)}</p>
                 ) : null}
                 <p className="text-xs text-slate-500">
-                  Recorded by {entry.recordedBy} • {formatDateLabel(entry.createdAt)}
+                  Recorded by {resolveActorLabel(entry.recordedBy)} • {formatDateLabel(entry.createdAt)}
                 </p>
                 {entry.approvalNotes ? (
                   <p className="text-xs text-slate-500">Approval notes: {entry.approvalNotes}</p>

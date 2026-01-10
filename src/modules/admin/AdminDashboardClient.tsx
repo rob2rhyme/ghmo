@@ -14,6 +14,7 @@ import {
   minutesStatusLabels,
   minutesStatusPillClasses
 } from "@/src/lib/minutes";
+import { resolveActorLabel, resolveActorName } from "@/src/lib/actor";
 import { useSearchParams } from "next/navigation";
 import MinutesPreview, { MinutesPreviewData } from "@/src/features/minutes/components/MinutesPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
@@ -425,7 +426,7 @@ export default function AdminDashboardClient({
   const displayEventTitle = selectedEvent?.title || editingEntry?.eventTitle;
   const displayEventDateMs = selectedEvent?.startsAtMs ?? editingEntry?.eventDate ?? null;
   const displayEventDate = displayEventDateMs ? new Date(displayEventDateMs).toLocaleString() : null;
-  const adminRecordedBy = adminActor.email ?? adminActor.name ?? adminActor.uid ?? "Admin";
+  const adminRecordedBy = resolveActorName(adminActor);
   const sortedMinutesEntries = useMemo(
     () => [...minutesEntries].sort((a, b) => (b.eventDate || 0) - (a.eventDate || 0)),
     [minutesEntries]
@@ -455,7 +456,7 @@ export default function AdminDashboardClient({
       decisions,
       actionItems,
       attendance,
-      recordedBy: editingEntry?.recordedBy ?? adminRecordedBy,
+      recordedBy: resolveActorName(editingEntry?.recordedBy ?? adminRecordedBy),
       signatures: formState.signatures,
       approvalNotes: approvalNotesInput.trim() || undefined
     };
@@ -1050,14 +1051,14 @@ export default function AdminDashboardClient({
                 <div className="mt-2 space-y-1 text-xs text-slate-500">
                   {entry.submittedAt ? (
                     <p>
-                      Submitted by {entry.submittedByUid || "—"} • {formatTimestamp(entry.submittedAt)}
+                      Submitted by {resolveActorLabel({ roles: ["admin"] })} • {formatTimestamp(entry.submittedAt)}
                     </p>
                   ) : entry.status === "draft" ? (
                     <p>Draft minutes can be updated before submission.</p>
                   ) : null}
                   {entry.approvedAt ? (
                     <p>
-                      Approved by {entry.approvedByUid || "—"} • {formatTimestamp(entry.approvedAt)}
+                      Approved by {resolveActorLabel({ roles: ["admin"] })} • {formatTimestamp(entry.approvedAt)}
                     </p>
                   ) : null}
                 </div>
@@ -1103,7 +1104,7 @@ export default function AdminDashboardClient({
                   </div>
                 ) : null}
                 <p className="mt-2 text-xs text-slate-500">
-                  Recorded by {entry.recordedBy} •{" "}
+                  Recorded by {resolveActorLabel(entry.recordedBy)} •{" "}
                   {entry.createdAt ? formatTimestamp(entry.createdAt) : "—"}
                 </p>
                 {entry.approvalNotes ? (
@@ -1145,7 +1146,7 @@ export default function AdminDashboardClient({
                     {log.createdAtMs ? new Date(log.createdAtMs).toLocaleString() : ""}
                   </span>
                 </div>
-                <p className="text-xs text-slate-600">Actor: {log.actorUid || "n/a"} | Role: {log.role || "n/a"}</p>
+                <p className="text-xs text-slate-600">Actor: {resolveActorLabel(log.actor ?? { role: log.role })}</p>
                 {log.metadata && (log.metadata.eventId || log.metadata.timelineId || log.metadata.action) ? (
                   <p className="text-xs text-slate-500">
                     {log.metadata.eventId ? `Event: ${log.metadata.eventId} ` : ""}

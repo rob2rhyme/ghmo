@@ -1,3 +1,4 @@
+//app/(admin)/admin/events/page.tsx
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
@@ -18,7 +19,9 @@ export default async function AdminEventsPage() {
     redirect("/admin/login");
   }
 
-  const res = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/admin/events`);
+  const res = await internalFetch(
+    `/api/organizations/${COMMUNITY_SLUG}/admin/events`
+  );
   if (!res.ok) throw new Error("Failed to load events");
   const { events } = (await res.json()) as {
     events: {
@@ -39,7 +42,10 @@ export default async function AdminEventsPage() {
           <h1 className="text-2xl font-semibold">Events</h1>
           <p className="text-sm text-slate-600">Manage organization events</p>
         </div>
-        <Link href="/admin/events/new" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90">
+        <Link
+          href="/admin/events/new"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
+        >
           New Event
         </Link>
       </div>
@@ -54,28 +60,52 @@ export default async function AdminEventsPage() {
         </div>
         <div className="divide-y divide-slate-100">
           {events.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-600">No events yet.</div>
+            <div className="px-4 py-3 text-sm text-slate-600">
+              No events yet.
+            </div>
           ) : (
-            events.map(evt => (
-              <div key={evt.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
+            events.map((evt) => (
+              <div
+                key={evt.id}
+                className="grid grid-cols-7 items-center px-4 py-3 text-sm"
+              >
                 <div className="col-span-2">
-                  <div className="font-semibold text-slate-900">{evt.title}</div>
-                  {evt.summary ? <div className="text-xs text-slate-600 line-clamp-2">{evt.summary}</div> : null}
+                  <div className="font-semibold text-slate-900">
+                    {evt.title}
+                  </div>
+                  {evt.summary ? (
+                    <div className="text-xs text-slate-600 line-clamp-2">
+                      {evt.summary}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="text-xs text-slate-700">
                   {(() => {
                     if (!evt.startsAt) return "—";
-                    if (typeof evt.startsAt === "object" && "toDate" in evt.startsAt && typeof evt.startsAt.toDate === "function") {
+                    if (
+                      typeof evt.startsAt === "object" &&
+                      "toDate" in evt.startsAt &&
+                      typeof evt.startsAt.toDate === "function"
+                    ) {
                       return new Date(evt.startsAt.toDate()).toLocaleString();
                     }
-                    return new Date(evt.startsAt as Date | number).toLocaleString();
+                    return new Date(
+                      evt.startsAt as Date | number
+                    ).toLocaleString();
                   })()}
                 </div>
-                <div className="text-xs font-semibold capitalize">{evt.status}</div>
+                <div className="text-xs font-semibold capitalize">
+                  {evt.status}
+                </div>
                 <div className="text-xs">{evt.featured ? "Yes" : "No"}</div>
-                <div className="text-xs">{evt.announcementDocTemplate || "—"}</div>
+                <div className="text-xs">
+                  {evt.announcementDocTemplate || "—"}
+                </div>
                 <div className="text-right">
-                  <Link href={`/admin/events/${evt.id}/edit`} className="text-sm font-semibold text-primary hover:underline">
+                  <Link
+                    href={`/admin/events/${evt.id}/edit`}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
                     Edit
                   </Link>
                 </div>

@@ -1,3 +1,4 @@
+//app/(admin)/admin/document-generator/page.tsx
 import { redirect } from "next/navigation";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -14,7 +15,9 @@ type DocumentGeneratorPageProps = {
   };
 };
 
-export default async function DocumentGeneratorPage({ searchParams }: DocumentGeneratorPageProps) {
+export default async function DocumentGeneratorPage({
+  searchParams,
+}: DocumentGeneratorPageProps) {
   try {
     await requireActiveAdmin(undefined, COMMUNITY_SLUG);
   } catch (error) {
@@ -33,7 +36,8 @@ export default async function DocumentGeneratorPage({ searchParams }: DocumentGe
     <div className="space-y-6 md:space-y-8">
       {docMissing ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          Document <span className="font-semibold">{docId}</span> was not found. Showing a fresh builder below.
+          Document <span className="font-semibold">{docId}</span> was not found.
+          Showing a fresh builder below.
         </div>
       ) : null}
       <DocBuilder
