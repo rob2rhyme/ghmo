@@ -4,34 +4,53 @@ import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { eventsCollectionPath, ensureOrgSlug, normalizeEvent, DEFAULT_TIMEZONE } from "@/src/lib/events";
 import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest, { params }: { params: { orgSlug: string; eventId: string } }) {
-  if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const member = await assertMember(req);
-  if (!member) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
+  }
 
-  const db = getAdminDb();
-  const primaryRef = db.collection(eventsCollectionPath(params.orgSlug)).doc(params.eventId);
-  const primarySnap = await primaryRef.get();
-  const fallbackSnap = primarySnap.exists
-    ? null
-    : await db.collection(`community/${COMMUNITY_ID}/events`).doc(params.eventId).get();
-  const docSnap = primarySnap.exists ? primarySnap : fallbackSnap;
-  if (!docSnap?.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const event = normalizeEvent(docSnap);
-  if (event.status !== "published") return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const member = await assertMember(req);
+    if (!member) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const buffer = await renderEventPdf(event);
-  const fileName = `${event.title || "Event"} Announcement.pdf`;
-  return new NextResponse(buffer, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${fileName.replace(/"/g, "")}"`
+    const db = getAdminDb();
+    const primaryRef = db.collection(eventsCollectionPath(params.orgSlug)).doc(params.eventId);
+    const primarySnap = await primaryRef.get();
+    const fallbackSnap = primarySnap.exists
+      ? null
+      : await db.collection(`community/${COMMUNITY_ID}/events`).doc(params.eventId).get();
+    const docSnap = primarySnap.exists ? primarySnap : fallbackSnap;
+    if (!docSnap?.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const event = normalizeEvent(docSnap);
+    if (event.status !== "published") return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const buffer = await renderEventPdf(event);
+    const fileName = `${event.title || "Event"} Announcement.pdf`;
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${fileName.replace(/"/g, "")}"`
+      }
+    });
+  } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: error.issues },
+        { status: 503 }
+      );
     }
-  });
+    throw error;
+  }
 }
 
 async function renderEventPdf(event: any): Promise<Uint8Array> {

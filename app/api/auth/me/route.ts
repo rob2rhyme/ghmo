@@ -3,6 +3,7 @@ import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,14 @@ async function loadActorSnapshot(orgSlug: string, authUid?: string | null, email
 }
 
 export async function GET(req: NextRequest) {
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
+  }
+
   const ctx = await getAuthContextFromRequest(req);
   const decodedInfo = ctx
     ? {
@@ -79,6 +88,12 @@ export async function GET(req: NextRequest) {
       actor: actorSnapshot ?? { roles: ["admin"] }
     });
   } catch (err) {
+    if (err instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: err.issues },
+        { status: 503 }
+      );
+    }
     if (err instanceof AdminAccessError) {
       console.warn("Auth/me admin guard failed", { uid: ctx.uid, reason: err.reason });
       return NextResponse.json({

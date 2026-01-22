@@ -90,3 +90,11 @@ export function getAdminServerEnv(): FullServerEnv {
     throw err;
   }
 }
+
+export function getAdminEnvStatus() {
+  const missing = adminEnvKeys.filter(key => {
+    const value = process.env[key];
+    return !value || value.trim().length === 0;
+  });
+  return { ok: missing.length === 0, missing };
+}

@@ -6,6 +6,7 @@ import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { orgDocumentsCollectionPath } from "@/src/lib/firestorePaths";
 import { FieldValue } from "firebase-admin/firestore";
 import { decryptSignature } from "@/src/lib/signatureEncryption";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,14 @@ function toDate(value: unknown): Date | undefined {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { sessionId: string } }) {
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
+  }
+
   try {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const payload = (await req.json().catch(() => ({}))) as FinalizePayload;
@@ -104,6 +113,12 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
 
     return NextResponse.json({ ok: true, documentId: savedRef.id });
   } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: error.issues },
+        { status: 503 }
+      );
+    }
     if (error instanceof AdminAccessError) {
       return NextResponse.json(
         { error: "Unauthorized", reason: error.reason ?? "ADMIN_ACCESS_DENIED" },

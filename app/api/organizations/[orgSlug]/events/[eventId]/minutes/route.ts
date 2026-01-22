@@ -5,6 +5,7 @@ import { eventsCollectionPath } from "@/src/lib/events";
 import { COMMUNITY_ID } from "@/src/lib/community";
 import { orgMinutesCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlain } from "@/src/lib/serialize.server";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,31 +21,49 @@ async function findEventDoc(orgSlug: string, eventId: string) {
 }
 
 export async function GET(req: NextRequest, { params }: { params: { orgSlug: string; eventId: string } }) {
-  if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const eventSnap = await findEventDoc(params.orgSlug, params.eventId);
-  if (!eventSnap) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const eventData = eventSnap.data() || {};
-  if (eventData.status !== "published") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
   }
 
-  const db = getAdminDb();
-  const minutesSnap = await db
-    .collection(orgMinutesCollectionPath(params.orgSlug))
-    .where("eventId", "==", params.eventId)
-    .limit(1)
-    .get();
+  try {
+    if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (minutesSnap.empty) {
-    return NextResponse.json({ ok: true, minutes: null });
-  }
+    const eventSnap = await findEventDoc(params.orgSlug, params.eventId);
+    if (!eventSnap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const doc = minutesSnap.docs[0];
-  const data = doc.data() as Record<string, any>;
-  if (data.status !== "approved") {
-    return NextResponse.json({ ok: true, minutes: null });
+    const eventData = eventSnap.data() || {};
+    if (eventData.status !== "published") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const db = getAdminDb();
+    const minutesSnap = await db
+      .collection(orgMinutesCollectionPath(params.orgSlug))
+      .where("eventId", "==", params.eventId)
+      .limit(1)
+      .get();
+
+    if (minutesSnap.empty) {
+      return NextResponse.json({ ok: true, minutes: null });
+    }
+
+    const doc = minutesSnap.docs[0];
+    const data = doc.data() as Record<string, any>;
+    if (data.status !== "approved") {
+      return NextResponse.json({ ok: true, minutes: null });
+    }
+    return NextResponse.json({ ok: true, minutes: toPlain({ id: doc.id, ...data }) });
+  } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: error.issues },
+        { status: 503 }
+      );
+    }
+    throw error;
   }
-  return NextResponse.json({ ok: true, minutes: toPlain({ id: doc.id, ...data }) });
 }

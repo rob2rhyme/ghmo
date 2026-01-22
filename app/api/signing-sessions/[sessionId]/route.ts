@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,14 @@ function toDate(value: unknown): Date | undefined {
 }
 
 export async function GET(_: Request, { params }: { params: { sessionId: string } }) {
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
+  }
+
   try {
     const sessionRef = getAdminDb().collection("signingSessions").doc(params.sessionId);
     const snapshot = await sessionRef.get();
@@ -34,6 +43,12 @@ export async function GET(_: Request, { params }: { params: { sessionId: string 
       expiresAt: expiresAt?.toISOString()
     });
   } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: error.issues },
+        { status: 503 }
+      );
+    }
     console.error("Failed to load public signing session", error);
     return NextResponse.json({ error: "Failed to load session" }, { status: 500 });
   }

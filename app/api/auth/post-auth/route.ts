@@ -3,8 +3,19 @@ import { getAdminAuth, getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail, normalizeMemberName } from "@/src/lib/members";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
+  }
+
   const token = req.headers.get("authorization")?.replace(/Bearer\s+/i, "");
   if (!token) return NextResponse.json({ ok: false });
 
@@ -40,6 +51,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: err.issues },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ ok: false });
   }
 }

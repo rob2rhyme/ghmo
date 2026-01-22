@@ -7,8 +7,11 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
 import { COMMUNITY_ID } from "@/src/lib/community";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 const ROUTE = "/api/auth/dev/admin-session";
+
+export const dynamic = "force-dynamic";
 
 function buildMeta(req: NextRequest) {
   return {
@@ -19,112 +22,130 @@ function buildMeta(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (process.env.ALLOW_DEV_ADMIN_LOGIN !== "true") {
-    return new Response("Not Found", { status: 404 });
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
   }
 
-  const tokenGate = process.env.DEV_ADMIN_LOGIN_TOKEN?.trim();
-  if (tokenGate) {
-    const providedToken =
-      req.headers.get("x-dev-login-token") ?? new URL(req.url).searchParams.get("token");
-    if (!providedToken || providedToken !== tokenGate) {
+  try {
+    if (process.env.ALLOW_DEV_ADMIN_LOGIN !== "true") {
       return new Response("Not Found", { status: 404 });
     }
-  }
 
-  const body = (await req.json()) as { orgSlug?: string; email?: string };
-
-  const orgSlug = body.orgSlug?.trim();
-  if (!orgSlug) {
-    return NextResponse.json({ error: "Missing organization" }, { status: 400 });
-  }
-
-  const emailValue = body.email?.trim();
-  const emailLower = normalizeMemberEmail(emailValue);
-  if (!emailLower) {
-    return NextResponse.json({ error: "Email required" }, { status: 400 });
-  }
-
-  const db = getAdminDb();
-  const snapshot = await db
-    .collection(orgAdminsCollectionPath(orgSlug))
-    .where("emailLower", "==", emailLower)
-    .limit(1)
-    .get();
-  if (snapshot.empty) {
-    return NextResponse.json({ error: "Admin not found" }, { status: 404 });
-  }
-
-  const adminDoc = snapshot.docs[0];
-  const adminData = adminDoc.data();
-  if (adminData.status !== "active") {
-    return NextResponse.json({ error: "Admin disabled" }, { status: 403 });
-  }
-
-  const roles = Array.isArray(adminData.roles) ? (adminData.roles as string[]) : [];
-  const role: Role = (roles[0] as Role) ?? "admin";
-
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (!apiKey) {
-    console.warn("Missing NEXT_PUBLIC_FIREBASE_API_KEY; cannot issue dev session");
-    return NextResponse.json({ error: "Dev login unavailable" }, { status: 503 });
-  }
-
-  const customToken = await issueCustomToken(adminDoc.id, role);
-
-  const identityRes = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: customToken, returnSecureToken: true })
+    const tokenGate = process.env.DEV_ADMIN_LOGIN_TOKEN?.trim();
+    if (tokenGate) {
+      const providedToken =
+        req.headers.get("x-dev-login-token") ?? new URL(req.url).searchParams.get("token");
+      if (!providedToken || providedToken !== tokenGate) {
+        return new Response("Not Found", { status: 404 });
+      }
     }
-  );
-  const identityPayload = await identityRes.json().catch(() => ({}));
-  if (!identityRes.ok) {
-    console.error("Dev session sign-in failed", { status: identityRes.status, body: identityPayload });
-    return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
-  }
 
-  const idToken = identityPayload.idToken as string | undefined;
-  if (!idToken) {
-    return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
-  }
+    const body = (await req.json()) as { orgSlug?: string; email?: string };
 
-  const decoded = await verifyIdToken(idToken);
+    const orgSlug = body.orgSlug?.trim();
+    if (!orgSlug) {
+      return NextResponse.json({ error: "Missing organization" }, { status: 400 });
+    }
 
-  await db.doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
-    {
-      lastLoginAt: Timestamp.now(),
-      authUid: decoded.uid
-    },
-    { merge: true }
-  );
+    const emailValue = body.email?.trim();
+    const emailLower = normalizeMemberEmail(emailValue);
+    if (!emailLower) {
+      return NextResponse.json({ error: "Email required" }, { status: 400 });
+    }
 
-  await logAuditEvent({
-    orgSlug,
-    action: "login_dev",
-    actor: {
-      uid: decoded.uid,
+    const db = getAdminDb();
+    const snapshot = await db
+      .collection(orgAdminsCollectionPath(orgSlug))
+      .where("emailLower", "==", emailLower)
+      .limit(1)
+      .get();
+    if (snapshot.empty) {
+      return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+    }
+
+    const adminDoc = snapshot.docs[0];
+    const adminData = adminDoc.data();
+    if (adminData.status !== "active") {
+      return NextResponse.json({ error: "Admin disabled" }, { status: 403 });
+    }
+
+    const roles = Array.isArray(adminData.roles) ? (adminData.roles as string[]) : [];
+    const role: Role = (roles[0] as Role) ?? "admin";
+
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (!apiKey) {
+      console.warn("Missing NEXT_PUBLIC_FIREBASE_API_KEY; cannot issue dev session");
+      return NextResponse.json({ error: "Dev login unavailable" }, { status: 503 });
+    }
+
+    const customToken = await issueCustomToken(adminDoc.id, role);
+
+    const identityRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: customToken, returnSecureToken: true })
+      }
+    );
+    const identityPayload = await identityRes.json().catch(() => ({}));
+    if (!identityRes.ok) {
+      console.error("Dev session sign-in failed", { status: identityRes.status, body: identityPayload });
+      return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
+    }
+
+    const idToken = identityPayload.idToken as string | undefined;
+    if (!idToken) {
+      return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
+    }
+
+    const decoded = await verifyIdToken(idToken);
+
+    await db.doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
+      {
+        lastLoginAt: Timestamp.now(),
+        authUid: decoded.uid
+      },
+      { merge: true }
+    );
+
+    await logAuditEvent({
+      orgSlug,
+      action: "login_dev",
+      actor: {
+        uid: decoded.uid,
+        adminId: adminDoc.id,
+        name: adminData.name as string | undefined,
+        email: adminData.email as string | undefined,
+        role
+      },
+      resource: { type: "admin_session", summary: "Dev login bypass" },
+      meta: { ...buildMeta(req), emailLower }
+    });
+
+    const sessionResponse = createSessionResponse(req, idToken, { devLogin: true, adminId: adminDoc.id });
+    console.info("Dev login granted", {
+      orgSlug,
       adminId: adminDoc.id,
-      name: adminData.name as string | undefined,
-      email: adminData.email as string | undefined,
-      role
-    },
-    resource: { type: "admin_session", summary: "Dev login bypass" },
-    meta: { ...buildMeta(req), emailLower }
-  });
-
-  const sessionResponse = createSessionResponse(req, idToken, { devLogin: true, adminId: adminDoc.id });
-  console.info("Dev login granted", {
-    orgSlug,
-    adminId: adminDoc.id,
-    emailLower,
-    cookiesAttached: true
-  });
-  console.warn("[AUTH] Dev admin-session endpoint used", {
-    orgSlug,
-    adminId: adminDoc.id
-  });
-  return sessionResponse;
+      emailLower,
+      cookiesAttached: true
+    });
+    console.warn("[AUTH] Dev admin-session endpoint used", {
+      orgSlug,
+      adminId: adminDoc.id
+    });
+    return sessionResponse;
+  } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: error.issues },
+        { status: 503 }
+      );
+    }
+    throw error;
+  }
 }

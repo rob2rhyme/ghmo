@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { encryptSignature, parsePngDataUrl } from "@/src/lib/signatureEncryption";
+import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,14 @@ function toDate(value: unknown): Date | undefined {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { sessionId: string } }) {
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json(
+      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { status: 503 }
+    );
+  }
+
   try {
     const payload = (await req.json().catch(() => ({}))) as SignPayload;
     if (!payload.dataUrl) {
@@ -50,6 +59,12 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json(
+        { error: "Admin env not configured", missing: error.issues },
+        { status: 503 }
+      );
+    }
     console.error("Failed to sign session", error);
     return NextResponse.json({ error: "Failed to submit signature" }, { status: 500 });
   }
