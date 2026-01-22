@@ -48,12 +48,15 @@
     "glob": "10.5.0",
     "undici": "6.23.0",
     "protobufjs": "7.5.4",
-    "lodash": "4.17.21",
+    "lodash": "4.17.23",
     "@jsdoc/salty": {
-      "lodash": "4.17.21"
+      "lodash": "4.17.23"
     },
     "requizzle": {
-      "lodash": "4.17.21"
+      "lodash": "4.17.23"
+    },
+    "catharsis": {
+      "lodash": "4.17.23"
     }
   }
 }
