@@ -7,26 +7,63 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
 });
 
 export const LETTERHEAD_STYLES = `
+  * {
+    box-sizing: border-box;
+  }
   .ghmo-letter-headline {
     font-size: 1.8rem;
     font-weight: 700;
     letter-spacing: 0.01em;
     margin-bottom: 0.5rem;
+    color: #111;
   }
   .ghmo-letter-meta {
     font-size: 0.85rem;
-    color: #475569;
-    margin-bottom: 1.5rem;
+    color: #334155;
+    margin-bottom: 1.2rem;
   }
   .ghmo-letter-body {
     font-size: 1rem;
-    line-height: 1.7;
-    color: #0f172a;
+    line-height: 1.65;
+    color: #111;
+    background: transparent;
+  }
+  .ghmo-letter-body p {
+    margin: 0 0 0.85rem;
+  }
+  .ghmo-letter-body p:last-child {
+    margin-bottom: 0;
   }
   .ghmo-letter-footer {
-    margin-top: 2rem;
+    margin-top: 1.6rem;
     font-size: 0.9rem;
-    color: #475569;
+    color: #334155;
+  }
+  .ghmo-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  @media print {
+    @page {
+      margin: 0.6in 0.7in 0.85in;
+    }
+    body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .ghmo-letter-headline,
+    .ghmo-letter-meta,
+    .ghmo-letter-body,
+    .ghmo-letter-footer {
+      color: #111;
+    }
+    .ghmo-letter-body {
+      line-height: 1.6;
+    }
+    p {
+      orphans: 3;
+      widows: 3;
+    }
   }
 `;
 

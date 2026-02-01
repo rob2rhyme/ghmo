@@ -7,6 +7,45 @@ export const weddingCertificate: DocTemplate = {
   title: "Wedding Certificate",
   category: "Certificate",
   description: "Create a Magar Community marriage certificate with bilingual cultural acknowledgements.",
+  steps: [
+    {
+      id: "document-details",
+      title: "Document Details",
+      fieldKeys: ["certificateNumber", "issueDate", "issuingAuthority", "officialSeal"]
+    },
+    {
+      id: "recipient-parties",
+      title: "Recipient/Parties",
+      fieldKeys: [
+        "groomName",
+        "brideName",
+        "brideEthnicity",
+        "brideEthnicityOther",
+        "maitiRepresentativeName",
+        "maitiRepresentativeRole",
+        "maitiRepresentativeRoleOther",
+        "maitiWitnessNote"
+      ]
+    },
+    {
+      id: "event-main-content",
+      title: "Event/Main Content",
+      fieldKeys: ["marriageDate", "ceremonyPlace", "optionalVowsEnabled", "customBlessing"]
+    },
+    {
+      id: "additional-details",
+      title: "Additional Details",
+      fieldKeys: [
+        "witness1Name",
+        "witness2Name",
+        "officiantName",
+        "officiantTitle",
+        "witness1Signature",
+        "witness2Signature",
+        "officiantSignature"
+      ]
+    }
+  ],
   fields: [
     { id: "groomName", label: "Groom Name / दुलहाको नाम", type: "text", placeholder: "Saurav Rai", required: true },
     { id: "brideName", label: "Bride Name / दुलहीको नाम", type: "text", placeholder: "Amrita Gurung", required: true },
@@ -149,6 +188,8 @@ export const weddingCertificate: DocTemplate = {
     }
   ],
   renderHtml(inputs) {
+    const organizationName =
+      escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
     const emptyLine = "____________________________________";
     const groomName = escapeHtml(inputs.groomName) || emptyLine;
     const brideName = escapeHtml(inputs.brideName) || emptyLine;
@@ -238,10 +279,11 @@ export const weddingCertificate: DocTemplate = {
           .doc-page {
             width: 8.5in;
             max-width: 100%;
-            min-height: 11in;
+            min-height: 100%;
             box-sizing: border-box;
-            padding: 0.6in 0.6in 0.85in;
-            background: #fff;
+            padding: 0;
+            background: transparent;
+            color: #111;
           }
           .doc-page,
           .doc-page * {
@@ -251,8 +293,8 @@ export const weddingCertificate: DocTemplate = {
           }
           .ghmo-cert {
             font-family: "Georgia", "Times New Roman", serif;
-            color: #1f2933;
-            line-height: 1.55;
+            color: #111;
+            line-height: 1.6;
             font-size: 0.95rem;
             max-width: 720px;
             margin: 0 auto;
@@ -290,7 +332,7 @@ export const weddingCertificate: DocTemplate = {
           .ghmo-cert-heading {
             font-size: 1.05rem;
             font-weight: 700;
-            margin: 0 0 0.5rem;
+            margin: 0 0 0.45rem;
             break-after: avoid;
             page-break-after: avoid;
           }
@@ -306,16 +348,18 @@ export const weddingCertificate: DocTemplate = {
             grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr);
             gap: 0.5rem;
             margin-bottom: 0.4rem;
-            align-items: baseline;
+            align-items: end;
           }
           .ghmo-cert-label {
             font-weight: 600;
           }
           .ghmo-cert-value {
             border-bottom: 1px solid #3e4c59;
-            min-height: 1.2rem;
-            padding-bottom: 0.1rem;
-            display: block;
+            min-height: 1.35rem;
+            padding-bottom: 0.18rem;
+            display: flex;
+            align-items: flex-end;
+            line-height: 1.2;
           }
           .ghmo-cert-note {
             font-size: 0.9rem;
@@ -323,7 +367,7 @@ export const weddingCertificate: DocTemplate = {
           }
           .ghmo-cert-blessing {
             border: 1px solid #e4e7eb;
-            background: #f8f9fb;
+            background: rgba(248, 249, 251, 0.85);
             border-radius: 8px;
             padding: 0.75rem;
           }
@@ -338,8 +382,11 @@ export const weddingCertificate: DocTemplate = {
           }
           .ghmo-cert-line {
             border-bottom: 1px solid #3e4c59;
-            min-height: 1.2rem;
-            padding-bottom: 0.15rem;
+            min-height: 1.35rem;
+            padding-bottom: 0.18rem;
+            display: flex;
+            align-items: flex-end;
+            line-height: 1.2;
           }
           .ghmo-cert-signature-image {
             display: block;
@@ -374,13 +421,17 @@ export const weddingCertificate: DocTemplate = {
           }
           @media print {
             @page {
-              margin: 0.5in 0.6in 0.75in;
+              margin: 0.6in 0.7in 0.85in;
             }
             .doc-page {
               padding: 0;
             }
             .ghmo-cert {
               font-size: 0.92rem;
+            }
+            .ghmo-cert-value,
+            .ghmo-cert-line {
+              padding-bottom: 0.16rem;
             }
             .ghmo-cert-heading {
               break-after: avoid;
@@ -394,7 +445,7 @@ export const weddingCertificate: DocTemplate = {
         </style>
         <div class="ghmo-cert">
           <p class="ghmo-letter-headline ghmo-cert-title">मगर समुदाय विवाह प्रमाणपत्र</p>
-          <p class="ghmo-letter-meta ghmo-cert-brand">Greater Harrisburg Magar Organization</p>
+          <p class="ghmo-letter-meta ghmo-cert-brand">${organizationName}</p>
           <div class="ghmo-cert-divider"></div>
           <div class="ghmo-letter-body ghmo-cert-body">
             <section class="ghmo-cert-section">
@@ -434,7 +485,7 @@ export const weddingCertificate: DocTemplate = {
             </p>
             <p class="ghmo-cert-subheading">Community Recognition (Interethnic Marriage)</p>
             <p class="ghmo-cert-paragraph">
-              In recognition of this interethnic union, the Greater Harrisburg Magar Organization acknowledges and affirms that the Bride, originally from the ${brideEthnicityEn} community, is welcomed and culturally recognized within the Magar community through this marriage, in accordance with Magar customs, mutual consent, and community acceptance.
+              In recognition of this interethnic union, the ${organizationName} acknowledges and affirms that the Bride, originally from the ${brideEthnicityEn} community, is welcomed and culturally recognized within the Magar community through this marriage, in accordance with Magar customs, mutual consent, and community acceptance.
             </p>
             <p class="ghmo-cert-paragraph">
               This acknowledgment was witnessed in the presence of the designated ‘Maiti’ representative from the Magar
@@ -492,7 +543,7 @@ export const weddingCertificate: DocTemplate = {
             </p>
             <p class="ghmo-cert-subheading">सामुदायिक मान्यता (अन्तरजातीय/अन्तरसमुदाय विवाह)</p>
             <p class="ghmo-cert-paragraph">
-              यस अन्तरजातीय/अन्तरसमुदाय विवाहको सन्दर्भमा, Greater Harrisburg Magar Organization (GHMO) ले ${brideEthnicityNp} समुदायकी दुलहीलाई विवाहपश्चात मगर समुदायमा सम्मानपूर्वक स्वागत तथा सांस्कृतिक मान्यता प्रदान गरिएको प्रमाणित गर्दछ, जुन मगर परम्परा, आपसी सहमति र समुदायिक स्वीकारोक्तिअनुसार सम्पन्न भएको हो।
+              यस अन्तरजातीय/अन्तरसमुदाय विवाहको सन्दर्भमा, ${organizationName} (GHMO) ले ${brideEthnicityNp} समुदायकी दुलहीलाई विवाहपश्चात मगर समुदायमा सम्मानपूर्वक स्वागत तथा सांस्कृतिक मान्यता प्रदान गरिएको प्रमाणित गर्दछ, जुन मगर परम्परा, आपसी सहमति र समुदायिक स्वीकारोक्तिअनुसार सम्पन्न भएको हो।
             </p>
             <p class="ghmo-cert-paragraph">
               यो मान्यता मगर समुदायका ‘माईती’ प्रतिनिधि ${maitiRepresentativeName} (${maitiRoleNp}) को

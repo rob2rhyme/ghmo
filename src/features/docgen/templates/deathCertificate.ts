@@ -21,6 +21,8 @@ export const deathCertificate: DocTemplate = {
     }
   ],
   renderHtml(inputs) {
+    const organizationName =
+      escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
     const deceasedName = escapeHtml(inputs.deceasedName) || "Beloved Member";
     const dateOfPassing = formatDate(inputs.dateOfPassing) || "TBD";
     const serviceDate = formatDate(inputs.serviceDate) || "TBD";
@@ -31,7 +33,7 @@ export const deathCertificate: DocTemplate = {
     return `
       <div>
         <p class="ghmo-letter-headline" style="text-align:center;">In Memoriam</p>
-        <p class="ghmo-letter-meta" style="text-align:center;">Greater Harrisburg Magar Organization</p>
+        <p class="ghmo-letter-meta" style="text-align:center;">${organizationName}</p>
         <div class="ghmo-letter-body" style="text-align:center;">
           <p>We honor the passing of</p>
           <p style="font-size:1.4rem; font-weight:600;">${deceasedName}</p>

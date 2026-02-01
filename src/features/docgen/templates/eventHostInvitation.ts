@@ -23,6 +23,8 @@ export const eventHostInvitation: DocTemplate = {
     { id: "supportContact", label: "Contact Information (GHMO)", type: "text", placeholder: "executive@ghmo.org" }
   ],
   renderHtml(inputs) {
+    const organizationName =
+      escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
     const hostName = escapeHtml(inputs.hostName) || "Esteemed Community Leader";
     const leaderCommunity = escapeHtml(inputs.leaderCommunity);
     const eventName = escapeHtml(inputs.eventName) || "Upcoming GHMO Event";
@@ -50,7 +52,7 @@ export const eventHostInvitation: DocTemplate = {
             Your involvement will help strengthen cultural collaboration and awareness across our communities. 
             Please contact us if you have any questions or coordination requests.
           </p>
-          <p class="ghmo-letter-footer">Warm regards,<br/>Greater Harrisburg Magar Organization</p>
+          <p class="ghmo-letter-footer">Warm regards,<br/>${organizationName}</p>
           <p class="ghmo-letter-footer" style="margin-top:0.5rem;">Contact: ${supportContact}</p>
         </div>
       </div>

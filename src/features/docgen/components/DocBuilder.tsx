@@ -7,7 +7,7 @@ import DocForm from "./DocForm";
 import DocPreview from "./DocPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "./LetterheadPage";
 import TemplateTabs from "./TemplateTabs";
-import { DocTemplateMeta } from "../types";
+import { DocField, DocTemplateMeta, DocTemplateStep } from "../types";
 import { getTemplateById } from "../templates";
 
 type DocBuilderProps = {
@@ -50,6 +50,70 @@ const SIGNATURE_IMAGE_BY_ROLE: Record<SignatureRole, string> = {
 const SIGNATURE_IMAGE_KEYS = new Set(
   SIGNATURE_ROLES.map(role => role.inputKey)
 );
+const LOCKED_FIELD_VALUES: Record<string, string> = {
+  organizationName: "Greater Harrisburg Magar Organization"
+};
+const LOCKED_FIELD_IDS = new Set([...Object.keys(LOCKED_FIELD_VALUES), "officialSeal"]);
+const FALLBACK_STEP_TITLES = [
+  "Document Details",
+  "Recipient/Parties",
+  "Event/Main Content",
+  "Additional Details"
+];
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+const buildTemplateSteps = (meta?: DocTemplateMeta): DocTemplateStep[] => {
+  if (!meta) return [];
+  const fieldIds = meta.fields
+    .map(field => field.id)
+    .filter(id => !LOCKED_FIELD_IDS.has(id));
+  if (meta.steps && meta.steps.length > 0) {
+    const cleaned = meta.steps
+      .map(step => ({
+        ...step,
+        fieldKeys: step.fieldKeys.filter(key => fieldIds.includes(key))
+      }))
+      .filter(step => step.fieldKeys.length > 0);
+    const covered = new Set(cleaned.flatMap(step => step.fieldKeys));
+    const missing = fieldIds.filter(id => !covered.has(id));
+    if (missing.length > 0) {
+      if (cleaned.length > 0) {
+        const last = cleaned[cleaned.length - 1];
+        cleaned[cleaned.length - 1] = {
+          ...last,
+          fieldKeys: [...last.fieldKeys, ...missing]
+        };
+      } else {
+        cleaned.push({
+          id: "additional-details",
+          title: "Additional Details",
+          fieldKeys: missing
+        });
+      }
+    }
+    return cleaned;
+  }
+
+  const groupCount = fieldIds.length <= 6 ? 2 : fieldIds.length <= 12 ? 3 : 4;
+  const titles = FALLBACK_STEP_TITLES.slice(0, groupCount);
+  const size = Math.ceil(fieldIds.length / groupCount);
+  return titles.map((title, index) => ({
+    id: slugify(title) || `step-${index + 1}`,
+    title,
+    fieldKeys: fieldIds.slice(index * size, (index + 1) * size)
+  }));
+};
+
+const mapFieldsById = (fields: DocField[]) =>
+  fields.reduce<Map<string, DocField>>((acc, field) => {
+    acc.set(field.id, field);
+    return acc;
+  }, new Map());
 
 export default function DocBuilder({
   templatesMeta,
@@ -64,6 +128,7 @@ export default function DocBuilder({
     if (!defaultTemplateId) return {};
     return { [defaultTemplateId]: initialInputs };
   });
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -84,6 +149,37 @@ export default function DocBuilder({
   );
   const selectedTemplate = useMemo(() => getTemplateById(selectedTemplateId), [selectedTemplateId]);
   const currentInputs = inputsByTemplate[selectedTemplateId] ?? {};
+  const mergedInputs = useMemo(
+    () => ({
+      ...currentInputs,
+      ...LOCKED_FIELD_VALUES
+    }),
+    [currentInputs]
+  );
+  const stepDefinitions = useMemo(
+    () => buildTemplateSteps(selectedTemplateMeta),
+    [selectedTemplateMeta]
+  );
+  const steps = useMemo(
+    () => [
+      ...stepDefinitions,
+      { id: "review-print", title: "Review & Print", fieldKeys: [] }
+    ],
+    [stepDefinitions]
+  );
+  const isReviewStep = activeStepIndex >= steps.length - 1;
+  const activeStep = steps[activeStepIndex];
+  const stepFields = useMemo(() => {
+    if (!selectedTemplateMeta || !activeStep || isReviewStep) return [];
+    const fieldMap = mapFieldsById(selectedTemplateMeta.fields);
+    return activeStep.fieldKeys
+      .map(key => fieldMap.get(key))
+      .filter((field): field is DocField => Boolean(field));
+  }, [activeStep, isReviewStep, selectedTemplateMeta]);
+
+  useEffect(() => {
+    setActiveStepIndex(index => Math.min(index, Math.max(steps.length - 1, 0)));
+  }, [steps.length]);
 
   const handleFieldChange = (fieldId: string, value: string) => {
     setInputsByTemplate(prev => ({
@@ -97,6 +193,7 @@ export default function DocBuilder({
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId);
+    setActiveStepIndex(0);
   };
 
   useEffect(() => {
@@ -107,7 +204,15 @@ export default function DocBuilder({
       issuingAuthority: undefined
     });
     setActiveQrRole(null);
+    setActiveStepIndex(0);
+    setLetterheadReady(false);
   }, [selectedTemplateId]);
+
+  useEffect(() => {
+    if (!isReviewStep) {
+      setLetterheadReady(false);
+    }
+  }, [isReviewStep]);
 
   useEffect(() => {
     const pendingSessions = Object.values(signatureSessions).filter(
@@ -207,6 +312,7 @@ export default function DocBuilder({
         }
         return acc;
       }, {});
+      const lockedInputs = { ...sanitizedInputs, ...LOCKED_FIELD_VALUES };
       const response = await fetch("/api/admin/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -214,7 +320,7 @@ export default function DocBuilder({
           templateId: selectedTemplateMeta.id,
           templateTitle: selectedTemplateMeta.title,
           category: selectedTemplateMeta.category,
-          inputs: sanitizedInputs,
+          inputs: lockedInputs,
           docId: initialDocId
         })
       });
@@ -302,6 +408,7 @@ export default function DocBuilder({
         }
         return acc;
       }, {});
+      const lockedInputs = { ...sanitizedInputs, ...LOCKED_FIELD_VALUES };
       const response = await fetch(
         `/api/admin/signing-sessions/${signedSessions[0].sessionId}/finalize`,
         {
@@ -312,7 +419,7 @@ export default function DocBuilder({
               templateId: selectedTemplateMeta.id,
               templateTitle: selectedTemplateMeta.title,
               category: selectedTemplateMeta.category,
-              inputs: sanitizedInputs,
+              inputs: lockedInputs,
               certificateId: currentInputs.certificateNumber || "",
               pngDataUrl: dataUrl
             },
@@ -374,7 +481,7 @@ export default function DocBuilder({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Document generator</p>
-            <h1 className="text-2xl font-semibold text-slate-900">Letter preview</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Document builder</h1>
             {initialDocId ? (
               <p className="text-xs text-slate-400">Editing saved document ({initialDocId})</p>
             ) : null}
@@ -383,84 +490,183 @@ export default function DocBuilder({
         <div className="hidden lg:block">
           <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
         </div>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="space-y-5 lg:col-span-5 min-w-0">
-            <div className="block lg:hidden">
-              <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
-            </div>
-            {selectedTemplateMeta ? (
-              <>
-                <p className="text-xs uppercase tracking-wide text-slate-400">{selectedTemplateMeta.category}</p>
-                <p className="text-sm text-slate-500">{selectedTemplateMeta.description}</p>
-                <DocForm
-                  fields={selectedTemplateMeta.fields}
-                  values={currentInputs}
-                  onChange={handleFieldChange}
-                  fieldActions={signatureActions}
-                />
-              </>
-            ) : (
-              <p className="text-sm text-slate-500">No template selected.</p>
-            )}
+        <div className="block lg:hidden">
+          <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
+        </div>
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {steps.map((step, index) => {
+              const active = index === activeStepIndex;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => setActiveStepIndex(index)}
+                  className={`rounded-full border px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-wide transition ${
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-slate-200 text-slate-500 hover:border-primary/40 hover:text-slate-700"
+                  }`}
+                >
+                  {step.title}
+                </button>
+              );
+            })}
           </div>
-          <div className="lg:col-span-7 min-w-0">
-            <div className="space-y-2 lg:sticky lg:top-6">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Live preview</p>
-              {selectedTemplate ? (
-                <DocPreview
-                  template={selectedTemplate}
-                  inputs={currentInputs}
-                  ref={previewRef}
-                  onBackgroundLoad={() => setLetterheadReady(true)}
-                />
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-center text-xs text-slate-400">
-                  Add a template to see a preview here.
-                </div>
-              )}
-              <p className="text-xs text-slate-400">
-                Preview is letter-size (8.5x11) and used for export.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-start">
-                <button
-                  type="button"
-                  onClick={() => handleExport("pdf")}
-                  disabled={!selectedTemplate || isExporting || !letterheadReady}
-                  className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                >
-                  Download PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport("jpeg")}
-                  disabled={!selectedTemplate || isExporting || !letterheadReady}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                >
-                  Download JPEG
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={!selectedTemplate || isSaving}
-                  className="rounded-full border border-emerald-400 bg-emerald-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                >
-                  Save to Gallery
-                </button>
-                {signatureEnabled ? (
-                  <button
-                    type="button"
-                    onClick={handleFinalizeSigned}
-                    disabled={!selectedTemplate || isFinalizing || !letterheadReady}
-                    className="rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                  >
-                    Finalize & Save Signed Certificate
-                  </button>
-                ) : null}
-              </div>
-              {statusMessage ? <p className={`text-xs ${statusColor}`}>{statusMessage}</p> : null}
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <p>
+              Step {Math.min(activeStepIndex + 1, steps.length)} of {steps.length}
+            </p>
+            <p className="uppercase tracking-wide">{activeStep?.title}</p>
           </div>
         </div>
+        {selectedTemplateMeta ? (
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/70 p-5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-400">{selectedTemplateMeta.category}</p>
+              <p className="text-sm text-slate-500">{selectedTemplateMeta.description}</p>
+            </div>
+            {!isReviewStep ? (
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-900">{activeStep?.title}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      {stepFields.length} fields
+                    </p>
+                  </div>
+                  <DocForm fields={stepFields} values={mergedInputs} onChange={handleFieldChange} />
+                </div>
+                <div className="flex flex-wrap justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
+                    disabled={activeStepIndex === 0}
+                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveStepIndex(index => Math.min(steps.length - 1, index + 1))}
+                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Letter preview</p>
+                  {selectedTemplate ? (
+                    <DocPreview
+                      template={selectedTemplate}
+                      inputs={mergedInputs}
+                      ref={previewRef}
+                      onBackgroundLoad={() => setLetterheadReady(true)}
+                    />
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-center text-xs text-slate-400">
+                      Add a template to see a preview here.
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-400">
+                    Preview is letter-size (8.5x11) and used for export.
+                  </p>
+                </div>
+                {signatureEnabled ? (
+                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Signature requests</p>
+                      <p className="text-[0.65rem] uppercase tracking-wide text-slate-400">
+                        Request links for mobile signing
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {SIGNATURE_ROLES.map(roleConfig => {
+                        const action = signatureActions?.[SIGNATURE_FIELDS[roleConfig.role]];
+                        if (!action) return null;
+                        return (
+                          <div
+                            key={roleConfig.role}
+                            className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-700">{roleConfig.label}</p>
+                              {action.badge ? (
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700">
+                                  {action.badge}
+                                </span>
+                              ) : null}
+                            </div>
+                            {action.status ? <p className="text-xs text-slate-400">{action.status}</p> : null}
+                            <button
+                              type="button"
+                              onClick={action.onClick}
+                              disabled={action.disabled}
+                              className="mt-3 w-full rounded-full border border-slate-200 px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {action.label}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-start">
+                  <button
+                    type="button"
+                    onClick={() => handleExport("pdf")}
+                    disabled={!selectedTemplate || isExporting || !letterheadReady}
+                    className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                  >
+                    Download PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport("jpeg")}
+                    disabled={!selectedTemplate || isExporting || !letterheadReady}
+                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                  >
+                    Download JPEG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={!selectedTemplate || isSaving}
+                    className="rounded-full border border-emerald-400 bg-emerald-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                  >
+                    Save to Gallery
+                  </button>
+                  {signatureEnabled ? (
+                    <button
+                      type="button"
+                      onClick={handleFinalizeSigned}
+                      disabled={!selectedTemplate || isFinalizing || !letterheadReady}
+                      className="rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                    >
+                      Finalize & Save Signed Certificate
+                    </button>
+                  ) : null}
+                </div>
+                {statusMessage ? <p className={`text-xs ${statusColor}`}>{statusMessage}</p> : null}
+                <div className="flex flex-wrap justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
+                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">No template selected.</p>
+        )}
       </div>
       {activeSession ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">

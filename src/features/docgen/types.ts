@@ -17,12 +17,19 @@ export type DocField = {
   defaultValue?: string;
 };
 
+export type DocTemplateStep = {
+  id: string;
+  title: string;
+  fieldKeys: string[];
+};
+
 export type DocTemplateMeta = {
   id: string;
   title: string;
   category: string;
   description: string;
   fields: DocField[];
+  steps?: DocTemplateStep[];
 };
 
 export type DocTemplate = DocTemplateMeta & {

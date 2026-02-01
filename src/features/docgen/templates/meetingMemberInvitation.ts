@@ -15,6 +15,8 @@ export const meetingMemberInvitation: DocTemplate = {
     { id: "rsvpLink", label: "RSVP Link or Contact", type: "text", placeholder: "https://..." }
   ],
   renderHtml(inputs) {
+    const organizationName =
+      escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
     const memberName = escapeHtml(inputs.memberName) || "Valued Member";
     const meetingDate = formatDate(inputs.meetingDate) || "TBD";
     const meetingTime = escapeHtml(inputs.meetingTime) || "TBD";
@@ -30,7 +32,7 @@ export const meetingMemberInvitation: DocTemplate = {
           <p>Dear ${memberName},</p>
           <p>We are honored to invite you to our next member meeting on ${meetingDate} at ${meetingTime}, which will be hosted at ${location}. Our focus will be on ${agenda}</p>
           <p>Please confirm your attendance by responding via ${rsvpLink}. Your steady presence strengthens our collective impact.</p>
-          <p class="ghmo-letter-footer">With appreciation,<br/>Greater Harrisburg Magar Organization</p>
+          <p class="ghmo-letter-footer">With appreciation,<br/>${organizationName}</p>
         </div>
       </div>
     `;

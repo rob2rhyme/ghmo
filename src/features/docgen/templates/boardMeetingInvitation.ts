@@ -22,6 +22,8 @@ export const boardMeetingInvitation: DocTemplate = {
     { id: "rsvpContact", label: "RSVP / Contact Information", type: "text", placeholder: "board@ghmo.org" }
   ],
   renderHtml(inputs) {
+    const organizationName =
+      escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
     const memberName = escapeHtml(inputs.memberName);
     const meetingTitle = escapeHtml(inputs.meetingTitle) || "Board Meeting";
     const meetingDate = formatDate(inputs.meetingDate) || "TBD";
@@ -37,7 +39,7 @@ export const boardMeetingInvitation: DocTemplate = {
         <div class="ghmo-letter-body">
           <p>Dear ${memberName || "Board Member"},</p>
           <p>
-            We are writing to formally invite you to attend the upcoming Board Meeting of the Greater Harrisburg Magar Organization. 
+            We are writing to formally invite you to attend the upcoming Board Meeting of the ${organizationName}. 
             Your guidance and participation are essential to GHMO’s continued governance and strategic direction.
           </p>
           <p>
@@ -52,7 +54,7 @@ export const boardMeetingInvitation: DocTemplate = {
           <p>
             Your presence and input are highly valued. Please confirm your availability or reach out if you have any questions regarding the meeting.
           </p>
-          <p class="ghmo-letter-footer">Respectfully,<br/>Greater Harrisburg Magar Organization</p>
+          <p class="ghmo-letter-footer">Respectfully,<br/>${organizationName}</p>
           <p class="ghmo-letter-footer" style="margin-top:0.5rem;">RSVP: ${rsvpContact}</p>
         </div>
       </div>

@@ -16,6 +16,8 @@ export const bhajanProgram: DocTemplate = {
     { id: "contact", label: "Contact Person / Info", type: "text", placeholder: "bhajan@ghmo.org" }
   ],
   renderHtml(inputs) {
+    const organizationName =
+      escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
     const hostName = escapeHtml(inputs.hostName) || "GHMO Family";
     const programTitle = escapeHtml(inputs.programTitle) || "Bhajan Program";
     const programDate = formatDate(inputs.programDate) || "TBD";
@@ -38,7 +40,7 @@ export const bhajanProgram: DocTemplate = {
             Please join us with your family and friends as we sing together, share prasadam, and 
             draw strength from our heritage.
           </p>
-          <p class="ghmo-letter-footer">With reverence,<br/>${hostName} · Greater Harrisburg Magar Organization</p>
+          <p class="ghmo-letter-footer">With reverence,<br/>${hostName} · ${organizationName}</p>
           <p class="ghmo-letter-footer" style="margin-top:0.5rem;">Contact: ${contact}</p>
         </div>
       </div>
