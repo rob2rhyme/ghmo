@@ -49,6 +49,7 @@
     "undici": "6.23.0",
     "protobufjs": "7.5.4",
     "lodash": "4.17.23",
+    "fast-xml-parser": "5.3.4",
     "@jsdoc/salty": {
       "lodash": "4.17.23"
     },
