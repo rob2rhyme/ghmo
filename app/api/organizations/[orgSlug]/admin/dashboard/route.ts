@@ -19,7 +19,8 @@ function fail(label: string, error: unknown) {
   return NextResponse.json({ error: "Failed to load admin dashboard", details: `${label}: ${message}` }, { status: 500 });
 }
 
-export async function GET(req: NextRequest, { params }: { params: { orgSlug: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

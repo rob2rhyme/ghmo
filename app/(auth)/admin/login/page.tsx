@@ -1,6 +1,7 @@
 //app/(auth)/admin/login/page.tsx
 
 import { redirect } from "next/navigation";
+import type { Route } from "next";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getServerEnv } from "@/src/lib/env.server";
@@ -17,10 +18,11 @@ export default async function AdminLoginPage({
   searchParams,
 }: AdminLoginPageProps) {
   const nextRoute = searchParams.next;
+  const adminRoute = (nextRoute?.startsWith("/") ? nextRoute : "/admin") as Route;
   const ctx = await getAuthContextFromRequest();
   try {
     await requireActiveAdmin(ctx ?? undefined, COMMUNITY_SLUG);
-    redirect(nextRoute || "/admin");
+    redirect(adminRoute);
   } catch (error) {
     if (error instanceof AdminAccessError) {
       // fall through to login UI

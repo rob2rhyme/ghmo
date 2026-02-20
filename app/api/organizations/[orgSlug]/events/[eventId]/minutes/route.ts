@@ -20,7 +20,8 @@ async function findEventDoc(orgSlug: string, eventId: string) {
   return null;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { orgSlug: string; eventId: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

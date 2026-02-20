@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (!FEATURE_PIN_LOGIN) {
       return NextResponse.json({ error: "PIN login disabled" }, { status: 404 });
     }
-    const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
+    const ip = req.headers.get("x-forwarded-for") || "unknown";
     const userAgent = req.headers.get("user-agent");
     const body = await req.json();
     const { pin, requestedRole } = body as { pin: string; requestedRole: Role };

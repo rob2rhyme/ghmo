@@ -60,7 +60,7 @@ export async function DELETE(req: NextRequest) {
         },
         { merge: true }
       );
-      const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
+      const ip = req.headers.get("x-forwarded-for") || "unknown";
       const userAgent = req.headers.get("user-agent") ?? null;
       await logAuditEvent({
         orgSlug: COMMUNITY_SLUG,

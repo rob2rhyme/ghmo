@@ -14,13 +14,14 @@ const MEMBER_ROUTE_PATH = "/api/organizations/ghmo/members";
 
 function buildAuditMeta(req: NextRequest, route: string) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.ip || "unknown",
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
     userAgent: req.headers.get("user-agent") ?? null,
     route
   };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { orgSlug: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
@@ -58,7 +59,8 @@ type CreateBody = {
   roles?: string[];
 };
 
-export async function POST(req: NextRequest, { params }: { params: { orgSlug: string } }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

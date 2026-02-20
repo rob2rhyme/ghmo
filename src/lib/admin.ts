@@ -80,7 +80,7 @@ export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string
     if (!ctx) {
       ctx = await getAuthContextFromRequest();
     }
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieName = cookieStore.get(SESSION_COOKIE_NAME) ? SESSION_COOKIE_NAME : cookieStore.get(SESSION_COOKIE_NAME_FALLBACK) ? SESSION_COOKIE_NAME_FALLBACK : null;
   }
 

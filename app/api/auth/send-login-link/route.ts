@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
+    const ip = req.headers.get("x-forwarded-for") || "unknown";
     const rateKey = `send-login-link:${COMMUNITY_ID}:${ip}`;
     const rate = checkRateLimit(rateKey, 5, 10 * 60 * 1000);
     if (!rate.success) {

@@ -453,7 +453,7 @@ export default function DocBuilder({
   const signatureEnabled = selectedTemplateId === "wedding-certificate";
   const activeSession = activeQrRole ? signatureSessions[activeQrRole] : undefined;
   const signatureActions = signatureEnabled
-    ? SIGNATURE_ROLES.reduce<Record<string, { label: string; onClick: () => void; status?: string; badge?: string }>>(
+    ? SIGNATURE_ROLES.reduce<Record<string, { label: string; onClick: () => void; status?: string; badge?: string; disabled?: boolean }>>(
         (acc, roleConfig) => {
           const session = signatureSessions[roleConfig.role];
           const status = session?.status;

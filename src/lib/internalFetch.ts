@@ -4,9 +4,9 @@ import { cookies, headers } from "next/headers";
 import { internalApiUrl } from "./serverUrl";
 
 export async function internalFetch(path: string, init: RequestInit = {}) {
-  const url = internalApiUrl(path);
-  const cookieHeader = cookies().toString();
-  const incomingHeaders = headers();
+  const url = await internalApiUrl(path);
+  const cookieHeader = (await cookies()).toString();
+  const incomingHeaders = await headers();
 
   const mergedHeaders = new Headers(init.headers || undefined);
   if (cookieHeader && !mergedHeaders.has("cookie")) mergedHeaders.set("cookie", cookieHeader);
