@@ -8,7 +8,8 @@ import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, { params }: { params: { orgSlug: string; eventId: string } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
@@ -86,7 +87,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { orgSlug: s
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { orgSlug: string; eventId: string } }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

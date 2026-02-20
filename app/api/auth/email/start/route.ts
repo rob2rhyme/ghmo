@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 function buildAuditMeta(req: NextRequest) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.ip || "unknown",
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
     userAgent: req.headers.get("user-agent") ?? null,
     route: "/api/auth/email/start"
   };

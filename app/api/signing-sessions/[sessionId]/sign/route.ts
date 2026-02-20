@@ -20,7 +20,8 @@ function toDate(value: unknown): Date | undefined {
   return undefined;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

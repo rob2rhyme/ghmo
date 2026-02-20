@@ -7,7 +7,8 @@ import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_: Request, { params }: { params: { orgSlug: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ orgSlug: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

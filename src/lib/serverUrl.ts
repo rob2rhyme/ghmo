@@ -2,8 +2,8 @@ import "server-only";
 
 import { headers } from "next/headers";
 
-export function getBaseUrl() {
-  const h = headers();
+export async function getBaseUrl() {
+  const h = await headers();
   const proto = h.get("x-forwarded-proto") ?? "https";
   const host = h.get("x-forwarded-host") ?? h.get("host");
   if (!host) {
@@ -13,7 +13,7 @@ export function getBaseUrl() {
   return `${proto}://${host}`;
 }
 
-export function internalApiUrl(path: string) {
+export async function internalApiUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${getBaseUrl()}${normalizedPath}`;
+  return `${await getBaseUrl()}${normalizedPath}`;
 }

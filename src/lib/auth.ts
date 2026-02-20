@@ -50,9 +50,9 @@ export type MemberAuthContext = {
   roles?: string[];
 };
 
-function extractBearerOrCookieToken(req?: NextRequest) {
-  const cookieStore = cookies();
-  const headerStore = headers();
+async function extractBearerOrCookieToken(req?: NextRequest) {
+  const cookieStore = await cookies();
+  const headerStore = await headers();
   const headerToken =
     req?.headers.get("authorization")?.replace(/Bearer\s+/i, "") ||
     headerStore.get("authorization")?.replace(/Bearer\s+/i, "");
@@ -61,7 +61,7 @@ function extractBearerOrCookieToken(req?: NextRequest) {
 }
 
 export async function getAuthContextFromRequest(req?: NextRequest): Promise<AuthContext | null> {
-  const token = extractBearerOrCookieToken(req);
+  const token = await extractBearerOrCookieToken(req);
   if (!token) return null;
   try {
     const decoded = await verifyIdToken(token);
@@ -85,7 +85,7 @@ export async function getAuthContextFromRequest(req?: NextRequest): Promise<Auth
 }
 
 export async function assertCommunityRole(requiredRole: Role) {
-  const token = extractBearerOrCookieToken();
+  const token = await extractBearerOrCookieToken();
   if (!token) return null;
   const decoded = await verifyIdToken(token);
   const email = (decoded as any).email;
@@ -142,7 +142,7 @@ export async function loadPinByRole(role: Role) {
 }
 
 export async function assertMember(req?: NextRequest): Promise<MemberAuthContext | null> {
-  const token = extractBearerOrCookieToken(req);
+  const token = await extractBearerOrCookieToken(req);
   if (!token) return null;
   try {
     const decoded = await verifyIdToken(token);

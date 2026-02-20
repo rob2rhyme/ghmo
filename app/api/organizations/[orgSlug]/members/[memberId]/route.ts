@@ -14,13 +14,14 @@ const MEMBER_PATCH_ROUTE = "/api/organizations/ghmo/members/[memberId]";
 
 function buildAuditMeta(req: NextRequest, route: string) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.ip || "unknown",
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
     userAgent: req.headers.get("user-agent") ?? null,
     route
   };
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { orgSlug: string; memberId: string } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSlug: string; memberId: string }> }) {
+  const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
