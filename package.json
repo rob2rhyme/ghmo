@@ -15,7 +15,7 @@
     "@react-pdf/renderer": "3.3.0",
     "autoprefixer": "10.4.17",
     "bcryptjs": "2.4.3",
-    "firebase": "10.14.1",
+    "firebase": "12.10.0",
     "firebase-admin": "13.6.1",
     "html-to-image": "1.11.11",
     "jsonwebtoken": "9.0.2",
