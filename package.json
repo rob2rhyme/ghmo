@@ -19,7 +19,7 @@
     "firebase-admin": "13.6.1",
     "html-to-image": "1.11.11",
     "jsonwebtoken": "9.0.2",
-    "jspdf": "^4.2.0",
+    "jspdf": "^4.2.1",
     "nanoid": "5.1.6",
     "next": "16.1.6",
     "next-themes": "^0.2.1",
