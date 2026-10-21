@@ -37,7 +37,9 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - No third-party UI dependencies were added for the communication log UI.
 
 ## Stack
-- Next.js 16 App Router (React 18.2 today; React 19 upgrade is Phase 0), TypeScript, TailwindCSS 3.4 (v4 + shadcn/ui in Phase 2)
+- Next.js 16.4 App Router, React 19.3, TypeScript 5.9, TailwindCSS 3.4 (v4 + shadcn/ui in Phase 2)
+- Node.js 22.12 or newer
+- Tooling: ESLint 9 (flat config, `eslint-config-next`), Vitest (unit), Playwright (browser smoke tests), GitHub Actions CI
 - Firebase Client SDK (Auth/Firestore) + Firebase Admin SDK
 - GoFundMe Pro webhook placeholder + reconcile endpoint
 - @react-pdf/renderer + html-to-image for exports
@@ -136,6 +138,18 @@ Legacy community paths are no longer supported; please migrate any old data into
 4) Set `FEATURE_EMAIL_ADMIN_LOGIN=true` and `FEATURE_PIN_LOGIN=false`.
 5) Allowlist admin emails by creating documents under `organizations/ghmo/admins` (set `emailLower`, `status: "active"`, `roles`, and optional `name`) so the magic-link flow recognizes them.
 6) Configure GoFundMe Pro webhook + reconcile schedule when ready.
+
+## Development Checks
+| Command | What it does |
+|---|---|
+| `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
+| `npm run lint` | ESLint. Fails on any error, or on more than 160 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
+| `npm test` | Vitest unit tests in `tests/unit/` |
+| `npm run build` | Production build. Works without Firebase secrets |
+| `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |
+| `npm run check` | typecheck + lint + unit tests |
+
+CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push to `main`, and fails on critical production advisories from `npm audit`. Dependabot opens weekly update PRs.
 
 ## Security Notes
 > The full threat model, the 17 known findings (S-01 to S-17) and the end-to-end encryption design are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §2–§4. Notable open issues until Phase 1 ships: the GoFundMe script loads on admin pages, disabling an admin does not end their session, and the rate limiter is in-memory only.

@@ -2,11 +2,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import ThemeLogo from "@/src/components/ThemeLogo";
-import { getCommunity } from "@/src/lib/community";
 import MultimediaHomeContent from "@/src/components/Multimedia/MultimediaHomeContent";
 
 export default async function CommunityLanding() {
-  const community = await getCommunity();
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-5xl flex-col items-center justify-center gap-6 px-1 py-12 text-center md:px-6">
       <div className="inline-flex items-center justify-center">

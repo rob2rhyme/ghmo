@@ -58,7 +58,6 @@ const statusHelperText: Record<MinutesStatus, string> = {
   submitted: "Submitted minutes are awaiting approval.",
   approved: "Approved minutes are locked until you return them to draft."
 };
-const SHOW_HOME_CONTENT_BLOCKS = false;
 const SHOW_WEBHOOK_EVENTS = false;
 
 export default function AdminDashboardClient({
@@ -66,12 +65,9 @@ export default function AdminDashboardClient({
   stats,
   webhookEvents,
   auditLogs,
-  blocks,
   minutes,
   adminActor
 }: AdminDashboardProps) {
-  const [blockText, setBlockText] = useState(JSON.stringify(blocks, null, 2));
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [reconcileStatus, setReconcileStatus] = useState<string | null>(null);
 
   const [events, setEvents] = useState<AdminEvent[]>([]);
@@ -93,21 +89,6 @@ export default function AdminDashboardClient({
   const [attendanceExpanded, setAttendanceExpanded] = useState(false);
   const [signaturesExpanded, setSignaturesExpanded] = useState(false);
   const [previewZoomMode, setPreviewZoomMode] = useState<PreviewZoomMode>("fit");
-
-  const saveBlocks = async () => {
-    try {
-      setSaveStatus("Saving...");
-      const parsed = JSON.parse(blockText);
-      await fetch("/api/admin/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blocks: parsed })
-      });
-      setSaveStatus("Saved");
-    } catch (err: any) {
-      setSaveStatus(`Error: ${err.message}`);
-    }
-  };
 
   useEffect(() => {
     let isActive = true;

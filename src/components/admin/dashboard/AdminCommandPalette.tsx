@@ -4,7 +4,7 @@ type AdminCommandPaletteProps = {
   value: string;
   onChange: (value: string) => void;
   onClear: () => void;
-  inputRef?: RefObject<HTMLInputElement>;
+  inputRef?: RefObject<HTMLInputElement | null>;
 };
 
 export default function AdminCommandPalette({ value, onChange, onClear, inputRef }: AdminCommandPaletteProps) {

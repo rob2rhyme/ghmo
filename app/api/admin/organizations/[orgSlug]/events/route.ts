@@ -70,7 +70,6 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const guard = await enforceActiveAdmin(req, params.orgSlug);
     if ("response" in guard) return guard.response;
-    const { actor } = guard;
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");

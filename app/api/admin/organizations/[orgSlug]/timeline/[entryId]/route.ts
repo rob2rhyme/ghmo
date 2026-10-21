@@ -80,8 +80,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
   }
 }
 
-export async function DELETE(req: NextRequest, context: { params: Promise<{ orgSlug: string; entryId: string }> }) {
-  const params = await context.params;
+export async function DELETE(_req: NextRequest, _context: { params: Promise<{ orgSlug: string; entryId: string }> }) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

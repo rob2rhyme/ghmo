@@ -7,8 +7,6 @@ import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { orgMembersCollectionPath } from "./firestorePaths";
 import { normalizeMemberEmail } from "./members";
 
-const adminAuth = getAdminAuth();
-const adminDb = getAdminDb();
 
 export type Role = "member" | "admin";
 
@@ -25,11 +23,11 @@ export async function verifyPin(pin: string, hash: string) {
 
 export async function issueCustomToken(uid: string, role: Role, claims?: Record<string, unknown>) {
   const admin = role === "admin";
-  return adminAuth.createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, admin, ...claims });
+  return getAdminAuth().createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, admin, ...claims });
 }
 
 export async function verifyIdToken(idToken: string) {
-  return adminAuth.verifyIdToken(idToken);
+  return getAdminAuth().verifyIdToken(idToken);
 }
 
 export type AuthContext = {
@@ -130,7 +128,7 @@ export async function logAuthAttempt(params: {
 }
 
 export async function loadPinByRole(role: Role) {
-  const snapshot = await adminDb
+  const snapshot = await getAdminDb()
     .collection(`organizations/${COMMUNITY_SLUG}/pins`)
     .where("role", "==", role)
     .where("status", "==", "active")
@@ -148,7 +146,7 @@ export async function assertMember(req?: NextRequest): Promise<MemberAuthContext
     const decoded = await verifyIdToken(token);
     const emailLower = normalizeMemberEmail(decoded.email);
     if (!emailLower) return null;
-    const memberSnap = await adminDb
+    const memberSnap = await getAdminDb()
       .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
       .where("emailLower", "==", emailLower)
       .where("status", "==", "active")

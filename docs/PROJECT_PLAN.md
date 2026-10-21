@@ -219,3 +219,20 @@ The owner accepted every recommendation.
 | D3 | **PIN login is removed.** | Set `FEATURE_PIN_LOGIN=false` now; code, collection and rules deleted in Phase 1 (S-05, S-17). |
 | D4 | **Silent admin analytics and the leaderboard are dropped.** | Removed from the roadmap (§6). |
 | D5 | **UI library: shadcn/ui.** | Tailwind v4 upgrade + shadcn primitives in Phase 2 (§5.1). |
+
+---
+
+## 8. Progress log
+
+### Phase 0 — Foundation repair · done 2026-10-21
+- **Upgrades:** React 18.2 → 19.3.1, Next 16.1.6 → 16.4.2, next-themes 0.4.6, @react-pdf/renderer 4.9, TypeScript 5.9.3, @types/node 22.
+- **Build without secrets:** `src/lib/auth.ts` no longer connects to Firebase at import time, so `npm run build` works in CI without credentials.
+- **Bug fixed:** the event announcement PDF route sent a stream cast to bytes; it now uses `renderToBuffer`.
+- **Lint:** ESLint 9 flat config with `eslint-config-next`. 0 errors. 160 legacy warnings (mostly `any` and React Compiler hook rules) are capped by `--max-warnings 160`; the cap only goes down. Dead "home content blocks" code removed from the admin dashboard.
+- **Tests:** Vitest (14 unit tests: signature encryption, rate limiter, HTML escaping, email normalization). Playwright smoke tests on desktop and mobile (admin redirect, login page, debug route hidden).
+- **CI:** GitHub Actions runs typecheck, lint, unit, build, e2e and `npm audit --audit-level=critical`. Dependabot weekly.
+- **Dependencies:** production advisories 44 → 18, 0 critical. `package.json` overrides were pinning vulnerable `undici` and `protobufjs`; now pinned to fixed versions. Remaining:
+  - Tailwind 3 file-watcher chain (`braces`, `micromatch`, `chokidar`, `postcss-selector-parser`): build-time only, cleared by the Tailwind v4 upgrade in Phase 2.
+  - `@grpc/grpc-js` 1.9 via the Firebase client and `firebase-admin` (plus `uuid`/`gaxios` via `google-gax`): even Firebase 13 pins this line. Not forced, because Firebase can't be exercised against real credentials in CI. Re-check on each Firebase release.
+- **Owner action:** enable branch protection on `main` requiring the `CI` checks (GitHub → Settings → Branches).
+

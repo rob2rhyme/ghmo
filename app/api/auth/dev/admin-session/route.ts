@@ -6,7 +6,6 @@ import { createSessionResponse } from "@/src/lib/sessionCookies";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
-import { COMMUNITY_ID } from "@/src/lib/community";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 const ROUTE = "/api/auth/dev/admin-session";

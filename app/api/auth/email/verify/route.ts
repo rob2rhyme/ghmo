@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
       oobCode?: string;
       emailLink?: string;
     };
-    let { orgSlug, email, oobCode, emailLink } = body;
+    const { orgSlug, oobCode, emailLink } = body;
+    let { email } = body;
     if (orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });
     let emailLower = normalizeMemberEmail(email);
     let resolvedOobCode = oobCode;

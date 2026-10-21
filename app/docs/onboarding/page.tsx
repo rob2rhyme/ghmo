@@ -15,7 +15,7 @@ export default function OnboardingDocPage() {
         <li>Use the manual reconcile action to sync donation totals after webhook setup.</li>
         <li>
           Allowlist admins by adding docs under `organizations/ghmo/admins` with `emailLower` and
-          `status: "active"` (and optional `name`/`roles`) set.
+          `status: &quot;active&quot;` (and optional `name`/`roles`) set.
         </li>
         <li>
           End-to-end encryption (planned): before it is switched on, two named trustees must each keep a paper copy of

@@ -1,6 +1,6 @@
 //app/(admin)/admin/events/page.tsx
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
-import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminEventsPage() {
-  const community = await getCommunity();
   try {
     await requireActiveAdmin(undefined, COMMUNITY_SLUG);
   } catch (error) {

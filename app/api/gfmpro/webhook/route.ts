@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, duplicate: true });
   }
 
-  let success = true;
+  const success = true;
   if (payload.type?.startsWith("transaction")) {
     const amount = Number(payload.data?.amount || 0);
     if (!Number.isNaN(amount)) {
