@@ -14,7 +14,7 @@ test("third-party script runs on public pages only", async ({ page }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.__THIRD_PARTY_MARKER__)).toBe(1);
 
-  await page.locator('a[href="/admin"]:visible').first().click();
+  await page.getByRole("link", { name: "Admin sign in" }).click();
   await expect(page).toHaveURL(/\/admin\/login/);
   expect(await page.evaluate(() => window.__THIRD_PARTY_MARKER__)).toBeUndefined();
 });

@@ -23,7 +23,16 @@ for (const path of SECURE_PAGES) {
     // instead of network idle. Any blocked script shows up as a console violation.
     await page.waitForLoadState("load");
     await page.waitForTimeout(1500);
-    expect(await page.evaluate(() => document.querySelectorAll("script:not([nonce])[src]").length)).toBe(0);
+    // Every script in the server-rendered HTML must carry this request's nonce.
+    // (Chunks loaded later by those scripts are allowed through 'strict-dynamic'.)
+    const nonce = csp.match(/'nonce-([^']+)'/)?.[1];
+    const html = await (await page.request.get(path)).text();
+    const htmlNonce = (await page.request.get(path)).headers()["content-security-policy"]?.match(/'nonce-([^']+)'/)?.[1];
+    expect(nonce).toBeTruthy();
+    const scriptTags = html.match(/<script\b[^>]*>/g) ?? [];
+    expect(scriptTags.length).toBeGreaterThan(0);
+    expect(scriptTags.every(tag => /\snonce=/.test(tag))).toBe(true);
+    expect(htmlNonce).not.toBe(nonce); // fresh nonce per request
     expect(violations).toEqual([]);
   });
 }

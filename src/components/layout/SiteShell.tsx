@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { headers } from "next/headers";
 import Providers from "@/src/components/Providers";
 import { CommunityHeader } from "@/src/components/community/CommunityHeader";
@@ -37,7 +38,7 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
           {chrome ? (
             <>
               <CommunityHeader name={community.name} />
-              <main className="mx-auto max-w-6xl px-1 py-3 md:px-6 md:py-8">{children}</main>
+              <main className="mx-auto max-w-6xl px-4 py-4 md:px-6 md:py-8">{children}</main>
               <SiteFooter />
             </>
           ) : (
@@ -58,6 +59,10 @@ function SiteFooter() {
           Built from scratch with custom code by Robin Thapa
           <span className="mx-2 inline-block">|</span>
           Copyright © {new Date().getFullYear()} GHMO, All Rights Reserved.
+          <span className="mx-2 inline-block">|</span>
+          <Link href="/admin/login" className="underline-offset-4 hover:underline">
+            Admin sign in
+          </Link>
         </div>
       </div>
     </div>

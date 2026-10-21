@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/src/components/ui/button";
 import { signOut } from "firebase/auth";
 import { getFirebaseAuth } from "@/src/lib/firebaseClient";
 
@@ -35,12 +36,8 @@ export default function SignOutButton() {
   if (signedOut) return null;
 
   return (
-    <button
-      onClick={handleSignOut}
-      disabled={loading}
-      className="rounded-md border border-border px-3 py-1 text-sm font-semibold text-foreground hover:border-primary/60 hover:text-primary disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-primary/60"
-    >
+    <Button type="button" variant="outline" size="sm" onClick={handleSignOut} loading={loading}>
       {loading ? "Signing out…" : "Sign out"}
-    </button>
+    </Button>
   );
 }
