@@ -15,3 +15,9 @@ test("debug cookie route is not exposed in production", async ({ request }) => {
   const response = await request.get("/api/debug/cookies");
   expect(response.status()).toBe(404);
 });
+
+test("unknown URLs get the global 404 page", async ({ page }) => {
+  const response = await page.goto("/this-page-does-not-exist");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});

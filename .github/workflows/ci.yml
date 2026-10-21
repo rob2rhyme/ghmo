@@ -30,6 +30,8 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+          # Marker "third-party" script for tests/e2e/third-party-isolation.spec.ts
+          NEXT_PUBLIC_GOFUNDME_PRO_INSTALL_SNIPPET: "window.__THIRD_PARTY_MARKER__=1;"
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

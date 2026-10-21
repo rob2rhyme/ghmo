@@ -2,6 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 
+// third-party-isolation.spec.ts needs a marker "third-party" script baked into the build
+// (NEXT_PUBLIC_ values are inlined at build time). Build for e2e with:
+//   NEXT_PUBLIC_GOFUNDME_PRO_INSTALL_SNIPPET='window.__THIRD_PARTY_MARKER__=1;' npm run build
+
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: true,
