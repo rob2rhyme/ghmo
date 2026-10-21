@@ -1,3 +1,4 @@
+import { readFile, writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { admin, clearEmulators, collectCspViolations, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "./helpers";
 
@@ -19,6 +20,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
 
   // --- Fill a name, then reach the signature step and request a signature ---
   await page.getByRole("button", { name: "Wedding Certificate" }).first().click();
+  await page.getByPlaceholder("GHMO-2024-001").fill("GHMO-2026-001");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("textbox").first().fill(GROOM);
   const request = page.getByRole("button", { name: "Request", exact: true }).first();
@@ -75,8 +77,15 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
   expect(JSON.stringify(docs.docs[0].data())).not.toContain("Pun");
 
   // --- Finalize: the browser builds and encrypts the PDF; the server stores only ciphertext ---
-  await page.getByRole("button", { name: "Finalize & Save Signed Certificate" }).click();
+  // The preview carries the verification QR code that will be printed on the certificate.
+  expect(await page.content()).toContain("Verification QR code");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Finalize & Save Signed Certificate" }).click()
+  ]);
   await expect(page.getByText(/Signed PDF saved/)).toBeVisible({ timeout: 30_000 });
+  const pdf = await readFile((await download.path())!);
   const all = await db.collection("organizations/ghmo/documents").get();
   const finalized = all.docs.find(d => d.data().status === "finalized")!;
   expect(finalized.data()).toHaveProperty("enc");
@@ -85,6 +94,33 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
   const after = (await sessions.doc(sessionId).get()).data()!;
   expect(after.status).toBe("finalized");
   expect(after).not.toHaveProperty("signatureSealed");
+
+  // --- Anyone can verify the certificate from its QR code, without learning who it is for ---
+  const certificates = await db.collection("certificates").get();
+  expect(certificates.size).toBe(1);
+  const record = certificates.docs[0].data();
+  expect(record).toMatchObject({ certificateId: "GHMO-2026-001", templateId: "wedding-certificate", status: "valid", issuedByUid: "alice" });
+  expect(JSON.stringify(record)).not.toContain("Pun");
+
+  const visitor = await (await browser.newContext()).newPage();
+  await visitor.goto(`/verify/${record.code}`);
+  await expect(visitor.getByText("Genuine certificate")).toBeVisible();
+  await expect(visitor.getByText("GHMO-2026-001")).toBeVisible();
+  await expect(visitor.getByText("Pun")).toHaveCount(0);
+
+  // The exact PDF that was issued checks out; any other file does not.
+  const pick = (name: string, bytes: Buffer) => writeFile(`test-results/${name}`, bytes).then(() => `test-results/${name}`);
+  await visitor.setInputFiles("#verify-pdf", await pick("issued.pdf", pdf));
+  await expect(visitor.getByText("This file is exactly the certificate that was issued.")).toBeVisible();
+  await visitor.setInputFiles("#verify-pdf", await pick("altered.pdf", Buffer.concat([pdf, Buffer.from("x")])));
+  await expect(visitor.getByText(/does not match the issued certificate/)).toBeVisible();
+
+  // Unknown codes and records whose database entry was altered both read as invalid.
+  await visitor.goto("/verify/AAAAAAAAAAAAAAAA");
+  await expect(visitor.getByText("No matching certificate")).toBeVisible();
+  await certificates.docs[0].ref.update({ certificateId: "GHMO-2026-999" });
+  await visitor.goto(`/verify/${record.code}`);
+  await expect(visitor.getByText("No matching certificate")).toBeVisible();
 
   expect(violations).toEqual([]);
 });

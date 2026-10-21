@@ -157,6 +157,13 @@ Legacy community paths are no longer supported; please migrate any old data into
 - **Existing data:** after turning encryption on, run Admin → Encryption → **Encrypt existing records** once. Backups taken earlier still contain plaintext; delete them when no longer needed.
 - **Tests:** `npm run test:e2e:auth` runs the real-browser encryption tests (needs Chromium; set `PLAYWRIGHT_CHROMIUM_PATH` if the bundled browser is missing).
 
+## Governance workflow (Phase 5)
+- **Minutes:** the admin who submits minutes can't approve them. Approval is tied to a fingerprint of the submitted content, so nothing can change during approval; editing submitted minutes sends them back to draft. Each approval keeps an immutable version, and reopening approved minutes needs a written reason and is audited.
+- **Action items:** Admin → Action Items tracks tasks from approved minutes. Status and notes are private (encrypted once encryption is on).
+- **Attendance:** Meeting Minutes → Records → "Export attendance (CSV)" exports what the filters show.
+- **Certificates:** issuing a signed certificate prints a QR code that leads to `/verify/{code}`. The page shows the certificate number, type and issue date (never names) and lets anyone check a PDF copy against the issued file in their browser. Records are HMAC-signed with `CERTIFICATE_SIGNING_KEY_BASE64`, which you must set to issue certificates. The issued PDF downloads when you finalize; keep that file, since re-exported copies won't match its fingerprint.
+- **Templates:** each document template has a version; saved documents remember it.
+
 ## Development Checks
 | Command | What it does |
 |---|---|

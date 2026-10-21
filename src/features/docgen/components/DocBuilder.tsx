@@ -1,6 +1,7 @@
 "use client";
 
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 import * as htmlToImage from "html-to-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import DocForm from "./DocForm";
@@ -72,9 +73,27 @@ const SIGNATURE_IMAGE_BY_ROLE: Record<SignatureRole, string> = {
   officiant: "officiantSignatureImage",
   issuingAuthority: "issuingAuthoritySignatureImage"
 };
-const SIGNATURE_IMAGE_KEYS = new Set(
-  SIGNATURE_ROLES.map(role => role.inputKey)
-);
+// Inputs that exist only while a certificate is being issued; they are never saved with a document.
+const VERIFICATION_KEYS = ["verificationCode", "verificationQrImage", "verificationUrl"];
+const VERIFICATION_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const newVerificationCode = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => VERIFICATION_ALPHABET[byte % 32]).join("");
+
+const bytesToBase64 = (bytes: Uint8Array) => {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+};
+
+function downloadBytes(fileName: string, bytes: Uint8Array<ArrayBuffer>) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+const SIGNATURE_IMAGE_KEYS = new Set([...SIGNATURE_ROLES.map(role => role.inputKey), ...VERIFICATION_KEYS]);
 const LOCKED_FIELD_VALUES: Record<string, string> = {
   organizationName: "Greater Harrisburg Magar Organization"
 };
@@ -207,6 +226,29 @@ export default function DocBuilder({
   useEffect(() => {
     setActiveStepIndex(index => Math.min(index, Math.max(steps.length - 1, 0)));
   }, [steps.length]);
+
+  const signatureTemplate = selectedTemplateId === "wedding-certificate";
+  const hasVerificationCode = Boolean(currentInputs.verificationCode);
+  useEffect(() => {
+    // Each certificate gets its own verification code; its QR code is printed on the certificate.
+    if (!signatureTemplate || hasVerificationCode) return;
+    let cancelled = false;
+    const code = newVerificationCode();
+    const url = `${window.location.origin}/verify/${code}`;
+    QRCode.toDataURL(url, { width: 160, margin: 1, errorCorrectionLevel: "M" }).then(image => {
+      if (cancelled) return;
+      setInputsByTemplate(prev => ({
+        ...prev,
+        "wedding-certificate": { ...(prev["wedding-certificate"] ?? {}), verificationCode: code, verificationUrl: url, verificationQrImage: image }
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [signatureTemplate, hasVerificationCode]);
+
+  /** Same value when requesting signatures and when issuing, so signatures can be matched to the certificate. */
+  const signingCertificateId = () => currentInputs.certificateNumber || currentInputs.certificateId || selectedTemplateMeta?.id || "";
 
   const handleFieldChange = (fieldId: string, value: string) => {
     setInputsByTemplate(prev => ({
@@ -383,8 +425,7 @@ export default function DocBuilder({
     if (!selectedTemplateMeta) return;
     setStatusMessage("Creating signing session...");
     try {
-      const certificateId =
-        currentInputs.certificateNumber || currentInputs.certificateId || selectedTemplateMeta.id;
+      const certificateId = signingCertificateId();
       const response = await fetch("/api/admin/signing-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -444,14 +485,20 @@ export default function DocBuilder({
       }, {});
       const lockedInputs = { ...sanitizedInputs, ...LOCKED_FIELD_VALUES };
       let sealedCertificate: Record<string, unknown>;
+      let signedPdf: Uint8Array<ArrayBuffer> | undefined;
       if (encrypted) {
         // The PDF is built and encrypted here, so the server never sees the signed certificate.
         // JPEG keeps the encrypted PDF under the 1 MiB document limit.
         const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         pdf.addImage(await toJpegDataUrl(dataUrl), "JPEG", 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-        const pdfBase64 = pdf.output("datauristring").split(",")[1];
+        const pdfBytes = new Uint8Array(pdf.output("arraybuffer"));
         const docId = newDocumentId();
-        sealedCertificate = { docId, ...(await packPrivate(documentLoc(docId), { inputs: lockedInputs, pdfBase64 })) };
+        signedPdf = pdfBytes;
+        sealedCertificate = {
+          docId,
+          pdfSha256: Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", pdfBytes)), b => b.toString(16).padStart(2, "0")).join(""),
+          ...(await packPrivate(documentLoc(docId), { inputs: lockedInputs, pdfBase64: bytesToBase64(pdfBytes) }))
+        };
       } else {
         sealedCertificate = { inputs: lockedInputs, pngDataUrl: dataUrl };
       }
@@ -466,7 +513,8 @@ export default function DocBuilder({
               templateTitle: selectedTemplateMeta.title,
               category: selectedTemplateMeta.category,
               templateVersion: selectedTemplateMeta.version,
-              certificateId: currentInputs.certificateNumber || "",
+              certificateId: signingCertificateId(),
+              verificationCode: currentInputs.verificationCode,
               ...sealedCertificate
             },
             signatures: signatureMap
@@ -478,6 +526,10 @@ export default function DocBuilder({
         throw new Error(errorPayload?.error ?? `Unexpected response (${response.status})`);
       }
       const payload = await response.json();
+      // The issued PDF is what the verification page checks, so hand it over now.
+      const issued = signedPdf ?? (payload?.pdfBase64 ? Uint8Array.from(atob(payload.pdfBase64), c => c.charCodeAt(0)) : undefined);
+      if (issued) downloadBytes(`${slugify(signingCertificateId() || "certificate")}.pdf`, issued as Uint8Array<ArrayBuffer>);
+      VERIFICATION_KEYS.forEach(key => handleFieldChange(key, ""));
       setStatusMessage(payload?.documentId ? `Signed PDF saved (ID: ${payload.documentId})` : "Signed PDF saved");
       setSignatureSessions({
         witness1: undefined,

@@ -378,3 +378,33 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 3. Deploy the updated `firestore.rules` (`firebase deploy --only firestore:rules`).
 4. Delete older Firestore backups/exports, and review who can still read the Firebase console.
 5. Any signatures collected before encryption was turned on must be finalized or discarded; they expire within minutes.
+
+### Phase 5 — Governance features · done 2026-10-21
+**Built:**
+- **Minutes approval workflow.** `planTransition` (pure, unit-tested) decides every status change inside a Firestore transaction.
+  - The approver can't be the submitter.
+  - Submitting stores a SHA-256 of the canonical content (the browser computes it for encrypted minutes). Approving must publish content with the same hash, so approval can't change the minutes. A mismatch is refused (`CONTENT_CHANGED`).
+  - Editing submitted minutes returns them to draft.
+  - Every approval writes an immutable `versions/{n}` snapshot (published content, hash, who submitted and approved).
+  - Reopening approved minutes needs a reason of at least 10 characters, unpublishes them, and is audited (`minutes_reopened`).
+- **Action-item tracking.** Admin → Action Items lists items from approved minutes (public content). Status and notes are separate records keyed by minutes ID + a hash of the task, encrypted once encryption is on (rules enforce the envelope), and covered by the migration job.
+- **Attendance export.** CSV of the filtered records, one row per person. Cells starting with `= + - @` are defused against spreadsheet formula injection.
+- **Template versioning.** Each template has a `version`; documents store it and warn when opened against a newer template.
+- **Certificate verification.**
+  - Each certificate gets a random 16-character code, shown as a QR code on the certificate.
+  - On issue, the server writes a record (certificate number, template, version, issue time, SHA-256 of the issued PDF) signed with an HMAC. The key is `CERTIFICATE_SIGNING_KEY_BASE64`, kept out of the database, so someone who can only write to Firestore can't forge a record.
+  - `/verify/{code}` shows the number, type and date, never names. Visitors can check a PDF against the issued file; hashing happens in their browser.
+  - Finalize now checks every signature: it was collected for this certificate number and for the role it's placed under, and no signature fills two roles. The certificate, its verification record and the used sessions are written in one batch.
+  - The issued PDF downloads on finalize.
+
+**Decisions and limits:**
+- **Cloud Storage for PDFs was not built.** New Firebase projects may need a paid plan for Storage, which conflicts with the free-tier rule. Encrypted certificates stay inside their Firestore document (about 1 MiB cap, JPEG-compressed). Revisit if the owner enables billing.
+- **The server does not rebuild the certificate from stored inputs.** With end-to-end encryption on, the server can't read the inputs. The browser builds the PDF and sends its hash; the server verifies who signed what and for which certificate, then signs the record. An admin could still issue a certificate with wording that differs from the signed template; this is bounded by trust in the issuing admins and the audit log.
+- **Only one admin?** The approver can't be the submitter, so minutes can't be approved. Keep at least two active admins.
+- A reopen reason is stored in plain text on the minutes record and in the audit log.
+- The verification page has no revoke screen yet. The record has a `status` field, and an admin can set `revoked` in Firestore for now.
+
+**Owner actions after deploying Phase 5**
+1. Set `CERTIFICATE_SIGNING_KEY_BASE64` in the hosting environment (`openssl rand -base64 32`). Back it up with your other secrets; losing it invalidates every QR code.
+2. Deploy the updated `firestore.rules`.
+3. Make sure at least two admins are active.
