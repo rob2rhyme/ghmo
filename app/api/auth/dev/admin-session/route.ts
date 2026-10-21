@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { exchangeCustomTokenForIdToken } from "@/src/lib/firebaseAuthRest";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { safeEqual } from "@/src/lib/security/compare";
 import { isDevLoginAllowed } from "@/src/lib/security/devLogin";
@@ -92,23 +93,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dev login unavailable" }, { status: 503 });
     }
 
-    const customToken = await issueCustomToken(adminDoc.id, role);
-
-    const identityRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: customToken, returnSecureToken: true })
-      }
-    );
-    const identityPayload = await identityRes.json().catch(() => ({}));
-    if (!identityRes.ok) {
-      console.error("Dev session sign-in failed", { status: identityRes.status });
-      return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
-    }
-
-    const idToken = identityPayload.idToken as string | undefined;
+    // Dev sessions only count as strong auth outside production (see requireActiveAdmin).
+    const customToken = await issueCustomToken(adminDoc.id, role, "dev");
+    const idToken = await exchangeCustomTokenForIdToken(customToken);
     if (!idToken) {
       return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
     }

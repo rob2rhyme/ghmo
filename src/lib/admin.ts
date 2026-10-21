@@ -1,7 +1,8 @@
 //src/lib/admin.ts
 import { NextRequest } from "next/server";
 import { getAdminDb } from "./firebaseAdmin";
-import { AuthContext, getAuthContextFromRequest } from "./auth";
+import { AuthContext, AuthMethod, getAuthContextFromRequest } from "./auth";
+import { isDevLoginAllowed } from "./security/devLogin";
 import { COMMUNITY_SLUG } from "./community";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "./firestorePaths";
 export type AdminProfile = {
@@ -65,7 +66,28 @@ function isNextRequest(value: AdminAuthInput): value is NextRequest {
   return Boolean(value && typeof (value as NextRequest).headers?.get === "function");
 }
 
-export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string = COMMUNITY_SLUG) {
+/**
+ * True when the session counts as strong admin authentication: a passkey sign-in,
+ * or the local dev bypass outside production.
+ */
+export function isStrongAdminAuth(authMethod: AuthMethod | null): boolean {
+  if (authMethod === "passkey") return true;
+  return authMethod === "dev" && isDevLoginAllowed(process.env);
+}
+
+type RequireAdminOptions = {
+  /**
+   * Accept a magic-link session. Only for passkey setup/recovery, sign-out and
+   * session status. Everything else requires a passkey session (plan D2).
+   */
+  allowMagicLink?: boolean;
+};
+
+export async function requireActiveAdmin(
+  input?: AdminAuthInput,
+  orgSlug: string = COMMUNITY_SLUG,
+  options: RequireAdminOptions = {}
+) {
   const ctx: AuthContext | null = isNextRequest(input)
     ? await getAuthContextFromRequest(input)
     : (input ?? (await getAuthContextFromRequest()));
@@ -79,6 +101,9 @@ export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string
   const profile = mapAdminDoc(doc.id, doc.data() as Record<string, unknown>);
   if (profile.status !== "active")
     throw new AdminAccessError(403, "Admin is disabled", "ADMIN_INACTIVE");
+  if (!isStrongAdminAuth(ctx.authMethod) && !options.allowMagicLink) {
+    throw new AdminAccessError(403, "Sign in with your passkey to continue", "PASSKEY_REQUIRED");
+  }
 
   const actor: AdminActor = {
     uid: ctx.uid,
@@ -89,7 +114,7 @@ export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string
     adminDocId: profile.id
   };
 
-  return { actor, admin: profile };
+  return { actor, admin: profile, authMethod: ctx.authMethod };
 }
 
 export async function getAdminProfile(orgSlug: string, adminId: string) {

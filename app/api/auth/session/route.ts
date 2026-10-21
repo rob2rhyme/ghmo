@@ -72,7 +72,7 @@ export async function DELETE(req: NextRequest) {
   try {
     // Audit first, while the session is still valid.
     try {
-      const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
+      const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
       await getAdminDb().doc(orgAdminDocPath(COMMUNITY_SLUG, admin.id)).set({ lastLogoutAt: Timestamp.now() }, { merge: true });
       await logAuditEvent({
         orgSlug: COMMUNITY_SLUG,

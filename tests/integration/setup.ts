@@ -14,3 +14,5 @@ process.env.FIREBASE_ADMIN_PRIVATE_KEY ??= privateKey;
 process.env.GCLOUD_PROJECT ??= "demo-ghmo";
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
+process.env.NEXT_PUBLIC_FIREBASE_API_KEY ??= "fake-api-key";
+process.env.NEXT_PUBLIC_APP_URL ??= "http://localhost:3000";

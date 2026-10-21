@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { exchangeCustomTokenForIdToken } from "@/src/lib/firebaseAuthRest";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { Timestamp } from "firebase-admin/firestore";
 import { issueCustomToken, verifyIdToken } from "@/src/lib/auth";
@@ -125,22 +126,10 @@ export async function POST(req: NextRequest) {
     const adminData = adminDoc.data();
     if (adminData.status !== "active") return NextResponse.json({ error: INVALID_LINK }, { status: 400 });
 
-    const customToken = await issueCustomToken(adminDoc.id, "admin");
-    const signinRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: customToken, returnSecureToken: true })
-      }
-    );
-    if (!signinRes.ok) {
-      console.error("Custom token sign-in failed", { status: signinRes.status });
-      return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
-    }
-    const signinPayload = await signinRes.json().catch(() => ({}));
-    const idToken = signinPayload.idToken as string | undefined;
-    if (!idToken) return NextResponse.json({ error: "Invalid token" }, { status: 500 });
+    // A magic link alone only allows setting up or recovering a passkey (plan D2).
+    const customToken = await issueCustomToken(adminDoc.id, "admin", "magic_link");
+    const idToken = await exchangeCustomTokenForIdToken(customToken);
+    if (!idToken) return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
 
     const decoded = await verifyIdToken(idToken);
     await getAdminDb().doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(

@@ -9,10 +9,18 @@ service cloud.firestore {
       return exists(adminPath) && get(adminPath).data.status == "active";
     }
 
+    // Admin data needs a passkey-backed token (plan decision D2). Tokens are minted by
+    // /api/auth/firebase-custom-token, which copies the session's `authMethod` claim. "dev" is
+    // only ever issued by the local dev bypass, which is disabled in production.
+    function hasStrongAuth() {
+      return request.auth.token.authMethod == "passkey" || request.auth.token.authMethod == "dev";
+    }
+
     function isAdmin() {
       return request.auth != null &&
         (request.auth.token.communityId == "ghmo-site" || request.auth.token.orgSlug == "ghmo") &&
         (request.auth.token.role == "admin" || request.auth.token.admin == true) &&
+        hasStrongAuth() &&
         hasActiveAdminRecord();
     }
 

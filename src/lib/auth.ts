@@ -9,6 +9,14 @@ import { normalizeMemberEmail } from "./members";
 export type Role = "member" | "admin";
 
 /**
+ * How the session was created (custom-token claim `authMethod`, copied into the session cookie).
+ * - passkey: WebAuthn sign-in. Required for admin access (plan decision D2).
+ * - magic_link: email link. Only good for setting up or recovering a passkey.
+ * - dev: local dev bypass (never in production).
+ */
+export type AuthMethod = "passkey" | "magic_link" | "dev";
+
+/**
  * The only session cookie. Firebase Hosting forwards only a cookie named `__session`.
  * Its value is a Firebase *session cookie* (revocable), never a raw ID token.
  */
@@ -16,9 +24,9 @@ export const SESSION_COOKIE_NAME = "__session";
 /** Pre-Phase-1 cookie that held a raw ID token. Only ever cleared, never read. */
 export const LEGACY_SESSION_COOKIE_NAME = "sessionToken";
 
-export async function issueCustomToken(uid: string, role: Role, claims?: Record<string, unknown>) {
+export async function issueCustomToken(uid: string, role: Role, authMethod: AuthMethod) {
   const admin = role === "admin";
-  return getAdminAuth().createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, admin, ...claims });
+  return getAdminAuth().createCustomToken(uid, { orgSlug: COMMUNITY_SLUG, role, admin, authMethod });
 }
 
 /** Verifies a Firebase ID token, rejecting tokens of users whose sessions were revoked. */
@@ -30,6 +38,7 @@ export type AuthContext = {
   uid: string;
   orgSlug: string;
   role: Role;
+  authMethod: AuthMethod | null;
   email?: string;
   emailLower?: string;
 };
@@ -73,7 +82,7 @@ export async function decodeRequestCredential(req?: NextRequest): Promise<Decode
 }
 
 function toAuthContext(decoded: DecodedIdToken): AuthContext | null {
-  const claims = decoded as DecodedIdToken & { orgSlug?: string; communityId?: string; orgId?: string; role?: Role };
+  const claims = decoded as DecodedIdToken & { orgSlug?: string; communityId?: string; orgId?: string; role?: Role; authMethod?: string };
   const orgSlug = claims.orgSlug || claims.communityId || claims.orgId;
   const role = claims.role;
   if (!orgSlug || !role || orgSlug !== COMMUNITY_SLUG) return null;
@@ -81,6 +90,10 @@ function toAuthContext(decoded: DecodedIdToken): AuthContext | null {
     uid: decoded.uid,
     orgSlug,
     role,
+    authMethod:
+      claims.authMethod === "passkey" || claims.authMethod === "magic_link" || claims.authMethod === "dev"
+        ? claims.authMethod
+        : null,
     email: decoded.email,
     emailLower: normalizeMemberEmail(decoded.email)
   };

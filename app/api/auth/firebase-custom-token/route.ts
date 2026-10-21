@@ -15,12 +15,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { actor } = await requireActiveAdmin(req, "ghmo");
+    // Passkey session required (default). The claim lets Firestore rules check it too.
+    const { actor, authMethod } = await requireActiveAdmin(req, "ghmo");
     const adminAuth = getAdminAuth();
     const token = await adminAuth.createCustomToken(actor.uid, {
       orgSlug: "ghmo",
       role: "admin",
-      admin: true
+      admin: true,
+      authMethod
     });
 
     return NextResponse.json(
