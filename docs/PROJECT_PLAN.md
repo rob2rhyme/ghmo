@@ -1,6 +1,6 @@
 # GHMO Platform — Upgraded Project Plan (v2)
 
-_Status: proposal · Last updated: 2026-10-21_
+_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-10-21_
 
 This plan replaces the "Upcoming Roadmap" in `README.md` as the source of truth for what gets built next.
 It has three parts:
@@ -29,7 +29,7 @@ Work ships in the phases in §6. Each phase must be deployable on its own. Do no
 | No testing or CI plan | `npm run lint` is only `tsc --noEmit`; there are no tests. Security code without tests is not acceptable. |
 | No UI foundation | Each page invents its own cards, buttons and inputs (see §5). |
 | Docs drift | README says Next.js 14; `package.json` has Next 16.1.6 with React 18.2. Next 16 expects React 19. This must be resolved before anything else. |
-| "Admin Activity Analytics (silent instrumentation)" | Silent tracking of admins conflicts with a privacy-first, E2EE design. **Recommend dropping it** or making it opt-in and aggregate-only. |
+| "Admin Activity Analytics (silent instrumentation)" | Silent tracking of admins conflicts with a privacy-first, E2EE design. **Dropped** (decision D4). |
 
 ---
 
@@ -58,8 +58,9 @@ Severity: **C**ritical · **H**igh · **M**edium · **L**ow.
 | S-02 | H | No Content-Security-Policy, HSTS, frame-ancestors, Referrer-Policy or Permissions-Policy headers. | `next.config.mjs` | Add headers. Use a strict nonce-based CSP on admin routes; relaxed CSP only on public embed pages. |
 | S-03 | H | Disabling an admin does not revoke access. Session cookie is a raw Firebase ID token (no revocation check), and custom claims (`admin: true`) persist across refresh tokens, so Firestore client access continues. `revokeRefreshTokens` is never called. | `src/lib/sessionCookies.ts`, `src/lib/auth.ts`, `firestore.rules:4` | Use `createSessionCookie` / `verifySessionCookie(…, true)`. Call `revokeRefreshTokens` on disable and logout. In rules, also check `exists()`/`get()` on an active admin doc. |
 | S-04 | H | Rate limiter is an in-memory `Map`. On serverless it resets per instance, so it barely limits anything. | `src/lib/rateLimit.ts` | Firestore transaction-based counter (free tier) keyed by hashed IP + email. |
-| S-05 | H | Shared per-role PIN login: one PIN for all admins, fixed 15-minute lockout (anyone can lock everyone out), rate key uses spoofable raw `x-forwarded-for`. | `app/api/auth/pin/route.ts` | Retire PIN login. Replace with passkeys (Phase 2). Until then, disable via `FEATURE_PIN_LOGIN=false`. |
+| S-05 | H | Shared per-role PIN login: one PIN for all admins, fixed 15-minute lockout (anyone can lock everyone out), rate key uses spoofable raw `x-forwarded-for`. `FEATURE_PIN_LOGIN` defaults to **on**. | `app/api/auth/pin/route.ts`, `app/api/admin/pins/route.ts`, `src/lib/env.server.ts` | **Remove PIN login entirely in Phase 1** (decision D3): delete the PIN routes, the `pins` collection and rules, and the flag. Until then set `FEATURE_PIN_LOGIN=false` in every environment. Magic link is the only login until passkeys land in Phase 2. |
 | S-06 | M | Secrets compared with `!==` / `===` (timing leaks). | `app/api/admin/bootstrap-pin/route.ts`, `src/lib/gofundme.ts:21` | `crypto.timingSafeEqual` on equal-length buffers. |
+| S-17 | M | First-admin bootstrap creates a PIN and uses the PIN document ID as the admin ID. | `app/api/admin/bootstrap-pin/route.ts` | Replace with `POST /api/admin/bootstrap` (secret + email only) that creates the first `admins` doc; the admin then signs in by magic link and enrolls a passkey. Delete the endpoint once used, or keep it permanently locked by the `config/bootstrap` marker. |
 | S-07 | M | Magic-link `continueUrl` is built from the request's own origin (Host header). | `app/api/auth/email/start/route.ts` | Build from a fixed `NEXT_PUBLIC_APP_URL`; restrict Firebase authorized domains. |
 | S-08 | M | Admin emails, continue URLs and partial OOB codes are written to logs. | email start/verify routes, `sessionCookies.ts` | Remove debug logs; log hashed identifiers only. |
 | S-09 | M | Session cookie `secure` flag depends on `x-forwarded-proto`; can be false in production behind some proxies. | `src/lib/sessionCookies.ts` | Always `secure: true` in production; use `__Host-` cookie prefix; `sameSite: "strict"` for admin. |
@@ -96,7 +97,7 @@ Severity: **C**ritical · **H**igh · **M**edium · **L**ow.
 ### 4.2 Cryptography (Web Crypto API only, no custom primitives)
 
 - **Device identity:** each admin device generates an ECDH P-256 key pair (encryption) and an ECDSA P-256 key pair (signing) with `extractable: false`, stored in IndexedDB.
-- **Unlocking the device keys:** wrap them with a key derived from the admin's **passkey via the WebAuthn PRF extension** (HKDF-SHA-256). Fallback where PRF is unsupported: a local passphrase through PBKDF2-SHA-256 (≥ 600k iterations). Argon2id via WASM is acceptable if a vetted package is chosen.
+- **Unlocking the device keys:** wrap them with a key derived from the admin's **passkey via the WebAuthn PRF extension** (HKDF-SHA-256). Passkeys are **required** for every admin (decision D2), so this is the normal path. Fallback only for authenticators without PRF support: a local passphrase through PBKDF2-SHA-256 (≥ 600k iterations), still behind passkey login.
 - **Workspace Data Key (WDK):** a random AES-256-GCM key per **epoch**. All E2EE records are encrypted with the current WDK.
 - **Workspace sealing key pair:** an ECDH P-256 key pair whose public half is published, so unauthenticated signers can encrypt to the workspace (sealed-box style: ephemeral ECDH → HKDF → AES-GCM). Its private half is wrapped like the WDK.
 - **Key wrapping:** for each enrolled device, `ECDH(device, wrapper-ephemeral) → HKDF → AES-KW` wraps the WDK and the sealing private key. Stored at `organizations/ghmo/keyring/{epoch}/devices/{deviceId}`.
@@ -109,10 +110,11 @@ Severity: **C**ritical · **H**igh · **M**edium · **L**ow.
 
 ### 4.3 Key lifecycle
 
-1. **Bootstrap:** the first super-admin creates epoch 1 (WDK + sealing key) and a **recovery key** (256-bit, shown once as a printable code). The recovery key wraps the WDK. It goes to two named trustees on paper. Without it, losing all devices means losing all E2EE data. State this plainly in the UI.
+1. **Bootstrap:** the first super-admin creates epoch 1 (WDK + sealing key) and a **recovery key** (256-bit, shown once as a printable code). The recovery key wraps the WDK. **Required** (decision D1): E2EE cannot be switched on until two named trustees have each confirmed they hold a paper copy. The trustees' names (not the key) are recorded in the keyring doc. Without the key, losing all devices means losing all E2EE data; the UI says this plainly.
 2. **New device or new admin:** the device generates keys and posts its public keys plus a fingerprint. An existing admin approves it after comparing a 6-word **safety code** in person or by phone, then wraps the WDK for it. The server cannot add a device on its own.
 3. **Admin removed or device lost:** revoke the device, then **rotate**: a new epoch is created and wrapped only for remaining devices. New data uses the new epoch. Old data stays readable to current admins (old epoch keys are re-wrapped for them) but the removed device can't read anything new. Optional background re-encryption of old records.
-4. **Recovery:** the recovery key unwraps the current WDK onto a new device; then rotate the recovery key.
+4. **Recovery:** with both trustees present, the recovery key unwraps the current WDK onto a new device; then rotate the recovery key and re-issue paper copies.
+5. **Annual drill:** once a year, recover onto a spare device to prove the paper copies still work.
 
 ### 4.4 What changes in the app
 - Realtime listeners (`onSnapshot` in chat and comms clients) decrypt in a client hook, `useDecryptedCollection()`.
@@ -135,7 +137,8 @@ _Detailed findings from the UI audit are in §5.4._
 
 ### 5.1 Design system
 - Define semantic tokens as CSS variables in `app/globals.css` (`--bg`, `--surface`, `--text`, `--muted`, `--primary`, `--danger`, `--success`, `--warning`, `--ring`, radii, shadows) with light and dark values. Map them in `tailwind.config.ts`. Replace hardcoded colors gradually.
-- Build a small primitives set in `src/components/ui/`: `Button`, `IconButton`, `Input`, `Textarea`, `Select`, `Field` (label + help + error), `Card`, `Badge`, `Tabs`, `Dialog`, `Toast`, `EmptyState`, `Skeleton`, `Table`. Plain Tailwind + Radix-style behavior. If adding a library, prefer shadcn/ui (copies source into the repo, no runtime vendor).
+- Build the primitives set in `src/components/ui/` with **shadcn/ui** (decision D5): source is copied into the repo, built on Radix, no runtime vendor. Add components with `npx shadcn@latest add <name>`: `button`, `input`, `textarea`, `select`, `label`, `form` (Field: label + help + error), `card`, `badge`, `tabs`, `dialog`, `sheet`, `sonner` (toasts), `skeleton`, `table`. Plus our own `EmptyState`.
+- Current shadcn/ui targets **Tailwind v4**; this repo is on Tailwind 3.4. Upgrade Tailwind to v4 at the start of Phase 2 (`npx @tailwindcss/upgrade`) before adding components.
 - Typography scale and spacing scale documented in one place.
 
 ### 5.2 Admin shell (mobile-first)
@@ -192,23 +195,27 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 
 | Phase | Name | Scope | Exit criteria |
 |---|---|---|---|
-| **0** | Foundation repair | Fix React/Next version mismatch (React 19 for Next 16). Add ESLint, Vitest, Playwright and GitHub Actions CI. Fix README stack drift. | CI green on `main`; branch protection on. |
-| **1** | Security hardening | S-01 → S-16. Security headers + CSP. Revocable session cookies. Durable rate limiting. Remove debug routes. Zod on every route. `proxy.ts`. | Header scan (securityheaders.com) A; disabled admin loses access within 1 minute in a test; no third-party script on `/admin`. |
-| **2** | Passkeys + UI foundation | WebAuthn passkeys as primary admin login (magic link for enrollment/recovery only). Retire PIN login. Design tokens, `ui/` primitives, new admin shell. | Every admin enrolled with a passkey; all admin pages on the new shell. |
-| **3** | E2EE core | `src/lib/e2ee/` (keys, envelopes, wrapping, sealing) with full tests. Keyring collection + rules. Device enrollment, safety codes, recovery key, Devices & keys page. | Two devices can share the WDK; removing one + rotating blocks it from new data (automated test). |
+| **0** | Foundation repair | Fix React/Next version mismatch (React 19 for Next 16). Add ESLint, Vitest, Playwright and GitHub Actions CI. | CI green on `main`; branch protection on. |
+| **1** | Security hardening | S-01 → S-17. Security headers + CSP. Revocable session cookies. Durable rate limiting. **Remove PIN login and PIN bootstrap.** Remove debug routes. Zod on every route. `proxy.ts`. | Header scan (securityheaders.com) A; disabled admin loses access within 1 minute in a test; no third-party script on `/admin`. |
+| **2** | Passkeys + UI foundation | WebAuthn passkeys **required** for admin login (magic link only for first enrollment and lost-device recovery). Tailwind v4 upgrade, design tokens, shadcn/ui primitives, new admin shell. | Every admin enrolled with a passkey; admin routes reject sessions without passkey auth; all admin pages on the new shell. |
+| **3** | E2EE core | `src/lib/e2ee/` (keys, envelopes, wrapping, sealing) with full tests. Keyring collection + rules. Device enrollment, safety codes, recovery key with two-trustee confirmation, Devices & keys page. | Two devices can share the WDK; removing one + rotating blocks it from new data (automated test); recovery drill passes. |
 | **4** | E2EE rollout | Encrypt Admin Chat → Plans & Issues → draft minutes → signatures (sealed) → document history. Client-side search. Migration job. Rules updated to envelope validation. | Firestore console shows no plaintext in E2EE collections; migration verified; plaintext backups scheduled for deletion. |
 | **5** | Governance features | Original roadmap items, built on the encrypted base: minutes approval workflow + versioning, action-item tracking, template versioning, QR verification (signed hash of the published document), attendance exports. | Per-feature acceptance. |
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
 
-**Dropped:** silent Admin Activity Analytics and the Admin Leaderboard (privacy conflict). Revisit only as opt-in, aggregate-only.
+**Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
 ---
 
-## 7. Decisions needed from the owner
+## 7. Decisions (resolved 2026-10-21)
 
-1. **Recovery model:** paper recovery key held by two trustees (recommended), or accept that losing all devices loses all encrypted data?
-2. **Passkeys required** for all admins? (Recommended. Every current admin needs a phone or laptop that supports them.)
-3. **Drop PIN login** entirely? (Recommended.)
-4. **Drop silent admin analytics?** (Recommended.)
-5. **UI library:** hand-rolled primitives vs. shadcn/ui (recommended: shadcn/ui, source vendored into the repo).
+The owner accepted every recommendation.
+
+| ID | Decision | Effect on the plan |
+|---|---|---|
+| D1 | **Paper recovery key held by two trustees** is required. | E2EE stays off until both trustees confirm (§4.3). Yearly recovery drill. |
+| D2 | **Passkeys are required** for all admins. | Phase 2 makes passkey login mandatory; passkey PRF unlocks device keys (§4.2). |
+| D3 | **PIN login is removed.** | Set `FEATURE_PIN_LOGIN=false` now; code, collection and rules deleted in Phase 1 (S-05, S-17). |
+| D4 | **Silent admin analytics and the leaderboard are dropped.** | Removed from the roadmap (§6). |
+| D5 | **UI library: shadcn/ui.** | Tailwind v4 upgrade + shadcn primitives in Phase 2 (§5.1). |

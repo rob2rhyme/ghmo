@@ -3,10 +3,12 @@
 Single-community App Router site for GHMO with admin-only magic-link authentication, structured meeting minutes governance, document generation, fundraising, and a multimedia hub.
 
 ## Current Focus
-- Solidify identical single-community routing (`/`, `/admin`) and remove orgSlug/tenant assumptions.
-- Stabilize whitelist-based admin email magic-link auth + env handling (NEXT_PUBLIC_FIREBASE_* + session cookies).
-- Multimedia aggregation page with Facebook/YouTube/TikTok/Instagram fallbacks.
-- Timeline/Events system deprecated; replace with structured Meeting Minutes for the official governance record.
+The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
+1. **Phase 0:** fix the React/Next version mismatch; add ESLint, tests and CI.
+2. **Phase 1:** security hardening (security headers, revocable sessions, durable rate limits, remove PIN login, keep third-party scripts off admin pages).
+3. **Phase 2:** required passkeys for admins; new UI on shadcn/ui + Tailwind v4.
+4. **Phases 3–4:** end-to-end encryption for admin chat, Plans & Issues, draft minutes, signatures and document history.
+5. **Phases 5–7:** governance features, public archive and integrations, external security review.
 
 ## Highlights
 - One community (`ghmo-site`) backed by Firebase + GoFundMe Pro; no multi-tenant routing.
@@ -35,7 +37,7 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 - No third-party UI dependencies were added for the communication log UI.
 
 ## Stack
-- Next.js 14 App Router, TypeScript, TailwindCSS
+- Next.js 16 App Router (React 18.2 today; React 19 upgrade is Phase 0), TypeScript, TailwindCSS 3.4 (v4 + shadcn/ui in Phase 2)
 - Firebase Client SDK (Auth/Firestore) + Firebase Admin SDK
 - GoFundMe Pro webhook placeholder + reconcile endpoint
 - @react-pdf/renderer + html-to-image for exports
@@ -59,10 +61,12 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 - Shortcut: Cmd+K / Ctrl+K focuses the search input; Esc clears the query (or blurs if empty).
 
 ## Authentication
-- Admins request magic links via `/login`, and Firestore stores their email in a whitelist (e.g., `organizations/{orgSlug}/members` with `status: "active"`). Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
+- Admins request magic links via `/admin/login`. The allowlist is the `organizations/ghmo/admins` collection: each doc has `emailLower` and `status: "active"`. Magic-link login only works when `FEATURE_EMAIL_ADMIN_LOGIN=true`. Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
 - Session state lives in the `sessionToken` cookie (with `__session` fallback) handled by `/api/auth/session`; public routes stay readable without a session token, while admin-only routes and APIs validate the token before running.
 - The dev helper `/api/auth/dev/admin-session` is disabled unless `NODE_ENV !== "production"` plus explicit flags (`NEXT_PUBLIC_DEV_LOGIN`, `DEV_LOGIN_SECRET`) are present.
-- The magic-link workflow is the only login path; there is no member login option, and all admin actions depend on the authored session token.
+- The magic-link workflow is the only supported login path; there is no member login option.
+- **PIN login is being removed** (plan decision D3). It is still in the code and still **on by default**, so set `FEATURE_PIN_LOGIN=false` in every environment now. The code is deleted in Phase 1.
+- **Passkeys will be required** for every admin from Phase 2 (decision D2). Magic links will then be used only for first enrollment and lost-device recovery.
 
 ## Data Model (single community)
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
@@ -129,26 +133,22 @@ Legacy community paths are no longer supported; please migrate any old data into
 1) Install deps: `npm install`
 2) Copy envs: `cp .env.example .env.local` and fill Firebase client config, Admin service account fields, GoFundMe secrets, social handles.
 3) Run dev server: `npm run dev`
-4) Whitelist admin emails by creating documents under `organizations/ghmo/members` (set `emailLower`, `status: "active"`, and optional profile data) so the magic-link auth flow recognizes them.
-5) Configure GoFundMe Pro webhook + reconcile schedule when ready.
+4) Set `FEATURE_EMAIL_ADMIN_LOGIN=true` and `FEATURE_PIN_LOGIN=false`.
+5) Allowlist admin emails by creating documents under `organizations/ghmo/admins` (set `emailLower`, `status: "active"`, `roles`, and optional `name`) so the magic-link flow recognizes them.
+6) Configure GoFundMe Pro webhook + reconcile schedule when ready.
 
 ## Security Notes
+> The full threat model, the 17 known findings (S-01 to S-17) and the end-to-end encryption design are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §2–§4. Notable open issues until Phase 1 ships: the GoFundMe script loads on admin pages, disabling an admin does not end their session, and the rate limiter is in-memory only.
+
 - Magic-link auth endpoints are rate-limited, return generic responses, and only honor allowlisted emails in Firestore so the attacker cannot enumerate addresses.
 - Sessions are anchored to the `sessionToken` cookie (with `__session` fallback) and verified via `requireActiveAdmin` before any admin page/API executes logic.
 - The dev helper `/api/auth/dev/admin-session` is gated by `NODE_ENV !== "production"` plus `NEXT_PUBLIC_DEV_LOGIN` and `DEV_LOGIN_SECRET`, and it remains disabled unless those flags are explicitly set.
 - Webhooks are validated via the shared-secret HMAC placeholder; replace that check with a provider-backed verification when credentials are available.
-- Firestore rules are deny-by-default and access is controlled by the `admin: true` custom claim.
+- Firestore rules are deny-by-default and access is controlled by the `admin: true` custom claim. (Phase 1 adds an active-admin check, because the claim alone survives disabling an admin.)
 - All communication log features are admin-only, and closed threads are immutable.
 
-## Feature Enhancements (Planned)
-- Admin Activity Analytics (Planned)
-  - Silent instrumentation (no UI yet).
-  - Tracks thread creation, comments posted, documents generated, meeting participation, and admin visits/interactions.
-- Admin Leaderboard (Future / Optional)
-  - Derived from analytics (not active).
-  - Time-boxed (monthly / quarterly).
-  - Category-based (participation, governance, documentation).
-  - Intended for insights, not competition; future and opt-in.
+## Dropped Features
+- **Admin Activity Analytics** (silent instrumentation) and the **Admin Leaderboard** were dropped on 2026-10-21 (plan decision D4). They conflict with the privacy and end-to-end encryption goals. Aggregate governance stats from approved minutes are still allowed.
 
 ## Reset Build Artifacts & Start Dev Server
 
