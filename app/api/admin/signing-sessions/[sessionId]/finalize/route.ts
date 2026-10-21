@@ -5,7 +5,7 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { orgDocumentsCollectionPath } from "@/src/lib/firestorePaths";
 import { FieldValue } from "firebase-admin/firestore";
-import { decryptSignature } from "@/src/lib/signatureEncryption";
+import { decryptSignature, isValidSigningSessionId } from "@/src/lib/signatureEncryption";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +55,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     if (payload.signatures) {
       Object.values(payload.signatures).forEach(id => sessionIds.add(id));
     }
+    if (![...sessionIds].every(id => typeof id === "string" && isValidSigningSessionId(id))) {
+      return NextResponse.json({ error: "Invalid signing session" }, { status: 400 });
+    }
 
     const sessions = await Promise.all(
       Array.from(sessionIds).map(async sessionId => {
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
       if (data.status !== "signed" || !data.signatureEnc) {
         return NextResponse.json({ error: `Session not signed (${sessionId})` }, { status: 409 });
       }
-      decryptSignature(data.signatureEnc);
+      decryptSignature(data.signatureEnc, sessionId);
     }
 
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });

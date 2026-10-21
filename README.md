@@ -55,7 +55,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
-- Auth: `/login` (magic link request) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (gated and disabled in production).
+- Auth: `/admin/login` (admin magic link) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (always disabled in production). `/login` is the member magic-link page.
 - API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
 
 ## Admin Dashboard Search
@@ -161,8 +161,9 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push
 - Rate limits are stored in Firestore (`organizations/ghmo/rateLimits`, keys SHA-256 hashed) so they hold across serverless instances, and fail closed if Firestore is unavailable. **Owner action:** in the Firebase console, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.
 - Client IPs come from the right-most `X-Forwarded-For` entry (configurable with `TRUSTED_PROXY_HOPS`), or `x-real-ip` on Vercel, so clients cannot spoof their IP to dodge limits.
 - Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
-- The dev helper `/api/auth/dev/admin-session` is gated by `NODE_ENV !== "production"` plus `NEXT_PUBLIC_DEV_LOGIN` and `DEV_LOGIN_SECRET`, and it remains disabled unless those flags are explicitly set.
-- Webhooks are validated via the shared-secret HMAC placeholder; replace that check with a provider-backed verification when credentials are available.
+- The dev helper `/api/auth/dev/admin-session` only works when the build is not production, `ALLOW_DEV_ADMIN_LOGIN=true`, and a 32+ character `DEV_ADMIN_LOGIN_TOKEN` is sent in the `x-dev-login-token` header. (Before Phase 1 the code did not check the environment and the token was optional.)
+- Webhooks are validated with a constant-time HMAC-SHA256 check, a 64 KB size cap and a Zod schema; the target organization is never taken from the payload. Replace the HMAC placeholder with the provider's documented verification when credentials are available.
+- Signing links: the session ID must be 64 hex characters; submissions are rate-limited, must be a real PNG under 200 KB, and are accepted exactly once (Firestore transaction). Signatures are encrypted with AES-256-GCM bound to their session, with key IDs for rotation. QR codes for signing links are generated in the browser.
 - Firestore rules are deny-by-default; admin access needs the `admin` custom claim **and** an active admin record. Rules are tested against the emulator (`npm run test:emulators`).
 - All communication log features are admin-only, and closed threads are immutable.
 

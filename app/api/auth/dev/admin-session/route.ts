@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/src/lib/rateLimit";
+import { safeEqual } from "@/src/lib/security/compare";
+import { isDevLoginAllowed } from "@/src/lib/security/devLogin";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
@@ -31,17 +34,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    if (process.env.ALLOW_DEV_ADMIN_LOGIN !== "true") {
+    if (!isDevLoginAllowed(process.env)) {
       return new Response("Not Found", { status: 404 });
     }
 
-    const tokenGate = process.env.DEV_ADMIN_LOGIN_TOKEN?.trim();
-    if (tokenGate) {
-      const providedToken =
-        req.headers.get("x-dev-login-token") ?? new URL(req.url).searchParams.get("token");
-      if (!providedToken || providedToken !== tokenGate) {
-        return new Response("Not Found", { status: 404 });
-      }
+    const rate = await checkRateLimit(`dev-login:${getClientIp(req.headers)}`, 10, 10 * 60 * 1000);
+    if (!rate.success) return new Response("Not Found", { status: 404 });
+
+    // Header only: query strings end up in access logs.
+    if (!safeEqual(req.headers.get("x-dev-login-token"), process.env.DEV_ADMIN_LOGIN_TOKEN?.trim())) {
+      return new Response("Not Found", { status: 404 });
     }
 
     const body = (await req.json()) as { orgSlug?: string; email?: string };
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest) {
     );
     const identityPayload = await identityRes.json().catch(() => ({}));
     if (!identityRes.ok) {
-      console.error("Dev session sign-in failed", { status: identityRes.status, body: identityPayload });
+      console.error("Dev session sign-in failed", { status: identityRes.status });
       return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
     }
 
@@ -128,12 +130,6 @@ export async function POST(req: NextRequest) {
     });
 
     const sessionResponse = await createSessionResponse(idToken, { devLogin: true, adminId: adminDoc.id });
-    console.info("Dev login granted", {
-      orgSlug,
-      adminId: adminDoc.id,
-      emailLower,
-      cookiesAttached: true
-    });
     console.warn("[AUTH] Dev admin-session endpoint used", {
       orgSlug,
       adminId: adminDoc.id

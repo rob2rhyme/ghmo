@@ -1,72 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { z } from "zod";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { encryptSignature, parsePngDataUrl } from "@/src/lib/signatureEncryption";
+import { checkRateLimit } from "@/src/lib/rateLimit";
+import { getClientIp } from "@/src/lib/security/clientIp";
+import {
+  encryptSignature,
+  isValidSigningSessionId,
+  MAX_SIGNATURE_BYTES,
+  parsePngDataUrl
+} from "@/src/lib/signatureEncryption";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
-type SignPayload = {
-  dataUrl?: string;
-  signerName?: string;
-};
+// base64 is 4/3 the size of the bytes, plus the data URL prefix.
+const MAX_DATA_URL_LENGTH = Math.ceil((MAX_SIGNATURE_BYTES * 4) / 3) + 64;
+
+const bodySchema = z.object({
+  dataUrl: z.string().min(1).max(MAX_DATA_URL_LENGTH),
+  signerName: z.string().trim().max(120).optional().nullable()
+});
 
 function toDate(value: unknown): Date | undefined {
-  if (!value) return undefined;
   if (value instanceof Date) return value;
-  if (typeof value === "object" && value && "toDate" in value && typeof (value as any).toDate === "function") {
-    return (value as any).toDate();
-  }
+  if (value instanceof Timestamp) return value.toDate();
   return undefined;
 }
 
+/**
+ * Public endpoint behind the secret signing link. Hardened per plan S-10:
+ * strict ID format, rate limits, size and PNG checks, and a transaction so a
+ * link can be used exactly once.
+ */
 export async function POST(req: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
-  const params = await context.params;
+  const { sessionId } = await context.params;
+  if (!isValidSigningSessionId(sessionId)) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "Signing is temporarily unavailable" }, { status: 503 });
+  }
+
+  const ipLimit = await checkRateLimit(`sign:ip:${getClientIp(req.headers)}`, 20, 10 * 60 * 1000);
+  const sessionLimit = await checkRateLimit(`sign:session:${sessionId}`, 5, 10 * 60 * 1000);
+  if (!ipLimit.success || !sessionLimit.success) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  }
+
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
+  }
+
+  let bytes: Buffer;
+  try {
+    bytes = parsePngDataUrl(parsed.data.dataUrl);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid signature" }, { status: 400 });
   }
 
   try {
-    const payload = (await req.json().catch(() => ({}))) as SignPayload;
-    if (!payload.dataUrl) {
-      return NextResponse.json({ error: "Missing signature data" }, { status: 400 });
-    }
-    const sessionRef = getAdminDb().collection("signingSessions").doc(params.sessionId);
-    const snapshot = await sessionRef.get();
-    if (!snapshot.exists) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
-    const data = snapshot.data() ?? {};
-    const expiresAt = toDate(data.expiresAt);
-    if (data.status !== "pending") {
-      return NextResponse.json({ error: "Session not pending" }, { status: 409 });
-    }
-    if (expiresAt && new Date() > expiresAt) {
-      await sessionRef.update({ status: "expired", updatedAt: FieldValue.serverTimestamp() });
-      return NextResponse.json({ error: "Session expired" }, { status: 410 });
-    }
-    const bytes = parsePngDataUrl(payload.dataUrl);
-    const signatureEnc = encryptSignature(bytes);
-    await sessionRef.update({
-      status: "signed",
-      signedAt: FieldValue.serverTimestamp(),
-      signerName: payload.signerName ?? null,
-      signatureEnc,
-      updatedAt: FieldValue.serverTimestamp()
+    const signatureEnc = encryptSignature(bytes, sessionId);
+    const db = getAdminDb();
+    const sessionRef = db.collection("signingSessions").doc(sessionId);
+
+    // Return outcomes instead of throwing: a throw would roll back the "expired" write.
+    const outcome = await db.runTransaction(async tx => {
+      const snapshot = await tx.get(sessionRef);
+      if (!snapshot.exists) return { status: 404, error: "Session not found" } as const;
+      const data = snapshot.data() ?? {};
+      if (data.status !== "pending") return { status: 409, error: "Session not pending" } as const;
+      const expiresAt = toDate(data.expiresAt);
+      if (expiresAt && new Date() > expiresAt) {
+        tx.update(sessionRef, { status: "expired", updatedAt: FieldValue.serverTimestamp() });
+        return { status: 410, error: "Session expired" } as const;
+      }
+      tx.update(sessionRef, {
+        status: "signed",
+        signedAt: FieldValue.serverTimestamp(),
+        signerName: parsed.data.signerName || null,
+        signatureEnc,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      return { status: 200 } as const;
     });
+
+    if (outcome.status !== 200) {
+      return NextResponse.json({ error: outcome.error }, { status: outcome.status });
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "Signing is temporarily unavailable" }, { status: 503 });
     }
-    console.error("Failed to sign session", error);
+    console.error("Failed to sign session", error instanceof Error ? error.message : "unknown error");
     return NextResponse.json({ error: "Failed to submit signature" }, { status: 500 });
   }
 }

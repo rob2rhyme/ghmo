@@ -7,6 +7,7 @@ import { AdminEnvError, getAdminEnvStatus, getServerEnv } from "@/src/lib/env.se
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
+import { getAppOrigin } from "@/src/lib/appUrl";
 
 const GENERIC_MESSAGE = "If your admin access is enabled, you'll receive an email with a sign-in link shortly.";
 
@@ -80,49 +81,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email login is temporarily unavailable" }, { status: 503 });
     }
 
-    const continueUrl = `${req.nextUrl.origin}/admin/login?mode=signIn&email=${encodeURIComponent(emailLower)}`;
-    const requestType = "EMAIL_SIGNIN";
-    let identityResponseBody: Record<string, unknown> = {};
+    // Never log the email, continue URL or Identity Toolkit body (plan S-08).
+    const continueUrl = `${getAppOrigin(req)}/admin/login?mode=signIn&email=${encodeURIComponent(emailLower)}`;
     try {
-      console.debug("Sending admin email link", { requestType, continueUrl, emailLower });
       const identityRes = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            requestType,
+            requestType: "EMAIL_SIGNIN",
             email: emailLower,
             continueUrl,
             canHandleCodeInApp: true
           })
         }
       );
-      identityResponseBody = await identityRes.json().catch(() => ({}));
-      console.debug("Identity Toolkit sendOobCode response", {
-        status: identityRes.status,
-        keys: Object.keys(identityResponseBody),
-        continueUrl,
-        emailLower
-      });
       if (!identityRes.ok) {
-        const identityBodyAny = identityResponseBody as Record<string, any>;
-        const identityError = identityBodyAny?.error;
-        const errorMessage =
-          identityError?.message ||
-          identityError?.errors?.[0]?.message ||
-          identityBodyAny?.error?.code ||
-          "UNKNOWN";
-        const errorMessageString = String(errorMessage);
-        if (
-          errorMessageString === "QUOTA_EXCEEDED" ||
-          errorMessageString.startsWith("QUOTA_EXCEEDED")
-        ) {
-          console.warn("Identity Toolkit sendOobCode quota exceeded", {
-            emailLower,
-            continueUrl,
-            message: errorMessageString
-          });
+        const body = (await identityRes.json().catch(() => ({}))) as { error?: { message?: string } };
+        const code = String(body.error?.message ?? "UNKNOWN");
+        if (code.startsWith("QUOTA_EXCEEDED")) {
+          console.warn("Identity Toolkit sendOobCode quota exceeded");
           return NextResponse.json(
             {
               ok: false,
@@ -132,28 +111,15 @@ export async function POST(req: NextRequest) {
             { status: 429 }
           );
         }
-        console.error("Identity Toolkit sendOobCode failed", {
-          status: identityRes.status,
-          code: errorMessageString,
-          body: identityResponseBody,
-          emailLower,
-          continueUrl
-        });
+        console.error("Identity Toolkit sendOobCode failed", { status: identityRes.status, code });
         return NextResponse.json(
           { ok: false, code: "SEND_FAILED", message: "Unable to send sign-in link right now." },
           { status: 503 }
         );
       }
     } catch (error) {
-      console.error("Failed to send admin email sign-in link", {
-        error,
-        emailLower,
-        continueUrl
-      });
-      return NextResponse.json(
-        { error: "Unable to send sign-in link right now" },
-        { status: 500 }
-      );
+      console.error("Failed to send admin email sign-in link", error instanceof Error ? error.message : "unknown error");
+      return NextResponse.json({ error: "Unable to send sign-in link right now" }, { status: 500 });
     }
 
     await logAuditEvent({

@@ -41,23 +41,8 @@ export async function GET(req: NextRequest) {
   }
 
   const ctx = await getAuthContextFromRequest(req);
-  const decodedInfo = ctx
-    ? {
-        uid: ctx.uid,
-        orgSlug: ctx.orgSlug,
-        role: ctx.role,
-        email: ctx.email,
-        emailLower: ctx.emailLower
-      }
-    : null;
-  console.debug("Auth/me request", {
-    authenticated: Boolean(ctx),
-    decoded: decodedInfo,
-    url: req.url
-  });
   if (!ctx) return NextResponse.json({ authenticated: false, role: null, uid: null, orgSlug: null });
   if (!ctx.orgSlug) {
-    console.warn("Auth/me missing orgSlug claim", { uid: ctx.uid, decoded: decodedInfo });
     return NextResponse.json({
       authenticated: false,
       isAdmin: false,
@@ -75,7 +60,6 @@ export async function GET(req: NextRequest) {
         name: actor.name,
         roles: actor.roles
       };
-    console.debug("Auth/me admin lookup succeeded", { uid: ctx.uid, emailLower: ctx.emailLower, adminDocId: actor.adminDocId });
     return NextResponse.json({
       authenticated: true,
       isAdmin: true,

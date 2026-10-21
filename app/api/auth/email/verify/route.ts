@@ -13,6 +13,8 @@ import { checkRateLimit } from "@/src/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
+const INVALID_LINK = "Invalid or expired link";
+
 function buildAuditMeta(req: NextRequest) {
   return {
     ip: getClientIp(req.headers),
@@ -62,37 +64,23 @@ export async function POST(req: NextRequest) {
         if (!email && parsed.searchParams.get("email")) {
           email = parsed.searchParams.get("email") || email;
         }
-      } catch (error) {
-        console.warn("Invalid emailLink provided", error);
+      } catch {
+        // Invalid link: handled below as a generic failure.
       }
     }
 
-    const hasEmailLink = Boolean(emailLink);
-    const hasOobCode = Boolean(resolvedOobCode);
     const normalizedEmail = normalizeMemberEmail(email);
     if (normalizedEmail) {
       emailLower = normalizedEmail;
     }
 
     if (!emailLower) {
-      console.warn("Missing email in verify payload", { hasEmailLink, hasOobCode });
       return NextResponse.json({ error: "Email required for verification" }, { status: 400 });
     }
 
     if (!resolvedOobCode) {
       return NextResponse.json({ error: "Missing oobCode" }, { status: 400 });
     }
-
-    const snapshot = await getAdminDb()
-      .collection(orgAdminsCollectionPath(orgSlug))
-      .where("emailLower", "==", emailLower)
-      .limit(1)
-      .get();
-    if (snapshot.empty) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-
-    const adminDoc = snapshot.docs[0];
-    const adminData = adminDoc.data();
-    if (adminData.status !== "active") return NextResponse.json({ error: "Admin disabled" }, { status: 403 });
 
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey) {
@@ -107,22 +95,28 @@ export async function POST(req: NextRequest) {
     };
 
     const endpoint = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithEmailLink?key=${apiKey}`;
-    console.debug("Verifying admin email link", {
-      endpoint,
-      emailLower,
-      oobCodePreview: resolvedOobCode.slice(0, 6),
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID
-    });
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(verifyPayload)
     });
+    // Verify the one-time link BEFORE looking at the allowlist, and give the same
+    // answer for every failure, so this endpoint cannot be used to discover which
+    // emails belong to admins.
     if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      console.warn("Email verify failed", text);
-      return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
+      return NextResponse.json({ error: INVALID_LINK }, { status: 400 });
     }
+
+    const snapshot = await getAdminDb()
+      .collection(orgAdminsCollectionPath(orgSlug))
+      .where("emailLower", "==", emailLower)
+      .limit(1)
+      .get();
+    if (snapshot.empty) return NextResponse.json({ error: INVALID_LINK }, { status: 400 });
+
+    const adminDoc = snapshot.docs[0];
+    const adminData = adminDoc.data();
+    if (adminData.status !== "active") return NextResponse.json({ error: INVALID_LINK }, { status: 400 });
 
     const customToken = await issueCustomToken(adminDoc.id, "admin");
     const signinRes = await fetch(
@@ -134,8 +128,7 @@ export async function POST(req: NextRequest) {
       }
     );
     if (!signinRes.ok) {
-      const text = await signinRes.text().catch(() => "");
-      console.warn("Custom token sign-in failed", text);
+      console.error("Custom token sign-in failed", { status: signinRes.status });
       return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
     }
     const signinPayload = await signinRes.json().catch(() => ({}));

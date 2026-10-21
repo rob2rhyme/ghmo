@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { safeEqual } from "./security/compare";
 import { getAdminDb } from "./firebaseAdmin";
 import { getServerEnv } from "./env.server";
 import { logAudit } from "./audit";
@@ -15,10 +16,8 @@ type WebhookPayload = {
 export function verifyGfmWebhookSignature(rawBody: string, signatureHeader?: string) {
   const env = getServerEnv();
   if (!signatureHeader || !env.GOFUNDME_PRO_WEBHOOK_SECRET) return false;
-  const hmac = crypto.createHmac("sha256", env.GOFUNDME_PRO_WEBHOOK_SECRET);
-  hmac.update(rawBody);
-  const expected = hmac.digest("hex");
-  return signatureHeader === expected;
+  const expected = crypto.createHmac("sha256", env.GOFUNDME_PRO_WEBHOOK_SECRET).update(rawBody).digest("hex");
+  return safeEqual(signatureHeader.trim().toLowerCase(), expected);
 }
 
 export async function recordWebhookEvent(communityId: string, eventId: string, payload: WebhookPayload) {
