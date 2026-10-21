@@ -104,8 +104,9 @@ describe("once encryption is on", () => {
     it("creates encrypted threads, never plaintext titles or bodies", async () => {
       await assertSucceeds(addDoc(collection(as("alice"), `${ORG}/commsThreads`), newThread()));
       await assertFails(addDoc(collection(as("alice"), `${ORG}/commsThreads`), { ...newThread(), title: "Secret plan" }));
-      const { enc: _enc, ...withoutEnc } = newThread();
-      await assertFails(addDoc(collection(as("alice"), `${ORG}/commsThreads`), { ...withoutEnc, title: "T", body: "B" }));
+      const plaintextThread = { ...newThread(), enc: undefined, title: "T", body: "B" };
+      delete (plaintextThread as { enc?: unknown }).enc;
+      await assertFails(addDoc(collection(as("alice"), `${ORG}/commsThreads`), plaintextThread));
     });
 
     it("lets another admin bump counters without touching the author's envelope", async () => {
