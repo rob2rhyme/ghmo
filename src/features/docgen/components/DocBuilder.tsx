@@ -7,6 +7,7 @@ import DocForm from "./DocForm";
 import DocPreview from "./DocPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "./LetterheadPage";
 import TemplateTabs from "./TemplateTabs";
+import LocalQrCode from "@/src/components/LocalQrCode";
 import { DocField, DocTemplateMeta, DocTemplateStep } from "../types";
 import { getTemplateById } from "../templates";
 
@@ -687,10 +688,8 @@ export default function DocBuilder({
               </button>
             </div>
             <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-center">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                  activeSession.signUrl
-                )}`}
+              <LocalQrCode
+                value={activeSession.signUrl}
                 alt="QR code for signing link"
                 className="h-48 w-48 rounded-lg border border-slate-200 bg-white p-2"
               />

@@ -7,5 +7,5 @@ export const metadata = siteMetadata;
 
 // Secure root layout: no third-party scripts. See SiteShell for why root layouts are split.
 export default function SecureRootLayout({ children }: { children: ReactNode }) {
-  return <SiteShell>{children}</SiteShell>;
+  return <SiteShell secure>{children}</SiteShell>;
 }

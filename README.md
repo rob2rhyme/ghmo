@@ -143,7 +143,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
-| `npm run lint` | ESLint. Fails on any error, or on more than 160 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
+| `npm run lint` | ESLint. Fails on any error, or on more than 159 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
 | `npm test` | Vitest unit tests in `tests/unit/` |
 | `npm run build` | Production build. Works without Firebase secrets |
 | `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |

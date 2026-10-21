@@ -6,5 +6,5 @@ import { siteMetadata } from "@/src/lib/siteMetadata";
 export const metadata = siteMetadata;
 
 export default function DocsRootLayout({ children }: { children: ReactNode }) {
-  return <SiteShell>{children}</SiteShell>;
+  return <SiteShell secure>{children}</SiteShell>;
 }

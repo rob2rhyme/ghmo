@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
+import { headers } from "next/headers";
 import Providers from "@/src/components/Providers";
 import { CommunityHeader } from "@/src/components/community/CommunityHeader";
 import { getCommunity } from "@/src/lib/community";
@@ -10,6 +11,11 @@ type SiteShellProps = {
   bodyStart?: ReactNode;
   /** Render the community header and footer. */
   chrome?: boolean;
+  /**
+   * Secure areas run under a nonce-based CSP (see proxy.ts). Reading the nonce makes
+   * the page render per request, which nonces require.
+   */
+  secure?: boolean;
 };
 
 /**
@@ -19,13 +25,14 @@ type SiteShellProps = {
  * navigating between root layouts, so third-party scripts loaded on public pages
  * can never stay alive in the browser after the user moves into the admin area.
  */
-export async function SiteShell({ children, bodyStart, chrome = true }: SiteShellProps) {
+export async function SiteShell({ children, bodyStart, chrome = true, secure = false }: SiteShellProps) {
   const community = await getCommunity();
+  const nonce = secure ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
-        <Providers>
+        <Providers nonce={nonce}>
           {bodyStart}
           {chrome ? (
             <>
