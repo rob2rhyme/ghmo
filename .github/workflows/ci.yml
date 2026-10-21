@@ -62,6 +62,19 @@ jobs:
       - run: npm ci
       - run: npm run test:emulators
 
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Fails if a credential (service-account key, API secret, private key) is committed.
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

@@ -63,6 +63,8 @@ Severity: **C**ritical · **H**igh · **M**edium · **L**ow.
 | S-17 | M | First-admin bootstrap creates a PIN and uses the PIN document ID as the admin ID. | `app/api/admin/bootstrap-pin/route.ts` | Replace with `POST /api/admin/bootstrap` (secret + email only) that creates the first `admins` doc; the admin then signs in by magic link and enrolls a passkey. Delete the endpoint once used, or keep it permanently locked by the `config/bootstrap` marker. |
 | S-18 | H | Signing-link QR codes were rendered by `api.qrserver.com`, sending the secret signing URL to a third party. | `src/features/docgen/components/DocBuilder.tsx` | Generate QR codes locally in the browser (`qrcode` package). |
 | S-19 | M | Open redirect: login pages accepted any `next` starting with `/`, including `//evil.com`; `/login` accepted absolute URLs. The admin login page also read Next 16's async `searchParams` synchronously, so `next` never worked. | `app/(auth)/admin/login/page.tsx`, `app/(auth)/login/page.tsx` | `safeRedirectPath()` allows same-origin paths only. |
+| S-20 | C | Dev login bypass (`/api/auth/dev/admin-session`) never checked the environment, and its token was optional: with `ALLOW_DEV_ADMIN_LOGIN=true` and no token, anyone could sign in as any admin by email. Token also accepted in the query string. | `app/api/auth/dev/admin-session/route.ts` | Always off in production; 32+ char token required, header only, constant-time compare, rate-limited. |
+| S-21 | M | Magic-link verify checked the admin allowlist before the link, so its error messages revealed which emails are admins. | `app/api/auth/email/verify/route.ts` | Verify the link first; one generic error for every failure. |
 | S-07 | M | Magic-link `continueUrl` is built from the request's own origin (Host header). | `app/api/auth/email/start/route.ts` | Build from a fixed `NEXT_PUBLIC_APP_URL`; restrict Firebase authorized domains. |
 | S-08 | M | Admin emails, continue URLs and partial OOB codes are written to logs. | email start/verify routes, `sessionCookies.ts` | Remove debug logs; log hashed identifiers only. |
 | S-09 | M | Session cookie `secure` flag depends on `x-forwarded-proto`; can be false in production behind some proxies. | `src/lib/sessionCookies.ts` | Always `secure: true` in production; use `__Host-` cookie prefix; `sameSite: "strict"` for admin. |
@@ -198,7 +200,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | Phase | Name | Scope | Exit criteria |
 |---|---|---|---|
 | **0** | Foundation repair | Fix React/Next version mismatch (React 19 for Next 16). Add ESLint, Vitest, Playwright and GitHub Actions CI. | CI green on `main`; branch protection on. |
-| **1** | Security hardening | S-01 → S-19. Security headers + CSP. Revocable session cookies. Durable rate limiting. **Remove PIN login and PIN bootstrap.** Remove debug routes. Zod on every route. `proxy.ts`. | Header scan (securityheaders.com) A; disabled admin loses access within 1 minute in a test; no third-party script on `/admin`. |
+| **1** | Security hardening | S-01 → S-21. Security headers + CSP. Revocable session cookies. Durable rate limiting. **Remove PIN login and PIN bootstrap.** Remove debug routes. Zod on every route. `proxy.ts`. | Header scan (securityheaders.com) A; disabled admin loses access within 1 minute in a test; no third-party script on `/admin`. |
 | **2** | Passkeys + UI foundation | WebAuthn passkeys **required** for admin login (magic link only for first enrollment and lost-device recovery). Tailwind v4 upgrade, design tokens, shadcn/ui primitives, new admin shell. | Every admin enrolled with a passkey; admin routes reject sessions without passkey auth; all admin pages on the new shell. |
 | **3** | E2EE core | `src/lib/e2ee/` (keys, envelopes, wrapping, sealing) with full tests. Keyring collection + rules. Device enrollment, safety codes, recovery key with two-trustee confirmation, Devices & keys page. | Two devices can share the WDK; removing one + rotating blocks it from new data (automated test); recovery drill passes. |
 | **4** | E2EE rollout | Encrypt Admin Chat → Plans & Issues → draft minutes → signatures (sealed) → document history. Client-side search. Migration job. Rules updated to envelope validation. | Firestore console shows no plaintext in E2EE collections; migration verified; plaintext backups scheduled for deletion. |
@@ -237,4 +239,32 @@ The owner accepted every recommendation.
   - Tailwind 3 file-watcher chain (`braces`, `micromatch`, `chokidar`, `postcss-selector-parser`): build-time only, cleared by the Tailwind v4 upgrade in Phase 2.
   - `@grpc/grpc-js` 1.9 via the Firebase client and `firebase-admin` (plus `uuid`/`gaxios` via `google-gax`): even Firebase 13 pins this line. Not forced, because Firebase can't be exercised against real credentials in CI. Re-check on each Firebase release.
 - **Owner action:** enable branch protection on `main` requiring the `CI` checks (GitHub → Settings → Branches).
+
+### Phase 1 — Security hardening · done 2026-10-21
+All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-18 (signing links sent to a third-party QR service), S-19 (open redirect), S-20 (dev login usable in production), S-21 (admin email enumeration).
+
+| Area | What changed | Proven by |
+|---|---|---|
+| Third-party scripts (S-01) | Public pages and secure areas use separate root layouts; only the public one loads the GoFundMe snippet. Crossing between them is a full page load. | e2e: marker script runs on `/`, is gone after clicking into `/admin` |
+| CSP and headers (S-02, S-12) | `proxy.ts` sets a strict nonce CSP on `/admin`, `/login`, `/sign`, `/c/`, `/docs` and a baseline CSP on public pages. HSTS, nosniff, frame denial, Referrer-Policy (no-referrer on signing links), Permissions-Policy, no-store on API and secure pages. | Unit tests for the policy; e2e checks every secure page loads with zero CSP violations and that injected inline scripts and event handlers are blocked |
+| Sessions (S-03, S-09) | Revocable Firebase session cookie `__session` (HttpOnly, Secure, SameSite=Lax, 8 h), verified with revocation checks. Issued only to active admins or allowlisted members. Logout revokes all of the user's tokens and signs out the Firebase client. | Emulator integration tests: allowlist, cookie flags, a copied cookie stops working after logout |
+| Database access (S-03) | Firestore rules require an active `admins/{uid}` record as well as the admin claim. | Emulator rules tests (disabled and deleted admins are refused; the old rules fail these tests) |
+| Rate limits and IPs (S-04) | Firestore-backed limiter with hashed keys, fails closed. Right-most `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`) or Vercel `x-real-ip`. | Unit tests |
+| PIN login (S-05, S-17) | Removed entirely. One-time `POST /api/admin/bootstrap` (secret + email) for the first admin. | — |
+| Secrets and logs (S-06, S-08) | Constant-time comparisons; no emails, links, codes or claims in logs. | Unit tests for `safeEqual` |
+| Links (S-07, S-19) | Magic links built from `NEXT_PUBLIC_APP_URL`; `safeRedirectPath()` on both login pages. | Unit tests |
+| Signing (S-10, S-11, S-18) | ID format check, rate limits, real-PNG and 200 KB checks, single-use transaction, AES-GCM bound to the session with key IDs for rotation; QR codes generated in the browser. | Emulator integration tests; unit tests |
+| Debug and dev routes (S-13, S-20) | `/api/debug/*` deleted; dev login always off in production. | e2e (404); unit tests |
+| Webhook (S-14) | Fixed organization, size cap, Zod schema. | Unit tests for the HMAC check |
+| Input validation (S-15) | `parseJsonBody()` + Zod schemas on every route that reads a body. | Unit tests for the helper |
+| CI (S-16) | CodeQL (security-extended), gitleaks secret scan, emulator job, critical-advisory audit gate. History scanned: no committed keys found. | CI |
+
+**Owner actions after deploying Phase 1**
+1. Set `NEXT_PUBLIC_APP_URL` to the production origin. Make sure Firebase Auth's authorized domains list only your real domains.
+2. Deploy the new Firestore rules: `npx firebase deploy --only firestore:rules` (or paste `firestore.rules` into the console).
+3. In Firestore, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.
+4. Remove `FEATURE_PIN_LOGIN`, `ALLOW_DEV_ADMIN_LOGIN` and `DEV_ADMIN_LOGIN_TOKEN` from production settings, and delete any old `organizations/ghmo/pins` documents.
+5. Set `DOCGEN_SIGNATURE_ENC_KEY_BASE64` if it isn't already set.
+6. Everyone has to sign in again once, because old session cookies are no longer accepted.
+7. Turn on branch protection for `main`, requiring the CI, CodeQL and secret-scan checks.
 
