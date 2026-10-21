@@ -13,6 +13,7 @@ import { Input } from "@/src/components/ui/input";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useE2ee, type DeviceView, type PreparedRecovery } from "@/src/lib/e2ee/client/E2eeProvider";
 import { DeviceSetupForm } from "./DeviceSetupForm";
+import { MigrationSection } from "./MigrationSection";
 import { errorText, UnlockCard } from "./UnlockCard";
 import { RecoveryKeyFlow } from "./RecoveryKeyFlow";
 
@@ -459,6 +460,7 @@ export default function EncryptionPanel() {
         <>
           <DevicesSection />
           <RecoverySection />
+          <MigrationSection />
         </>
       ) : null}
     </div>
