@@ -97,6 +97,8 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Without tokens, the page renders embeds/profile links and curated placeholder cards.
 
 ## Upcoming Roadmap
+> **Superseded:** the current plan — security hardening, end-to-end encryption and the UI upgrade — is in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). The list below is kept for history.
+
 - **Governance & Compliance**
   - Approval/sign-off workflow for minutes (draft → submitted → approved with attribution/signatures).
   - Minutes versioning and revision history to track changes over time.
