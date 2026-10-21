@@ -5,9 +5,11 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
-import { normalizeMemberEmail, normalizeMemberName, isMemberStatus, sanitizeMemberRoles } from "@/src/lib/members";
+import { normalizeMemberEmail, normalizeMemberName, sanitizeMemberRoles } from "@/src/lib/members";
 import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -53,12 +55,18 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   }
 }
 
-type CreateBody = {
-  email?: string;
-  name?: string | null;
-  status?: string;
-  roles?: string[];
-};
+/**
+ * Member roles are an allowlist: admin privileges live in the separate `admins`
+ * collection and must never be granted through a member record.
+ */
+const MEMBER_ROLES = ["member"] as const;
+
+const createMemberSchema = z.object({
+  email: z.string().trim().email().max(320),
+  name: z.string().max(120).nullable().optional(),
+  status: z.enum(["active", "disabled"]).optional(),
+  roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional()
+});
 
 export async function POST(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
   const params = await context.params;
@@ -76,13 +84,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     if ("response" in guard) return guard.response;
     const { actor, admin } = guard;
 
-    const body = (await req.json()) as CreateBody;
-    const emailInput = body.email?.trim() || "";
+    const parsed = await parseJsonBody(req, createMemberSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+    const emailInput = body.email;
     const emailLower = normalizeMemberEmail(emailInput);
     if (!emailLower) return NextResponse.json({ error: "Email is required" }, { status: 400 });
 
     const name = normalizeMemberName(body.name);
-    const status = isMemberStatus(body.status) ? body.status : "active";
+    const status = body.status ?? "active";
     const sanitizedRoles = sanitizeMemberRoles(body.roles);
     const roles = sanitizedRoles.length > 0 ? sanitizedRoles : ["member"];
     const now = new Date();

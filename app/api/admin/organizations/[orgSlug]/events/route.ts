@@ -6,8 +6,11 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { z } from "zod";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+const TIMEZONE_PATTERN = /^[A-Za-z0-9_+\-/]*$/;
 
 const createEventSchema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -15,30 +18,20 @@ const createEventSchema = z.object({
   body: z.string().trim().min(1).max(50000),
   status: z.enum(["draft", "published", "archived"]).optional(),
   featured: z.boolean().optional(),
-  timezone: z.string().trim().max(64).optional(),
+  timezone: z.string().trim().max(64).regex(TIMEZONE_PATTERN).optional(),
   location: z.string().trim().max(200).optional(),
-  startsAt: z.string().nullable().optional(),
-  endsAt: z.string().nullable().optional(),
+  startsAt: z.string().max(64).nullable().optional(),
+  endsAt: z.string().max(64).nullable().optional(),
   announcementDocTemplate: z.string().trim().max(200).optional(),
-  announcementPdfSource: z.unknown().optional()
+  announcementPdfSource: z
+    .object({
+      generator: z.literal("document-generator"),
+      docType: z.literal("eventAnnouncement"),
+      payloadVersion: z.number().int().min(0).max(1000)
+    })
+    .nullable()
+    .optional()
 });
-
-type ValidationErrorResponse = {
-  ok: false;
-  error: "VALIDATION_ERROR";
-  details: { path: string; message: string }[];
-};
-
-function toValidationErrorResponse(errors: z.ZodError): ValidationErrorResponse {
-  return {
-    ok: false,
-    error: "VALIDATION_ERROR",
-    details: errors.issues.map(issue => ({
-      path: issue.path.join(".") || "payload",
-      message: issue.message
-    }))
-  };
-}
 
 function parseOptionalDate(
   value: string | null | undefined,
@@ -110,11 +103,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     if ("response" in guard) return guard.response;
     const { actor } = guard;
 
-    const body = await req.json();
-    const parsed = createEventSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(toValidationErrorResponse(parsed.error), { status: 400 });
-    }
+    const parsed = await parseJsonBody(req, createEventSchema);
+    if (!parsed.ok) return parsed.response;
 
     // Dates require explicit parsing to avoid storing Invalid Date values.
     const startsAtResult = parseOptionalDate(parsed.data.startsAt, "startsAt");

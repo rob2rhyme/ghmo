@@ -49,6 +49,14 @@ export type CreateDocumentInput = {
   docId?: string;
 };
 
+/** Thrown when trying to change a finalized (signed) document. */
+export class DocumentLockedError extends Error {
+  constructor() {
+    super("Finalized documents cannot be changed");
+    this.name = "DocumentLockedError";
+  }
+}
+
 export async function createDocument(payload: CreateDocumentInput) {
   const documentData = {
     templateId: payload.templateId,
@@ -56,8 +64,8 @@ export async function createDocument(payload: CreateDocumentInput) {
     category: payload.category,
     inputs: payload.inputs,
     createdByUid: payload.createdByUid,
-    createdByEmail: payload.createdByEmail,
-    createdByName: payload.createdByName,
+    createdByEmail: payload.createdByEmail ?? null,
+    createdByName: payload.createdByName ?? null,
     createdByRoles: payload.createdByRoles,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp()
@@ -65,8 +73,14 @@ export async function createDocument(payload: CreateDocumentInput) {
 
   let docRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
   if (payload.docId) {
-    docRef = getDocumentsCollection().doc(payload.docId);
-    await docRef.set(documentData, { merge: true });
+    const ref = getDocumentsCollection().doc(payload.docId);
+    docRef = ref;
+    // Signed certificates are immutable: their inputs must keep matching the signed PDF.
+    await ref.firestore.runTransaction(async tx => {
+      const existing = await tx.get(ref);
+      if (existing.exists && existing.data()?.status === "finalized") throw new DocumentLockedError();
+      tx.set(ref, documentData, { merge: true });
+    });
   } else {
     docRef = await getDocumentsCollection().add(documentData);
   }
