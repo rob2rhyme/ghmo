@@ -68,7 +68,8 @@ export default function DocumentGeneratorClient({
       const blob = await pdf(doc).toBlob();
       downloadBlob(blob, `${communitySlug}-${selected.name}.pdf`);
 
-      const outputRefs: string[] = [];
+      // Log file names only; the images themselves stay on this device.
+      const outputRefs: string[] = [`${communitySlug}-${selected.name}.pdf`];
 
       const node = previewRef.current;
       if (node) {
@@ -76,7 +77,7 @@ export default function DocumentGeneratorClient({
         const jpegDataUrl = await htmlToImage.toJpeg(node, { quality: 0.92 });
         downloadDataUrl(pngDataUrl, `${communitySlug}-${selected.name}.png`);
         downloadDataUrl(jpegDataUrl, `${communitySlug}-${selected.name}.jpg`);
-        outputRefs.push(pngDataUrl, jpegDataUrl);
+        outputRefs.push(`${communitySlug}-${selected.name}.png`, `${communitySlug}-${selected.name}.jpg`);
       }
 
       await fetch("/api/docgen/log", {

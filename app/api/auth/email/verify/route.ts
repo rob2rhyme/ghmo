@@ -10,10 +10,20 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { normalizeMemberEmail } from "@/src/lib/members";
 import { createSessionResponse } from "@/src/lib/sessionCookies";
 import { checkRateLimit } from "@/src/lib/rateLimit";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 const INVALID_LINK = "Invalid or expired link";
+
+const bodySchema = z.object({
+  orgSlug: z.string().max(100).optional(),
+  email: z.string().max(320).optional(),
+  oobCode: z.string().max(2048).optional(),
+  // The full window.location.href of the magic link page.
+  emailLink: z.string().max(8192).optional()
+});
 
 function buildAuditMeta(req: NextRequest) {
   return {
@@ -41,12 +51,9 @@ export async function POST(req: NextRequest) {
     if (!verifyLimit.success) {
       return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
     }
-    const body = (await req.json()) as {
-      orgSlug?: string;
-      email?: string;
-      oobCode?: string;
-      emailLink?: string;
-    };
+    const parsedBody = await parseJsonBody(req, bodySchema);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.data;
     const { orgSlug, oobCode, emailLink } = body;
     let { email } = body;
     if (orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAppOrigin } from "@/src/lib/appUrl";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-type Body = { email?: string };
+// `email` stays optional/loosely typed: a blank or malformed address gets the same
+// generic answer as an unknown one, so validation cannot be used for enumeration.
+const bodySchema = z.object({ email: z.string().max(320).optional() });
+const emailFormat = z.string().email().max(320);
 
 export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
@@ -29,10 +35,11 @@ export async function POST(req: NextRequest) {
 
     const db = getAdminDb();
 
-    const body = (await req.json()) as Body;
-    const emailRaw = body.email?.trim() || "";
+    const parsed = await parseJsonBody(req, bodySchema);
+    if (!parsed.ok) return parsed.response;
+    const emailRaw = parsed.data.email?.trim() || "";
     const emailLower = emailRaw.toLowerCase();
-    if (!emailLower) {
+    if (!emailLower || !emailFormat.safeParse(emailRaw).success) {
       return NextResponse.json({ ok: true, message: genericMessage() });
     }
 
@@ -57,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    const continueUrl = `${req.nextUrl.origin}/login`;
+    const continueUrl = `${getAppOrigin(req)}/login`;
     if (!firebaseApiKey) {
       console.warn("Missing NEXT_PUBLIC_FIREBASE_API_KEY; cannot send magic link");
       return NextResponse.json({ ok: true, message: genericMessage() });
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(payload)
       });
     } catch (err) {
-      console.error("Failed to send magic link", err);
+      console.error("Failed to send magic link", err instanceof Error ? err.message : "unknown error");
     }
 
     return NextResponse.json({ ok: true, message: genericMessage() });

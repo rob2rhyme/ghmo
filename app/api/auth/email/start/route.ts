@@ -7,11 +7,22 @@ import { AdminEnvError, getAdminEnvStatus, getServerEnv } from "@/src/lib/env.se
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAppOrigin } from "@/src/lib/appUrl";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 const GENERIC_MESSAGE = "If your admin access is enabled, you'll receive an email with a sign-in link shortly.";
 
 export const dynamic = "force-dynamic";
+
+// `email` stays optional/loosely typed: a blank or malformed address gets the same
+// generic answer as an unknown one, so validation cannot be used for enumeration.
+const bodySchema = z.object({
+  orgSlug: z.string().trim().max(100).regex(/^[a-z0-9-]*$/i).optional(),
+  email: z.string().max(320).optional()
+});
+const emailFormat = z.string().email().max(320);
 
 function buildAuditMeta(req: NextRequest) {
   return {
@@ -35,13 +46,15 @@ export async function POST(req: NextRequest) {
     if (!FEATURE_EMAIL_ADMIN_LOGIN) {
       return NextResponse.json({ error: "Email login disabled" }, { status: 404 });
     }
-    const payload = (await req.json()) as { orgSlug?: string; email?: string };
-    const orgSlug = payload.orgSlug?.trim();
+    const parsed = await parseJsonBody(req, bodySchema);
+    if (!parsed.ok) return parsed.response;
+    const orgSlug = parsed.data.orgSlug;
     if (!orgSlug) return NextResponse.json({ error: "Missing organization" }, { status: 400 });
+    // Single community: never query or audit under a client-chosen organization.
+    if (orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const emailValue = payload.email?.trim();
-    const emailLower = normalizeMemberEmail(emailValue);
-    if (!emailLower) {
+    const emailLower = normalizeMemberEmail(parsed.data.email);
+    if (!emailLower || !emailFormat.safeParse(emailLower).success) {
       return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
     }
 

@@ -11,10 +11,17 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 const ROUTE = "/api/auth/dev/admin-session";
 
 export const dynamic = "force-dynamic";
+
+const bodySchema = z.object({
+  orgSlug: z.string().trim().max(100).regex(/^[a-z0-9-]*$/i).optional(),
+  email: z.string().trim().max(320).optional()
+});
 
 function buildMeta(req: NextRequest) {
   return {
@@ -46,15 +53,16 @@ export async function POST(req: NextRequest) {
       return new Response("Not Found", { status: 404 });
     }
 
-    const body = (await req.json()) as { orgSlug?: string; email?: string };
+    const parsed = await parseJsonBody(req, bodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
-    const orgSlug = body.orgSlug?.trim();
+    const orgSlug = body.orgSlug;
     if (!orgSlug) {
       return NextResponse.json({ error: "Missing organization" }, { status: 400 });
     }
 
-    const emailValue = body.email?.trim();
-    const emailLower = normalizeMemberEmail(emailValue);
+    const emailLower = normalizeMemberEmail(body.email);
     if (!emailLower) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
