@@ -340,3 +340,41 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 2. Every other admin sets up each of their devices; another admin approves each one after comparing the safety code by phone or in person.
 3. Put a yearly reminder on the calendar: test the recovery key (Admin → Encryption → Test).
 
+
+### Phase 4 — E2EE rollout · done 2026-10-21
+**Design as built** (refines §4.4 and §6):
+- **Gating:** rules treat the workspace as "encrypted" once `e2ee/state.enabled` is true. From then on, private fields must be stored as an envelope written by one of the caller's own active devices, and plaintext writes are refused. Before that, plaintext still works. Pages that show private data ask the admin to unlock first (`EncryptionGate`).
+- **Admin Chat:** `{body}` is encrypted. The audit log records that a message was sent, never what it said (the audit route ignores `summary`).
+- **Plans & Issues:** title and body, the conclusion text, comments and each vote's value are encrypted. Status, priority, timestamps, authors and who voted stay readable (rules need them). Vote counts are no longer stored on the thread: each browser decrypts the votes and tallies them, because public counts would have revealed how each admin voted.
+- **Meeting minutes:** drafts and submitted minutes keep their content (chair, agenda, summary, decisions, action items, attendance, signatures) inside `enc`; approval notes inside `approvalEnc`. Minutes are server-written only (rules deny direct writes); the API validates the envelope and the writing device, and refuses plaintext content once encryption is on. **Approval publishes a plaintext copy** (`published`) for the public pages, supplied by the approver's browser; returning to draft deletes it. Approving and saving content are separate requests. Lists and search decrypt on the client.
+- **Signatures:** the signing page seals the image to the workspace sealing key (ephemeral ECDH → HKDF → AES-GCM, bound to the session and epoch). The server stores only ciphertext; an unlocked admin device opens it. The old server-side AES key is used only for signatures collected before encryption.
+- **Document history:** saved documents keep inputs inside `enc`. On finalize, the browser builds the PDF (as JPEG, to stay under the 1 MiB document limit) and encrypts it with the inputs. Finalized documents now get `status: "finalized"`, so the existing edit lock works.
+- **Migration:** Admin → Encryption → "Encrypt existing records". An unlocked device encrypts each legacy record, decrypts it again to prove it matches, and the server swaps plaintext for the envelope only if the record is unchanged and the envelope comes from the caller's own device. Covers chat, threads, conclusions, comments, votes, draft/submitted minutes and saved documents. **Approved minutes stay public.** Safe to run again.
+
+**Exit criteria met:**
+- With encryption on, browser tests read the stored data directly and find only ciphertext for chat, threads, comments, conclusions, votes, draft minutes, signatures and saved documents; audit entries contain no content.
+- Migration test: seeds plaintext in every area, runs the job, finds none left, and the data is still readable afterwards.
+- Tests: 116 unit, 67 rules, 7 real-browser (virtual passkey with PRF) including a second admin reading and voting.
+
+**Bugs found and fixed during the phase:**
+- Chat audit entries sent the first 80 characters of every message in plaintext.
+- Next 16 passes `params`/`searchParams` as promises: the thread detail page, the minutes page (`?mode=records` was ignored), the document generator (`?docId=` was ignored) and the signing page all read them synchronously.
+- The admin events list returned timestamps the minutes editor couldn't parse, so no past event could be selected.
+- Finalized certificates never got `status: "finalized"`, so the edit lock never applied.
+- CSP `base-uri 'none'` blocked html-to-image (document exports); it is now `'self'`. Cross-origin base tags are still refused.
+- Removed the unused `AdminDashboardClient` (it still wrote plaintext minutes).
+
+**Known limits:**
+- **Backups made before the migration still contain the old plaintext.** Delete them once they are no longer needed (Firestore exports/PITR retention, any manual exports).
+- Approval trusts the approver's browser to supply the content to publish; Phase 5 adds separation of duties and server-side checks.
+- The migrated record's envelope is signed by the migrating admin's device, not the original author's (the readable `createdBy` is unchanged).
+- Encrypted finalized certificates are capped near 1 MiB; Phase 5 moves PDFs to Cloud Storage.
+- The events collection is read from two paths (`organizations/ghmo-site/events` by the admin list, `organizations/ghmo/events` by the public minutes route). Worth unifying.
+- Metadata stays readable: who wrote what and when, thread status, event titles, who voted.
+
+**Owner actions after deploying Phase 4**
+1. Make sure encryption is on and every admin has an approved device (Admin → Encryption).
+2. A super admin (or any admin with an unlocked device) opens Admin → Encryption and runs **Encrypt existing records** once. Keep the page open until it says Done.
+3. Deploy the updated `firestore.rules` (`firebase deploy --only firestore:rules`).
+4. Delete older Firestore backups/exports, and review who can still read the Firebase console.
+5. Any signatures collected before encryption was turned on must be finalized or discarded; they expire within minutes.

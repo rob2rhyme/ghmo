@@ -153,7 +153,9 @@ Legacy community paths are no longer supported; please migrate any old data into
 - **New devices** must be approved by another admin after comparing a 12-digit safety code, or activated with the paper recovery key.
 - **Lost devices:** revoking a lost device rotates to a new epoch it can't read.
 - The server only ever stores public keys and wrapped keys (`organizations/ghmo/e2ee/**`, server-only in Firestore rules).
-- Phase 4 moves Admin Chat, Plans & Issues, draft minutes, signatures and document history onto these keys.
+- **What is encrypted:** Admin Chat; Plans & Issues (titles, details, comments, conclusions, votes); draft and submitted minutes; signatures (sealed in the signer's browser); saved documents and finalized certificates. Approved minutes are public by design and are published as a plaintext copy on approval.
+- **Existing data:** after turning encryption on, run Admin → Encryption → **Encrypt existing records** once. Backups taken earlier still contain plaintext; delete them when no longer needed.
+- **Tests:** `npm run test:e2e:auth` runs the real-browser encryption tests (needs Chromium; set `PLAYWRIGHT_CHROMIUM_PATH` if the bundled browser is missing).
 
 ## Development Checks
 | Command | What it does |
@@ -179,7 +181,7 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push
 - Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
 - The dev helper `/api/auth/dev/admin-session` only works when the build is not production, `ALLOW_DEV_ADMIN_LOGIN=true`, and a 32+ character `DEV_ADMIN_LOGIN_TOKEN` is sent in the `x-dev-login-token` header. (Before Phase 1 the code did not check the environment and the token was optional.)
 - Webhooks are validated with a constant-time HMAC-SHA256 check, a 64 KB size cap and a Zod schema; the target organization is never taken from the payload. Replace the HMAC placeholder with the provider's documented verification when credentials are available.
-- Signing links: the session ID must be 64 hex characters; submissions are rate-limited, must be a real PNG under 200 KB, and are accepted exactly once (Firestore transaction). Signatures are encrypted with AES-256-GCM bound to their session, with key IDs for rotation. QR codes for signing links are generated in the browser.
+- Signing links: the session ID must be 64 hex characters; submissions are rate-limited, must be a real PNG under 200 KB, and are accepted exactly once (Firestore transaction). With end-to-end encryption on, the signer's browser seals the signature to the workspace key and the server stores only ciphertext; before that, signatures use server-side AES-256-GCM bound to their session. QR codes for signing links are generated in the browser.
 - Firestore rules are deny-by-default; admin access needs the `admin` custom claim **and** an active admin record. Rules are tested against the emulator (`npm run test:emulators`).
 - All communication log features are admin-only, and closed threads are immutable.
 

@@ -34,6 +34,10 @@ export default function OnboardingDocPage() {
           encrypted data. Test the recovery key once a year.
         </li>
         <li>
+          After turning encryption on, run Admin → Encryption → &quot;Encrypt existing records&quot; once and keep the
+          page open until it says Done. Then delete older backups, which still contain the earlier plaintext.
+        </li>
+        <li>
           Each admin sets up encryption on each device they use; another admin approves it after comparing the 12-digit
           safety code by phone or in person.
         </li>
