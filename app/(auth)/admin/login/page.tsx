@@ -1,42 +1,57 @@
-//app/(auth)/admin/login/page.tsx
-
 import { redirect } from "next/navigation";
 import type { Route } from "next";
-import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
-import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { getServerEnv } from "@/src/lib/env.server";
+import { AdminAccessError, getAdminProfile, requireActiveAdmin } from "@/src/lib/admin";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { getAdminEnvStatus, getServerEnv } from "@/src/lib/env.server";
+import { listPasskeys } from "@/src/lib/passkeys";
+import { isDevLoginAllowed } from "@/src/lib/security/devLogin";
 import { safeRedirectPath } from "@/src/lib/security/redirect";
-import AdminLoginClient from "./AdminLoginClient";
+import AdminLoginClient, { type LoginStage } from "./AdminLoginClient";
 
 type AdminLoginPageProps = {
-  searchParams: Promise<{
-    next?: string | string[];
-  }>;
+  searchParams: Promise<{ next?: string | string[] }>;
 };
 
-export default async function AdminLoginPage({
-  searchParams,
-}: AdminLoginPageProps) {
+/**
+ * Admin sign-in. The stage is decided here from the session:
+ * - no session                    -> "signin" (passkey, or email link for setup/recovery)
+ * - magic-link session            -> "setup" (create a passkey), or "pending" if a new
+ *                                    passkey is waiting for another admin's approval
+ * - passkey session               -> straight to the admin area
+ */
+export default async function AdminLoginPage({ searchParams }: AdminLoginPageProps) {
   const { next } = await searchParams;
-  const adminRoute = safeRedirectPath(typeof next === "string" ? next : null, "/admin") as Route;
-  const ctx = await getAuthContextFromRequest();
-  try {
-    await requireActiveAdmin(ctx ?? undefined, COMMUNITY_SLUG);
-    redirect(adminRoute);
-  } catch (error) {
-    if (error instanceof AdminAccessError) {
-      // fall through to login UI
-    } else {
-      throw error;
+  const nextPath = safeRedirectPath(typeof next === "string" ? next : null, "/admin");
+
+  let stage: LoginStage = "signin";
+  let adminName: string | null = null;
+
+  if (getAdminEnvStatus().ok) {
+    const ctx = await getAuthContextFromRequest();
+    if (ctx) {
+      try {
+        await requireActiveAdmin(ctx, COMMUNITY_SLUG);
+        redirect(nextPath as Route);
+      } catch (error) {
+        if (!(error instanceof AdminAccessError)) throw error;
+        if (error.reason === "PASSKEY_REQUIRED") {
+          const [passkeys, profile] = await Promise.all([listPasskeys(ctx.uid), getAdminProfile(COMMUNITY_SLUG, ctx.uid)]);
+          stage = passkeys.some(p => p.status === "pending") ? "pending" : "setup";
+          adminName = profile?.name ?? null;
+        }
+      }
     }
   }
 
-  const env = getServerEnv();
   return (
     <AdminLoginClient
       orgSlug={COMMUNITY_SLUG}
-      featureEmailLogin={env.FEATURE_EMAIL_ADMIN_LOGIN}
+      stage={stage}
+      nextPath={nextPath}
+      adminName={adminName}
+      featureEmailLogin={getServerEnv().FEATURE_EMAIL_ADMIN_LOGIN}
+      devLoginAvailable={isDevLoginAllowed(process.env)}
     />
   );
 }

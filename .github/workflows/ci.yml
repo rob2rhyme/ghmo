@@ -46,7 +46,7 @@ jobs:
           retention-days: 7
 
   emulators:
-    name: Firestore rules + auth integration (emulators)
+    name: Rules, auth integration and passkey e2e (emulators)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -61,6 +61,16 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run test:emulators
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      # Real browser passkey flow (virtual authenticator) against the emulators.
+      - run: npm run test:e2e:auth
+        env:
+          CI: "true"
+          NEXT_TELEMETRY_DISABLED: "1"
 
   secrets:
     name: Secret scan

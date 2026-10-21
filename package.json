@@ -6,14 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --max-warnings 136",
+    "lint": "eslint . --max-warnings 132",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm test",
     "audit": "audit-ci --moderate",
-    "test:emulators": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"vitest run --config vitest.emulator.config.mts\""
+    "test:emulators": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"vitest run --config vitest.emulator.config.mts\"",
+    "test:e2e:auth": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"playwright test --config playwright.emulator.config.ts\""
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",

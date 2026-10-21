@@ -268,3 +268,31 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 6. Everyone has to sign in again once, because old session cookies are no longer accepted.
 7. Turn on branch protection for `main`, requiring the CI, CodeQL and secret-scan checks.
 
+### Phase 2 — Passkeys + UI foundation · done 2026-10-21
+**UI foundation**
+- Tailwind 3.4 → 4.3.3 (official upgrade tool). This also cleared the Tailwind 3 advisory chain: production advisories 18 → 11.
+- Semantic design tokens (light and dark) using shadcn/ui names. Real dark mode: the `!important` overrides are gone and 865 hard-coded palette classes were migrated. Printed-document previews stay white.
+- shadcn/ui primitives in `src/components/ui` on Radix (button, input, textarea, label, field, card, badge, alert, dialog, sheet, separator, skeleton, toasts, empty state). The shadcn CLI couldn't reach `ui.shadcn.com` from the build sandbox, so the sources were written in shadcn's format. `components.json` is in place, so `npx shadcn add` works wherever the site is reachable.
+- Self-hosted Inter (no Google Fonts request), a global focus ring, and reduced-motion support.
+- **Admin shell:** grouped sidebar with `aria-current` on desktop; top bar with a slide-out menu on phones; a skip link. The duplicate nav and static heading are gone.
+- **Public header:** a mobile menu; the Admin link shows only to admins, and the footer has "Admin sign in".
+- `loading.tsx` / `error.tsx` for the admin, public and member areas.
+- Fix: after streaming was added, admin pages' redirects became client-side and could be hidden. The admin layout is now a single server-side gate that redirects before anything streams.
+- Only Admin Chat and Plans & Issues wait for the browser Firestore connection; other admin pages no longer block on it.
+
+**Passkeys (decision D2)**
+- WebAuthn with user verification and discoverable credentials. Challenges are single-use and expire after 5 minutes. The RP ID and origin come from `NEXT_PUBLIC_APP_URL`. Failures are rate-limited and all give the same answer.
+- Sessions carry `authMethod`. Admin pages, admin APIs and Firestore rules require `passkey`. A magic-link session can only create a passkey, check its status, or sign out.
+- Recovery approval: a new passkey added through a magic link by an admin who already has one stays pending until another admin approves it.
+- `/admin/security`: list, add, remove and approve passkeys. Each passkey records PRF support ("Encryption-ready"), which Phase 3 uses to unlock device keys.
+- **Tests:**
+  - A software WebAuthn authenticator plus 10 emulator integration tests: setup, approval, phishing origin, replay, missing user verification, disabled admin, last-key guard.
+  - Rules tests for magic-link and pre-passkey tokens.
+  - A real-browser end-to-end test with Chromium's virtual authenticator against the emulators.
+
+**Owner actions after deploying Phase 2**
+1. Make sure `NEXT_PUBLIC_APP_URL` is the exact production origin. Passkeys are bound to that domain, so changing the domain later means re-creating passkeys.
+2. Deploy the updated `firestore.rules`.
+3. Each admin: open `/admin/login`, request an email link, create a passkey, and then (recommended) add a second passkey on another device under Admin → Security.
+4. Add a Firestore TTL policy on `expiresAt` for the `webauthnChallenges` collection group (like `rateLimits`).
+

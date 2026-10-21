@@ -37,7 +37,9 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - No third-party UI dependencies were added for the communication log UI.
 
 ## Stack
-- Next.js 16.4 App Router, React 19.3, TypeScript 5.9, TailwindCSS 3.4 (v4 + shadcn/ui in Phase 2)
+- Next.js 16.4 App Router, React 19.3, TypeScript 5.9, Tailwind CSS 4.3
+- UI: shadcn/ui-style primitives in `src/components/ui` (Radix), semantic design tokens with light/dark themes in `app/globals.css`, self-hosted Inter, lucide icons, sonner toasts
+- Passkeys: `@simplewebauthn/server` + `@simplewebauthn/browser`
 - Node.js 22.12 or newer
 - Tooling: ESLint 9 (flat config, `eslint-config-next`), Vitest (unit), Playwright (browser smoke tests), GitHub Actions CI
 - Firebase Client SDK (Auth/Firestore) + Firebase Admin SDK
@@ -70,7 +72,10 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - The magic-link workflow is the only supported login path; there is no member login option.
 - **PIN login has been removed** (plan decision D3). The PIN routes, the `pins` collection rules and `FEATURE_PIN_LOGIN` no longer exist; any old `organizations/ghmo/pins` documents can be deleted.
 - **First admin:** set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters) and call `POST /api/admin/bootstrap` with `{ "secret", "email", "name" }`. It creates one `super_admin` in `organizations/ghmo/admins` and then locks itself permanently. Remove the secret afterwards.
-- **Passkeys will be required** for every admin from Phase 2 (decision D2). Magic links will then be used only for first enrollment and lost-device recovery.
+- **Passkeys are required** for every admin (decision D2). Admins sign in at `/admin/login` with a passkey (fingerprint, face or device PIN). The email magic link only starts a limited session that can create a passkey; it cannot open admin pages, admin APIs or admin data in Firestore.
+- **Recovery:** if an admin who already has a passkey adds a new one through a magic link, the new passkey stays *pending* until **another** admin approves it under Admin → Security, so access to someone's email alone is not enough. If no other admin with a passkey exists, it activates immediately (audited).
+- **Security page** (`/admin/security`): list, add and remove your passkeys (you can't remove your last one), and approve other admins' pending passkeys. Super admins can remove another admin's passkey (lost device).
+- Sessions record how they were created (`authMethod` claim: `passkey`, `magic_link` or local-only `dev`); `requireActiveAdmin` and the Firestore rules both require `passkey`.
 
 ## Data Model (single community)
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
@@ -145,11 +150,12 @@ Legacy community paths are no longer supported; please migrate any old data into
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
-| `npm run lint` | ESLint. Fails on any error, or on more than 136 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
+| `npm run lint` | ESLint. Fails on any error, or on more than 132 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
 | `npm test` | Vitest unit tests in `tests/unit/` |
 | `npm run build` | Production build. Works without Firebase secrets |
 | `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |
-| `npm run test:emulators` | Firestore rules tests and auth/session integration tests against the Firebase emulators (needs Java 11+) |
+| `npm run test:emulators` | Firestore rules tests and auth/session/passkey/signing integration tests against the Firebase emulators (needs Java 11+) |
+| `npm run test:e2e:auth` | Real-browser passkey sign-in (Chromium virtual authenticator) against the emulators. Run `npm run build` first |
 | `npm run check` | typecheck + lint + unit tests |
 
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push to `main`, and fails on critical production advisories from `npm audit`. Dependabot opens weekly update PRs.

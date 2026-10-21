@@ -15,15 +15,10 @@ test("signed-out visitors do not see an Admin link in the header", async ({ page
   await expect(page.getByRole("link", { name: "Admin sign in" })).toBeVisible();
 });
 
-test("admin shell marks the current page in its navigation", async ({ page, context }, testInfo) => {
-  // A placeholder cookie gets past the proxy's redirect; the page itself still
-  // refuses to load data without a real session. Only the shell is checked here.
+test("a placeholder session cookie does not get into the admin area", async ({ page, context }) => {
   await context.addCookies([{ name: "__session", value: "placeholder", domain: "localhost", path: "/" }]);
-  await page.goto("/admin/events");
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "Open admin menu" }).click();
-  }
-  const nav = page.getByRole("navigation", { name: "Admin" }).last();
-  await expect(nav.getByRole("link", { name: "Events" })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current", "page");
+  const response = await page.goto("/admin/events");
+  await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fevents/);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
 });

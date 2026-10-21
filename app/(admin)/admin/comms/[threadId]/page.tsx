@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
 import CommsThreadDetailClient from "@/src/components/admin/comms/CommsThreadDetailClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -33,7 +34,9 @@ export default async function AdminCommsThreadPage({ params }: AdminCommsThreadP
         title="Thread Detail"
         description="Review discussion, propose a conclusion, and finalize when resolved."
       />
-      <CommsThreadDetailClient threadId={params.threadId} actor={toPlain(actorInfo)} />
+      <FirebaseAdminAuthBootstrap>
+        <CommsThreadDetailClient threadId={params.threadId} actor={toPlain(actorInfo)} />
+      </FirebaseAdminAuthBootstrap>
     </div>
   );
 }

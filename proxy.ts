@@ -38,6 +38,8 @@ export function proxy(req: NextRequest) {
   // Next.js reads the CSP request header to stamp its own scripts with the nonce.
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
+  // Lets the admin layout send people back here after signing in.
+  requestHeaders.set("x-pathname", `${pathname}${search}`);
   requestHeaders.set("Content-Security-Policy", csp);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });

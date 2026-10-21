@@ -8,6 +8,7 @@ import {
   MessagesSquare,
   NotebookPen,
   ScrollText,
+  ShieldCheck,
   type LucideIcon
 } from "lucide-react";
 
@@ -47,6 +48,10 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/document-generator", label: "Document Generator", icon: FileSignature, noPrefetch: true },
       { href: "/admin/document-gallery", label: "Document Gallery", icon: FolderOpen, noPrefetch: true }
     ]
+  },
+  {
+    label: "Account",
+    items: [{ href: "/admin/security", label: "Security", icon: ShieldCheck }]
   }
 ];
 

@@ -11,7 +11,14 @@ export default function OnboardingDocPage() {
           Set `FEATURE_EMAIL_ADMIN_LOGIN=true`. Admins sign in with an email magic link at `/admin/login` (PIN login
           has been removed).
         </li>
-        <li>Passkeys will be required for every admin once Phase 2 ships. Magic links will then be used only for first setup and lost-device recovery.</li>
+        <li>
+          Every admin signs in with a passkey (fingerprint, face or device PIN). The first time, use the email link on
+          `/admin/login`, then create a passkey. Add a second passkey on another device under Admin → Security.
+        </li>
+        <li>
+          Lost a device? Use the email link again and create a new passkey. Another admin must approve it under Admin →
+          Security before it works; confirm with them by phone or in person first.
+        </li>
         <li>
           First admin: set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters), then `POST /api/admin/bootstrap` with
           the secret, email and name. It works once; remove the secret afterwards.
