@@ -8,6 +8,7 @@ import { orgAdminsCollectionPath, orgDocPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { safeEqual } from "@/src/lib/security/compare";
+import { getClientIp } from "@/src/lib/security/clientIp";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const ip = req.headers.get("x-real-ip") || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(req.headers);
   const rate = await checkRateLimit(`bootstrap:${ip}`, 5, 10 * 60 * 1000);
   if (!rate.success) {
     return NextResponse.json({ error: "Too many attempts" }, { status: 429 });

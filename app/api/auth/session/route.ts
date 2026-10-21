@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { Timestamp } from "firebase-admin/firestore";
 import { verifyIdToken, SESSION_COOKIE_NAME, SESSION_COOKIE_NAME_FALLBACK } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -60,7 +61,7 @@ export async function DELETE(req: NextRequest) {
         },
         { merge: true }
       );
-      const ip = req.headers.get("x-forwarded-for") || "unknown";
+      const ip = getClientIp(req.headers);
       const userAgent = req.headers.get("user-agent") ?? null;
       await logAuditEvent({
         orgSlug: COMMUNITY_SLUG,

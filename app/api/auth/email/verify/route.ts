@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { Timestamp } from "firebase-admin/firestore";
 import { issueCustomToken, verifyIdToken } from "@/src/lib/auth";
 import { AdminEnvError, getAdminEnvStatus, getServerEnv } from "@/src/lib/env.server";
@@ -8,12 +9,13 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { logAuditEvent } from "@/src/lib/audit";
 import { normalizeMemberEmail } from "@/src/lib/members";
 import { createSessionResponse } from "@/src/lib/sessionCookies";
+import { checkRateLimit } from "@/src/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 function buildAuditMeta(req: NextRequest) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: getClientIp(req.headers),
     userAgent: req.headers.get("user-agent") ?? null,
     route: "/api/auth/email/verify"
   };
@@ -32,6 +34,10 @@ export async function POST(req: NextRequest) {
     const { FEATURE_EMAIL_ADMIN_LOGIN } = getServerEnv();
     if (!FEATURE_EMAIL_ADMIN_LOGIN) {
       return NextResponse.json({ error: "Email login disabled" }, { status: 404 });
+    }
+    const verifyLimit = await checkRateLimit(`email-verify:${getClientIp(req.headers)}`, 10, 10 * 60 * 1000);
+    if (!verifyLimit.success) {
+      return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
     }
     const body = (await req.json()) as {
       orgSlug?: string;

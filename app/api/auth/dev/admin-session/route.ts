@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { issueCustomToken, verifyIdToken, type Role } from "@/src/lib/auth";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 function buildMeta(req: NextRequest) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: getClientIp(req.headers),
     userAgent: req.headers.get("user-agent") ?? null,
     route: ROUTE
   };

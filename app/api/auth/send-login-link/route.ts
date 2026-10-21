@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
@@ -19,9 +20,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const ip = req.headers.get("x-forwarded-for") || "unknown";
+    const ip = getClientIp(req.headers);
     const rateKey = `send-login-link:${COMMUNITY_ID}:${ip}`;
-    const rate = checkRateLimit(rateKey, 5, 10 * 60 * 1000);
+    const rate = await checkRateLimit(rateKey, 5, 10 * 60 * 1000);
     if (!rate.success) {
       return NextResponse.json({ ok: true, message: genericMessage() });
     }

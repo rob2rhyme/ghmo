@@ -1,5 +1,6 @@
 //app/api/auth/email/start/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { AdminEnvError, getAdminEnvStatus, getServerEnv } from "@/src/lib/env.server";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 function buildAuditMeta(req: NextRequest) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: getClientIp(req.headers),
     userAgent: req.headers.get("user-agent") ?? null,
     route: "/api/auth/email/start"
   };
@@ -44,14 +45,14 @@ export async function POST(req: NextRequest) {
     }
 
     const meta = { ...buildAuditMeta(req), emailLower };
-    const ipLimit = checkRateLimit(`email-start:${orgSlug}:${meta.ip}`, 5, 5 * 60 * 1000);
-    const emailLimit = checkRateLimit(`email-start:${orgSlug}:email:${emailLower}`, 5, 5 * 60 * 1000);
+    const ipLimit = await checkRateLimit(`email-start:${orgSlug}:${meta.ip}`, 5, 5 * 60 * 1000);
+    const emailLimit = await checkRateLimit(`email-start:${orgSlug}:email:${emailLower}`, 5, 5 * 60 * 1000);
     if (!ipLimit.success || !emailLimit.success) {
       return NextResponse.json(
         {
           ok: true,
           message: GENERIC_MESSAGE,
-          retryInMs: Math.max(ipLimit.retryInMs ?? 0, emailLimit.retryInMs ?? 0)
+          retryInMs: Math.max(ipLimit.success ? 0 : ipLimit.retryInMs, emailLimit.success ? 0 : emailLimit.retryInMs)
         },
         { status: 429 }
       );
