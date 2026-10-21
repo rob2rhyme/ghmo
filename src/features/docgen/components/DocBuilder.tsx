@@ -38,6 +38,8 @@ type DocBuilderProps = {
   initialTemplateId?: string;
   initialInputs?: Record<string, string>;
   initialDocId?: string;
+  /** Template version the saved document was made with. */
+  initialTemplateVersion?: number;
 };
 
 type ExportFormat = "pdf" | "jpeg";
@@ -142,7 +144,8 @@ export default function DocBuilder({
   templatesMeta,
   initialTemplateId,
   initialInputs,
-  initialDocId
+  initialDocId,
+  initialTemplateVersion
 }: DocBuilderProps) {
   const { openSealedSignature, packPrivate, enabled: encrypted } = useE2ee();
   const defaultTemplateId = initialTemplateId ?? templatesMeta[0]?.id ?? "";
@@ -350,6 +353,7 @@ export default function DocBuilder({
           templateId: selectedTemplateMeta.id,
           templateTitle: selectedTemplateMeta.title,
           category: selectedTemplateMeta.category,
+          templateVersion: selectedTemplateMeta.version,
           ...privateFields,
           docId: savedId
         })
@@ -461,6 +465,7 @@ export default function DocBuilder({
               templateId: selectedTemplateMeta.id,
               templateTitle: selectedTemplateMeta.title,
               category: selectedTemplateMeta.category,
+              templateVersion: selectedTemplateMeta.version,
               certificateId: currentInputs.certificateNumber || "",
               ...sealedCertificate
             },
@@ -525,6 +530,12 @@ export default function DocBuilder({
             <h1 className="text-2xl font-semibold text-foreground">Document builder</h1>
             {initialDocId ? (
               <p className="text-xs text-slate-400">Editing saved document ({initialDocId})</p>
+            ) : null}
+            {initialDocId && initialTemplateVersion && selectedTemplateMeta && selectedTemplateMeta.id === initialTemplateId && initialTemplateVersion < selectedTemplateMeta.version ? (
+              <p className="text-xs text-warning">
+                Saved with version {initialTemplateVersion} of this template; it now shows version {selectedTemplateMeta.version}, so
+                wording or layout may differ.
+              </p>
             ) : null}
           </div>
         </div>

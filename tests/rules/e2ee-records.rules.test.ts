@@ -55,6 +55,14 @@ describe("before encryption is turned on, plaintext still works", () => {
     );
   });
 
+  it("accepts plaintext action item tracking, but only valid statuses", async () => {
+    const ref = doc(as("bob"), `${ORG}/actionItemStatus/m1_abc123`);
+    const stamp = { updatedAt: serverTimestamp(), updatedBy: "bob" };
+    await assertSucceeds(setDoc(ref, { status: "done", note: "Signed", ...stamp }));
+    await assertFails(setDoc(ref, { status: "finished", ...stamp }));
+    await assertFails(setDoc(ref, { status: "done", note: "x".repeat(1001), ...stamp }));
+  });
+
   it("accepts plaintext votes", async () => {
     await env.withSecurityRulesDisabled(async ctx => {
       await setDoc(doc(ctx.firestore(), `${ORG}/commsThreads/t1`), { title: "T", body: "B", status: "closing", createdBy: { uid: "alice" } });
@@ -180,6 +188,16 @@ describe("once encryption is on", () => {
       await assertSucceeds(vote("bob", { enc: envelope(BOB_DEVICE, "E".repeat(40)), ...meta("bob") }));
       // You can only vote as yourself.
       await assertFails(setDoc(doc(as("bob"), `${ref.path}/conclusionVotes/alice`), { enc: envelope(BOB_DEVICE), ...meta("bob") }));
+    });
+
+    it("action item tracking: an envelope from the writer's own device, stamped with their uid", async () => {
+      const ref = (uid: string) => doc(as(uid), `${ORG}/actionItemStatus/m1_abc123`);
+      const stamp = (uid: string) => ({ updatedAt: serverTimestamp(), updatedBy: uid });
+      await assertSucceeds(setDoc(ref("bob"), { enc: envelope(BOB_DEVICE), ...stamp("bob") }));
+      await assertFails(setDoc(ref("bob"), { status: "done", ...stamp("bob") }));
+      await assertFails(setDoc(ref("bob"), { enc: envelope(ALICE_DEVICE), ...stamp("bob") }));
+      await assertFails(setDoc(ref("bob"), { enc: envelope(BOB_DEVICE), ...stamp("alice") }));
+      await assertFails(setDoc(ref("bob"), { enc: envelope(BOB_DEVICE), status: "done", ...stamp("bob") }));
     });
 
     it("anyone but admins still can't read", async () => {

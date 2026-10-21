@@ -9,6 +9,8 @@ describe("migration definitions", () => {
     expect(plainFields("votes", { value: "approve" })).toEqual({ value: "approve" });
     expect(plainFields("votes", { value: "maybe" })).toBeNull();
     expect(plainFields("documents", { inputs: { a: "b" } })).toEqual({ inputs: { a: "b" } });
+    expect(plainFields("actionStatus", { status: "done", note: "ok", updatedBy: "u" })).toEqual({ status: "done", note: "ok" });
+    expect(plainFields("actionStatus", { enc: {}, updatedBy: "u" })).toBeNull();
   });
 
   it("migrates a conclusion even when its thread is already encrypted", () => {

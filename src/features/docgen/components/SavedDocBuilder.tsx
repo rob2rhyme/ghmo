@@ -11,6 +11,7 @@ type SavedDocBuilderProps = {
   initialTemplateId?: string;
   initialInputs?: Record<string, string>;
   initialDocId?: string;
+  initialTemplateVersion?: number;
   /** Encrypted inputs of the saved document, if it was saved with encryption on. */
   enc?: Record<string, unknown>;
 };

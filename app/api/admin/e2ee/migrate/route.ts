@@ -39,6 +39,8 @@ function docPath(area: MigrationArea, id: string, parentId?: string) {
       return `${ORG}/minutes/${id}`;
     case "documents":
       return `${ORG}/documents/${id}`;
+    case "actionStatus":
+      return `${ORG}/actionItemStatus/${id}`;
   }
 }
 
@@ -72,6 +74,9 @@ async function findPending(area: MigrationArea): Promise<MigrationItem[]> {
       break;
     case "documents":
       (await db.collection(`${ORG}/documents`).get()).docs.forEach(d => consider(d));
+      break;
+    case "actionStatus":
+      (await db.collection(`${ORG}/actionItemStatus`).get()).docs.forEach(d => consider(d));
       break;
   }
   return items;

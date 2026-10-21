@@ -260,6 +260,24 @@ service cloud.firestore {
       }
     }
 
+    // Private tracking of action items from approved minutes. The document ID is minutes ID + task hash.
+    function isValidActionStatus() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['enc', 'status', 'note', 'updatedAt', 'updatedBy']) &&
+        d.get('updatedBy', null) == request.auth.uid &&
+        d.get('updatedAt', null) == request.time &&
+        (e2eeOn()
+          ? (!('status' in d) && !('note' in d) && isFreshEnvelope(d.get('enc', null)))
+          : (!('enc' in d) && d.get('status', null) in ['open', 'done', 'dropped'] &&
+             (!('note' in d) || (d.note is string && d.note.size() <= 1000))));
+    }
+
+    match /organizations/ghmo/actionItemStatus/{key} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && isValidActionStatus();
+      allow delete: if false;
+    }
+
     match /organizations/ghmo/adminChatMessages/{messageId} {
       allow read: if isAdmin();
       allow create: if isAdmin() && isValidChatMessageCreate();

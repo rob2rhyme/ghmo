@@ -18,6 +18,7 @@ const documentSchema = z.object({
   templateId: z.string().trim().min(1).max(100),
   templateTitle: z.string().trim().min(1).max(200),
   category: z.string().trim().max(100).optional(),
+  templateVersion: z.number().int().min(1).max(10_000).optional(),
   inputs: z
     .record(z.string().regex(INPUT_KEY_PATTERN), z.string().max(10_000))
     .refine(value => Object.keys(value).length <= MAX_INPUT_FIELDS, { message: "Too many inputs" })
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
       templateId: payload.templateId,
       templateTitle: payload.templateTitle,
       category: payload.category ?? "General",
+      templateVersion: payload.templateVersion,
       inputs: payload.inputs,
       enc: payload.enc,
       createdByUid: actor.uid,

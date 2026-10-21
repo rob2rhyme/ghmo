@@ -4,6 +4,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const weddingCertificate: DocTemplate = {
   id: "wedding-certificate",
+  version: 1,
   title: "Wedding Certificate",
   category: "Certificate",
   description: "Create a Magar Community marriage certificate with bilingual cultural acknowledgements.",

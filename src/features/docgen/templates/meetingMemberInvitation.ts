@@ -3,6 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const meetingMemberInvitation: DocTemplate = {
   id: "meeting-member-invitation",
+  version: 1,
   title: "General Meeting Invitation",
   category: "Meeting",
   description: "Invite attendees to a curated council meeting with the latest agenda and follow-up expectations.",

@@ -7,12 +7,13 @@
  * the record changed in the meantime.
  */
 import type { RecordLocation } from "./e2ee";
+import { actionStatusLoc } from "./actionItems";
 import { documentLoc } from "./documentRecords";
 import { CONTENT_FIELDS, minutesLoc } from "./minutesRecords";
 import { commentLoc, conclusionLoc, threadLoc, voteLoc } from "./commsRecords";
 import { MINUTES_PATH } from "./minutesRecords";
 
-export const MIGRATION_AREAS = ["chat", "threads", "conclusions", "comments", "votes", "minutes", "documents"] as const;
+export const MIGRATION_AREAS = ["chat", "threads", "conclusions", "comments", "votes", "minutes", "documents", "actionStatus"] as const;
 export type MigrationArea = (typeof MIGRATION_AREAS)[number];
 
 export const AREA_LABELS: Record<MigrationArea, string> = {
@@ -22,7 +23,8 @@ export const AREA_LABELS: Record<MigrationArea, string> = {
   comments: "Thread comments",
   votes: "Conclusion votes",
   minutes: "Draft and submitted minutes",
-  documents: "Saved documents"
+  documents: "Saved documents",
+  actionStatus: "Action item tracking"
 };
 
 export type MigrationItem = {
@@ -65,6 +67,8 @@ export function plainFields(area: MigrationArea, data: Record<string, unknown>):
       return data.status === "approved" ? null : pick([...CONTENT_FIELDS], data);
     case "documents":
       return pick(["inputs", "pdfBase64"], data);
+    case "actionStatus":
+      return data.status === "open" || data.status === "done" || data.status === "dropped" ? pick(["status", "note"], data) : null;
   }
 }
 
@@ -84,6 +88,8 @@ export function locationFor(area: MigrationArea, id: string, parentId?: string):
       return minutesLoc(id);
     case "documents":
       return documentLoc(id);
+    case "actionStatus":
+      return actionStatusLoc(id);
   }
 }
 
@@ -103,6 +109,8 @@ export function plaintextFieldsToDelete(area: MigrationArea): string[] {
       return [...CONTENT_FIELDS, "approvalNotes"];
     case "documents":
       return ["inputs", "pdfBase64"];
+    case "actionStatus":
+      return ["status", "note"];
   }
 }
 

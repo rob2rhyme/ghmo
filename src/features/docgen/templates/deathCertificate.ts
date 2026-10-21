@@ -3,6 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const deathCertificate: DocTemplate = {
   id: "death-certificate",
+  version: 1,
   title: "Memorial Notice",
   category: "Certificate",
   description: "Document a memorial acknowledgement with dates and contact information for families.",

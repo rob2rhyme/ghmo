@@ -3,6 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const eventHostInvitation: DocTemplate = {
   id: "event-host-invitation",
+  version: 1,
   title: "Community Leader Invitation",
   category: "Events",
   description: "Invite an external community leader to attend and help share awareness of a GHMO event.",

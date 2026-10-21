@@ -3,6 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const bhajanProgram: DocTemplate = {
   id: "bhajan_program",
+  version: 1,
   title: "Bhajan Program",
   category: "Religious",
   description: "Invitation for a home religious gathering and bhajan program.",

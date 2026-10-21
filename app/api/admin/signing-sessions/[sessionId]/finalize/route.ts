@@ -30,6 +30,7 @@ const finalizeSchema = z.object({
     templateId: z.string().trim().min(1).max(100),
     templateTitle: z.string().trim().min(1).max(200),
     category: z.string().trim().max(100).optional(),
+    templateVersion: z.number().int().min(1).max(10_000).optional(),
     inputs: z
       .record(z.string().regex(INPUT_KEY_PATTERN), z.string().max(10_000))
       .refine(value => Object.keys(value).length <= MAX_INPUT_FIELDS, { message: "Too many inputs" })
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
       templateId: certificatePayload.templateId,
       templateTitle: certificatePayload.templateTitle,
       category: certificatePayload.category ?? "General",
+      ...(certificatePayload.templateVersion ? { templateVersion: certificatePayload.templateVersion } : {}),
       certificateId: certificatePayload.certificateId ?? null,
       signed: true,
       status: "finalized",

@@ -11,6 +11,7 @@ import {
 } from "@/src/lib/minutes";
 import { useUnpackedMinutes } from "@/src/components/admin/minutes/useUnpackedMinutes";
 import { resolveActorLabel } from "@/src/lib/actor";
+import { attendanceCsv } from "@/src/lib/attendanceCsv";
 
 const statusOptions: MinutesStatus[] = ["draft", "submitted", "approved"];
 
@@ -42,6 +43,16 @@ export default function MinutesSearchClient({ initialMinutes: rawMinutes }: Minu
       })
       .sort((a, b) => Number(b.eventDate || 0) - Number(a.eventDate || 0));
   }, [initialMinutes, query, meetingTypeFilter, statusFilter, startDate, endDate]);
+
+  // Exports exactly what the filters show, generated here from the decrypted minutes.
+  const exportAttendance = () => {
+    const url = URL.createObjectURL(new Blob([attendanceCsv(filteredMinutes)], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `attendance-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
@@ -110,9 +121,19 @@ export default function MinutesSearchClient({ initialMinutes: rawMinutes }: Minu
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">{filteredMinutes.length} result{filteredMinutes.length === 1 ? "" : "s"}</p>
-          <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
-            Go to minutes editor
-          </Link>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={exportAttendance}
+              disabled={filteredMinutes.length === 0}
+              className="text-sm font-semibold text-primary disabled:opacity-50"
+            >
+              Export attendance (CSV)
+            </button>
+            <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
+              Go to minutes editor
+            </Link>
+          </div>
         </div>
         <div className="divide-y divide-border">
           {filteredMinutes.length === 0 ? (

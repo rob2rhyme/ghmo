@@ -47,6 +47,7 @@ export default async function DocumentGeneratorPage({
           initialTemplateId={templateId}
           initialInputs={savedDocument?.inputs}
           initialDocId={savedDocument?.id}
+          initialTemplateVersion={savedDocument?.templateVersion}
           enc={savedDocument?.enc}
         />
       </EncryptionGate>
