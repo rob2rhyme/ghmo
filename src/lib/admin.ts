@@ -1,8 +1,7 @@
 //src/lib/admin.ts
 import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
 import { getAdminDb } from "./firebaseAdmin";
-import { AuthContext, getAuthContextFromRequest, SESSION_COOKIE_NAME, SESSION_COOKIE_NAME_FALLBACK } from "./auth";
+import { AuthContext, getAuthContextFromRequest } from "./auth";
 import { COMMUNITY_SLUG } from "./community";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "./firestorePaths";
 export type AdminProfile = {
@@ -67,37 +66,14 @@ function isNextRequest(value: AdminAuthInput): value is NextRequest {
 }
 
 export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string = COMMUNITY_SLUG) {
-  let ctx: AuthContext | null = null;
-  let cookieName: string | null = null;
-
-  if (isNextRequest(input)) {
-    ctx = await getAuthContextFromRequest(input);
-    cookieName = input.cookies.get(SESSION_COOKIE_NAME) ? SESSION_COOKIE_NAME : input.cookies.get(SESSION_COOKIE_NAME_FALLBACK) ? SESSION_COOKIE_NAME_FALLBACK : null;
-  } else {
-    ctx = input ?? null;
-    if (!ctx) {
-      ctx = await getAuthContextFromRequest();
-    }
-    const cookieStore = await cookies();
-    cookieName = cookieStore.get(SESSION_COOKIE_NAME) ? SESSION_COOKIE_NAME : cookieStore.get(SESSION_COOKIE_NAME_FALLBACK) ? SESSION_COOKIE_NAME_FALLBACK : null;
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    console.debug("requireActiveAdmin resolving context", {
-      orgSlug,
-      cookieUsed: cookieName,
-      hasContext: Boolean(ctx),
-      ctx: ctx
-        ? { uid: ctx.uid, orgSlug: ctx.orgSlug, role: ctx.role, emailLower: ctx.emailLower }
-        : null
-    });
-  }
+  const ctx: AuthContext | null = isNextRequest(input)
+    ? await getAuthContextFromRequest(input)
+    : (input ?? (await getAuthContextFromRequest()));
 
   if (!ctx) throw new AdminAccessError(401, "Unauthorized", "NO_CONTEXT");
   if (!ctx.orgSlug) throw new AdminAccessError(403, "Organization missing", "ORGSLUG_MISSING");
   if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "Organization mismatch", "ORGSLUG_MISMATCH");
   const docPath = orgAdminDocPath(orgSlug, ctx.uid);
-  console.debug("requireActiveAdmin checking doc", { docPath, uid: ctx.uid });
   const doc = await getAdminDb().doc(docPath).get();
   if (!doc || !doc.exists) throw new AdminAccessError(403, "Admin profile not found", "ADMIN_DOC_NOT_FOUND");
   const profile = mapAdminDoc(doc.id, doc.data() as Record<string, unknown>);

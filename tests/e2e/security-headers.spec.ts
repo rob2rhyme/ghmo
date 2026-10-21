@@ -53,7 +53,7 @@ test("signing links never send a Referer", async ({ request }) => {
 });
 
 test("API responses are not cached", async ({ request }) => {
-  const response = await request.get("/api/debug/env");
+  const response = await request.get("/api/auth/me");
   expect(response.headers()["cache-control"]).toContain("no-store");
 });
 

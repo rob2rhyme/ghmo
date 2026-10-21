@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
       meta: { ...buildAuditMeta(req), emailLower }
     });
 
-    return createSessionResponse(req, idToken);
+    return await createSessionResponse(idToken);
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(

@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
       meta: { ...buildMeta(req), emailLower }
     });
 
-    const sessionResponse = createSessionResponse(req, idToken, { devLogin: true, adminId: adminDoc.id });
+    const sessionResponse = await createSessionResponse(idToken, { devLogin: true, adminId: adminDoc.id });
     console.info("Dev login granted", {
       orgSlug,
       adminId: adminDoc.id,

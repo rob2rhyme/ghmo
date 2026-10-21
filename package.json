@@ -6,13 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --max-warnings 154",
+    "lint": "eslint . --max-warnings 143",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm test",
-    "audit": "audit-ci --moderate"
+    "audit": "audit-ci --moderate",
+    "test:emulators": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"vitest run --config vitest.emulator.config.mts\""
   },
   "dependencies": {
     "@heroicons/react": "2.1.5",
@@ -35,6 +36,7 @@
     "zod": "3.22.4"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "3.0.4",
     "@playwright/test": "1.64.1",
     "@types/jsonwebtoken": "9.0.5",
     "@types/node": "22.19.1",
@@ -45,6 +47,7 @@
     "dotenv": "^17.2.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.2",
+    "firebase-tools": "15.33.0",
     "html-to-image": "^1.11.11",
     "postcss": "8.5.31",
     "typescript": "5.9.3",

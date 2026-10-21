@@ -12,7 +12,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 
 ## Highlights
 - One community (`ghmo-site`) backed by Firebase + GoFundMe Pro; no multi-tenant routing.
-- Admins authenticate via whitelist-only email magic links (OTP); `sessionToken` (with `__session` fallback) is the source of truth for guarded pages/API routes.
+- Admins authenticate via allowlist-only email magic links; a revocable Firebase session cookie named `__session` is the source of truth for guarded pages/API routes.
 - Modules: Plans & Issues (Admin Communication Log) for governed admin-only decision threads (conclusion required to close, append-only comments, read-only after closure, full auditability), Admin Chat (WhatsApp-style coordination for quick updates only; decisions belong in Plans & Issues), Meeting Minutes (agenda/decisions/action items + structured attendance), Document Generator (GHMO letterhead preview + PDF/JPEG export), Admin dashboard overview (KPIs/quick actions/recents/system status), Multimedia hub.
 - Audit logs cover auth attempts, admin actions, document generation, webhook receipts, and reconciliation runs.
 
@@ -64,7 +64,8 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 
 ## Authentication
 - Admins request magic links via `/admin/login`. The allowlist is the `organizations/ghmo/admins` collection: each doc has `emailLower` and `status: "active"`. Magic-link login only works when `FEATURE_EMAIL_ADMIN_LOGIN=true`. Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
-- Session state lives in the `sessionToken` cookie (with `__session` fallback) handled by `/api/auth/session`; public routes stay readable without a session token, while admin-only routes and APIs validate the token before running.
+- Session state lives in one `__session` cookie: a Firebase **session cookie** (HttpOnly, Secure in production, SameSite=Lax, 8 hours), checked for revocation on every request. `/api/auth/session` only issues it to active admins or allowlisted members. Signing out revokes all of the user's tokens (every device) and signs the browser's Firebase client out.
+- Firestore rules require an active `admins/{uid}` record in addition to the admin claim, so setting an admin's `status` to anything but `active` cuts off their database access immediately.
 - The dev helper `/api/auth/dev/admin-session` is disabled unless `NODE_ENV !== "production"` plus explicit flags (`NEXT_PUBLIC_DEV_LOGIN`, `DEV_LOGIN_SECRET`) are present.
 - The magic-link workflow is the only supported login path; there is no member login option.
 - **PIN login has been removed** (plan decision D3). The PIN routes, the `pins` collection rules and `FEATURE_PIN_LOGIN` no longer exist; any old `organizations/ghmo/pins` documents can be deleted.
@@ -144,10 +145,11 @@ Legacy community paths are no longer supported; please migrate any old data into
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
-| `npm run lint` | ESLint. Fails on any error, or on more than 154 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
+| `npm run lint` | ESLint. Fails on any error, or on more than 143 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
 | `npm test` | Vitest unit tests in `tests/unit/` |
 | `npm run build` | Production build. Works without Firebase secrets |
 | `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |
+| `npm run test:emulators` | Firestore rules tests and auth/session integration tests against the Firebase emulators (needs Java 11+) |
 | `npm run check` | typecheck + lint + unit tests |
 
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push to `main`, and fails on critical production advisories from `npm audit`. Dependabot opens weekly update PRs.
@@ -158,10 +160,10 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push
 - Magic-link auth endpoints are rate-limited, return generic responses, and only honor allowlisted emails in Firestore so the attacker cannot enumerate addresses.
 - Rate limits are stored in Firestore (`organizations/ghmo/rateLimits`, keys SHA-256 hashed) so they hold across serverless instances, and fail closed if Firestore is unavailable. **Owner action:** in the Firebase console, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.
 - Client IPs come from the right-most `X-Forwarded-For` entry (configurable with `TRUSTED_PROXY_HOPS`), or `x-real-ip` on Vercel, so clients cannot spoof their IP to dodge limits.
-- Sessions are anchored to the `sessionToken` cookie (with `__session` fallback) and verified via `requireActiveAdmin` before any admin page/API executes logic.
+- Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
 - The dev helper `/api/auth/dev/admin-session` is gated by `NODE_ENV !== "production"` plus `NEXT_PUBLIC_DEV_LOGIN` and `DEV_LOGIN_SECRET`, and it remains disabled unless those flags are explicitly set.
 - Webhooks are validated via the shared-secret HMAC placeholder; replace that check with a provider-backed verification when credentials are available.
-- Firestore rules are deny-by-default and access is controlled by the `admin: true` custom claim. (Phase 1 adds an active-admin check, because the claim alone survives disabling an admin.)
+- Firestore rules are deny-by-default; admin access needs the `admin` custom claim **and** an active admin record. Rules are tested against the emulator (`npm run test:emulators`).
 - All communication log features are admin-only, and closed threads are immutable.
 
 ## Dropped Features

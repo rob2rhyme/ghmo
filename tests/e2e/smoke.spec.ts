@@ -11,9 +11,10 @@ test("admin login page renders", async ({ page }) => {
   await expect(page.locator("body")).toBeVisible();
 });
 
-test("debug cookie route is not exposed in production", async ({ request }) => {
-  const response = await request.get("/api/debug/cookies");
-  expect(response.status()).toBe(404);
+test("debug routes do not exist", async ({ request }) => {
+  for (const path of ["/api/debug/cookies", "/api/debug/env"]) {
+    expect((await request.get(path)).status()).toBe(404);
+  }
 });
 
 test("unknown URLs get the global 404 page", async ({ page }) => {

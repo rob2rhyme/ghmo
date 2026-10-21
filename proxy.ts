@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildPublicCsp, buildSecureCsp, createNonce, isSecurePath } from "@/src/lib/security/csp";
 
 // Fast checks only. Full session verification happens server-side in requireActiveAdmin.
-const SESSION_COOKIES = ["__session", "sessionToken"];
+const SESSION_COOKIE = "__session";
 
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
   if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const hasSession = SESSION_COOKIES.some(name => req.cookies.has(name));
-    if (!hasSession) {
+    if (!req.cookies.has(SESSION_COOKIE)) {
       const loginUrl = req.nextUrl.clone();
       loginUrl.pathname = "/admin/login";
       loginUrl.search = "";

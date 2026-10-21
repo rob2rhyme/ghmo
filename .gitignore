@@ -44,3 +44,5 @@ lerna-debug.log*
 /coverage
 /playwright-report
 /test-results
+firestore-debug.log
+*-debug.log
