@@ -14,7 +14,8 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "audit": "audit-ci --moderate",
     "test:emulators": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"vitest run --config vitest.emulator.config.mts\"",
-    "test:e2e:auth": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"playwright test --config playwright.emulator.config.ts\""
+    "test:e2e:auth": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"playwright test --config playwright.emulator.config.ts\"",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
@@ -53,6 +54,7 @@
     "@types/qrcode": "1.5.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitest/coverage-v8": "5.0.5",
     "audit-ci": "^7.1.0",
     "dotenv": "^17.2.3",
     "eslint": "9.39.5",

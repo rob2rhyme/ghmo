@@ -13,6 +13,12 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/unit/**/*.test.ts"]
+    include: ["tests/unit/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      // The E2EE library must stay fully tested (plan Phase 3).
+      include: ["src/lib/e2ee/**"],
+      thresholds: { statements: 98, branches: 90, functions: 100, lines: 100 }
+    }
   }
 });
