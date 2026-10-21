@@ -41,6 +41,13 @@ describe("buildSecureCsp", () => {
     expect(prod).toContain("frame-src 'self' blob: https://x.firebaseapp.com");
   });
 
+  it("allows the local Firebase emulators only when asked", () => {
+    expect(prod).not.toContain("127.0.0.1");
+    const withEmulators = buildSecureCsp({ nonce: "n", isDev: false, upgradeInsecure: false, allowEmulators: true });
+    expect(withEmulators).toContain("http://127.0.0.1:8080");
+    expect(withEmulators).toContain("http://127.0.0.1:9099");
+  });
+
   it("adds unsafe-eval and dev sockets only in development", () => {
     const dev = buildSecureCsp({ nonce: "n", isDev: true, upgradeInsecure: false });
     expect(dev).toContain("'unsafe-eval'");

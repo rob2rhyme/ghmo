@@ -61,12 +61,10 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run test:emulators
-      - run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      # Real browser passkey flow (virtual authenticator) against the emulators.
+      # Real browser passkey + encryption flows (virtual authenticator) against the emulators.
+      # The script builds the app with emulator settings itself.
       - run: npm run test:e2e:auth
         env:
           CI: "true"

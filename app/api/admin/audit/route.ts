@@ -30,13 +30,10 @@ const bodySchema = z.object({
     .object({
       type: z.string().trim().max(64).optional(),
       id: z.string().trim().max(200).optional(),
-      path: z.string().trim().max(500).optional(),
-      // Clients send thread titles here; truncate rather than reject long ones.
-      summary: z
-        .string()
-        .max(5000)
-        .transform(value => value.slice(0, 500))
-        .optional()
+      path: z.string().trim().max(500).optional()
+      // No `summary`: chat messages and thread titles are end-to-end encrypted, so the
+      // audit log must never receive their text from a client. Unknown keys are stripped,
+      // so an older cached client that still sends one cannot leak it either.
     })
     .optional(),
   meta: z

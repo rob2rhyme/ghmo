@@ -30,13 +30,15 @@ type SecureCspOptions = {
   isDev: boolean;
   upgradeInsecure: boolean;
   firebaseAuthDomain?: string;
+  /** Tests only: allow the local Firebase emulators (never set in production). */
+  allowEmulators?: boolean;
 };
 
 function join(directives: Array<string | false>): string {
   return directives.filter(Boolean).join("; ");
 }
 
-export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDomain }: SecureCspOptions): string {
+export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDomain, allowEmulators }: SecureCspOptions): string {
   const authFrame = firebaseAuthDomain ? ` https://${firebaseAuthDomain}` : "";
   return join([
     "default-src 'self'",
@@ -47,7 +49,8 @@ export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDoma
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com" +
-      (isDev ? " ws: http://localhost:*" : ""),
+      (isDev ? " ws: http://localhost:*" : "") +
+      (allowEmulators ? " http://127.0.0.1:8080 http://127.0.0.1:9099 http://localhost:8080 http://localhost:9099" : ""),
     `frame-src 'self' blob:${authFrame}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",

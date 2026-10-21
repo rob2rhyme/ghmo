@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
 // Full sign-in flows against the Firebase emulators. Run with `npm run test:e2e:auth`
-// (wraps this in `firebase emulators:exec`); needs `npm run build` first.
+// (wraps this in `firebase emulators:exec` and builds the app with emulator settings first).
 const PORT = Number(process.env.E2E_AUTH_PORT ?? 3300);
 
 const { privateKey } = crypto.generateKeyPairSync("rsa", {
@@ -19,6 +19,9 @@ export const EMULATOR_ENV = {
   FIREBASE_AUTH_EMULATOR_HOST: process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9099",
   FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080",
   NEXT_PUBLIC_FIREBASE_API_KEY: "fake-api-key",
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "localhost",
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-ghmo",
+  NEXT_PUBLIC_USE_FIREBASE_EMULATORS: "true",
   FEATURE_EMAIL_ADMIN_LOGIN: "true"
 };
 Object.assign(process.env, EMULATOR_ENV);

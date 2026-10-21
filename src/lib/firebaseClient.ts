@@ -1,7 +1,7 @@
 //src/lib/firebaseClient.ts
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { getClientEnv } from "./env.client";
 
 let firebaseInitError: string | null = null;
@@ -26,8 +26,17 @@ function initFirebaseClients() {
   };
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const isFirstInit = !firebaseAuth || !firestore;
   firebaseAuth = firebaseAuth ?? getAuth(app);
   firestore = firestore ?? getFirestore(app);
+
+  // Test-only: talk to the local Firebase emulators. Ignored on any non-localhost origin,
+  // so a mis-set flag can never redirect a deployed site's traffic.
+  const onLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  if (isFirstInit && onLocalhost && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") {
+    connectAuthEmulator(firebaseAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
+  }
 }
 
 try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clock, KeyRound, Lock, RefreshCw, ShieldAlert, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, Lock, RefreshCw, ShieldAlert, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -13,15 +13,10 @@ import { Input } from "@/src/components/ui/input";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useE2ee, type DeviceView, type PreparedRecovery } from "@/src/lib/e2ee/client/E2eeProvider";
 import { DeviceSetupForm } from "./DeviceSetupForm";
+import { errorText, UnlockCard } from "./UnlockCard";
 import { RecoveryKeyFlow } from "./RecoveryKeyFlow";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
-
-function errorText(err: unknown) {
-  const name = (err as { name?: string })?.name;
-  if (name === "NotAllowedError") return "The passkey prompt was closed. Try again.";
-  return err instanceof Error ? err.message : "Something went wrong";
-}
 
 function SafetyCode({ code, large = false }: { code: string; large?: boolean }) {
   return (
@@ -45,44 +40,6 @@ function StatusBadge({ device }: { device: DeviceView }) {
       </Badge>
     );
   return <Badge variant="destructive">Revoked</Badge>;
-}
-
-function UnlockCard() {
-  const { identity, unlock } = useE2ee();
-  const [passphrase, setPassphrase] = useState("");
-  const [busy, setBusy] = useState(false);
-  const usesPassphrase = identity?.unlock.method === "passphrase";
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      await unlock(usesPassphrase ? passphrase : undefined);
-      setPassphrase("");
-    } catch (err) {
-      toast.error(errorText(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Unlock encryption on this device</CardTitle>
-        <CardDescription>Encrypted chat and threads stay unreadable until you unlock. Keys are forgotten when you lock or close the tab.</CardDescription>
-      </CardHeader>
-      <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        {usesPassphrase ? (
-          <Field label="Encryption passphrase" className="flex-1">
-            <Input type="password" autoComplete="current-password" value={passphrase} onChange={e => setPassphrase(e.target.value)} />
-          </Field>
-        ) : null}
-        <Button type="submit" loading={busy}>
-          <KeyRound aria-hidden="true" />
-          {usesPassphrase ? "Unlock" : "Unlock with passkey"}
-        </Button>
-      </form>
-    </Card>
-  );
 }
 
 function RecoverWithKey() {
