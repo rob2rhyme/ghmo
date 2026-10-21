@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -6,11 +7,73 @@ import { orgMinutesCollectionPath } from "@/src/lib/firestorePaths";
 import { eventsCollectionPath } from "@/src/lib/events";
 import { COMMUNITY_SLUG, COMMUNITY_ID } from "@/src/lib/community";
 import { toPlain } from "@/src/lib/serialize.server";
-import { meetingTypes, MeetingAttendance } from "@/src/lib/minutes";
+import { meetingTypes, MeetingAttendance, MeetingType } from "@/src/lib/minutes";
 import { resolveActorName } from "@/src/lib/actor";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+const MAX_LIST_ITEMS = 200;
+const MAX_LINE_LENGTH = 2000;
+const MAX_NAME_LENGTH = 200;
+const MAX_SUMMARY_LENGTH = 50_000;
+
+// Firestore document id: no "/" (would address a nested path) and not "." / "..".
+const docIdSchema = z
+  .string()
+  .trim()
+  .max(200)
+  .refine(value => !value.includes("/") && value !== "." && value !== "..", "Invalid id");
+
+const meetingTypeSchema = z.enum(meetingTypes as [MeetingType, ...MeetingType[]]);
+const lineListSchema = z.array(z.string().max(MAX_LINE_LENGTH)).max(MAX_LIST_ITEMS);
+const nameListSchema = z.array(z.string().max(MAX_NAME_LENGTH)).max(MAX_LIST_ITEMS);
+
+const actionItemSchema = z.object({
+  task: z.string().max(MAX_LINE_LENGTH),
+  assignedTo: z.string().max(MAX_NAME_LENGTH).nullish(),
+  dueDate: z.union([z.string().max(64), z.number().finite()]).nullish()
+});
+
+// Legacy records may send attendance as a bare list of present names.
+const attendanceSchema = z.union([
+  nameListSchema,
+  z.object({
+    present: nameListSchema.optional(),
+    absent: nameListSchema.optional(),
+    guests: nameListSchema.optional()
+  })
+]);
+
+const signaturesSchema = z.object({
+  chairName: z.string().max(MAX_NAME_LENGTH).optional(),
+  secretaryName: z.string().max(MAX_NAME_LENGTH).optional()
+});
+
+const minutesFieldsSchema = {
+  meetingType: meetingTypeSchema,
+  chairedBy: z.string().max(MAX_NAME_LENGTH).nullish(),
+  agenda: lineListSchema.optional(),
+  discussionSummary: z.string().max(MAX_SUMMARY_LENGTH).nullish(),
+  decisions: lineListSchema.optional(),
+  actionItems: z.array(actionItemSchema).max(MAX_LIST_ITEMS).optional(),
+  attendance: attendanceSchema.nullish(),
+  signatures: signaturesSchema.nullish()
+};
+
+const createMinutesSchema = z.object({
+  ...minutesFieldsSchema,
+  eventId: docIdSchema
+});
+
+const updateMinutesSchema = z.object({
+  ...minutesFieldsSchema,
+  meetingType: meetingTypeSchema.optional(),
+  id: docIdSchema,
+  action: z.enum(["submit", "approve", "returnToDraft"]).optional(),
+  approvalNotes: z.string().max(5000).nullish()
+});
 
 type MinutesActionItem = { task: string; assignedTo?: string; dueDate?: Date };
 
@@ -160,18 +223,17 @@ export async function POST(req: NextRequest) {
     const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
     if ("response" in guard) return guard.response;
     const { actor } = guard;
-    const payload = await req.json();
+    const parsed = await parseJsonBody(req, createMinutesSchema);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data;
     const db = getAdminDb();
 
-    const eventId = typeof payload.eventId === "string" ? payload.eventId.trim() : "";
+    const eventId = payload.eventId;
     if (!eventId) {
       return NextResponse.json({ error: "eventId is required" }, { status: 400 });
     }
 
     const meetingType = payload.meetingType;
-    if (!meetingTypes.includes(meetingType)) {
-      return NextResponse.json({ error: "Invalid meetingType" }, { status: 400 });
-    }
 
     const eventSnap = await resolveEventDocument(eventId);
     if (!eventSnap) {
@@ -191,7 +253,7 @@ export async function POST(req: NextRequest) {
     const agenda = ensureStringArray(payload.agenda);
     const decisions = ensureStringArray(payload.decisions);
     const attendance = sanitizeAttendancePayload(payload.attendance);
-    const actionItems = sanitizeActionItems(Array.isArray(payload.actionItems) ? payload.actionItems : []);
+    const actionItems = sanitizeActionItems(payload.actionItems ?? []);
     const signatures = sanitizeSignatures(payload.signatures);
 
     const minutesRef = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
@@ -267,16 +329,14 @@ export async function PATCH(req: NextRequest) {
     const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
     if ("response" in guard) return guard.response;
     const { actor } = guard;
-    const payload = await req.json();
+    const parsed = await parseJsonBody(req, updateMinutesSchema);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data;
     const db = getAdminDb();
 
-    const id = typeof payload.id === "string" ? payload.id.trim() : "";
+    const id = payload.id;
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
-    }
-
-    if (payload.meetingType !== undefined && !meetingTypes.includes(payload.meetingType)) {
-      return NextResponse.json({ error: "Invalid meetingType" }, { status: 400 });
     }
 
     const ref = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).doc(id);
@@ -286,7 +346,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const beforeData = snap.data() || {};
-    const action = typeof payload.action === "string" ? (payload.action as MinutesAction) : undefined;
+    const action: MinutesAction | undefined = payload.action;
     const updates: Record<string, any> = { updatedAt: new Date() };
     if (payload.meetingType) updates.meetingType = payload.meetingType;
     if (payload.chairedBy !== undefined) updates.chairedBy = sanitizeText(payload.chairedBy) ?? null;
@@ -306,7 +366,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (action) {
-      const statusChanged = applyStatusAction(updates, action, beforeData, actor.uid, payload.approvalNotes);
+      const statusChanged = applyStatusAction(
+        updates,
+        action,
+        beforeData,
+        actor.uid,
+        payload.approvalNotes ?? undefined
+      );
       if (!statusChanged) {
         return NextResponse.json({ error: "Action not allowed" }, { status: 400 });
       }
