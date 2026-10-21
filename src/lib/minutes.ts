@@ -41,6 +41,10 @@ export type MeetingMinutesRecord = {
   approvalNotes?: string;
   createdAt: number;
   updatedAt?: number;
+  /** Set by the admin API: the content is stored encrypted. */
+  encrypted?: boolean;
+  /** Set by the client after decrypting; "failed" means this device can't read it. */
+  _e2ee?: "encrypted" | "legacy" | "failed";
 };
 
 export type MeetingMinutesFormInput = {

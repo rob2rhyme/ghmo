@@ -43,6 +43,11 @@ describe("admin access requires an active admin record", () => {
     await assertSucceeds(getDoc(doc(admin(), `${ORG}/adminChatMessages/msg1`)));
   });
 
+  it("keeps minutes server-written: admins can read them but not write them directly", async () => {
+    await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m1`), { title: "Tampered" }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m2`), { title: "New" }));
+  });
+
   it("blocks a disabled admin even though the token still has the admin claim", async () => {
     const db = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
     await assertFails(getDoc(doc(db, `${ORG}/minutes/m1`)));

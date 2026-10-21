@@ -173,6 +173,9 @@ export default function EventDetailPage() {
                 {isAdminMinutesView ? (
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <p>{adminStatusDescriptions[meetingMinutes.status]}</p>
+                    {meetingMinutes.encrypted && meetingMinutes.status !== "approved" ? (
+                      <p>The content of unapproved minutes is encrypted. Open Meeting Minutes to read it.</p>
+                    ) : null}
                     {meetingMinutes.submittedAt ? (
                       <p>
                         Submitted by {resolveActorLabel({ roles: ["admin"] })} •{" "}

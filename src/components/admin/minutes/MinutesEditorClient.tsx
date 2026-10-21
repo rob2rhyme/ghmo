@@ -19,6 +19,9 @@ import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/compone
 import { COMMUNITY_SLUG } from "@/src/lib/community.constants";
 import { resolveActorName } from "@/src/lib/actor";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { approvalLoc, minutesLoc, unpackMinutes } from "@/src/lib/minutesRecords";
+import { useUnpackedMinutes } from "./useUnpackedMinutes";
 
 type AdminActor = {
   uid: string;
@@ -30,7 +33,8 @@ type AdminActor = {
 type AdminEvent = {
   id: string;
   title?: string;
-  startsAt?: string | null;
+  /** Milliseconds from the API (ISO strings are accepted too). */
+  startsAt?: number | string | null;
   timezone?: string;
   location?: string;
 };
@@ -57,12 +61,28 @@ const statusHelperText: Record<MinutesStatus, string> = {
 };
 const isNonNull = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
-export default function MinutesEditorClient({ minutes, adminActor }: MinutesEditorClientProps) {
+/** A random Firestore-style document id; chosen here so the ciphertext can be bound to it. */
+function newMinutesId() {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from(crypto.getRandomValues(new Uint8Array(20)), byte => alphabet[byte % alphabet.length]).join("");
+}
+
+export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }: MinutesEditorClientProps) {
+  const { enabled: encrypted, packPrivate, unpackPrivate } = useE2ee();
+  const decryptedMinutes = useUnpackedMinutes(rawMinutes);
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
-  const [minutesEntries, setMinutesEntries] = useState<MeetingMinutesRecord[]>(minutes ?? []);
+  // Records saved in this session replace the loaded copy until the page is reloaded.
+  const [savedEntries, setSavedEntries] = useState<MeetingMinutesRecord[]>([]);
+  const minutesEntries = useMemo(() => {
+    const loadedIds = new Set(decryptedMinutes.map(entry => entry.id));
+    return [
+      ...savedEntries.filter(entry => !loadedIds.has(entry.id)),
+      ...decryptedMinutes.map(entry => savedEntries.find(saved => saved.id === entry.id) ?? entry)
+    ];
+  }, [decryptedMinutes, savedEntries]);
   const [formState, setFormState] = useState<MeetingMinutesFormInput>(() => createEmptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [minutesSaveStatus, setMinutesSaveStatus] = useState<string | null>(null);
@@ -108,10 +128,6 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
       setFormState(prev => ({ ...prev, eventId: prev.eventId || eventParam }));
     }
   }, [editingId, searchParams]);
-
-  useEffect(() => {
-    setMinutesEntries(minutes ?? []);
-  }, [minutes]);
 
   useEffect(() => {
     const minutesId = searchParams.get("minutesId");
@@ -273,8 +289,13 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
       payload.signatures = signaturesPayload;
     }
     const method = editingId ? "PATCH" : "POST";
-    const body = editingId ? { id: editingId, ...payload } : payload;
     try {
+      if (editingEntry?._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device, so they can't be edited here.");
+      const id = editingId ?? newMinutesId();
+      const { eventId, meetingType, ...content } = payload;
+      // With encryption on this is {enc}; before that it is the plain fields, as always.
+      const privateFields = await packPrivate(minutesLoc(id), content);
+      const body = editingId ? { id, meetingType, ...privateFields } : { id, eventId, meetingType, ...privateFields };
       const res = await fetch("/api/admin/minutes", {
         method,
         headers: { "Content-Type": "application/json" },
@@ -282,10 +303,8 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
-      const saved = data.minutes;
-      setMinutesEntries(prev =>
-        editingId ? prev.map(entry => (entry.id === editingId ? saved : entry)) : [saved, ...prev]
-      );
+      const saved = await unpackMinutes(unpackPrivate, data.minutes);
+      setSavedEntries(prev => [saved, ...prev.filter(entry => entry.id !== saved.id)]);
       setMinutesSaveStatus(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
       setFormState(createEmptyForm());
       setEditingId(null);
@@ -353,21 +372,26 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
     setIsUpdatingStatus(true);
     setStatusActionStatus("Updating status...");
     try {
+      const notes = action === "approve" ? approvalNotesInput.trim() : "";
+      const extra: Record<string, unknown> = {};
+      if (action === "approve" && encrypted && editingEntry?.encrypted) {
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        // Approving publishes the saved content as a plaintext copy for the public pages.
+        const { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures } = editingEntry;
+        extra.published = { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures };
+        if (notes) extra.approvalEnc = (await packPrivate(approvalLoc(editingId), { approvalNotes: notes })).enc;
+      } else if (notes) {
+        extra.approvalNotes = notes;
+      }
       const res = await fetch("/api/admin/minutes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingId,
-          action,
-          approvalNotes: action === "approve" ? approvalNotesInput.trim() || undefined : undefined
-        })
+        body: JSON.stringify({ id: editingId, action, ...extra })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update status");
-      const updated = data.minutes;
-      setMinutesEntries(prev =>
-        prev.map(entry => (entry.id === updated.id ? updated : entry))
-      );
+      const updated = await unpackMinutes(unpackPrivate, data.minutes);
+      setSavedEntries(prev => [updated, ...prev.filter(entry => entry.id !== updated.id)]);
       loadMinutesIntoForm(updated);
       setStatusActionStatus(
         action === "approve"
@@ -387,7 +411,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
     const now = Date.now();
     return events
       .map(evt => {
-        const startMs = evt.startsAt ? Date.parse(evt.startsAt) : NaN;
+        const startMs = typeof evt.startsAt === "number" ? evt.startsAt : evt.startsAt ? Date.parse(evt.startsAt) : NaN;
         if (isNaN(startMs) || !isFinite(startMs)) return null;
         return { ...evt, startsAtMs: startMs };
       })

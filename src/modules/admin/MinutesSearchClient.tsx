@@ -9,6 +9,7 @@ import {
   minutesStatusLabels,
   minutesStatusPillClasses
 } from "@/src/lib/minutes";
+import { useUnpackedMinutes } from "@/src/components/admin/minutes/useUnpackedMinutes";
 import { resolveActorLabel } from "@/src/lib/actor";
 
 const statusOptions: MinutesStatus[] = ["draft", "submitted", "approved"];
@@ -17,7 +18,8 @@ type MinutesSearchClientProps = {
   initialMinutes: MeetingMinutesRecord[];
 };
 
-export default function MinutesSearchClient({ initialMinutes }: MinutesSearchClientProps) {
+export default function MinutesSearchClient({ initialMinutes: rawMinutes }: MinutesSearchClientProps) {
+  const initialMinutes = useUnpackedMinutes(rawMinutes);
   const [query, setQuery] = useState("");
   const [meetingTypeFilter, setMeetingTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -139,6 +141,9 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
                     </Link>
                   </div>
                 </div>
+                {entry._e2ee === "failed" ? (
+                  <p className="text-xs text-destructive">Can&apos;t be decrypted on this device.</p>
+                ) : null}
                 {entry.agenda.length ? (
                   <p className="text-xs text-muted-foreground">
                     Agenda: {entry.agenda.slice(0, 3).join(", ")}

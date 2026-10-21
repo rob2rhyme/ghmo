@@ -68,9 +68,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Minutes are written only through /api/admin/minutes (status rules, device checks, audit);
+    // admins may read them, and their content is ciphertext once encryption is on.
     match /organizations/{orgSlug}/minutes/{doc=**} {
       allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow write: if false;
     }
 
     // ---- End-to-end encryption (plan Phase 4) ----
