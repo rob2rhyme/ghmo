@@ -21,6 +21,7 @@ import { resolveActorName } from "@/src/lib/actor";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { approvalLoc, minutesLoc, unpackMinutes } from "@/src/lib/minutesRecords";
+import { hashContent } from "@/src/lib/minutesContent";
 import { useUnpackedMinutes } from "./useUnpackedMinutes";
 
 type AdminActor = {
@@ -92,6 +93,8 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const [isExportingMinutes, setIsExportingMinutes] = useState(false);
   const [minutesExportStatus, setMinutesExportStatus] = useState<string | null>(null);
   const [approvalNotesInput, setApprovalNotesInput] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
+  const [versions, setVersions] = useState<{ version: number; approvedAt?: number; contentHash: string }[]>([]);
   const [statusActionStatus, setStatusActionStatus] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [attendanceExpanded, setAttendanceExpanded] = useState(false);
@@ -383,6 +386,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       } else if (notes) {
         extra.approvalNotes = notes;
       }
+      if (action === "submit" && editingEntry?.encrypted) {
+        // The approver's copy must hash to exactly this, so the minutes can't change during approval.
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        extra.contentHash = await hashContent(editingEntry as unknown as Record<string, unknown>);
+      }
+      if (action === "returnToDraft" && editingStatus === "approved") extra.reason = reopenReason.trim();
       const res = await fetch("/api/admin/minutes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -393,6 +402,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       const updated = await unpackMinutes(unpackPrivate, data.minutes);
       setSavedEntries(prev => [updated, ...prev.filter(entry => entry.id !== updated.id)]);
       loadMinutesIntoForm(updated);
+      setReopenReason("");
       setStatusActionStatus(
         action === "approve"
           ? "Minutes approved."
@@ -477,6 +487,20 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   useEffect(() => {
     setPreviewReady(false);
   }, [previewMinutesData]);
+
+  const editingVersion = editingEntry?.version;
+  useEffect(() => {
+    if (!editingId || !editingVersion) return;
+    let cancelled = false;
+    void fetch(`/api/admin/minutes?versionsFor=${editingId}`, { cache: "no-store" })
+      .then(res => (res.ok ? res.json() : { versions: [] }))
+      .then(data => {
+        if (!cancelled) setVersions(data.versions ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId, editingVersion]);
 
   const attendanceState = ensureAttendanceState(formState.attendance);
 
@@ -845,6 +869,33 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                 placeholder="Optional context for approvers"
               />
             </div>
+            {editingStatus === "submitted" && editingEntry?.submittedByUid === adminActor.uid ? (
+              <p className="mt-3 text-xs text-muted-foreground">You submitted these minutes, so another admin must approve them.</p>
+            ) : null}
+            {editingStatus === "approved" ? (
+              <div className="mt-4 space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reason for reopening</label>
+                <textarea
+                  className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+                  value={reopenReason}
+                  onChange={e => setReopenReason(e.target.value)}
+                  rows={2}
+                  placeholder="Required. Recorded in the audit log; reopening unpublishes the minutes."
+                />
+              </div>
+            ) : null}
+            {versions.length ? (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved versions</p>
+                <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                  {versions.map(v => (
+                    <li key={v.version}>
+                      Version {v.version} · {v.approvedAt ? new Date(v.approvedAt).toLocaleString() : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {statusActionStatus ? <p className="mt-2 text-xs text-muted-foreground">{statusActionStatus}</p> : null}
           </AdminSectionCard>
         ) : null}
