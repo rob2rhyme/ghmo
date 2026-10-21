@@ -146,16 +146,26 @@ Legacy community paths are no longer supported; please migrate any old data into
 5) Allowlist admin emails by creating documents under `organizations/ghmo/admins` (set `emailLower`, `status: "active"`, `roles`, and optional `name`) so the magic-link flow recognizes them.
 6) Configure GoFundMe Pro webhook + reconcile schedule when ready.
 
+## End-to-End Encryption
+- Admin → **Encryption** (`/admin/encryption`) manages end-to-end encryption keys. The design and owner steps are in `docs/PROJECT_PLAN.md` §4 and §8 (Phase 3).
+- Each admin device has its own keys. They are stored in the browser, locked with the admin's passkey (or a passphrase if the passkey can't), and unlocked once per session.
+- A shared workspace key per key generation ("epoch") is wrapped for each approved device and for the **recovery key**. Two named trustees each hold a paper copy of the recovery key.
+- **New devices** must be approved by another admin after comparing a 12-digit safety code, or activated with the paper recovery key.
+- **Lost devices:** revoking a lost device rotates to a new epoch it can't read.
+- The server only ever stores public keys and wrapped keys (`organizations/ghmo/e2ee/**`, server-only in Firestore rules).
+- Phase 4 moves Admin Chat, Plans & Issues, draft minutes, signatures and document history onto these keys.
+
 ## Development Checks
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
 | `npm run lint` | ESLint. Fails on any error, or on more than 132 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
 | `npm test` | Vitest unit tests in `tests/unit/` |
+| `npm run test:coverage` | Unit tests with the coverage gate for the E2EE library (`src/lib/e2ee`) |
 | `npm run build` | Production build. Works without Firebase secrets |
 | `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |
 | `npm run test:emulators` | Firestore rules tests and auth/session/passkey/signing integration tests against the Firebase emulators (needs Java 11+) |
-| `npm run test:e2e:auth` | Real-browser passkey sign-in (Chromium virtual authenticator) against the emulators. Run `npm run build` first |
+| `npm run test:e2e:auth` | Real-browser passkey sign-in and E2EE setup/unlock/approval (Chromium virtual authenticator with PRF) against the emulators. Run `npm run build` first |
 | `npm run check` | typecheck + lint + unit tests |
 
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push to `main`, and fails on critical production advisories from `npm audit`. Dependabot opens weekly update PRs.

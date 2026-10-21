@@ -124,11 +124,12 @@ export async function getAdminProfile(orgSlug: string, adminId: string) {
 }
 
 export async function listAdmins(orgSlug: string) {
-  const snapshot = await getAdminDb()
-    .collection(orgAdminsCollectionPath(orgSlug))
-    .orderBy("createdAt", "asc")
-    .get();
-  return snapshot.docs.map(doc => mapAdminDoc(doc.id, doc.data() as Record<string, unknown>));
+  // No orderBy: Firestore silently drops documents that lack the sort field
+  // (e.g. admins added by hand in the console). Sort in memory instead.
+  const snapshot = await getAdminDb().collection(orgAdminsCollectionPath(orgSlug)).get();
+  return snapshot.docs
+    .map(doc => mapAdminDoc(doc.id, doc.data() as Record<string, unknown>))
+    .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
 }
 
 export function isSuperAdmin(admin: AdminProfile) {

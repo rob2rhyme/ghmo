@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Landmark,
   LayoutDashboard,
+  LockKeyhole,
   MessagesSquare,
   NotebookPen,
   ScrollText,
@@ -51,7 +52,10 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
   {
     label: "Account",
-    items: [{ href: "/admin/security", label: "Security", icon: ShieldCheck }]
+    items: [
+      { href: "/admin/security", label: "Security", icon: ShieldCheck },
+      { href: "/admin/encryption", label: "Encryption", icon: LockKeyhole }
+    ]
   }
 ];
 

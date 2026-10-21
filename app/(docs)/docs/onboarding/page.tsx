@@ -29,8 +29,13 @@ export default function OnboardingDocPage() {
           `status: &quot;active&quot;` (and optional `name`/`roles`) set.
         </li>
         <li>
-          End-to-end encryption (planned): before it is switched on, two named trustees must each keep a paper copy of
-          the recovery key. Without it, losing every admin device means losing all encrypted data.
+          End-to-end encryption: a super admin turns it on under Admin → Encryption with both trustees present. Each
+          trustee keeps one paper copy of the recovery key. Without it, losing every admin device means losing all
+          encrypted data. Test the recovery key once a year.
+        </li>
+        <li>
+          Each admin sets up encryption on each device they use; another admin approves it after comparing the 12-digit
+          safety code by phone or in person.
         </li>
       </ul>
     </main>

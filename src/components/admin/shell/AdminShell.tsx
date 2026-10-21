@@ -11,6 +11,8 @@ import { Button } from "@/src/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/src/components/ui/sheet";
 import { cn } from "@/src/lib/utils";
 import { ADMIN_NAV, isActiveNavItem } from "./adminNav";
+import { EncryptionStatusBadge } from "@/src/components/admin/encryption/EncryptionStatusBadge";
+import { E2eeProvider } from "@/src/lib/e2ee/client/E2eeProvider";
 
 function Brand() {
   return (
@@ -61,7 +63,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
 function ShellFooterActions() {
   return (
-    <div className="flex items-center justify-between gap-2 border-t border-sidebar-border pt-4">
+    <div className="flex flex-col gap-3 border-t border-sidebar-border pt-4">
+      <EncryptionStatusBadge />
+      <div className="flex items-center justify-between gap-2">
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground"
@@ -69,9 +73,10 @@ function ShellFooterActions() {
         <ExternalLink className="size-4" aria-hidden="true" />
         Public site
       </Link>
-      <div className="flex items-center gap-2">
-        <ThemeToggle />
-        <SignOutButton />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
       </div>
     </div>
   );
@@ -84,6 +89,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+    <E2eeProvider>
     <div className="min-h-screen md:grid md:grid-cols-[16rem_1fr]">
       <a
         href="#admin-main"
@@ -127,5 +133,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+    </E2eeProvider>
   );
 }

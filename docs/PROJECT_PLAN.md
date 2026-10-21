@@ -296,3 +296,47 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 3. Each admin: open `/admin/login`, request an email link, create a passkey, and then (recommended) add a second passkey on another device under Admin → Security.
 4. Add a Firestore TTL policy on `expiresAt` for the `webauthnChallenges` collection group (like `rateLimits`).
 
+### Phase 3 — E2EE core · done 2026-10-21
+**Design as built** (refines §4.2–§4.3):
+- **Device keys:** P-256 ECDH + ECDSA per browser. The private keys are kept in IndexedDB only in sealed form, under a key derived (HKDF) from the admin's **passkey PRF** output. A passphrase (PBKDF2-SHA-256, 600k) is the fallback for passkeys without PRF. Unlocking needs the device *and* the passkey/biometric. Opened keys are non-extractable and live in memory only until lock, sign-out or tab close.
+- **Workspace key per epoch:** each copy is wrapped to a recipient with ephemeral ECDH → HKDF-SHA-256 → AES-256-GCM. The epoch and recipient are bound as AAD, so a copy can't be replayed for another epoch or recipient.
+- **Recovery key:** the **private half of a P-256 key pair**. The paper copy is that private scalar: 14 groups of Crockford base32 plus a checksum, with look-alike letters tolerated. Every epoch is wrapped to the recovery *public* key, so rotation never needs the paper copy.
+  - **Proof of possession:** to activate a device with the recovery key, the client decrypts a token that was wrapped to the recovery key; the server stores only the token's hash.
+- **Record envelopes:** AES-256-GCM with AAD = exact Firestore path + document ID + epoch + writing device, plus an ECDSA signature by that device. Ready for Phase 4.
+- **Safety codes:** 12 digits computed from a device's public keys, compared by phone or in person before approving it.
+
+**Server rules (transactions):**
+- Setup is super admin only, happens once, and needs two different trustees.
+- Approval is done from one of the approver's active devices, or with recovery proof on the admin's own device. The key copies must cover every epoch.
+- Rotation must be exactly the next epoch, wrapped for every remaining active device plus recovery. Revoked devices' copies are deleted, and only super admins can revoke another admin's device.
+- Replacing the recovery key rewraps every epoch, so the old paper copies stop working.
+- Firestore rules keep the whole keyring server-only.
+
+**UI:** Admin → Encryption:
+- the setup wizard (device keys → recovery key shown once with Print → re-type two groups → two trustees confirmed);
+- unlock and lock, plus a lock-state badge in the sidebar;
+- pending approvals with safety-code confirmation;
+- device list with revoke + rotate, and "Rotate keys now";
+- recovery-key test (drill), recovery-key replacement, and activating a device with the recovery key.
+
+**Exit criteria met:**
+- Two devices share the workspace key; revoking one and rotating locks it out of new data. Covered by a unit lifecycle test and emulator API tests.
+- The recovery drill passes, in unit tests and in the browser.
+- Tests:
+  - 34 crypto unit tests, with a coverage gate (100% lines and functions) on `src/lib/e2ee`.
+  - 8 keyring API integration tests with real crypto against the emulators.
+  - A real-browser test using Chromium's virtual authenticator with PRF: Alice turns encryption on, locks, unlocks after a reload, and runs the recovery drill; Bob sets up a device; Alice compares safety codes and approves; Bob unlocks.
+
+**Bugs found and fixed during the phase:**
+- Admins without a `createdAt` field were dropped from `listAdmins` (an `orderBy` quirk), so they showed as "Unknown admin" and were flagged as inactive.
+- A just-approved device looked unlocked while holding no workspace keys; it now loads them as soon as it is approved.
+
+**Known limits** (also in §4.5):
+- A device revoked later keeps whatever it already decrypted. Rotation only protects data written afterwards.
+- Web E2EE trusts the JavaScript the server sends; safety codes guard against a server swapping keys, but not against malicious code.
+
+**Owner actions after deploying Phase 3**
+1. A super admin opens Admin → Encryption and runs setup. Do this with both trustees present, so each can take a paper copy straight away.
+2. Every other admin sets up each of their devices; another admin approves each one after comparing the safety code by phone or in person.
+3. Put a yearly reminder on the calendar: test the recovery key (Admin → Encryption → Test).
+
