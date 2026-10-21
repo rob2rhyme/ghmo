@@ -113,7 +113,7 @@ export default function EventDetailPage() {
   }, []);
 
   if (!event) {
-    return <div className="px-4 py-10 text-sm text-slate-600">Loading event...</div>;
+    return <div className="px-4 py-10 text-sm text-muted-foreground">Loading event...</div>;
   }
 
   const start = event.startsAt ? new Date(event.startsAt.toDate?.() || event.startsAt) : null;
@@ -130,12 +130,12 @@ export default function EventDetailPage() {
         <div>
           <h1 className="text-3xl font-semibold">{event.title}</h1>
           {start ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               {start.toLocaleString("en-US", { timeZone: event.timezone || DEFAULT_TIMEZONE })}
               {end ? ` - ${end.toLocaleString("en-US", { timeZone: event.timezone || DEFAULT_TIMEZONE })}` : ""}
             </p>
           ) : null}
-          {event.location ? <p className="text-sm text-slate-600">{event.location}</p> : null}
+          {event.location ? <p className="text-sm text-muted-foreground">{event.location}</p> : null}
         </div>
         <Link
           href={`/api/organizations/${params.orgSlug}/events/${event.id}/announcement.pdf`}
@@ -144,12 +144,12 @@ export default function EventDetailPage() {
           Download Announcement PDF
         </Link>
       </div>
-      {event.summary ? <p className="text-lg text-slate-700">{event.summary}</p> : null}
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="whitespace-pre-wrap text-slate-800">{event.body}</p>
+      {event.summary ? <p className="text-lg text-foreground/80">{event.summary}</p> : null}
+      <div className="rounded-lg border border-border bg-card p-4 shadow-xs">
+        <p className="whitespace-pre-wrap text-foreground">{event.body}</p>
       </div>
       {isPastEvent ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Meeting Minutes</h2>
             {!meetingMinutes && !minutesLoading && adminMinutesAccess ? (
@@ -159,9 +159,9 @@ export default function EventDetailPage() {
             ) : null}
           </div>
           {minutesLoading ? (
-            <p className="mt-2 text-sm text-slate-600">Loading minutes...</p>
+            <p className="mt-2 text-sm text-muted-foreground">Loading minutes...</p>
           ) : meetingMinutes ? (
-            <div className="mt-4 space-y-4 text-sm text-slate-700">
+            <div className="mt-4 space-y-4 text-sm text-foreground/80">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
@@ -171,7 +171,7 @@ export default function EventDetailPage() {
                   </span>
                 </div>
                 {isAdminMinutesView ? (
-                  <div className="space-y-1 text-xs text-slate-500">
+                  <div className="space-y-1 text-xs text-muted-foreground">
                     <p>{adminStatusDescriptions[meetingMinutes.status]}</p>
                     {meetingMinutes.submittedAt ? (
                       <p>
@@ -187,12 +187,12 @@ export default function EventDetailPage() {
                     ) : null}
                   </div>
                 ) : meetingMinutes.status === "approved" ? (
-                  <p className="text-xs text-slate-500">Official minutes for this event.</p>
+                  <p className="text-xs text-muted-foreground">Official minutes for this event.</p>
                 ) : null}
               </div>
               {meetingMinutes.agenda.length ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Agenda</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Agenda</p>
                   <ul className="list-disc space-y-1 pl-5">
                     {meetingMinutes.agenda.map((item, idx) => (
                       <li key={`agenda-${idx}`}>{item}</li>
@@ -202,13 +202,13 @@ export default function EventDetailPage() {
               ) : null}
               {meetingMinutes.discussionSummary ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Discussion summary</p>
-                  <p className="text-sm text-slate-700">{meetingMinutes.discussionSummary}</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Discussion summary</p>
+                  <p className="text-sm text-foreground/80">{meetingMinutes.discussionSummary}</p>
                 </div>
               ) : null}
               {meetingMinutes.decisions.length ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Decisions</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Decisions</p>
                   <ul className="list-disc space-y-1 pl-5">
                     {meetingMinutes.decisions.map((decision, idx) => (
                       <li key={`decision-${idx}`}>{decision}</li>
@@ -218,7 +218,7 @@ export default function EventDetailPage() {
               ) : null}
               {meetingMinutes.actionItems.length ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Action items</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Action items</p>
                   <ul className="list-disc space-y-1 pl-5">
                     {meetingMinutes.actionItems.map((action, idx) => (
                       <li key={`action-${idx}`}>
@@ -232,30 +232,30 @@ export default function EventDetailPage() {
               ) : null}
               {renderAttendanceBlock(normalizedMeetingAttendance)}
               {meetingMinutes.signatures && (meetingMinutes.signatures.chairName || meetingMinutes.signatures.secretaryName) ? (
-                <div className="space-y-1 text-xs text-slate-600">
+                <div className="space-y-1 text-xs text-muted-foreground">
                   {meetingMinutes.signatures.chairName ? (
                     <p>
-                      <span className="font-semibold text-slate-700">Chair:</span>{" "}
+                      <span className="font-semibold text-foreground/80">Chair:</span>{" "}
                       {meetingMinutes.signatures.chairName}
                     </p>
                   ) : null}
                   {meetingMinutes.signatures.secretaryName ? (
                     <p>
-                      <span className="font-semibold text-slate-700">Secretary:</span>{" "}
+                      <span className="font-semibold text-foreground/80">Secretary:</span>{" "}
                       {meetingMinutes.signatures.secretaryName}
                     </p>
                   ) : null}
                 </div>
               ) : null}
               {meetingMinutes.approvalNotes ? (
-                <p className="text-xs text-slate-500">Approval notes: {meetingMinutes.approvalNotes}</p>
+                <p className="text-xs text-muted-foreground">Approval notes: {meetingMinutes.approvalNotes}</p>
               ) : null}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 Recorded by {resolveActorLabel(meetingMinutes.recordedBy)} • {formatTimestamp(meetingMinutes.createdAt)}
               </p>
             </div>
           ) : (
-            <p className="mt-2 text-sm text-slate-600">No minutes recorded for this event yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
           )}
         </div>
       ) : null}
@@ -286,20 +286,20 @@ function normalizeEventAttendance(value?: MeetingMinutesRecord["attendance"] | s
 function renderAttendanceBlock(attendance?: MeetingAttendance) {
   if (!attendance) return null;
   return (
-    <div className="space-y-1 text-xs text-slate-500">
+    <div className="space-y-1 text-xs text-muted-foreground">
       {attendance.present && attendance.present.length ? (
         <p>
-          <span className="font-semibold text-slate-700">Present:</span> {attendance.present.join(", ")}
+          <span className="font-semibold text-foreground/80">Present:</span> {attendance.present.join(", ")}
         </p>
       ) : null}
       {attendance.absent && attendance.absent.length ? (
         <p>
-          <span className="font-semibold text-slate-700">Absent:</span> {attendance.absent.join(", ")}
+          <span className="font-semibold text-foreground/80">Absent:</span> {attendance.absent.join(", ")}
         </p>
       ) : null}
       {attendance.guests && attendance.guests.length ? (
         <p>
-          <span className="font-semibold text-slate-700">Guests:</span> {attendance.guests.join(", ")}
+          <span className="font-semibold text-foreground/80">Guests:</span> {attendance.guests.join(", ")}
         </p>
       ) : null}
     </div>

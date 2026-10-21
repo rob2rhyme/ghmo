@@ -42,25 +42,25 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
   }, [initialMinutes, query, meetingTypeFilter, statusFilter, startDate, endDate]);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Search</label>
             <input
               type="search"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Event title, agenda, decisions, attendees..."
-              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting type</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting type</label>
             <select
               value={meetingTypeFilter}
               onChange={e => setMeetingTypeFilter(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               <option value="">All types</option>
               {meetingTypes.map(type => (
@@ -71,11 +71,11 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</label>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               <option value="">All statuses</option>
               {statusOptions.map(status => (
@@ -88,40 +88,40 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">From date</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">From date</label>
             <input
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Through date</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Through date</label>
             <input
               type="date"
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
         </div>
         <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-600">{filteredMinutes.length} result{filteredMinutes.length === 1 ? "" : "s"}</p>
+          <p className="text-sm text-muted-foreground">{filteredMinutes.length} result{filteredMinutes.length === 1 ? "" : "s"}</p>
           <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
             Go to minutes editor
           </Link>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-border">
           {filteredMinutes.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">No minutes match the criteria.</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">No minutes match the criteria.</p>
           ) : (
             filteredMinutes.map(entry => (
               <div key={entry.id} className="space-y-3 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{entry.eventTitle}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm font-semibold text-foreground">{entry.eventTitle}</p>
+                    <p className="text-xs text-muted-foreground">
                     {entry.meetingType} • {formatDateLabel(entry.eventDate ?? undefined)}
                     </p>
                   </div>
@@ -140,29 +140,29 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
                   </div>
                 </div>
                 {entry.agenda.length ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Agenda: {entry.agenda.slice(0, 3).join(", ")}
                     {entry.agenda.length > 3 ? "…" : ""}
                   </p>
                 ) : null}
                 {entry.decisions.length ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Decisions: {entry.decisions.join(", ")}
                   </p>
                 ) : null}
                 {entry.actionItems.length ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Action items: {entry.actionItems.map(item => item.task).join(", ")}
                   </p>
                 ) : null}
                 {formatAttendanceSummary(entry.attendance) ? (
-                  <p className="text-xs text-slate-500">{formatAttendanceSummary(entry.attendance)}</p>
+                  <p className="text-xs text-muted-foreground">{formatAttendanceSummary(entry.attendance)}</p>
                 ) : null}
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Recorded by {resolveActorLabel(entry.recordedBy)} • {formatDateLabel(entry.createdAt)}
                 </p>
                 {entry.approvalNotes ? (
-                  <p className="text-xs text-slate-500">Approval notes: {entry.approvalNotes}</p>
+                  <p className="text-xs text-muted-foreground">Approval notes: {entry.approvalNotes}</p>
                 ) : null}
               </div>
             ))

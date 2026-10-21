@@ -27,7 +27,7 @@ export default async function CommunityLanding() {
             priority
           />
         </div>
-        <p className="max-w-3xl text-lg text-slate-600 dark:text-slate-200">
+        <p className="max-w-3xl text-lg text-muted-foreground dark:text-slate-200">
           Secure, member-first hub with magic-link access, hardened admin controls,
           fundraising, document generation, and multimedia highlights.
         </p>
@@ -35,40 +35,40 @@ export default async function CommunityLanding() {
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/donate"
-          className="rounded-md bg-primary px-5 py-3 text-white shadow-sm hover:bg-primary/90"
+          className="rounded-md bg-primary px-5 py-3 text-white shadow-xs hover:bg-primary/90"
         >
           Donate
         </Link>
         <Link
           href="/docs/onboarding"
-          className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
+          className="rounded-md border border-border px-5 py-3 text-foreground hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
         >
           Onboarding Guide
         </Link>
         <Link
           href="/c/ghmo/events"
-          className="rounded-md border border-slate-200 px-5 py-3 text-slate-800 hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
+          className="rounded-md border border-border px-5 py-3 text-foreground hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
         >
           Events
         </Link>
       </div>
       <div className="grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase text-slate-500">Members</p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+        <div className="rounded-lg border border-border bg-card p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase text-muted-foreground">Members</p>
+          <p className="mt-1 text-sm text-foreground/80 dark:text-slate-200">
             Whitelist-only access with email magic links and audit logging.
           </p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase text-slate-500">Admins</p>
-        <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+        <div className="rounded-lg border border-border bg-card p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase text-muted-foreground">Admins</p>
+        <p className="mt-1 text-sm text-foreground/80 dark:text-slate-200">
           Magic-link login, meeting minutes, document tools, and GoFundMe
           reconciliation.
         </p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase text-slate-500">Docs & Guides</p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+        <div className="rounded-lg border border-border bg-card p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase text-muted-foreground">Docs & Guides</p>
+          <p className="mt-1 text-sm text-foreground/80 dark:text-slate-200">
             Keep operational instructions in the onboarding guide and expand as
             you grow.
           </p>

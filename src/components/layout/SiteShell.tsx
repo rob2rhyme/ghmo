@@ -31,7 +31,7 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <Providers nonce={nonce}>
           {bodyStart}
           {chrome ? (

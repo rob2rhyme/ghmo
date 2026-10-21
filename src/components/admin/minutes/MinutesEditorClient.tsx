@@ -465,10 +465,10 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 {editingId ? "Update Meeting Minutes" : "Add Meeting Minutes"}
               </p>
-              <h2 className="mt-1 text-2xl font-semibold text-slate-900">
+              <h2 className="mt-1 text-2xl font-semibold text-foreground">
                 {selectedEvent?.title || displayEventTitle || "Create minutes"}
               </h2>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Link structured minutes to a past event. Admin-only governance tool.
               </p>
               {editingEntry ? (
@@ -478,14 +478,14 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   >
                     {minutesStatusLabels[editingStatus]}
                   </span>
-                  <p className="text-xs text-slate-500">{statusHelperText[editingStatus]}</p>
+                  <p className="text-xs text-muted-foreground">{statusHelperText[editingStatus]}</p>
                 </div>
               ) : null}
             </div>
             {editingId ? (
               <button
                 onClick={cancelMinutesEdit}
-                className="whitespace-nowrap rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-primary hover:text-slate-900"
+                className="whitespace-nowrap rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 hover:border-primary hover:text-foreground"
                 type="button"
               >
                 Cancel edit
@@ -498,9 +498,9 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
           <AdminSectionCard title="Event & Meeting Metadata" description="Attach minutes to a completed event.">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Event</label>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event</label>
                 <select
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                   value={formState.eventId}
                   onChange={e => setFormState(prev => ({ ...prev, eventId: e.target.value }))}
                   disabled={Boolean(editingId)}
@@ -513,24 +513,24 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   ))}
                 </select>
                 {eventsLoading ? (
-                  <p className="text-xs text-slate-500">Loading past events...</p>
+                  <p className="text-xs text-muted-foreground">Loading past events...</p>
                 ) : eventsError ? (
-                  <p className="text-xs text-red-500">{eventsError}</p>
+                  <p className="text-xs text-destructive">{eventsError}</p>
                 ) : pastEvents.length === 0 ? (
-                  <p className="text-xs text-slate-500">No past events available yet.</p>
+                  <p className="text-xs text-muted-foreground">No past events available yet.</p>
                 ) : null}
               </div>
               {displayEventTitle ? (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  <p className="font-semibold text-slate-900">{displayEventTitle}</p>
+                <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                  <p className="font-semibold text-foreground">{displayEventTitle}</p>
                   <p>{displayEventDate ?? "Date unavailable"}</p>
                 </div>
               ) : null}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting Type</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting Type</label>
                   <select
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                     value={formState.meetingType}
                     onChange={e =>
                       setFormState(prev => ({
@@ -547,18 +547,18 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chaired by</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chaired by</label>
                   <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                    className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                     value={formState.chairedBy}
                     onChange={e => setFormState(prev => ({ ...prev, chairedBy: e.target.value }))}
                     placeholder="Optional chair"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recorded by</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recorded by</label>
                   <input
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 focus:outline-none"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground focus:outline-hidden"
                     value={adminRecordedBy}
                     readOnly
                   />
@@ -572,10 +572,10 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
               {formState.agenda.map((item, index) => (
                 <div
                   key={`agenda-${index}`}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                  className="flex items-start gap-3 rounded-2xl border border-border bg-background p-3"
                 >
                   <input
-                    className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                    className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                     value={item}
                     onChange={e => updateTextList("agenda", index, e.target.value)}
                     placeholder="Agenda item"
@@ -583,7 +583,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   <button
                     type="button"
                     onClick={() => removeTextListEntry("agenda", index)}
-                    className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                    className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                   >
                     ×
                   </button>
@@ -601,7 +601,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
 
           <AdminSectionCard title="Discussion Summary" description="Summarize key discussions and context.">
             <textarea
-              className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+              className="w-full rounded-2xl border border-border px-3 py-3 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
               value={formState.discussionSummary}
               onChange={e => setFormState(prev => ({ ...prev, discussionSummary: e.target.value }))}
               rows={4}
@@ -614,10 +614,10 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
               {formState.decisions.map((item, index) => (
                 <div
                   key={`decision-${index}`}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                  className="flex items-start gap-3 rounded-2xl border border-border bg-background p-3"
                 >
                   <input
-                    className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                    className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                     value={item}
                     onChange={e => updateTextList("decisions", index, e.target.value)}
                     placeholder="Decision"
@@ -625,7 +625,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   <button
                     type="button"
                     onClick={() => removeTextListEntry("decisions", index)}
-                    className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                    className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                   >
                     ×
                   </button>
@@ -644,10 +644,10 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
           <AdminSectionCard title="Action Items" description="Assign follow ups with owners and due dates.">
             <div className="space-y-3">
               {formState.actionItems.map((item, index) => (
-                <div key={`action-${index}`} className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div key={`action-${index}`} className="space-y-3 rounded-2xl border border-border bg-background p-4">
                   <div className="flex items-start gap-3">
                     <input
-                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={item.task}
                       onChange={e => updateActionItem(index, "task", e.target.value)}
                       placeholder="Task"
@@ -655,21 +655,21 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                     <button
                       type="button"
                       onClick={() => removeActionItem(index)}
-                      className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                      className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                     >
                       ×
                     </button>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <input
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={item.assignedTo}
                       onChange={e => updateActionItem(index, "assignedTo", e.target.value)}
                       placeholder="Assigned to (optional)"
                     />
                     <input
                       type="date"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={item.dueDate || ""}
                       onChange={e => updateActionItem(index, "dueDate", e.target.value)}
                     />
@@ -690,7 +690,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
             <button
               type="button"
               onClick={() => setAttendanceExpanded(prev => !prev)}
-              className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500"
+              className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             >
               <span>{attendanceExpanded ? "Hide attendance" : "Add attendance"}</span>
               <span className="text-xs text-slate-400">{attendanceExpanded ? "Hide" : "Show"}</span>
@@ -701,7 +701,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   const rows = attendanceState[section] ?? [""];
                   return (
                     <div key={section} className="space-y-2">
-                      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <span>
                           {section === "present" ? "Present" : section === "absent" ? "Absent" : "Guests"}
                         </span>
@@ -718,10 +718,10 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                         {rows.map((person, index) => (
                           <div
                             key={`${section}-${index}`}
-                            className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/80 px-3 py-2"
+                            className="flex items-center gap-3 rounded-full border border-border bg-white/80 px-3 py-2"
                           >
                             <input
-                              className="flex-1 bg-transparent text-sm focus:outline-none"
+                              className="flex-1 bg-transparent text-sm focus:outline-hidden"
                               value={person}
                               onChange={e => updateAttendanceItem(section, index, e.target.value)}
                               placeholder="Name or role"
@@ -729,7 +729,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                             <button
                               type="button"
                               onClick={() => removeAttendanceItem(section, index)}
-                              className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                              className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                             >
                               ×
                             </button>
@@ -747,7 +747,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
             <button
               type="button"
               onClick={() => setSignaturesExpanded(prev => !prev)}
-              className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500"
+              className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             >
               <span>{signaturesExpanded ? "Hide signatures" : "Add signatures"}</span>
               <span className="text-xs text-slate-400">{signaturesExpanded ? "Hide" : "Show"}</span>
@@ -755,13 +755,13 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
             {signaturesExpanded ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <input
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                  className="rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                   value={formState.signatures?.chairName || ""}
                   onChange={e => updateSignatureField("chairName", e.target.value)}
                   placeholder="Chair name"
                 />
                 <input
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                  className="rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                   value={formState.signatures?.secretaryName || ""}
                   onChange={e => updateSignatureField("secretaryName", e.target.value)}
                   placeholder="Secretary name"
@@ -771,7 +771,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
           </AdminSectionCard>
 
           <div className="flex items-center justify-between">
-            {minutesSaveStatus ? <p className="text-xs text-slate-600">{minutesSaveStatus}</p> : <span />}
+            {minutesSaveStatus ? <p className="text-xs text-muted-foreground">{minutesSaveStatus}</p> : <span />}
             <button
               onClick={handleMinutesSubmit}
               disabled={isSavingMinutes || isApproved}
@@ -806,32 +806,32 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                 type="button"
                 onClick={() => handleMinutesStatusAction("returnToDraft")}
                 disabled={!canReturnToDraft || isUpdatingStatus}
-                className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Return to draft
               </button>
             </div>
             <div className="mt-4 space-y-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Approval notes</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approval notes</label>
               <textarea
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                 value={approvalNotesInput}
                 onChange={e => setApprovalNotesInput(e.target.value)}
                 rows={3}
                 placeholder="Optional context for approvers"
               />
             </div>
-            {statusActionStatus ? <p className="mt-2 text-xs text-slate-500">{statusActionStatus}</p> : null}
+            {statusActionStatus ? <p className="mt-2 text-xs text-muted-foreground">{statusActionStatus}</p> : null}
           </AdminSectionCard>
         ) : null}
       </div>
 
       <div className="space-y-5">
         <div className="sticky top-6 space-y-4">
-          <AdminSectionCard className="bg-slate-50">
-            <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <AdminSectionCard className="bg-background">
+            <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>🧾</span>
                   <span>Live preview</span>
                 </div>
@@ -845,7 +845,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
                     previewZoomMode === "fit"
                       ? "bg-slate-900 text-white"
-                      : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                      : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                   }`}
                 >
                   Fit
@@ -856,7 +856,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                   className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
                     previewZoomMode === "100"
                       ? "bg-slate-900 text-white"
-                      : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                      : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                   }`}
                 >
                   100%
@@ -872,7 +872,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                 className="min-h-[520px] w-full sm:min-h-[620px] lg:min-h-[720px]"
               />
             </div>
-            {minutesExportStatus ? <p className="mt-3 text-xs text-slate-500">{minutesExportStatus}</p> : null}
+            {minutesExportStatus ? <p className="mt-3 text-xs text-muted-foreground">{minutesExportStatus}</p> : null}
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -886,7 +886,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                 type="button"
                 onClick={() => handleMinutesExport("jpeg")}
                 disabled={!formState.eventId || isExportingMinutes || !previewReady}
-                className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Download Minutes JPEG
               </button>

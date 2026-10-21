@@ -103,30 +103,30 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
         title="Admin Chat"
         description="Admin Chat: for quick coordination."
       >
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted-foreground">
           Use this channel for quick updates, reminders, and coordination. Formal decisions belong in Plans & Issues.
         </p>
       </AdminSectionCard>
 
       <AdminSectionCard>
-        <div className="flex h-[60vh] flex-col rounded-2xl border border-slate-200 bg-slate-50">
+        <div className="flex h-[60vh] flex-col rounded-2xl border border-border bg-background">
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {loading ? (
-              <p className="text-sm text-slate-500">Loading messages...</p>
+              <p className="text-sm text-muted-foreground">Loading messages...</p>
             ) : loadError ? (
-              <p className="text-sm text-rose-600">{loadError}</p>
+              <p className="text-sm text-destructive">{loadError}</p>
             ) : messages.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
-                <p className="text-sm text-slate-500">No messages yet.</p>
+              <div className="rounded-xl border border-dashed border-border bg-card px-4 py-6 text-center">
+                <p className="text-sm text-muted-foreground">No messages yet.</p>
               </div>
             ) : (
               messages.map(message => (
                 <div
                   key={message.id}
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-xs ${
                     message.createdBy?.uid === actor.uid
                       ? "ml-auto bg-primary text-white"
-                      : "bg-white text-slate-800"
+                      : "bg-card text-foreground"
                   }`}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
@@ -141,25 +141,25 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
             )}
             <div ref={endRef} />
           </div>
-          <div className="border-t border-slate-200 bg-white px-4 py-3">
+          <div className="border-t border-border bg-card px-4 py-3">
             <div className="flex flex-wrap items-end gap-2">
               <textarea
                 value={body}
                 onChange={event => setBody(event.target.value)}
                 rows={2}
-                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                className="flex-1 rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden"
                 placeholder="Share an update or ask for help..."
               />
               <button
                 type="button"
                 onClick={handleSend}
                 disabled={isSending}
-                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSending ? "Sending..." : "Send"}
               </button>
             </div>
-            {sendStatus ? <p className="mt-2 text-sm text-slate-500">{sendStatus}</p> : null}
+            {sendStatus ? <p className="mt-2 text-sm text-muted-foreground">{sendStatus}</p> : null}
           </div>
         </div>
       </AdminSectionCard>

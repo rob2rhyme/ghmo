@@ -13,7 +13,7 @@ export default function AdminCommandPalette({ value, onChange, onClear, inputRef
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-xs">
       <div className="flex flex-1 items-center gap-3">
         <span className="text-sm text-slate-400" aria-hidden>
           /
@@ -24,14 +24,14 @@ export default function AdminCommandPalette({ value, onChange, onClear, inputRef
           value={value}
           onChange={handleChange}
           placeholder="Search actions, minutes, and audit activity..."
-          className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+          className="w-full bg-transparent text-sm text-foreground placeholder:text-slate-400 focus:outline-hidden"
         />
       </div>
       {value ? (
         <button
           type="button"
           onClick={onClear}
-          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 transition hover:border-primary hover:text-slate-900"
+          className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
           aria-label="Clear search"
         >
           Clear

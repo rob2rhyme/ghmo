@@ -450,7 +450,7 @@ export default function DocBuilder({
     }
   };
 
-  const statusColor = statusMessage?.toLowerCase().includes("failed") ? "text-rose-600" : "text-slate-500";
+  const statusColor = statusMessage?.toLowerCase().includes("failed") ? "text-destructive" : "text-muted-foreground";
   const signatureEnabled = selectedTemplateId === "wedding-certificate";
   const activeSession = activeQrRole ? signatureSessions[activeQrRole] : undefined;
   const signatureActions = signatureEnabled
@@ -478,11 +478,11 @@ export default function DocBuilder({
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="space-y-2 rounded-2xl border border-border bg-card p-5 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Document generator</p>
-            <h1 className="text-2xl font-semibold text-slate-900">Document builder</h1>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Document generator</p>
+            <h1 className="text-2xl font-semibold text-foreground">Document builder</h1>
             {initialDocId ? (
               <p className="text-xs text-slate-400">Editing saved document ({initialDocId})</p>
             ) : null}
@@ -506,7 +506,7 @@ export default function DocBuilder({
                   className={`rounded-full border px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-wide transition ${
                     active
                       ? "border-primary bg-primary/10 text-primary"
-                      : "border-slate-200 text-slate-500 hover:border-primary/40 hover:text-slate-700"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground/80"
                   }`}
                 >
                   {step.title}
@@ -514,7 +514,7 @@ export default function DocBuilder({
               );
             })}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
               Step {Math.min(activeStepIndex + 1, steps.length)} of {steps.length}
             </p>
@@ -522,16 +522,16 @@ export default function DocBuilder({
           </div>
         </div>
         {selectedTemplateMeta ? (
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/70 p-5">
+          <div className="space-y-4 rounded-2xl border border-border bg-white/70 p-5">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">{selectedTemplateMeta.category}</p>
-              <p className="text-sm text-slate-500">{selectedTemplateMeta.description}</p>
+              <p className="text-sm text-muted-foreground">{selectedTemplateMeta.description}</p>
             </div>
             {!isReviewStep ? (
               <>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900">{activeStep?.title}</p>
+                    <p className="text-sm font-semibold text-foreground">{activeStep?.title}</p>
                     <p className="text-xs uppercase tracking-wide text-slate-400">
                       {stepFields.length} fields
                     </p>
@@ -543,7 +543,7 @@ export default function DocBuilder({
                     type="button"
                     onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
                     disabled={activeStepIndex === 0}
-                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-input disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Back
                   </button>
@@ -559,7 +559,7 @@ export default function DocBuilder({
             ) : (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Letter preview</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Letter preview</p>
                   {selectedTemplate ? (
                     <DocPreview
                       template={selectedTemplate}
@@ -568,7 +568,7 @@ export default function DocBuilder({
                       onBackgroundLoad={() => setLetterheadReady(true)}
                     />
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-center text-xs text-slate-400">
+                    <div className="rounded-2xl border border-dashed border-border bg-white/70 p-6 text-center text-xs text-slate-400">
                       Add a template to see a preview here.
                     </div>
                   )}
@@ -577,9 +577,9 @@ export default function DocBuilder({
                   </p>
                 </div>
                 {signatureEnabled ? (
-                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Signature requests</p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Signature requests</p>
                       <p className="text-[0.65rem] uppercase tracking-wide text-slate-400">
                         Request links for mobile signing
                       </p>
@@ -591,10 +591,10 @@ export default function DocBuilder({
                         return (
                           <div
                             key={roleConfig.role}
-                            className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+                            className="rounded-xl border border-border bg-background/70 p-3"
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-slate-700">{roleConfig.label}</p>
+                              <p className="text-sm font-semibold text-foreground/80">{roleConfig.label}</p>
                               {action.badge ? (
                                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700">
                                   {action.badge}
@@ -606,7 +606,7 @@ export default function DocBuilder({
                               type="button"
                               onClick={action.onClick}
                               disabled={action.disabled}
-                              className="mt-3 w-full rounded-full border border-slate-200 px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                              className="mt-3 w-full rounded-full border border-border px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {action.label}
                             </button>
@@ -629,7 +629,7 @@ export default function DocBuilder({
                     type="button"
                     onClick={() => handleExport("jpeg")}
                     disabled={!selectedTemplate || isExporting || !letterheadReady}
-                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
                   >
                     Download JPEG
                   </button>
@@ -646,7 +646,7 @@ export default function DocBuilder({
                       type="button"
                       onClick={handleFinalizeSigned}
                       disabled={!selectedTemplate || isFinalizing || !letterheadReady}
-                      className="rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
+                      className="rounded-full border border-border bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
                     >
                       Finalize & Save Signed Certificate
                     </button>
@@ -657,7 +657,7 @@ export default function DocBuilder({
                   <button
                     type="button"
                     onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
-                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300"
+                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-input"
                   >
                     Back
                   </button>
@@ -666,38 +666,38 @@ export default function DocBuilder({
             )}
           </div>
         ) : (
-          <p className="text-sm text-slate-500">No template selected.</p>
+          <p className="text-sm text-muted-foreground">No template selected.</p>
         )}
       </div>
       {activeSession ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md space-y-4 rounded-2xl bg-card p-6 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">Signature link</p>
-                <p className="text-lg font-semibold text-slate-900">
+                <p className="text-lg font-semibold text-foreground">
                   {SIGNATURE_ROLES.find(role => role.role === activeSession.role)?.label}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveQrRole(null)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"
+                className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground"
               >
                 Close
               </button>
             </div>
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background/60 p-4 text-center">
               <LocalQrCode
                 value={activeSession.signUrl}
                 alt="QR code for signing link"
-                className="h-48 w-48 rounded-lg border border-slate-200 bg-white p-2"
+                className="h-48 w-48 rounded-lg border border-border bg-card p-2"
               />
-              <p className="text-xs text-slate-500">Scan on phone to sign</p>
+              <p className="text-xs text-muted-foreground">Scan on phone to sign</p>
             </div>
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Direct link</p>
-              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+              <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
                 {activeSession.signUrl}
               </div>
               <button
@@ -711,7 +711,7 @@ export default function DocBuilder({
                     setStatusMessage("Unable to copy link");
                   }
                 }}
-                className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary"
+                className="rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground/80 transition hover:border-primary"
               >
                 Copy link
               </button>

@@ -26,7 +26,7 @@ export default function AdminNavControls() {
               key={link.label}
               href={link.href}
               prefetch={disablePrefetch ? false : undefined}
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground/80 transition hover:bg-muted"
             >
               {link.label}
             </Link>

@@ -211,21 +211,21 @@ export default function AdminLoginClient({
   return (
     <>
       <div className="flex min-h-[70vh] items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md space-y-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="w-full max-w-md space-y-5 rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+            <h1 className="text-2xl font-semibold text-foreground dark:text-slate-50">
               Sign in
             </h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-1 text-sm text-muted-foreground dark:text-slate-300">
               Admins authenticate an emailed link.
             </p>
           </div>
           {featureEmailLogin ? (
-            <div className="space-y-2 rounded-md border border-slate-100 bg-slate-50 p-4 text-sm">
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
+            <div className="space-y-2 rounded-md border border-border bg-background p-4 text-sm">
+              <p className="font-semibold text-foreground dark:text-slate-200">
                 Email Magic Link
               </p>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground dark:text-slate-400">
                 {emailStatus}
               </p>
               <input
@@ -233,7 +233,7 @@ export default function AdminLoginClient({
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 placeholder="you@example.com"
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground outline-hidden transition focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               />
               <button
                 type="button"
@@ -243,7 +243,7 @@ export default function AdminLoginClient({
                 Send Magic Link
               </button>
               {verificationStatus ? (
-                <p className="text-xs text-slate-500">{verificationStatus}</p>
+                <p className="text-xs text-muted-foreground">{verificationStatus}</p>
               ) : null}
             </div>
           ) : null}
@@ -261,7 +261,7 @@ export default function AdminLoginClient({
                 onChange={(e) => setDevLoginToken(e.target.value)}
                 type="password"
                 placeholder="Dev login token"
-                className="w-full rounded-md border border-yellow-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-yellow-400 dark:border-yellow-600 dark:bg-yellow-800 dark:text-slate-100"
+                className="w-full rounded-md border border-yellow-200 bg-card px-3 py-2 text-sm text-foreground outline-hidden transition focus:border-yellow-400 dark:border-yellow-600 dark:bg-yellow-800 dark:text-slate-100"
               />
               <button
                 type="button"
@@ -269,7 +269,7 @@ export default function AdminLoginClient({
                 disabled={
                   devLoginLoading || !devLoginToken || !normalizedEmail
                 }
-                className="w-full rounded-md bg-yellow-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-yellow-600 disabled:opacity-60"
+                className="w-full rounded-md bg-yellow-500 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-yellow-600 disabled:opacity-60"
               >
                 {devLoginLoading
                   ? "Starting dev session…"
@@ -283,19 +283,19 @@ export default function AdminLoginClient({
             </div>
           )}
           {!featureEmailLogin && !devLoginEnabled ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Admin login is currently disabled; reach out to your admin to
               unblock.
             </p>
           ) : null}
           {mounted && firebaseInitError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-400/50 dark:bg-red-900/30 dark:text-red-100">
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-destructive dark:border-red-400/50 dark:bg-red-900/30 dark:text-red-100">
               Firebase web config is missing. Add NEXT_PUBLIC_FIREBASE_* vars to
               .env.local and restart.
             </div>
           ) : null}
           {enableMemberLogin && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-muted-foreground dark:text-slate-400">
               Member?{" "}
               <a href={`/login`} className="text-primary">
                 Use member login
@@ -307,7 +307,7 @@ export default function AdminLoginClient({
       {isMagicLinkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 sm:px-8">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
             aria-hidden="true"
           />
           <div
@@ -332,7 +332,7 @@ export default function AdminLoginClient({
               <button
                 type="button"
                 onClick={() => setIsMagicLinkModalOpen(false)}
-                className="inline-flex items-center rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-primary/40 transition hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="inline-flex items-center rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-primary/40 transition hover:bg-primary/90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 Close
               </button>

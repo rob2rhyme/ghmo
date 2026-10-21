@@ -12,7 +12,7 @@ export default function TemplateTabs({ tabs, activeTabId, onTabChange }: Templat
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-slate-500">Templates</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Templates</p>
         <span className="text-xs text-slate-400">Choose one</span>
       </div>
       <div className="flex gap-2 overflow-x-auto whitespace-nowrap px-1">
@@ -25,8 +25,8 @@ export default function TemplateTabs({ tabs, activeTabId, onTabChange }: Templat
               onClick={() => onTabChange(tab.id)}
               className={`flex-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${
                 active
-                  ? "border-primary bg-primary/10 text-primary shadow-sm"
-                  : "border-slate-200 bg-white text-slate-800 hover:border-primary/60"
+                  ? "border-primary bg-primary/10 text-primary shadow-xs"
+                  : "border-border bg-card text-foreground hover:border-primary/60"
               }`}
             >
               {tab.title}

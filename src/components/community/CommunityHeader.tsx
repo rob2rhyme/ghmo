@@ -20,7 +20,7 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
   const showAdmin = !loading && isAdmin;
   const showSignOut = !loading && isAuthenticated;
   return (
-    <header className="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
+    <header className="border-b border-border bg-white/80 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-2.5 py-3 md:px-6 md:py-4">
         <Link href="/" className="flex items-center gap-3 text-primary">
           <Image
@@ -42,7 +42,7 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
           <span className="hidden text-lg font-semibold md:inline">{label}</span>
           <span className="sr-only">Greater Harrisburg Magar Organization</span>
         </Link>
-        <nav className="hidden items-center gap-4 text-sm text-slate-700 dark:text-slate-200 md:flex">
+        <nav className="hidden items-center gap-4 text-sm text-foreground/80 dark:text-slate-200 md:flex">
           <div className="flex items-center gap-4">
             <Link href="/">Home</Link>
             <Link href="/donate">Donate</Link>
@@ -57,7 +57,7 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
             {showSignOut ? <SignOutButton /> : null}
           </div>
         </nav>
-        <nav className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-200 md:hidden">
+        <nav className="flex items-center gap-4 text-sm text-foreground/80 dark:text-slate-200 md:hidden">
           <div className="flex items-center gap-3">
             <Link href="/">Home</Link>
             <Link href="/donate">Donate</Link>

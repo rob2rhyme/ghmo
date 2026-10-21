@@ -2,10 +2,10 @@ export default function OnboardingDocPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-4 px-6 py-10">
       <h1 className="text-3xl font-bold">Community Operations</h1>
-      <p className="text-slate-600">
+      <p className="text-muted-foreground">
         This deployment is a single community instance for the Greater Harrisburg Magar Organization. Configure Firebase, GoFundMe Pro, and social handles via env vars, then manage content and meeting minutes from Admin. The full roadmap and security plan live in docs/PROJECT_PLAN.md.
       </p>
-      <ul className="list-disc space-y-2 pl-5 text-slate-700">
+      <ul className="list-disc space-y-2 pl-5 text-foreground/80">
         <li>Define environment variables before running the app (Firebase client + admin, GoFundMe Pro secrets, social URLs).</li>
         <li>
           Set `FEATURE_EMAIL_ADMIN_LOGIN=true`. Admins sign in with an email magic link at `/admin/login` (PIN login

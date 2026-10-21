@@ -15,17 +15,17 @@ export default function AdminSectionCard({
   children,
   className
 }: AdminSectionCardProps) {
-  const classes = ["rounded-2xl border border-slate-200 bg-white p-5 shadow-sm", className]
+  const classes = ["rounded-2xl border border-border bg-card p-5 shadow-xs", className]
     .filter(Boolean)
     .join(" ");
 
   return (
     <section className={classes}>
       {(title || description || actions) && (
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
           <div>
-            {title ? <h2 className="text-lg font-semibold text-slate-900">{title}</h2> : null}
-            {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+            {title ? <h2 className="text-lg font-semibold text-foreground">{title}</h2> : null}
+            {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
           </div>
           {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
         </div>

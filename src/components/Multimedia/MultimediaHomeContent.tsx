@@ -31,10 +31,10 @@ export default async function MultimediaHomeContent() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-2 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <header className="space-y-2 rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <p className="text-sm uppercase tracking-wide text-primary/80">Multimedia</p>
         <h1 className="text-3xl font-bold">Stories & Highlights</h1>
-        <p className="text-slate-600 dark:text-slate-300">
+        <p className="text-muted-foreground dark:text-slate-300">
           Aggregated social content across Facebook, YouTube, TikTok, and Instagram. API-ready when tokens are present; graceful
           embeds otherwise.
         </p>
