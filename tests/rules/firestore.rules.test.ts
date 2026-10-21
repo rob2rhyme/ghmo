@@ -76,7 +76,7 @@ describe("admin access requires an active admin record", () => {
 });
 
 describe("server-only collections", () => {
-  it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
+  it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "e2ee/state", "e2ee/state/devices/d1", "e2ee/state/wraps/1_recovery", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
     "denies client access to %s, even for admins",
     async path => {
       await assertFails(getDoc(doc(admin(), `${ORG}/${path}`)));

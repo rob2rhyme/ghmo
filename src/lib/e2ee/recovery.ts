@@ -10,7 +10,7 @@
  * encoding the 32-byte private scalar plus a 2-byte checksum to catch typos.
  */
 import { bytesEqual, concatBytes, toBase64Url, fromBase64Url } from "./encoding";
-import { ECDH_PARAMS, exportPublicJwk, type PublicJwk } from "./keys";
+import { ECDH_PARAMS, exportPublicJwk, unwrapWithPrivateKey, wrapToPublicKey, type KeyWrap, type PublicJwk } from "./keys";
 
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -123,4 +123,25 @@ export function pickVerificationGroups(count = 2): number[] {
     if (picks.size === count) break;
   }
   return [...picks].sort((a, b) => a - b);
+}
+
+const RECOVERY_CHECK_CONTEXT = "ghmo-e2ee/recovery-check/v1";
+
+/**
+ * Proof-of-possession for the recovery key. A random token is wrapped to the
+ * recovery public key; the server keeps only its SHA-256. Unwrapping the token
+ * (possible only with the paper key) and sending it back proves possession, so a
+ * device can be activated "by recovery key" without another admin.
+ */
+export async function createRecoveryCheck(recoveryPublic: PublicJwk) {
+  const token = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(token);
+  const wrap = await wrapToPublicKey(token, recoveryPublic, RECOVERY_CHECK_CONTEXT);
+  const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", token));
+  return { wrap, tokenHash: [...digest].map(b => b.toString(16).padStart(2, "0")).join("") };
+}
+
+/** Answers the recovery check with the recovery private key (returns the token, base64url). */
+export async function answerRecoveryCheck(wrap: KeyWrap, recoveryPrivate: CryptoKey): Promise<string> {
+  return toBase64Url(await unwrapWithPrivateKey(wrap, recoveryPrivate, RECOVERY_CHECK_CONTEXT));
 }

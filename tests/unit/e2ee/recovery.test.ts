@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  answerRecoveryCheck,
+  createRecoveryCheck,
   epochWrapContext,
   formatRecoveryKey,
   generateRecoveryKey,
@@ -65,5 +67,20 @@ describe("recovery key unwraps workspace keys", () => {
     );
     await expect(attempt).rejects.toThrow();
     await expect(importRecoveryPrivateKey(other.printable, recovery.publicJwk)).rejects.toThrow(/doesn't belong/);
+  });
+});
+
+describe("recovery key proof-of-possession", () => {
+  it("only the paper key can answer the check, and the answer matches the stored hash", async () => {
+    const recovery = await generateRecoveryKey();
+    const check = await createRecoveryCheck(recovery.publicJwk);
+    const token = await answerRecoveryCheck(check.wrap, await importRecoveryPrivateKey(recovery.printable, recovery.publicJwk));
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Buffer.from(token, "base64url")));
+    expect([...digest].map(b => b.toString(16).padStart(2, "0")).join("")).toBe(check.tokenHash);
+
+    const other = await generateRecoveryKey();
+    const otherCheck = await createRecoveryCheck(other.publicJwk);
+    const mine = await importRecoveryPrivateKey(recovery.printable, recovery.publicJwk);
+    await expect(answerRecoveryCheck(otherCheck.wrap, mine)).rejects.toThrow();
   });
 });
