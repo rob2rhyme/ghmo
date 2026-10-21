@@ -1,10 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // The admin custom claim is permanent on a Firebase user, so it is not enough on
+    // its own: the admin record must also exist and be active. Disabling an admin in
+    // organizations/ghmo/admins/{uid} therefore cuts off database access immediately.
+    function hasActiveAdminRecord() {
+      let adminPath = /databases/$(database)/documents/organizations/ghmo/admins/$(request.auth.uid);
+      return exists(adminPath) && get(adminPath).data.status == "active";
+    }
+
+    // Admin data needs a passkey-backed token (plan decision D2). Tokens are minted by
+    // /api/auth/firebase-custom-token, which copies the session's `authMethod` claim. "dev" is
+    // only ever issued by the local dev bypass, which is disabled in production.
+    function hasStrongAuth() {
+      return request.auth.token.authMethod == "passkey" || request.auth.token.authMethod == "dev";
+    }
+
     function isAdmin() {
       return request.auth != null &&
         (request.auth.token.communityId == "ghmo-site" || request.auth.token.orgSlug == "ghmo") &&
-        (request.auth.token.role == "admin" || request.auth.token.admin == true);
+        (request.auth.token.role == "admin" || request.auth.token.admin == true) &&
+        hasStrongAuth() &&
+        hasActiveAdminRecord();
     }
 
     function isMember() {
@@ -34,10 +51,6 @@ service cloud.firestore {
     }
 
     match /organizations/{orgSlug}/docgen/{doc=**} {
-      allow read, write: if isAdmin();
-    }
-
-    match /organizations/{orgSlug}/pins/{doc=**} {
       allow read, write: if isAdmin();
     }
 

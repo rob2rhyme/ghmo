@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMember } from "@/src/lib/auth";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { COMMUNITY_ID } from "@/src/lib/community";
 import { eventsCollectionPath, ensureOrgSlug, normalizeEvent, DEFAULT_TIMEZONE } from "@/src/lib/events";
-import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
 
     const buffer = await renderEventPdf(event);
     const fileName = `${event.title || "Event"} Announcement.pdf`;
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
@@ -97,6 +97,6 @@ async function renderEventPdf(event: any): Promise<Uint8Array> {
     </Document>
   );
 
-  const buffer = (await pdf(doc).toBuffer()) as unknown as Uint8Array;
+  const buffer = await renderToBuffer(doc);
   return buffer;
 }

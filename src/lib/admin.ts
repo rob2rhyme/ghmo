@@ -1,8 +1,8 @@
 //src/lib/admin.ts
 import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
 import { getAdminDb } from "./firebaseAdmin";
-import { AuthContext, getAuthContextFromRequest, SESSION_COOKIE_NAME, SESSION_COOKIE_NAME_FALLBACK } from "./auth";
+import { AuthContext, AuthMethod, getAuthContextFromRequest } from "./auth";
+import { isDevLoginAllowed } from "./security/devLogin";
 import { COMMUNITY_SLUG } from "./community";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "./firestorePaths";
 export type AdminProfile = {
@@ -16,7 +16,6 @@ export type AdminProfile = {
   createdBy?: string;
   lastLoginAt?: Date;
   lastLogoutAt?: Date;
-  pinId?: string;
   authUid?: string;
 };
 
@@ -57,7 +56,6 @@ function mapAdminDoc(id: string, data: Record<string, unknown>): AdminProfile {
     createdBy: data.createdBy as string | undefined,
     lastLoginAt: toDate(data.lastLoginAt),
     lastLogoutAt: toDate(data.lastLogoutAt),
-    pinId: data.pinId as string | undefined,
     authUid: data.authUid as string | undefined
   };
 }
@@ -68,43 +66,44 @@ function isNextRequest(value: AdminAuthInput): value is NextRequest {
   return Boolean(value && typeof (value as NextRequest).headers?.get === "function");
 }
 
-export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string = COMMUNITY_SLUG) {
-  let ctx: AuthContext | null = null;
-  let cookieName: string | null = null;
+/**
+ * True when the session counts as strong admin authentication: a passkey sign-in,
+ * or the local dev bypass outside production.
+ */
+export function isStrongAdminAuth(authMethod: AuthMethod | null): boolean {
+  if (authMethod === "passkey") return true;
+  return authMethod === "dev" && isDevLoginAllowed(process.env);
+}
 
-  if (isNextRequest(input)) {
-    ctx = await getAuthContextFromRequest(input);
-    cookieName = input.cookies.get(SESSION_COOKIE_NAME) ? SESSION_COOKIE_NAME : input.cookies.get(SESSION_COOKIE_NAME_FALLBACK) ? SESSION_COOKIE_NAME_FALLBACK : null;
-  } else {
-    ctx = input ?? null;
-    if (!ctx) {
-      ctx = await getAuthContextFromRequest();
-    }
-    const cookieStore = await cookies();
-    cookieName = cookieStore.get(SESSION_COOKIE_NAME) ? SESSION_COOKIE_NAME : cookieStore.get(SESSION_COOKIE_NAME_FALLBACK) ? SESSION_COOKIE_NAME_FALLBACK : null;
-  }
+type RequireAdminOptions = {
+  /**
+   * Accept a magic-link session. Only for passkey setup/recovery, sign-out and
+   * session status. Everything else requires a passkey session (plan D2).
+   */
+  allowMagicLink?: boolean;
+};
 
-  if (process.env.NODE_ENV !== "production") {
-    console.debug("requireActiveAdmin resolving context", {
-      orgSlug,
-      cookieUsed: cookieName,
-      hasContext: Boolean(ctx),
-      ctx: ctx
-        ? { uid: ctx.uid, orgSlug: ctx.orgSlug, role: ctx.role, emailLower: ctx.emailLower }
-        : null
-    });
-  }
+export async function requireActiveAdmin(
+  input?: AdminAuthInput,
+  orgSlug: string = COMMUNITY_SLUG,
+  options: RequireAdminOptions = {}
+) {
+  const ctx: AuthContext | null = isNextRequest(input)
+    ? await getAuthContextFromRequest(input)
+    : (input ?? (await getAuthContextFromRequest()));
 
   if (!ctx) throw new AdminAccessError(401, "Unauthorized", "NO_CONTEXT");
   if (!ctx.orgSlug) throw new AdminAccessError(403, "Organization missing", "ORGSLUG_MISSING");
   if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "Organization mismatch", "ORGSLUG_MISMATCH");
   const docPath = orgAdminDocPath(orgSlug, ctx.uid);
-  console.debug("requireActiveAdmin checking doc", { docPath, uid: ctx.uid });
   const doc = await getAdminDb().doc(docPath).get();
   if (!doc || !doc.exists) throw new AdminAccessError(403, "Admin profile not found", "ADMIN_DOC_NOT_FOUND");
   const profile = mapAdminDoc(doc.id, doc.data() as Record<string, unknown>);
   if (profile.status !== "active")
     throw new AdminAccessError(403, "Admin is disabled", "ADMIN_INACTIVE");
+  if (!isStrongAdminAuth(ctx.authMethod) && !options.allowMagicLink) {
+    throw new AdminAccessError(403, "Sign in with your passkey to continue", "PASSKEY_REQUIRED");
+  }
 
   const actor: AdminActor = {
     uid: ctx.uid,
@@ -115,7 +114,7 @@ export async function requireActiveAdmin(input?: AdminAuthInput, orgSlug: string
     adminDocId: profile.id
   };
 
-  return { actor, admin: profile };
+  return { actor, admin: profile, authMethod: ctx.authMethod };
 }
 
 export async function getAdminProfile(orgSlug: string, adminId: string) {
@@ -125,11 +124,12 @@ export async function getAdminProfile(orgSlug: string, adminId: string) {
 }
 
 export async function listAdmins(orgSlug: string) {
-  const snapshot = await getAdminDb()
-    .collection(orgAdminsCollectionPath(orgSlug))
-    .orderBy("createdAt", "asc")
-    .get();
-  return snapshot.docs.map(doc => mapAdminDoc(doc.id, doc.data() as Record<string, unknown>));
+  // No orderBy: Firestore silently drops documents that lack the sort field
+  // (e.g. admins added by hand in the console). Sort in memory instead.
+  const snapshot = await getAdminDb().collection(orgAdminsCollectionPath(orgSlug)).get();
+  return snapshot.docs
+    .map(doc => mapAdminDoc(doc.id, doc.data() as Record<string, unknown>))
+    .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
 }
 
 export function isSuperAdmin(admin: AdminProfile) {

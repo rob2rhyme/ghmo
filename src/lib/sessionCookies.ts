@@ -1,39 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, SESSION_COOKIE_NAME_FALLBACK } from "./auth";
+import "server-only";
+import { NextResponse } from "next/server";
+import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "./auth";
+import { getAdminAuth } from "./firebaseAdmin";
 
-const DEFAULT_MAX_AGE = 60 * 60; // 1 hour
+/** Admin and member sessions last 8 hours, then a fresh magic-link sign-in is needed. */
+export const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 
-function computeSecureFlag(req?: NextRequest) {
-  const isProd = process.env.NODE_ENV === "production";
-  const forwardedProto = req?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
-  const requestProto = req?.nextUrl?.protocol?.replace(":", "");
-  const isHttps = forwardedProto === "https" || requestProto === "https";
-  return isProd && Boolean(isHttps);
+function cookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    // Always Secure in production, regardless of proxy headers (S-09).
+    secure: process.env.NODE_ENV === "production",
+    // Lax keeps the cookie off cross-site POSTs (CSRF) while still allowing
+    // admins to open /admin links from email.
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge
+  };
 }
 
-export function createSessionResponse(
-  req: NextRequest | undefined,
-  idToken: string,
-  payload: Record<string, unknown> = { ok: true }
-) {
-  const secure = computeSecureFlag(req);
-  const cookieOptions = {
-    httpOnly: true,
-    secure,
-    sameSite: "lax" as const,
-    path: "/" as const,
-    maxAge: DEFAULT_MAX_AGE
-  };
-
-  const response = NextResponse.json(payload);
-  response.cookies.set(SESSION_COOKIE_NAME, idToken, cookieOptions);
-  response.cookies.set(SESSION_COOKIE_NAME_FALLBACK, idToken, cookieOptions);
-  console.debug("Session cookies attached", {
-    secure: cookieOptions.secure,
-    sameSite: cookieOptions.sameSite,
-    path: cookieOptions.path,
-    maxAge: cookieOptions.maxAge,
-    url: req?.url
+/**
+ * Exchanges a fresh Firebase ID token (signed in within the last 5 minutes) for a
+ * revocable Firebase session cookie and attaches it to a JSON response.
+ */
+export async function createSessionResponse(idToken: string, payload: Record<string, unknown> = { ok: true }) {
+  const sessionCookie = await getAdminAuth().createSessionCookie(idToken, {
+    expiresIn: SESSION_MAX_AGE_SECONDS * 1000
   });
+  const response = NextResponse.json(payload);
+  response.cookies.set(SESSION_COOKIE_NAME, sessionCookie, cookieOptions(SESSION_MAX_AGE_SECONDS));
+  response.cookies.set(LEGACY_SESSION_COOKIE_NAME, "", cookieOptions(0));
+  return response;
+}
+
+export function clearSessionCookies(response: NextResponse) {
+  response.cookies.set(SESSION_COOKIE_NAME, "", cookieOptions(0));
+  response.cookies.set(LEGACY_SESSION_COOKIE_NAME, "", cookieOptions(0));
   return response;
 }

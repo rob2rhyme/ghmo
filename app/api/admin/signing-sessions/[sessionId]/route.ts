@@ -3,7 +3,7 @@ import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
-import { decryptSignature, toPngDataUrl } from "@/src/lib/signatureEncryption";
+import { decryptSignature, isValidSigningSessionId, toPngDataUrl } from "@/src/lib/signatureEncryption";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
 
   try {
     await requireActiveAdmin(req, COMMUNITY_SLUG);
+    if (!isValidSigningSessionId(params.sessionId)) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
     const sessionRef = getAdminDb().collection("signingSessions").doc(params.sessionId);
     const snapshot = await sessionRef.get();
     if (!snapshot.exists) {
@@ -55,7 +58,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
 
     const includeSignature = req.nextUrl.searchParams.get("includeSignature") === "1";
     if (includeSignature && data.status === "signed" && data.signatureEnc) {
-      const decrypted = decryptSignature(data.signatureEnc);
+      const decrypted = decryptSignature(data.signatureEnc, params.sessionId);
       responsePayload.signatureDataUrl = toPngDataUrl(decrypted);
     }
 

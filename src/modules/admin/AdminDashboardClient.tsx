@@ -58,7 +58,6 @@ const statusHelperText: Record<MinutesStatus, string> = {
   submitted: "Submitted minutes are awaiting approval.",
   approved: "Approved minutes are locked until you return them to draft."
 };
-const SHOW_HOME_CONTENT_BLOCKS = false;
 const SHOW_WEBHOOK_EVENTS = false;
 
 export default function AdminDashboardClient({
@@ -66,12 +65,9 @@ export default function AdminDashboardClient({
   stats,
   webhookEvents,
   auditLogs,
-  blocks,
   minutes,
   adminActor
 }: AdminDashboardProps) {
-  const [blockText, setBlockText] = useState(JSON.stringify(blocks, null, 2));
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [reconcileStatus, setReconcileStatus] = useState<string | null>(null);
 
   const [events, setEvents] = useState<AdminEvent[]>([]);
@@ -93,21 +89,6 @@ export default function AdminDashboardClient({
   const [attendanceExpanded, setAttendanceExpanded] = useState(false);
   const [signaturesExpanded, setSignaturesExpanded] = useState(false);
   const [previewZoomMode, setPreviewZoomMode] = useState<PreviewZoomMode>("fit");
-
-  const saveBlocks = async () => {
-    try {
-      setSaveStatus("Saving...");
-      const parsed = JSON.parse(blockText);
-      await fetch("/api/admin/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blocks: parsed })
-      });
-      setSaveStatus("Saved");
-    } catch (err: any) {
-      setSaveStatus(`Error: ${err.message}`);
-    }
-  };
 
   useEffect(() => {
     let isActive = true;
@@ -494,16 +475,16 @@ export default function AdminDashboardClient({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
-            <p className="text-sm text-slate-600">{community.name}</p>
+            <p className="text-sm text-muted-foreground">{community.name}</p>
           </div>
           <div className="flex gap-2">
             <a
               href="/admin/events"
-              className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:border-primary/50"
+              className="rounded-md border border-border px-3 py-2 text-sm font-semibold text-foreground hover:border-primary/50"
             >
               Events
             </a>
@@ -515,7 +496,7 @@ export default function AdminDashboardClient({
             </button>
           </div>
         </div>
-        {reconcileStatus ? <p className="mt-2 text-sm text-slate-600">{reconcileStatus}</p> : null}
+        {reconcileStatus ? <p className="mt-2 text-sm text-muted-foreground">{reconcileStatus}</p> : null}
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard label="Raised" value={`$${(stats.totalRaised || 0).toLocaleString()}`} />
           <StatCard label="Goal" value={`$${(stats.goal || 0).toLocaleString()}`} />
@@ -525,16 +506,16 @@ export default function AdminDashboardClient({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
                   {editingId ? "Update Meeting Minutes" : "Add Meeting Minutes"}
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold text-slate-900">
+                <h2 className="mt-1 text-2xl font-semibold text-foreground">
                   {selectedEvent?.title || displayEventTitle || "Create minutes"}
                 </h2>
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Link structured minutes to a past event. Admin-only governance tool.
                 </p>
                 {editingEntry ? (
@@ -544,14 +525,14 @@ export default function AdminDashboardClient({
                     >
                       {minutesStatusLabels[editingStatus]}
                     </span>
-                    <p className="text-xs text-slate-500">{statusHelperText[editingStatus]}</p>
+                    <p className="text-xs text-muted-foreground">{statusHelperText[editingStatus]}</p>
                   </div>
                 ) : null}
               </div>
               {editingId ? (
                 <button
                   onClick={cancelMinutesEdit}
-                  className="whitespace-nowrap rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-primary hover:text-slate-900"
+                  className="whitespace-nowrap rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 hover:border-primary hover:text-foreground"
                   type="button"
                 >
                   Cancel edit
@@ -561,9 +542,9 @@ export default function AdminDashboardClient({
           </div>
 
           <fieldset disabled={isApproved} className="space-y-5">
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>📋</span>
                   <span>Event & Meeting metadata</span>
                 </div>
@@ -571,9 +552,9 @@ export default function AdminDashboardClient({
               </div>
               <div className="space-y-4 px-5 py-5">
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Event</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event</label>
                   <select
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                     value={formState.eventId}
                     onChange={e => setFormState(prev => ({ ...prev, eventId: e.target.value }))}
                     disabled={Boolean(editingId)}
@@ -586,24 +567,24 @@ export default function AdminDashboardClient({
                     ))}
                   </select>
                   {eventsLoading ? (
-                    <p className="text-xs text-slate-500">Loading past events...</p>
+                    <p className="text-xs text-muted-foreground">Loading past events...</p>
                   ) : eventsError ? (
-                    <p className="text-xs text-red-500">{eventsError}</p>
+                    <p className="text-xs text-destructive">{eventsError}</p>
                   ) : pastEvents.length === 0 ? (
-                    <p className="text-xs text-slate-500">No past events available yet.</p>
+                    <p className="text-xs text-muted-foreground">No past events available yet.</p>
                   ) : null}
                 </div>
                 {displayEventTitle ? (
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    <p className="font-semibold text-slate-900">{displayEventTitle}</p>
+                  <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                    <p className="font-semibold text-foreground">{displayEventTitle}</p>
                     <p>{displayEventDate ?? "Date unavailable"}</p>
                   </div>
                 ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting Type</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting Type</label>
                     <select
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={formState.meetingType}
                       onChange={e =>
                         setFormState(prev => ({ ...prev, meetingType: e.target.value as MeetingMinutesFormInput["meetingType"] }))
@@ -617,18 +598,18 @@ export default function AdminDashboardClient({
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chaired by</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chaired by</label>
                     <input
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={formState.chairedBy}
                       onChange={e => setFormState(prev => ({ ...prev, chairedBy: e.target.value }))}
                       placeholder="Optional chair"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recorded by</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recorded by</label>
                     <input
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 focus:outline-none"
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground focus:outline-hidden"
                       value={adminRecordedBy}
                       readOnly
                     />
@@ -637,9 +618,9 @@ export default function AdminDashboardClient({
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>📝</span>
                   <span>Agenda items</span>
                 </div>
@@ -652,14 +633,14 @@ export default function AdminDashboardClient({
                 </button>
               </div>
               <div className="space-y-3 px-5 py-5">
-                <p className="text-xs text-slate-500">Capture the flow of the meeting for reference.</p>
+                <p className="text-xs text-muted-foreground">Capture the flow of the meeting for reference.</p>
                 {formState.agenda.map((item, index) => (
                   <div
                     key={`agenda-${index}`}
-                    className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                    className="flex items-start gap-3 rounded-2xl border border-border bg-background p-3"
                   >
                     <input
-                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={item}
                       onChange={e => updateTextList("agenda", index, e.target.value)}
                       placeholder="Agenda item"
@@ -667,7 +648,7 @@ export default function AdminDashboardClient({
                     <button
                       type="button"
                       onClick={() => removeTextListEntry("agenda", index)}
-                      className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                      className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                     >
                       ×
                     </button>
@@ -676,9 +657,9 @@ export default function AdminDashboardClient({
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>💬</span>
                   <span>Discussion summary</span>
                 </div>
@@ -686,7 +667,7 @@ export default function AdminDashboardClient({
               </div>
               <div className="px-5 py-5">
                 <textarea
-                  className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                  className="w-full rounded-2xl border border-border px-3 py-3 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                   value={formState.discussionSummary}
                   onChange={e => setFormState(prev => ({ ...prev, discussionSummary: e.target.value }))}
                   rows={4}
@@ -695,9 +676,9 @@ export default function AdminDashboardClient({
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>✅</span>
                   <span>Decisions / motions</span>
                 </div>
@@ -710,14 +691,14 @@ export default function AdminDashboardClient({
                 </button>
               </div>
               <div className="space-y-3 px-5 py-5">
-                <p className="text-xs text-slate-500">Capture each motion or decision for historical context.</p>
+                <p className="text-xs text-muted-foreground">Capture each motion or decision for historical context.</p>
                 {formState.decisions.map((item, index) => (
                   <div
                     key={`decision-${index}`}
-                    className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                    className="flex items-start gap-3 rounded-2xl border border-border bg-background p-3"
                   >
                     <input
-                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={item}
                       onChange={e => updateTextList("decisions", index, e.target.value)}
                       placeholder="Decision"
@@ -725,7 +706,7 @@ export default function AdminDashboardClient({
                     <button
                       type="button"
                       onClick={() => removeTextListEntry("decisions", index)}
-                      className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                      className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                     >
                       ×
                     </button>
@@ -734,9 +715,9 @@ export default function AdminDashboardClient({
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>🧭</span>
                   <span>Action items</span>
                 </div>
@@ -749,12 +730,12 @@ export default function AdminDashboardClient({
                 </button>
               </div>
               <div className="space-y-3 px-5 py-5">
-                <p className="text-xs text-slate-500">Assign follow ups with owners and due dates.</p>
+                <p className="text-xs text-muted-foreground">Assign follow ups with owners and due dates.</p>
                 {formState.actionItems.map((item, index) => (
-                  <div key={`action-${index}`} className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <div key={`action-${index}`} className="space-y-3 rounded-2xl border border-border bg-background p-4">
                     <div className="flex items-start gap-3">
                       <input
-                        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                        className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                         value={item.task}
                         onChange={e => updateActionItem(index, "task", e.target.value)}
                         placeholder="Task"
@@ -762,21 +743,21 @@ export default function AdminDashboardClient({
                       <button
                         type="button"
                         onClick={() => removeActionItem(index)}
-                        className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                        className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                       >
                         ×
                       </button>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <input
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                        className="rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                         value={item.assignedTo}
                         onChange={e => updateActionItem(index, "assignedTo", e.target.value)}
                         placeholder="Assigned to (optional)"
                       />
                       <input
                         type="date"
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                        className="rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                         value={item.dueDate || ""}
                         onChange={e => updateActionItem(index, "dueDate", e.target.value)}
                       />
@@ -786,11 +767,11 @@ export default function AdminDashboardClient({
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
               <button
                 type="button"
                 onClick={() => setAttendanceExpanded(prev => !prev)}
-                className="flex w-full items-center justify-between px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                className="flex w-full items-center justify-between px-5 py-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
               >
                 <span className="flex items-center gap-2">
                   <span aria-hidden>👥</span>
@@ -800,13 +781,13 @@ export default function AdminDashboardClient({
                 <span className="text-xs text-slate-400">{attendanceExpanded ? "Hide" : "Show"}</span>
               </button>
               {attendanceExpanded ? (
-                <div className="border-t border-slate-100 px-5 py-5">
+                <div className="border-t border-border px-5 py-5">
                   <div className="space-y-4">
                     {(["present", "absent", "guests"] as AttendanceSection[]).map(section => {
                       const rows = attendanceState[section] ?? [""];
                       return (
                         <div key={section} className="space-y-2">
-                          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             <span>
                               {section === "present" ? "Present" : section === "absent" ? "Absent" : "Guests"}
                             </span>
@@ -823,10 +804,10 @@ export default function AdminDashboardClient({
                             {rows.map((person, index) => (
                               <div
                                 key={`${section}-${index}`}
-                                className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/80 px-3 py-2"
+                                className="flex items-center gap-3 rounded-full border border-border bg-white/80 px-3 py-2"
                               >
                                 <input
-                                  className="flex-1 bg-transparent text-sm focus:outline-none"
+                                  className="flex-1 bg-transparent text-sm focus:outline-hidden"
                                   value={person}
                                   onChange={e => updateAttendanceItem(section, index, e.target.value)}
                                   placeholder="Name or role"
@@ -834,7 +815,7 @@ export default function AdminDashboardClient({
                                 <button
                                   type="button"
                                   onClick={() => removeAttendanceItem(section, index)}
-                                  className="rounded-full p-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                                  className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
                                 >
                                   ×
                                 </button>
@@ -849,11 +830,11 @@ export default function AdminDashboardClient({
               ) : null}
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section className="rounded-2xl border border-border bg-card shadow-xs">
               <button
                 type="button"
                 onClick={() => setSignaturesExpanded(prev => !prev)}
-                className="flex w-full items-center justify-between px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                className="flex w-full items-center justify-between px-5 py-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
               >
                 <span className="flex items-center gap-2">
                   <span aria-hidden>✍️</span>
@@ -863,16 +844,16 @@ export default function AdminDashboardClient({
                 <span className="text-xs text-slate-400">{signaturesExpanded ? "Hide" : "Show"}</span>
               </button>
               {signaturesExpanded ? (
-                <div className="border-t border-slate-100 px-5 py-5">
+                <div className="border-t border-border px-5 py-5">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <input
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={formState.signatures?.chairName || ""}
                       onChange={e => updateSignatureField("chairName", e.target.value)}
                       placeholder="Chair name"
                     />
                     <input
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                      className="rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                       value={formState.signatures?.secretaryName || ""}
                       onChange={e => updateSignatureField("secretaryName", e.target.value)}
                       placeholder="Secretary name"
@@ -892,15 +873,15 @@ export default function AdminDashboardClient({
                 {editingId ? "Update Minutes" : "Save Minutes"}
               </button>
             </div>
-            {minutesSaveStatus ? <p className="text-xs text-slate-600">{minutesSaveStatus}</p> : null}
+            {minutesSaveStatus ? <p className="text-xs text-muted-foreground">{minutesSaveStatus}</p> : null}
           </fieldset>
 
           {editingEntry ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status actions</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status actions</p>
+                  <p className="text-sm text-muted-foreground">
                     Submit, approve, or unlock minutes based on their workflow state.
                   </p>
                 </div>
@@ -925,33 +906,33 @@ export default function AdminDashboardClient({
                     type="button"
                     onClick={() => handleMinutesStatusAction("returnToDraft")}
                     disabled={!canReturnToDraft || isUpdatingStatus}
-                    className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Return to draft
                   </button>
                 </div>
               </div>
               <div className="space-y-1 mt-3">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Approval notes</label>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approval notes</label>
                 <textarea
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring focus:ring-primary/20"
+                  className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
                   value={approvalNotesInput}
                   onChange={e => setApprovalNotesInput(e.target.value)}
                   rows={3}
                   placeholder="Optional context for approvers"
                 />
               </div>
-              {statusActionStatus ? <p className="mt-2 text-xs text-slate-500">{statusActionStatus}</p> : null}
+              {statusActionStatus ? <p className="mt-2 text-xs text-muted-foreground">{statusActionStatus}</p> : null}
             </div>
           ) : null}
         </div>
 
         <div className="space-y-5">
           <div className="sticky top-6 space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="rounded-2xl border border-border bg-background p-5 shadow-xs">
+              <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <span aria-hidden>🧾</span>
                     <span>Live preview</span>
                   </div>
@@ -965,7 +946,7 @@ export default function AdminDashboardClient({
                     className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
                       previewZoomMode === "fit"
                         ? "bg-slate-900 text-white"
-                        : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                        : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                     }`}
                   >
                     Fit
@@ -976,7 +957,7 @@ export default function AdminDashboardClient({
                     className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
                       previewZoomMode === "100"
                         ? "bg-slate-900 text-white"
-                        : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                        : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                     }`}
                   >
                     100%
@@ -992,7 +973,7 @@ export default function AdminDashboardClient({
                   className="min-h-[520px] sm:min-h-[620px] lg:min-h-[720px] w-full"
                 />
               </div>
-              {minutesExportStatus ? <p className="mt-3 text-xs text-slate-500">{minutesExportStatus}</p> : null}
+              {minutesExportStatus ? <p className="mt-3 text-xs text-muted-foreground">{minutesExportStatus}</p> : null}
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
@@ -1006,7 +987,7 @@ export default function AdminDashboardClient({
                   type="button"
                   onClick={() => handleMinutesExport("jpeg")}
                   disabled={!formState.eventId || isExportingMinutes || !previewReady}
-                  className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Download Minutes JPEG
                 </button>
@@ -1017,18 +998,18 @@ export default function AdminDashboardClient({
       </div>
 
       <div className="mt-4 space-y-3 border-t pt-3">
-        <h3 className="text-sm font-semibold text-slate-900">Recorded meeting minutes</h3>
+        <h3 className="text-sm font-semibold text-foreground">Recorded meeting minutes</h3>
         {sortedMinutesEntries.length === 0 ? (
-          <p className="text-xs text-slate-500">No minutes recorded yet.</p>
+          <p className="text-xs text-muted-foreground">No minutes recorded yet.</p>
         ) : (
           sortedMinutesEntries.map(entry => {
             const attendanceSummary = formatAttendanceSummary(entry.attendance);
             return (
-              <div key={entry.id} className="rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm shadow-sm">
+              <div key={entry.id} className="rounded-2xl border border-border bg-white/90 p-4 text-sm shadow-xs">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-slate-900">{entry.eventTitle}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="font-semibold text-foreground">{entry.eventTitle}</p>
+                    <p className="text-xs text-muted-foreground">
                       {entry.meetingType} •{" "}
                       {entry.eventDate ? new Date(entry.eventDate).toLocaleString() : "Date unavailable"}
                     </p>
@@ -1048,7 +1029,7 @@ export default function AdminDashboardClient({
                     {minutesStatusLabels[entry.status]}
                   </span>
                 </div>
-                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                   {entry.submittedAt ? (
                     <p>
                       Submitted by {resolveActorLabel({ roles: ["admin"] })} • {formatTimestamp(entry.submittedAt)}
@@ -1064,8 +1045,8 @@ export default function AdminDashboardClient({
                 </div>
                 {entry.decisions.length ? (
                   <div className="mt-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Decisions</p>
-                    <ul className="list-disc space-y-1 pl-5 text-xs text-slate-700">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Decisions</p>
+                    <ul className="list-disc space-y-1 pl-5 text-xs text-foreground/80">
                       {entry.decisions.map((decision, idx) => (
                         <li key={`${entry.id}-decision-${idx}`}>{decision}</li>
                       ))}
@@ -1074,8 +1055,8 @@ export default function AdminDashboardClient({
                 ) : null}
                 {entry.actionItems.length ? (
                   <div className="mt-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Action items</p>
-                    <ul className="list-disc space-y-1 pl-5 text-xs text-slate-700">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Action items</p>
+                    <ul className="list-disc space-y-1 pl-5 text-xs text-foreground/80">
                       {entry.actionItems.map((action, idx) => (
                         <li key={`${entry.id}-action-${idx}`}>
                           {action.task}
@@ -1087,28 +1068,28 @@ export default function AdminDashboardClient({
                   </div>
                 ) : null}
                 {attendanceSummary ? (
-                  <p className="mt-2 text-xs text-slate-600">{attendanceSummary}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{attendanceSummary}</p>
                 ) : null}
                 {entry.signatures ? (
-                  <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                     {entry.signatures.chairName ? (
                       <p>
-                        <span className="font-semibold text-slate-700">Chair:</span> {entry.signatures.chairName}
+                        <span className="font-semibold text-foreground/80">Chair:</span> {entry.signatures.chairName}
                       </p>
                     ) : null}
                     {entry.signatures.secretaryName ? (
                       <p>
-                        <span className="font-semibold text-slate-700">Secretary:</span> {entry.signatures.secretaryName}
+                        <span className="font-semibold text-foreground/80">Secretary:</span> {entry.signatures.secretaryName}
                       </p>
                     ) : null}
                   </div>
                 ) : null}
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-muted-foreground">
                   Recorded by {resolveActorLabel(entry.recordedBy)} •{" "}
                   {entry.createdAt ? formatTimestamp(entry.createdAt) : "—"}
                 </p>
                 {entry.approvalNotes ? (
-                  <p className="mt-1 text-xs text-slate-500">Approval notes: {entry.approvalNotes}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Approval notes: {entry.approvalNotes}</p>
                 ) : null}
               </div>
             );
@@ -1118,37 +1099,37 @@ export default function AdminDashboardClient({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {SHOW_WEBHOOK_EVENTS && (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-lg border border-border bg-card p-5 shadow-xs">
             <h2 className="text-lg font-semibold">Webhook Events</h2>
             <ul className="mt-3 space-y-2 text-sm">
-              {webhookEvents.length === 0 ? <li className="text-slate-500">No webhook events yet.</li> : null}
+              {webhookEvents.length === 0 ? <li className="text-muted-foreground">No webhook events yet.</li> : null}
               {webhookEvents.map(evt => (
-                <li key={evt.id} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+                <li key={evt.id} className="rounded-md border border-border bg-background px-3 py-2">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">{evt.type || "event"}</span>
-                    <span className="text-xs text-slate-500">{evt.receivedAt ? new Date(evt.receivedAt.toDate?.() || evt.receivedAt).toLocaleString() : ""}</span>
+                    <span className="text-xs text-muted-foreground">{evt.receivedAt ? new Date(evt.receivedAt.toDate?.() || evt.receivedAt).toLocaleString() : ""}</span>
                   </div>
-                  <p className="text-xs text-slate-600 break-words">{evt.event_id}</p>
+                  <p className="text-xs text-muted-foreground wrap-break-word">{evt.event_id}</p>
                 </li>
               ))}
             </ul>
           </div>
         )}
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-5 shadow-xs">
           <h2 className="text-lg font-semibold">Audit Logs</h2>
           <ul className="mt-3 space-y-2 text-sm">
-            {auditLogs.length === 0 ? <li className="text-slate-500">No audit logs yet.</li> : null}
+            {auditLogs.length === 0 ? <li className="text-muted-foreground">No audit logs yet.</li> : null}
             {auditLogs.map(log => (
-              <li key={log.id} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+              <li key={log.id} className="rounded-md border border-border bg-background px-3 py-2">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">{log.summary || log.type}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-muted-foreground">
                     {log.createdAtMs ? new Date(log.createdAtMs).toLocaleString() : ""}
                   </span>
                 </div>
-                <p className="text-xs text-slate-600">Actor: {resolveActorLabel(log.actor ?? { role: log.role })}</p>
+                <p className="text-xs text-muted-foreground">Actor: {resolveActorLabel(log.actor ?? { role: log.role })}</p>
                 {log.metadata && (log.metadata.eventId || log.metadata.timelineId || log.metadata.action) ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     {log.metadata.eventId ? `Event: ${log.metadata.eventId} ` : ""}
                     {log.metadata.timelineId ? `Timeline: ${log.metadata.timelineId} ` : ""}
                     {log.metadata.action ? `Action: ${log.metadata.action}` : ""}
@@ -1165,9 +1146,9 @@ export default function AdminDashboardClient({
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3">
-      <p className="text-xs uppercase text-slate-600">{label}</p>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
+    <div className="rounded-md border border-border bg-background px-4 py-3">
+      <p className="text-xs uppercase text-muted-foreground">{label}</p>
+      <p className="text-2xl font-bold text-foreground">{value}</p>
     </div>
   );
 }

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/src/components/ui/button";
+import { signOut } from "firebase/auth";
+import { getFirebaseAuth } from "@/src/lib/firebaseClient";
 
 export default function SignOutButton() {
   const router = useRouter();
@@ -12,6 +15,13 @@ export default function SignOutButton() {
     try {
       setLoading(true);
       await fetch("/api/auth/session", { method: "DELETE" });
+      try {
+        // Also drop the browser's Firebase login (kept in IndexedDB) so this device
+        // has no admin credentials left after signing out.
+        await signOut(getFirebaseAuth());
+      } catch {
+        // Firebase client not configured on this page; server session is already gone.
+      }
       setSignedOut(true);
       window.dispatchEvent(new Event("auth:changed"));
       router.push("/");
@@ -26,12 +36,8 @@ export default function SignOutButton() {
   if (signedOut) return null;
 
   return (
-    <button
-      onClick={handleSignOut}
-      disabled={loading}
-      className="rounded-md border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-800 hover:border-primary/60 hover:text-primary disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-primary/60"
-    >
+    <Button type="button" variant="outline" size="sm" onClick={handleSignOut} loading={loading}>
       {loading ? "Signing out…" : "Sign out"}
-    </button>
+    </Button>
   );
 }

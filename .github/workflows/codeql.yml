@@ -1,0 +1,74 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      # Results stay in CI (no upload), so this works whether or not GitHub code
+      # scanning is enabled for the repository. Turning code scanning on later only
+      # adds the Security-tab view; this gate keeps working either way.
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+          upload: never
+          output: codeql-results
+      - name: Report findings (fail on error-level results)
+        run: |
+          node - <<'JS'
+          const fs = require("fs");
+          const path = require("path");
+          const dir = "codeql-results";
+          let errors = 0;
+          let total = 0;
+          for (const file of fs.readdirSync(dir).filter(f => f.endsWith(".sarif"))) {
+            const sarif = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+            for (const run of sarif.runs ?? []) {
+              const rules = new Map();
+              for (const rule of run.tool?.driver?.rules ?? []) rules.set(rule.id, rule);
+              for (const result of run.results ?? []) {
+                total += 1;
+                const rule = rules.get(result.ruleId) ?? {};
+                const level = result.level ?? rule.defaultConfiguration?.level ?? "warning";
+                const loc = result.locations?.[0]?.physicalLocation;
+                const where = loc ? `${loc.artifactLocation?.uri}:${loc.region?.startLine ?? "?"}` : "unknown location";
+                const severity = rule.properties?.["security-severity"] ?? "n/a";
+                const line = `${level.toUpperCase()} ${result.ruleId} (security-severity ${severity}) at ${where}: ${result.message?.text}`;
+                if (level === "error") {
+                  errors += 1;
+                  console.log(`::error file=${loc?.artifactLocation?.uri ?? ""},line=${loc?.region?.startLine ?? 1}::${line}`);
+                } else {
+                  console.log(line);
+                }
+              }
+            }
+          }
+          console.log(`CodeQL: ${total} finding(s), ${errors} at error level.`);
+          if (errors > 0) process.exit(1);
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-sarif
+          path: codeql-results
+          retention-days: 14

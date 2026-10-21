@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
 import AdminChatClient from "@/src/components/admin/chat/AdminChatClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -29,7 +30,9 @@ export default async function AdminChatPage() {
         title="Admin Chat"
         description="WhatsApp-style coordination for quick admin updates."
       />
-      <AdminChatClient actor={toPlain(actorInfo)} />
+      <FirebaseAdminAuthBootstrap>
+        <AdminChatClient actor={toPlain(actorInfo)} />
+      </FirebaseAdminAuthBootstrap>
     </div>
   );
 }

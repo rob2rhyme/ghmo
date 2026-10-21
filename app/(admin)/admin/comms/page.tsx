@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
 import CommsBoardClient from "@/src/components/admin/comms/CommsBoardClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -29,7 +30,9 @@ export default async function AdminCommsPage() {
         title="Plans & Issues"
         description="Governed threads for proposals, plans, and issues that require admin decisions."
       />
-      <CommsBoardClient actor={toPlain(actorInfo)} />
+      <FirebaseAdminAuthBootstrap>
+        <CommsBoardClient actor={toPlain(actorInfo)} />
+      </FirebaseAdminAuthBootstrap>
     </div>
   );
 }

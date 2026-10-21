@@ -1,6 +1,6 @@
 //app/(admin)/admin/events/page.tsx
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
-import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminEventsPage() {
-  const community = await getCommunity();
   try {
     await requireActiveAdmin(undefined, COMMUNITY_SLUG);
   } catch (error) {
@@ -40,7 +39,7 @@ export default async function AdminEventsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Events</h1>
-          <p className="text-sm text-slate-600">Manage organization events</p>
+          <p className="text-sm text-muted-foreground">Manage organization events</p>
         </div>
         <Link
           href="/admin/events/new"
@@ -49,8 +48,8 @@ export default async function AdminEventsPage() {
           New Event
         </Link>
       </div>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="grid grid-cols-7 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase text-slate-600">
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <div className="grid grid-cols-7 bg-background px-4 py-2 text-xs font-semibold uppercase text-muted-foreground">
           <div className="col-span-2">Title</div>
           <div>Start</div>
           <div>Status</div>
@@ -58,9 +57,9 @@ export default async function AdminEventsPage() {
           <div>Template</div>
           <div className="text-right">Actions</div>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-border">
           {events.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-600">
+            <div className="px-4 py-3 text-sm text-muted-foreground">
               No events yet.
             </div>
           ) : (
@@ -70,16 +69,16 @@ export default async function AdminEventsPage() {
                 className="grid grid-cols-7 items-center px-4 py-3 text-sm"
               >
                 <div className="col-span-2">
-                  <div className="font-semibold text-slate-900">
+                  <div className="font-semibold text-foreground">
                     {evt.title}
                   </div>
                   {evt.summary ? (
-                    <div className="text-xs text-slate-600 line-clamp-2">
+                    <div className="text-xs text-muted-foreground line-clamp-2">
                       {evt.summary}
                     </div>
                   ) : null}
                 </div>
-                <div className="text-xs text-slate-700">
+                <div className="text-xs text-foreground/80">
                   {(() => {
                     if (!evt.startsAt) return "—";
                     if (

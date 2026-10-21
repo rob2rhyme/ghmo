@@ -68,7 +68,8 @@ export default function DocumentGeneratorClient({
       const blob = await pdf(doc).toBlob();
       downloadBlob(blob, `${communitySlug}-${selected.name}.pdf`);
 
-      const outputRefs: string[] = [];
+      // Log file names only; the images themselves stay on this device.
+      const outputRefs: string[] = [`${communitySlug}-${selected.name}.pdf`];
 
       const node = previewRef.current;
       if (node) {
@@ -76,7 +77,7 @@ export default function DocumentGeneratorClient({
         const jpegDataUrl = await htmlToImage.toJpeg(node, { quality: 0.92 });
         downloadDataUrl(pngDataUrl, `${communitySlug}-${selected.name}.png`);
         downloadDataUrl(jpegDataUrl, `${communitySlug}-${selected.name}.jpg`);
-        outputRefs.push(pngDataUrl, jpegDataUrl);
+        outputRefs.push(`${communitySlug}-${selected.name}.png`, `${communitySlug}-${selected.name}.jpg`);
       }
 
       await fetch("/api/docgen/log", {
@@ -92,17 +93,17 @@ export default function DocumentGeneratorClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm lg:flex-row">
+      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-xs lg:flex-row">
         <div className="flex-1 space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-semibold">Document Generator</h1>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase text-primary">{communitySlug}</span>
           </div>
-          <label className="text-sm font-semibold text-slate-800">Template</label>
+          <label className="text-sm font-semibold text-foreground">Template</label>
           <select
             value={selectedId}
             onChange={e => setSelectedId(e.target.value)}
-            className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {templates.map(t => (
               <option key={t.id} value={t.id}>
@@ -113,11 +114,11 @@ export default function DocumentGeneratorClient({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {fields.map(field => (
               <div key={field} className="space-y-1">
-                <label className="text-xs font-semibold uppercase text-slate-600">{field}</label>
+                <label className="text-xs font-semibold uppercase text-muted-foreground">{field}</label>
                 <input
                   value={inputs[field] || ""}
                   onChange={e => setInputs(prev => ({ ...prev, [field]: e.target.value }))}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm"
                   placeholder={`Enter ${field}`}
                 />
               </div>
@@ -130,14 +131,14 @@ export default function DocumentGeneratorClient({
             >
               Export PDF + Images
             </button>
-            {status ? <p className="text-sm text-slate-600">{status}</p> : null}
+            {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
           </div>
         </div>
         <div className="flex-1">
-          <div ref={previewRef} className="rounded-lg border border-slate-200 bg-white p-4 shadow-inner">
-            <p className="text-lg font-semibold text-slate-900">{selected.letterhead?.title || "Letterhead"}</p>
-            {selected.letterhead?.subtitle ? <p className="text-sm text-slate-600">{selected.letterhead.subtitle}</p> : null}
-            <div className="mt-4 space-y-2 text-sm text-slate-700">
+          <div ref={previewRef} className="rounded-lg border border-border bg-card p-4 shadow-inner">
+            <p className="text-lg font-semibold text-foreground">{selected.letterhead?.title || "Letterhead"}</p>
+            {selected.letterhead?.subtitle ? <p className="text-sm text-muted-foreground">{selected.letterhead.subtitle}</p> : null}
+            <div className="mt-4 space-y-2 text-sm text-foreground/80">
               {fields.map(field => (
                 <div key={field}>
                   <span className="font-semibold">{field}: </span>
@@ -146,7 +147,7 @@ export default function DocumentGeneratorClient({
               ))}
             </div>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Preview is also used for PNG/JPEG exports.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Preview is also used for PNG/JPEG exports.</p>
         </div>
       </div>
     </div>

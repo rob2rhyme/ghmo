@@ -56,34 +56,34 @@ export default async function GumbaProjectPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <h1 className="text-2xl font-semibold">GUMBA Project</h1>
-        <p className="text-slate-600 dark:text-slate-300">
+        <p className="text-muted-foreground dark:text-slate-300">
           Project overview and fundraising progress.
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-md bg-primary/10 px-4 py-3">
-            <p className="text-xs uppercase text-slate-600">Raised</p>
+            <p className="text-xs uppercase text-muted-foreground">Raised</p>
             <p className="text-2xl font-bold text-primary">
               ${totalRaised.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-md bg-secondary/10 px-4 py-3">
-            <p className="text-xs uppercase text-slate-600">Goal</p>
-            <p className="text-2xl font-bold text-secondary">
+          <div className="rounded-md bg-highlight/10 px-4 py-3">
+            <p className="text-xs uppercase text-muted-foreground">Goal</p>
+            <p className="text-2xl font-bold text-highlight">
               ${goal.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-md bg-slate-100 px-4 py-3 dark:bg-slate-800/70">
-            <p className="text-xs uppercase text-slate-600">Last updated</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+          <div className="rounded-md bg-muted px-4 py-3 dark:bg-slate-800/70">
+            <p className="text-xs uppercase text-muted-foreground">Last updated</p>
+            <p className="text-lg font-semibold text-foreground dark:text-slate-100">
               {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : "—"}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Meeting minutes</h2>
           <Link
@@ -94,7 +94,7 @@ export default async function GumbaProjectPage() {
           </Link>
         </div>
         {Array.isArray(minutes) && minutes.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">
+          <p className="mt-4 text-sm text-muted-foreground">
             No meeting minutes recorded yet.
           </p>
         ) : (
@@ -111,27 +111,27 @@ export default async function GumbaProjectPage() {
                 return (
                   <div
                     key={entry.id}
-                    className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3 text-sm"
+                    className="rounded-md border border-border bg-background px-4 py-3 text-sm"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-900">
+                        <p className="font-semibold text-foreground">
                           {entry.eventTitle}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {entry.meetingType} •{" "}
                           {entry.eventDate
                             ? new Date(entry.eventDate).toLocaleString()
                             : "Date unavailable"}
                         </p>
                       </div>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         {entry.decisions.length} decision
                         {entry.decisions.length === 1 ? "" : "s"}
                       </p>
                     </div>
                     {entry.decisions.length ? (
-                      <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-700">
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-foreground/80">
                         {entry.decisions.map(
                           (decision: string, idx: number) => (
                             <li key={`${entry.id}-decision-${idx}`}>
@@ -142,8 +142,8 @@ export default async function GumbaProjectPage() {
                       </ul>
                     ) : null}
                     {entry.actionItems.length ? (
-                      <div className="mt-2 text-xs text-slate-700">
-                        <p className="font-semibold text-slate-600">
+                      <div className="mt-2 text-xs text-foreground/80">
+                        <p className="font-semibold text-muted-foreground">
                           Action items
                         </p>
                         <ul className="list-disc space-y-1 pl-5">
@@ -165,7 +165,7 @@ export default async function GumbaProjectPage() {
                         </ul>
                       </div>
                     ) : null}
-                    <p className="mt-2 text-xs text-slate-500">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       Recorded by {resolveActorLabel(entry.recordedBy)}
                       {attendanceSummary ? ` • ${attendanceSummary}` : ""}
                     </p>

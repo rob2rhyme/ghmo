@@ -20,14 +20,14 @@ type DocFormProps = {
 
 export default function DocForm({ fields, values, onChange, fieldActions }: DocFormProps) {
   return (
-    <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/60 p-5 shadow-inner">
+    <div className="space-y-4 rounded-2xl border border-border bg-white/60 p-5 shadow-inner">
       {fields.map(field => {
         const value = values[field.id] ?? field.defaultValue ?? "";
         const action = fieldActions?.[field.id];
         return (
           <div key={field.id} className="space-y-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {field.label}
               </label>
               {action ? (
@@ -41,7 +41,7 @@ export default function DocForm({ fields, values, onChange, fieldActions }: DocF
                     type="button"
                     onClick={action.onClick}
                     disabled={action.disabled}
-                    className="rounded-full border border-slate-200 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {action.label}
                   </button>
@@ -54,13 +54,13 @@ export default function DocForm({ fields, values, onChange, fieldActions }: DocF
                 value={value}
                 onChange={e => onChange(field.id, e.target.value)}
                 placeholder={field.placeholder}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary/50"
               />
             ) : field.type === "select" ? (
               <select
                 value={value}
                 onChange={e => onChange(field.id, e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary/50"
               >
                 <option value="">Choose an option</option>
                 {field.options?.map(option => (
@@ -70,12 +70,12 @@ export default function DocForm({ fields, values, onChange, fieldActions }: DocF
                 ))}
               </select>
             ) : field.type === "checkbox" ? (
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
+              <label className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-foreground/80">
                 <input
                   type="checkbox"
                   checked={value === "true"}
                   onChange={e => onChange(field.id, e.target.checked ? "true" : "false")}
-                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded-sm border-input text-primary focus:ring-primary"
                 />
                 <span>{field.placeholder ?? "Enabled"}</span>
               </label>
@@ -85,7 +85,7 @@ export default function DocForm({ fields, values, onChange, fieldActions }: DocF
                 value={value}
                 onChange={e => onChange(field.id, e.target.value)}
                 placeholder={field.placeholder}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary/50"
               />
             )}
             {action?.status ? <p className="text-xs text-slate-400">{action.status}</p> : null}

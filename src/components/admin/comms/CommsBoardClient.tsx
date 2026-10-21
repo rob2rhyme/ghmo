@@ -168,43 +168,43 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
         title="Plans & Issues"
         description="For decisions, proposals, and issues. Close threads with a clear conclusion."
       >
-        <div className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
           <div className="space-y-3">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Thread title
               <input
                 value={title}
                 onChange={event => setTitle(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden"
                 placeholder="e.g., Approve community outreach plan"
               />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Details
               <textarea
                 value={body}
                 onChange={event => setBody(event.target.value)}
                 rows={5}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden"
                 placeholder="Summarize the plan, proposal, or issue."
               />
             </label>
           </div>
-          <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-4">
+          <div className="space-y-4 rounded-xl border border-border bg-background px-4 py-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Thread settings
               </p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Highlight urgency or pin important items to the top of attention.
               </p>
             </div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Priority
               <select
                 value={priority}
                 onChange={event => setPriority(event.target.value as CommsThreadPriority)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                className="mt-2 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
               >
                 {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -213,12 +213,12 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
                 ))}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-600">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
                 checked={pinned}
                 onChange={event => setPinned(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                className="h-4 w-4 rounded-sm border-input text-primary focus:ring-primary"
               />
               Pin this thread for extra visibility
             </label>
@@ -226,11 +226,11 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
               type="button"
               onClick={handleCreateThread}
               disabled={isSubmitting}
-              className="w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? "Creating..." : "Create thread"}
             </button>
-            {createStatus ? <p className="text-sm text-slate-500">{createStatus}</p> : null}
+            {createStatus ? <p className="text-sm text-muted-foreground">{createStatus}</p> : null}
           </div>
         </div>
       </AdminSectionCard>
@@ -243,7 +243,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
             <button
               type="button"
               onClick={handleSeedThreads}
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary hover:text-slate-900"
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
             >
               Create sample threads
             </button>
@@ -260,7 +260,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
                 className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
                   statusFilter === status
                     ? "bg-slate-900 text-white"
-                    : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                    : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                 }`}
               >
                 {status === "all" ? "All" : STATUS_LABELS[status]}
@@ -270,24 +270,24 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           <input
             value={queryText}
             onChange={event => setQueryText(event.target.value)}
-            className="min-w-[220px] flex-1 rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
+            className="min-w-[220px] flex-1 rounded-full border border-border px-4 py-2 text-sm text-foreground/80 focus:border-primary focus:outline-hidden"
             placeholder="Search title or details"
           />
         </div>
 
-        {seedStatus ? <p className="mt-3 text-sm text-slate-500">{seedStatus}</p> : null}
+        {seedStatus ? <p className="mt-3 text-sm text-muted-foreground">{seedStatus}</p> : null}
 
         {loading ? (
-          <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-            <p className="text-sm text-slate-500">Loading threads...</p>
+          <div className="mt-6 rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
+            <p className="text-sm text-muted-foreground">Loading threads...</p>
           </div>
         ) : loadError ? (
           <div className="mt-6 rounded-xl border border-dashed border-rose-200 bg-rose-50 px-4 py-6 text-center">
-            <p className="text-sm text-rose-600">{loadError}</p>
+            <p className="text-sm text-destructive">{loadError}</p>
           </div>
         ) : filteredThreads.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-            <p className="text-sm text-slate-500">
+          <div className="mt-6 rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
+            <p className="text-sm text-muted-foreground">
               {threads.length === 0 ? "No threads yet." : "No threads match your filters."}
             </p>
           </div>
@@ -297,21 +297,21 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
               <Link
                 key={thread.id}
                 href={`/admin/comms/${thread.id}`}
-                className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 transition hover:border-primary/50 hover:bg-white"
+                className="rounded-2xl border border-border bg-background px-4 py-4 transition hover:border-primary/50 hover:bg-card"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-slate-900">{thread.title}</h3>
+                      <h3 className="text-base font-semibold text-foreground">{thread.title}</h3>
                       {(thread.pinned || thread.priority) && (
-                        <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           {thread.pinned ? "Pinned" : null}
                           {thread.pinned && thread.priority ? " • " : null}
                           {thread.priority ? PRIORITY_LABELS[thread.priority] : null}
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {formatTimestamp(thread.createdAt)} • {resolveActorName(thread.createdBy)}
                     </p>
                   </div>
@@ -322,17 +322,17 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                           : (thread.status || "open") === "closing"
                             ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : "border-slate-200 bg-slate-100 text-slate-600"
+                          : "border-border bg-muted text-muted-foreground"
                       }`}
                     >
                       {STATUS_LABELS[thread.status || "open"]}
                     </span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">
+                    <span className="rounded-full border border-border bg-card px-2 py-0.5 text-muted-foreground">
                       {thread.commentCount ?? 0} comments
                     </span>
                   </div>
                 </div>
-                <p className="mt-2 text-sm text-slate-600">{thread.body}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{thread.body}</p>
               </Link>
             ))}
           </div>

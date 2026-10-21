@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { exchangeCustomTokenForIdToken } from "@/src/lib/firebaseAuthRest";
+import { checkRateLimit } from "@/src/lib/rateLimit";
+import { safeEqual } from "@/src/lib/security/compare";
+import { isDevLoginAllowed } from "@/src/lib/security/devLogin";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { issueCustomToken, verifyIdToken, type Role } from "@/src/lib/auth";
@@ -6,16 +11,22 @@ import { createSessionResponse } from "@/src/lib/sessionCookies";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgAdminDocPath, orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail } from "@/src/lib/members";
-import { COMMUNITY_ID } from "@/src/lib/community";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 const ROUTE = "/api/auth/dev/admin-session";
 
 export const dynamic = "force-dynamic";
 
+const bodySchema = z.object({
+  orgSlug: z.string().trim().max(100).regex(/^[a-z0-9-]*$/i).optional(),
+  email: z.string().trim().max(320).optional()
+});
+
 function buildMeta(req: NextRequest) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: getClientIp(req.headers),
     userAgent: req.headers.get("user-agent") ?? null,
     route: ROUTE
   };
@@ -31,28 +42,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    if (process.env.ALLOW_DEV_ADMIN_LOGIN !== "true") {
+    if (!isDevLoginAllowed(process.env)) {
       return new Response("Not Found", { status: 404 });
     }
 
-    const tokenGate = process.env.DEV_ADMIN_LOGIN_TOKEN?.trim();
-    if (tokenGate) {
-      const providedToken =
-        req.headers.get("x-dev-login-token") ?? new URL(req.url).searchParams.get("token");
-      if (!providedToken || providedToken !== tokenGate) {
-        return new Response("Not Found", { status: 404 });
-      }
+    const rate = await checkRateLimit(`dev-login:${getClientIp(req.headers)}`, 10, 10 * 60 * 1000);
+    if (!rate.success) return new Response("Not Found", { status: 404 });
+
+    // Header only: query strings end up in access logs.
+    if (!safeEqual(req.headers.get("x-dev-login-token"), process.env.DEV_ADMIN_LOGIN_TOKEN?.trim())) {
+      return new Response("Not Found", { status: 404 });
     }
 
-    const body = (await req.json()) as { orgSlug?: string; email?: string };
+    const parsed = await parseJsonBody(req, bodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
-    const orgSlug = body.orgSlug?.trim();
+    const orgSlug = body.orgSlug;
     if (!orgSlug) {
       return NextResponse.json({ error: "Missing organization" }, { status: 400 });
     }
 
-    const emailValue = body.email?.trim();
-    const emailLower = normalizeMemberEmail(emailValue);
+    const emailLower = normalizeMemberEmail(body.email);
     if (!emailLower) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
@@ -82,23 +93,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dev login unavailable" }, { status: 503 });
     }
 
-    const customToken = await issueCustomToken(adminDoc.id, role);
-
-    const identityRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: customToken, returnSecureToken: true })
-      }
-    );
-    const identityPayload = await identityRes.json().catch(() => ({}));
-    if (!identityRes.ok) {
-      console.error("Dev session sign-in failed", { status: identityRes.status, body: identityPayload });
-      return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
-    }
-
-    const idToken = identityPayload.idToken as string | undefined;
+    // Dev sessions only count as strong auth outside production (see requireActiveAdmin).
+    const customToken = await issueCustomToken(adminDoc.id, role, "dev");
+    const idToken = await exchangeCustomTokenForIdToken(customToken);
     if (!idToken) {
       return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
     }
@@ -127,13 +124,7 @@ export async function POST(req: NextRequest) {
       meta: { ...buildMeta(req), emailLower }
     });
 
-    const sessionResponse = createSessionResponse(req, idToken, { devLogin: true, adminId: adminDoc.id });
-    console.info("Dev login granted", {
-      orgSlug,
-      adminId: adminDoc.id,
-      emailLower,
-      cookiesAttached: true
-    });
+    const sessionResponse = await createSessionResponse(idToken, { devLogin: true, adminId: adminDoc.id });
     console.warn("[AUTH] Dev admin-session endpoint used", {
       orgSlug,
       adminId: adminDoc.id

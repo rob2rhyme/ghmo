@@ -51,13 +51,13 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
           <>
             <Link
               href="/admin/minutes?mode=new"
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90"
             >
               Create Minutes
             </Link>
             <Link
               href="/admin/minutes?mode=records"
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-slate-900"
+              className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 transition hover:border-primary hover:text-foreground"
             >
               View Records
             </Link>
@@ -71,7 +71,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
           className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
             mode === "new"
               ? "bg-slate-900 text-white"
-              : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+              : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
           }`}
         >
           Create / Edit
@@ -81,7 +81,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
           className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
             mode === "records"
               ? "bg-slate-900 text-white"
-              : "border border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+              : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
           }`}
         >
           Records

@@ -1,0 +1,10 @@
+# Secret scanning config for gitleaks (CI "Secret scan" job).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders and test fixtures"
+paths = [
+  '''\.env\.example$''',
+  '''package-lock\.json$'''
+]

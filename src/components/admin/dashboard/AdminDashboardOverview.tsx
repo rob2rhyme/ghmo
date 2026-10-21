@@ -173,20 +173,20 @@ export default function AdminDashboardOverview({
           <>
             <Link
               href="/admin/minutes?mode=new"
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90"
             >
               Create Minutes
             </Link>
             <Link
               href="/admin/events/new"
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-slate-900"
+              className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 transition hover:border-primary hover:text-foreground"
             >
               New Event
             </Link>
             <button
               type="button"
               onClick={triggerReconcile}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-primary hover:text-slate-900"
+              className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:border-primary hover:text-foreground"
             >
               Manual Reconcile
             </button>
@@ -201,7 +201,7 @@ export default function AdminDashboardOverview({
         inputRef={inputRef}
       />
 
-      {reconcileStatus ? <p className="text-sm text-slate-500">{reconcileStatus}</p> : null}
+      {reconcileStatus ? <p className="text-sm text-muted-foreground">{reconcileStatus}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <AdminKpiCard label="Raised" value={`$${(stats.totalRaised || 0).toLocaleString()}`} />
@@ -215,8 +215,8 @@ export default function AdminDashboardOverview({
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {filteredQuickActions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center sm:col-span-2 lg:col-span-5">
-              <p className="text-sm text-slate-500">No quick actions match your search.</p>
+            <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center sm:col-span-2 lg:col-span-5">
+              <p className="text-sm text-muted-foreground">No quick actions match your search.</p>
             </div>
           ) : (
             filteredQuickActions.map(action => (
@@ -243,8 +243,8 @@ export default function AdminDashboardOverview({
           }
         >
           {recentMinutes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-              <p className="text-sm text-slate-500">
+            <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
+              <p className="text-sm text-muted-foreground">
                 {normalizedQuery ? "No minutes match your search." : "No minutes recorded yet."}
               </p>
               {!normalizedQuery ? (
@@ -256,10 +256,10 @@ export default function AdminDashboardOverview({
           ) : (
             <div className="space-y-3">
               {recentMinutes.map(entry => (
-                <div key={entry.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div key={entry.id} className="flex items-start justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{entry.eventTitle}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm font-semibold text-foreground">{entry.eventTitle}</p>
+                    <p className="text-xs text-muted-foreground">
                       {entry.meetingType} • {entry.eventDate ? new Date(entry.eventDate).toLocaleString() : "Date unavailable"}
                     </p>
                   </div>
@@ -284,20 +284,20 @@ export default function AdminDashboardOverview({
           }
         >
           {recentAuditLogs.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-              <p className="text-sm text-slate-500">
+            <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
+              <p className="text-sm text-muted-foreground">
                 {normalizedQuery ? "No audit activity matches your search." : "No audit activity yet."}
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {recentAuditLogs.map(log => (
-                <div key={log.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div key={log.id} className="rounded-xl border border-border bg-background px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-900">{log.summary || log.type}</p>
-                    <span className="text-xs text-slate-500">{formatTimestamp(log.createdAtMs)}</span>
+                    <p className="text-sm font-semibold text-foreground">{log.summary || log.type}</p>
+                    <span className="text-xs text-muted-foreground">{formatTimestamp(log.createdAtMs)}</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Actor: {resolveActorLabel(log.actor ?? { role: log.role })}
                   </p>
                 </div>
@@ -314,28 +314,28 @@ export default function AdminDashboardOverview({
           <button
             type="button"
             onClick={triggerReconcile}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary hover:text-slate-900"
+            className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
           >
             Manual Reconcile
           </button>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Webhook events</p>
-            <p className="mt-2 text-sm text-slate-700">
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Webhook events</p>
+            <p className="mt-2 text-sm text-foreground/80">
               {webhookEvents?.length ? `${webhookEvents.length} received` : "No recent webhook activity"}
             </p>
             {latestWebhookEvent?.ts ? (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Last received {new Date(latestWebhookEvent.ts).toLocaleString()}
               </p>
             ) : null}
           </div>
-          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Manual reconcile</p>
-            <p className="mt-2 text-sm text-slate-700">Trigger a donation sync when needed.</p>
-            {reconcileStatus ? <p className="mt-1 text-xs text-slate-500">{reconcileStatus}</p> : null}
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Manual reconcile</p>
+            <p className="mt-2 text-sm text-foreground/80">Trigger a donation sync when needed.</p>
+            {reconcileStatus ? <p className="mt-1 text-xs text-muted-foreground">{reconcileStatus}</p> : null}
           </div>
         </div>
       </AdminSectionCard>

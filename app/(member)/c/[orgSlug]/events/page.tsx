@@ -65,7 +65,7 @@ export default function EventsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Events</h1>
-          <p className="text-sm text-slate-600">Organization events and announcements</p>
+          <p className="text-sm text-muted-foreground">Organization events and announcements</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(["calendar", "list", "grid"] as ViewMode[]).map(mode => (
@@ -73,7 +73,7 @@ export default function EventsPage() {
               key={mode}
               onClick={() => setView(mode)}
               className={`rounded-md px-3 py-2 text-sm font-semibold ${
-                view === mode ? "bg-primary text-white" : "border border-slate-200 bg-white text-slate-800"
+                view === mode ? "bg-primary text-white" : "border border-border bg-card text-foreground"
               }`}
             >
               {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -84,7 +84,7 @@ export default function EventsPage() {
               key={stat}
               onClick={() => setFilter(stat)}
               className={`rounded-md px-3 py-2 text-sm ${
-                filter === stat ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-700"
+                filter === stat ? "bg-slate-900 text-white" : "border border-border bg-card text-foreground/80"
               }`}
             >
               {stat === "future" ? "Upcoming" : stat === "past" ? "Past" : "All"}
@@ -94,7 +94,7 @@ export default function EventsPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-600">Loading events...</p>
+        <p className="text-sm text-muted-foreground">Loading events...</p>
       ) : view === "calendar" ? (
         <CalendarView grouped={grouped} orgSlug={orgSlug} />
       ) : view === "grid" ? (
@@ -107,20 +107,20 @@ export default function EventsPage() {
 }
 
 function ListView({ events, orgSlug }: { events: EventRecord[]; orgSlug: string }) {
-  if (events.length === 0) return <p className="text-sm text-slate-600">No events yet.</p>;
+  if (events.length === 0) return <p className="text-sm text-muted-foreground">No events yet.</p>;
   return (
     <div className="space-y-3">
       {events.map(evt => (
-        <div key={evt.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div key={evt.id} className="rounded-lg border border-border bg-card p-4 shadow-xs">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">{evt.title}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{evt.title}</h2>
               {evt.startsAt ? (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-muted-foreground">
                   {new Date(evt.startsAt.toDate?.() || evt.startsAt).toLocaleString("en-US", { timeZone: evt.timezone || DEFAULT_TIMEZONE })}
                 </p>
               ) : null}
-              {evt.location ? <p className="text-sm text-slate-600">{evt.location}</p> : null}
+              {evt.location ? <p className="text-sm text-muted-foreground">{evt.location}</p> : null}
             </div>
             <Link
               href={`/api/organizations/${orgSlug}/events/${evt.id}/announcement.pdf`}
@@ -129,7 +129,7 @@ function ListView({ events, orgSlug }: { events: EventRecord[]; orgSlug: string 
               Download Announcement PDF
             </Link>
           </div>
-          {evt.summary ? <p className="mt-2 text-sm text-slate-700">{evt.summary}</p> : null}
+          {evt.summary ? <p className="mt-2 text-sm text-foreground/80">{evt.summary}</p> : null}
           <div className="mt-2 flex gap-3 text-sm text-primary">
             <Link href={`/c/${orgSlug}/events/${evt.id}`} className="font-semibold hover:underline">
               View details
@@ -142,23 +142,23 @@ function ListView({ events, orgSlug }: { events: EventRecord[]; orgSlug: string 
 }
 
 function GridView({ events, orgSlug }: { events: EventRecord[]; orgSlug: string }) {
-  if (events.length === 0) return <p className="text-sm text-slate-600">No events yet.</p>;
+  if (events.length === 0) return <p className="text-sm text-muted-foreground">No events yet.</p>;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {events.map(evt => (
-        <div key={evt.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div key={evt.id} className="rounded-lg border border-border bg-card p-4 shadow-xs">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="text-lg font-semibold">{evt.title}</h3>
               {evt.startsAt ? (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-muted-foreground">
                   {new Date(evt.startsAt.toDate?.() || evt.startsAt).toLocaleString("en-US", { timeZone: evt.timezone || DEFAULT_TIMEZONE })}
                 </p>
               ) : null}
-              {evt.location ? <p className="text-sm text-slate-600">{evt.location}</p> : null}
+              {evt.location ? <p className="text-sm text-muted-foreground">{evt.location}</p> : null}
             </div>
           </div>
-          {evt.summary ? <p className="mt-2 text-sm text-slate-700 line-clamp-3">{evt.summary}</p> : null}
+          {evt.summary ? <p className="mt-2 text-sm text-foreground/80 line-clamp-3">{evt.summary}</p> : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href={`/api/organizations/${orgSlug}/events/${evt.id}/announcement.pdf`}
@@ -168,7 +168,7 @@ function GridView({ events, orgSlug }: { events: EventRecord[]; orgSlug: string 
             </Link>
             <Link
               href={`/c/${orgSlug}/events/${evt.id}`}
-              className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 hover:border-primary/50"
+              className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/50"
             >
               Details
             </Link>
@@ -190,11 +190,11 @@ function CalendarView({ grouped, orgSlug }: { grouped: Record<string, EventRecor
   while (days.length % 7 !== 0) days.push(null);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-xs">
       <div className="mb-3 text-lg font-semibold">
         {today.toLocaleString("default", { month: "long" })} {year}
       </div>
-      <div className="grid grid-cols-7 text-center text-xs font-semibold uppercase text-slate-500">
+      <div className="grid grid-cols-7 text-center text-xs font-semibold uppercase text-muted-foreground">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
           <div key={d} className="pb-2">
             {d}
@@ -206,11 +206,11 @@ function CalendarView({ grouped, orgSlug }: { grouped: Record<string, EventRecor
           const dateStr = day ? new Date(year, month, day).toISOString().slice(0, 10) : "";
           const dayEvents = day ? grouped[dateStr] || [] : [];
           return (
-            <div key={idx} className="min-h-[90px] rounded-md border border-slate-100 bg-slate-50 p-2 text-xs">
-              <div className="font-semibold text-slate-700">{day || ""}</div>
+            <div key={idx} className="min-h-[90px] rounded-md border border-border bg-background p-2 text-xs">
+              <div className="font-semibold text-foreground/80">{day || ""}</div>
               <div className="mt-1 space-y-1">
                 {dayEvents.map(evt => (
-                  <Link key={evt.id} href={`/c/${orgSlug}/events/${evt.id}`} className="block rounded bg-white px-1 py-0.5 text-[11px] font-semibold text-primary">
+                  <Link key={evt.id} href={`/c/${orgSlug}/events/${evt.id}`} className="block rounded-sm bg-card px-1 py-0.5 text-[11px] font-semibold text-primary">
                     {evt.title}
                   </Link>
                 ))}

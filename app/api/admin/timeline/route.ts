@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -6,8 +7,47 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { orgTimelineCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+// Deprecated feature (no UI caller); still bounded so it cannot be used to write arbitrary data.
+const docIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .refine(value => !value.includes("/") && value !== "." && value !== "..", "Invalid id");
+const titleSchema = z.string().max(200);
+const bodyTextSchema = z.string().max(20_000);
+const tagsSchema = z.array(z.string().trim().max(50)).max(50);
+const attachmentSchema = z.object({
+  url: z
+    .string()
+    .url()
+    .max(2048)
+    .refine(value => /^https?:\/\//i.test(value), "Only http(s) URLs are allowed"),
+  name: z.string().max(200).optional(),
+  contentType: z.string().max(100).optional()
+});
+
+const createSchema = z.object({
+  title: titleSchema.refine(value => value.trim().length > 0, "Title is required"),
+  body: bodyTextSchema.optional(),
+  timestamp: z
+    .union([z.string().max(64), z.number().finite()])
+    .refine(value => !Number.isNaN(new Date(value).getTime()), "Invalid timestamp")
+    .optional(),
+  tags: tagsSchema.optional(),
+  attachments: z.array(attachmentSchema).max(20).optional()
+});
+
+const updateSchema = z.object({
+  id: docIdSchema,
+  title: titleSchema.optional(),
+  body: bodyTextSchema.optional(),
+  tags: tagsSchema.optional()
+});
 
 export async function GET(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
@@ -65,11 +105,13 @@ export async function POST(req: NextRequest) {
     const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
     if ("response" in guard) return guard.response;
     const { actor } = guard;
-    const data = await req.json();
+    const parsed = await parseJsonBody(req, createSchema);
+    if (!parsed.ok) return parsed.response;
+    const data = parsed.data;
     const ref = getAdminDb().collection(orgTimelineCollectionPath(COMMUNITY_SLUG));
     const doc = await ref.add({
       title: data.title,
-      body: data.body,
+      body: data.body ?? "",
       timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -116,12 +158,9 @@ export async function PATCH(req: NextRequest) {
     if ("response" in guard) return guard.response;
     const { actor } = guard;
 
-    const { id, title, body, tags } = (await req.json()) as {
-      id?: string;
-      title?: string;
-      body?: string;
-      tags?: string[];
-    };
+    const parsed = await parseJsonBody(req, updateSchema);
+    if (!parsed.ok) return parsed.response;
+    const { id, title, body, tags } = parsed.data;
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
     if (title !== undefined && !title.trim())
       return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });

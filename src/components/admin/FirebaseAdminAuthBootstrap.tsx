@@ -79,11 +79,11 @@ export default function FirebaseAdminAuthBootstrap({ children }: FirebaseAdminAu
 
   if (state !== "ready") {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
+      <div className="flex min-h-[40vh] items-center justify-center rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-xs">
         <div>
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
-          <p className="mt-3 text-sm font-semibold text-slate-700">Securing admin session…</p>
-          <p className="mt-1 text-xs text-slate-500">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+          <p className="mt-3 text-sm font-semibold text-foreground/80">Securing admin session…</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             {state === "error" ? error || "Unable to connect to Firebase." : "Connecting to Firestore."}
           </p>
         </div>

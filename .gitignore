@@ -39,3 +39,10 @@ lerna-debug.log*
 .DS_Store
 .vscode/
 .idea/
+
+# test output
+/coverage
+/playwright-report
+/test-results
+firestore-debug.log
+*-debug.log

@@ -31,31 +31,31 @@ export default async function DocumentGalleryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Document gallery
             </p>
-            <h1 className="text-2xl font-semibold text-slate-900">
+            <h1 className="text-2xl font-semibold text-foreground">
               Saved letters & certificates
             </h1>
           </div>
           <Link
             href="/admin/document-generator"
-            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-slate-900"
+            className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground"
           >
             Build new document
           </Link>
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-muted-foreground">
           Each record stores the template, inputs, and creator so you can
           reopen, re-export, or iterate.
         </p>
       </div>
       <section className="space-y-3">
         {documents.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-600">
+          <div className="rounded-2xl border border-border bg-background/70 p-5 text-sm text-muted-foreground">
             No documents saved yet. Use the Document Generator to create a new
             letter or certificate and save it to the gallery.
           </div>
@@ -64,17 +64,17 @@ export default async function DocumentGalleryPage() {
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className="rounded-2xl border border-border bg-card p-5 shadow-xs"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-lg font-semibold text-slate-900">
+                    <p className="text-lg font-semibold text-foreground">
                       {doc.templateTitle}
                     </p>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
                       {doc.category || "General"}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}
                     </p>
                   </div>
@@ -87,19 +87,19 @@ export default async function DocumentGalleryPage() {
                 <div className="mt-4 flex flex-wrap gap-2 text-xs">
                   <Link
                     href={`/admin/document-generator?docId=${doc.id}`}
-                    className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
+                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
                   >
                     Open
                   </Link>
                   <Link
                     href={`/admin/document-generator?docId=${doc.id}&focus=export&format=pdf`}
-                    className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
+                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
                   >
                     Export PDF
                   </Link>
                   <Link
                     href={`/admin/document-generator?docId=${doc.id}&focus=export&format=jpeg`}
-                    className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 transition hover:border-primary"
+                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
                   >
                     Export JPEG
                   </Link>

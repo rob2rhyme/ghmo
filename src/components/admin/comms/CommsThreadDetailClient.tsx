@@ -463,7 +463,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           <button
             type="button"
             onClick={() => setProposeModalOpen(true)}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-primary hover:text-slate-900"
+            className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
           >
             Propose Conclusion
           </button>
@@ -472,11 +472,11 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
 
       {loading ? (
         <AdminSectionCard>
-          <p className="text-sm text-slate-500">Loading thread...</p>
+          <p className="text-sm text-muted-foreground">Loading thread...</p>
         </AdminSectionCard>
       ) : loadError ? (
         <AdminSectionCard>
-          <p className="text-sm text-rose-600">{loadError}</p>
+          <p className="text-sm text-destructive">{loadError}</p>
         </AdminSectionCard>
       ) : thread && threadMeta ? (
         <>
@@ -484,17 +484,17 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold text-slate-900">{thread.title}</h1>
+                  <h1 className="text-2xl font-semibold text-foreground">{thread.title}</h1>
                   {(threadMeta.pinned || threadMeta.priority) && (
-                    <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {threadMeta.pinned ? "Pinned" : null}
                       {threadMeta.pinned && threadMeta.priority ? " • " : null}
                       {threadMeta.priority ? PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority : null}
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-slate-600">{thread.body}</p>
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-2 text-sm text-muted-foreground">{thread.body}</p>
+                <p className="mt-3 text-xs text-muted-foreground">
                   Created {threadMeta.createdAt} by {threadMeta.createdBy}
                 </p>
               </div>
@@ -505,23 +505,23 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : threadMeta.status === "closing"
                         ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-slate-200 bg-slate-100 text-slate-600"
+                      : "border-border bg-muted text-muted-foreground"
                   }`}
                 >
                   {STATUS_LABELS[threadMeta.status] || threadMeta.status}
                 </span>
-                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">
+                <span className="rounded-full border border-border bg-card px-2 py-0.5 text-muted-foreground">
                   {threadMeta.commentCount} comments
                 </span>
               </div>
             </div>
             {(isClosing || isClosed) && thread.conclusion?.text ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Conclusion</p>
-                    <p className="mt-2 text-sm text-slate-700">{thread.conclusion.text}</p>
-                    <p className="mt-2 text-xs text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conclusion</p>
+                    <p className="mt-2 text-sm text-foreground/80">{thread.conclusion.text}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
                       Proposed {formatTimestamp(thread.conclusion.proposedAt)} by{" "}
                       {resolveActorName(thread.conclusion.proposedBy)}
                     </p>
@@ -531,7 +531,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
                         {threadMeta.approvedCount} approve
                       </span>
-                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700">
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-destructive">
                         {threadMeta.rejectedCount} reject
                       </span>
                     </div>
@@ -548,7 +548,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                         className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
                           conclusionVote === "approve"
                             ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border border-slate-200 text-slate-600 hover:border-primary hover:text-slate-900"
+                            : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         Approve
@@ -559,8 +559,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                         disabled={isVotingConclusion || conclusionVote === "reject"}
                         className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
                           conclusionVote === "reject"
-                            ? "border border-rose-200 bg-rose-50 text-rose-700"
-                            : "border border-slate-200 text-slate-600 hover:border-primary hover:text-slate-900"
+                            ? "border border-rose-200 bg-rose-50 text-destructive"
+                            : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         Reject
@@ -576,15 +576,15 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                         {isFinalizing ? "Finalizing..." : "Finalize Close"}
                       </button>
                       {conclusionVoteStatus ? (
-                        <p className="text-xs text-slate-500">{conclusionVoteStatus}</p>
+                        <p className="text-xs text-muted-foreground">{conclusionVoteStatus}</p>
                       ) : null}
-                      {finalizeStatus ? <p className="text-xs text-rose-600">{finalizeStatus}</p> : null}
+                      {finalizeStatus ? <p className="text-xs text-destructive">{finalizeStatus}</p> : null}
                     </div>
                   </div>
                 ) : null}
 
                 {isClosed ? (
-                  <p className="mt-3 text-xs text-slate-500">
+                  <p className="mt-3 text-xs text-muted-foreground">
                     Finalized {formatTimestamp(thread.finalizedAt)} by {resolveActorName(thread.finalizedBy)}
                   </p>
                 ) : null}
@@ -595,8 +595,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           <div className="grid gap-6">
             <AdminSectionCard title="Discussion" description="Add context, replies, and lightweight likes.">
               {topLevelComments.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-                  <p className="text-sm text-slate-500">No comments yet.</p>
+                <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">No comments yet.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -606,16 +606,16 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                     const liked = Boolean(likedComments[comment.id]);
                     return (
                       <div key={comment.id} className="space-y-2">
-                        <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                        <div className="rounded-xl border border-border bg-background px-4 py-3">
                           <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-foreground">
                               {resolveActorName(comment.createdBy)}
                             </p>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-muted-foreground">
                               {formatTimestamp(comment.createdAt)}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-700">{comment.body}</p>
+                          <p className="mt-2 text-sm text-foreground/80">{comment.body}</p>
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
                             <button
                               type="button"
@@ -624,7 +624,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                               className={`rounded-full border px-3 py-1 transition ${
                                 liked
                                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                                  : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
                               } disabled:cursor-not-allowed disabled:opacity-60`}
                             >
                               {liked ? "Liked" : "Like"} · {likeCount}
@@ -633,7 +633,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                               type="button"
                               onClick={() => setReplyToId(comment.id)}
                               disabled={!isOpen}
-                              className="rounded-full border border-slate-200 px-3 py-1 text-slate-500 transition hover:border-primary hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-full border border-border px-3 py-1 text-muted-foreground transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Reply
                             </button>
@@ -645,16 +645,16 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                               const replyLikeCount = likeCounts[reply.id] ?? 0;
                               const replyLiked = Boolean(likedComments[reply.id]);
                               return (
-                                <div key={reply.id} className="rounded-xl border border-slate-100 bg-white px-4 py-3">
+                                <div key={reply.id} className="rounded-xl border border-border bg-card px-4 py-3">
                                   <div className="flex items-start justify-between gap-3">
-                                    <p className="text-sm font-semibold text-slate-900">
+                                    <p className="text-sm font-semibold text-foreground">
                                       {resolveActorName(reply.createdBy)}
                                     </p>
-                                    <span className="text-xs text-slate-500">
+                                    <span className="text-xs text-muted-foreground">
                                       {formatTimestamp(reply.createdAt)}
                                     </span>
                                   </div>
-                                  <p className="mt-2 text-sm text-slate-700">{reply.body}</p>
+                                  <p className="mt-2 text-sm text-foreground/80">{reply.body}</p>
                                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
                                     <button
                                       type="button"
@@ -663,7 +663,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                                       className={`rounded-full border px-3 py-1 transition ${
                                         replyLiked
                                           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                          : "border-slate-200 text-slate-500 hover:border-primary hover:text-slate-900"
+                                          : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
                                       } disabled:cursor-not-allowed disabled:opacity-60`}
                                     >
                                       {replyLiked ? "Liked" : "Like"} · {replyLikeCount}
@@ -682,20 +682,20 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
 
               <div className="mt-4 space-y-2">
                 {replyTarget ? (
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>
                       Replying to {resolveActorName(replyTarget.createdBy)}
                     </span>
                     <button
                       type="button"
                       onClick={() => setReplyToId(null)}
-                      className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground"
                     >
                       Cancel reply
                     </button>
                   </div>
                 ) : null}
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Add comment
                   <textarea
                     ref={commentInputRef}
@@ -703,7 +703,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                     onChange={event => setCommentBody(event.target.value)}
                     rows={3}
                     disabled={!isOpen}
-                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none disabled:bg-slate-100"
+                    className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden disabled:bg-muted"
                     placeholder={isOpen ? "Share feedback or a decision." : "Thread is not open for comments."}
                   />
                 </label>
@@ -712,12 +712,12 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                     type="button"
                     onClick={handlePostComment}
                     disabled={!isOpen || isPostingComment}
-                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isPostingComment ? "Posting..." : "Post comment"}
                   </button>
-                  {commentStatus ? <p className="text-sm text-slate-500">{commentStatus}</p> : null}
-                  {likeStatus ? <p className="text-sm text-slate-500">{likeStatus}</p> : null}
+                  {commentStatus ? <p className="text-sm text-muted-foreground">{commentStatus}</p> : null}
+                  {likeStatus ? <p className="text-sm text-muted-foreground">{likeStatus}</p> : null}
                 </div>
               </div>
             </AdminSectionCard>
@@ -727,38 +727,38 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
 
       {proposeModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-2xl bg-card p-6 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Propose conclusion</h2>
-                <p className="mt-1 text-sm text-slate-600">
+                <h2 className="text-lg font-semibold text-foreground">Propose conclusion</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Proposing a conclusion moves the thread into the closing review stage.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setProposeModalOpen(false)}
-                className="text-sm font-semibold text-slate-500 hover:text-slate-700"
+                className="text-sm font-semibold text-muted-foreground hover:text-foreground/80"
               >
                 Close
               </button>
             </div>
-            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Conclusion
               <textarea
                 value={proposedConclusion}
                 onChange={event => setProposedConclusion(event.target.value)}
                 rows={4}
-                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden"
                 placeholder="Summarize the decision or outcome."
               />
             </label>
-            {proposeStatus ? <p className="mt-2 text-sm text-rose-600">{proposeStatus}</p> : null}
+            {proposeStatus ? <p className="mt-2 text-sm text-destructive">{proposeStatus}</p> : null}
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setProposeModalOpen(false)}
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+                className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground"
               >
                 Cancel
               </button>

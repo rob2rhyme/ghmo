@@ -85,7 +85,7 @@ export default function DonateTopBackground({
         className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[65vh] bg-[url('/assets/Ghmo-building.png')] bg-cover bg-center bg-no-repeat will-change-transform sm:h-[55vh] lg:h-[45vh]"
         style={bgHeight ? { height: `${bgHeight}px` } : undefined}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/65 via-slate-950/35 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-b from-slate-950/65 via-slate-950/35 to-transparent" />
       </div>
       <div ref={coverRef} className="relative z-10">
         {children}

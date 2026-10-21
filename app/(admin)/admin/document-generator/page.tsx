@@ -35,7 +35,7 @@ export default async function DocumentGeneratorPage({
   return (
     <div className="space-y-6 md:space-y-8">
       {docMissing ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-destructive">
           Document <span className="font-semibold">{docId}</span> was not found.
           Showing a fresh builder below.
         </div>

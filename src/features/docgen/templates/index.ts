@@ -20,7 +20,7 @@ export const TEMPLATES_BY_ID = TEMPLATES.reduce<Record<string, DocTemplate>>((ac
   return acc;
 }, {});
 
-export const TEMPLATE_META: DocTemplateMeta[] = TEMPLATES.map(({ renderHtml, ...meta }) => meta);
+export const TEMPLATE_META: DocTemplateMeta[] = TEMPLATES.map(({ renderHtml: _renderHtml, ...meta }) => meta);
 
 export function getTemplateById(templateId: string) {
   return TEMPLATES_BY_ID[templateId];

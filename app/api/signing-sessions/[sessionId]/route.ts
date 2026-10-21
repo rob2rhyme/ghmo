@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { isValidSigningSessionId } from "@/src/lib/signatureEncryption";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ function toDate(value: unknown): Date | undefined {
 
 export async function GET(_: Request, context: { params: Promise<{ sessionId: string }> }) {
   const params = await context.params;
+  if (!isValidSigningSessionId(params.sessionId)) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(

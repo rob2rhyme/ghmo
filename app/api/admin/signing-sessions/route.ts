@@ -5,14 +5,16 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-type SigningSessionPayload = {
-  role?: "witness1" | "witness2" | "officiant" | "issuingAuthority";
-  certificateId?: string;
-  expiresInMinutes?: number;
-};
+const signingSessionSchema = z.object({
+  role: z.enum(["witness1", "witness2", "officiant", "issuingAuthority"]),
+  certificateId: z.string().trim().max(200).optional(),
+  expiresInMinutes: z.number().int().min(1).max(60).optional()
+});
 
 export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
@@ -25,11 +27,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG);
-    const payload = (await req.json().catch(() => ({}))) as SigningSessionPayload;
-    if (!payload.role) {
-      return NextResponse.json({ error: "Missing role" }, { status: 400 });
-    }
-    const expiresInMinutes = Math.max(1, Math.min(60, payload.expiresInMinutes ?? 10));
+    const parsed = await parseJsonBody(req, signingSessionSchema);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data;
+    const expiresInMinutes = payload.expiresInMinutes ?? 10;
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + expiresInMinutes * 60 * 1000);
     const sessionId = crypto.randomBytes(32).toString("hex");

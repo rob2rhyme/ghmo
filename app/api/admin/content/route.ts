@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getHomeBlocks, upsertHomeBlocks } from "@/src/lib/adminCommunity";
 import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+// Home blocks are free-form objects (no typed editor yet); bound the count and
+// rely on parseJsonBody's 256 KB body cap for overall size.
+const bodySchema = z.object({
+  blocks: z.array(z.record(z.unknown())).max(100)
+});
 
 export async function GET(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
@@ -45,8 +53,10 @@ export async function POST(req: NextRequest) {
     const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
     if ("response" in guard) return guard.response;
     const { actor } = guard;
-    const { blocks } = await req.json();
-    await upsertHomeBlocks(blocks || []);
+    const parsed = await parseJsonBody(req, bodySchema);
+    if (!parsed.ok) return parsed.response;
+    const { blocks } = parsed.data;
+    await upsertHomeBlocks(blocks);
     await logAuditEvent({
       orgSlug: COMMUNITY_SLUG,
       action: "home_blocks_updated",
@@ -58,7 +68,7 @@ export async function POST(req: NextRequest) {
         role: actor.roles[0] ?? "admin"
       },
       resource: { type: "home_blocks", summary: "Updated home content blocks" },
-      meta: { blockCount: Array.isArray(blocks) ? blocks.length : 0, route: "/api/admin/content" }
+      meta: { blockCount: blocks.length, route: "/api/admin/content" }
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

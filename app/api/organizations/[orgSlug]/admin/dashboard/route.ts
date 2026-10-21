@@ -14,11 +14,6 @@ import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
-function fail(label: string, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return NextResponse.json({ error: "Failed to load admin dashboard", details: `${label}: ${message}` }, { status: 500 });
-}
-
 export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
   const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();

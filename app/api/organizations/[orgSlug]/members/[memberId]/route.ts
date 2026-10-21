@@ -1,20 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/src/lib/security/clientIp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
-import { normalizeMemberName, isMemberStatus, sanitizeMemberRoles } from "@/src/lib/members";
+import { normalizeMemberName, sanitizeMemberRoles } from "@/src/lib/members";
 import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 const MEMBER_PATCH_ROUTE = "/api/organizations/ghmo/members/[memberId]";
 
+/** Firestore doc IDs only: no "/" so a path param cannot reach another collection. */
+const MEMBER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** Admin privileges live in the `admins` collection; member records only carry these roles. */
+const MEMBER_ROLES = ["member"] as const;
+
+const updateMemberSchema = z.object({
+  name: z.string().max(120).nullable().optional(),
+  status: z.enum(["active", "disabled"]).optional(),
+  roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional()
+});
+
 function buildAuditMeta(req: NextRequest, route: string) {
   return {
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
+    ip: getClientIp(req.headers),
     userAgent: req.headers.get("user-agent") ?? null,
     route
   };
@@ -37,14 +52,17 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     const { actor, admin } = guard;
 
     const { memberId } = params;
-    if (!memberId) return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
+    if (!MEMBER_ID_PATTERN.test(memberId)) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+
+    const parsed = await parseJsonBody(req, updateMemberSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const memberRef = getAdminDb().doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${memberId}`);
     const snapshot = await memberRef.get();
     if (!snapshot.exists) return NextResponse.json({ error: "Member not found" }, { status: 404 });
 
     const beforeData = snapshot.data() as Record<string, unknown>;
-    const body = await req.json();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     let hasChange = false;
 
@@ -54,16 +72,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
       hasChange = true;
     }
 
-    if (
-      Object.prototype.hasOwnProperty.call(body, "status") &&
-      typeof body.status === "string" &&
-      isMemberStatus(body.status)
-    ) {
+    if (body.status !== undefined) {
       updates.status = body.status;
       hasChange = true;
     }
 
-    if (Array.isArray(body.roles)) {
+    if (body.roles !== undefined) {
       const roles = sanitizeMemberRoles(body.roles);
       if (roles.length > 0) {
         updates.roles = roles;
@@ -84,7 +98,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
       action: "member_updated",
       actor: {
         uid: actor.uid,
-        adminId: admin.pinId,
+        adminId: admin.id,
         role: actor.roles[0] ?? "admin",
         name: admin.name,
         email: admin.email

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth, getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberEmail, normalizeMemberName } from "@/src/lib/members";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";

@@ -152,10 +152,10 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
     <div className="mx-auto w-full max-w-md">
       <div className="space-y-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Signature request</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Signature request</p>
           <h1 className="text-2xl font-semibold text-slate-100">Signature for {roleLabel}</h1>
           {expiresAt ? (
-            <p className="text-xs text-slate-500">Session expires at {new Date(expiresAt).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Session expires at {new Date(expiresAt).toLocaleString()}</p>
           ) : null}
         </div>
         {message ? <p className="text-sm text-slate-300">{message}</p> : null}
@@ -177,7 +177,7 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
                 type="text"
                 value={signerName}
                 onChange={event => setSignerName(event.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary/50"
                 placeholder="Name"
               />
             </div>

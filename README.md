@@ -3,14 +3,16 @@
 Single-community App Router site for GHMO with admin-only magic-link authentication, structured meeting minutes governance, document generation, fundraising, and a multimedia hub.
 
 ## Current Focus
-- Solidify identical single-community routing (`/`, `/admin`) and remove orgSlug/tenant assumptions.
-- Stabilize whitelist-based admin email magic-link auth + env handling (NEXT_PUBLIC_FIREBASE_* + session cookies).
-- Multimedia aggregation page with Facebook/YouTube/TikTok/Instagram fallbacks.
-- Timeline/Events system deprecated; replace with structured Meeting Minutes for the official governance record.
+The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
+1. **Phase 0:** fix the React/Next version mismatch; add ESLint, tests and CI.
+2. **Phase 1:** security hardening (security headers, revocable sessions, durable rate limits, remove PIN login, keep third-party scripts off admin pages).
+3. **Phase 2:** required passkeys for admins; new UI on shadcn/ui + Tailwind v4.
+4. **Phases 3–4:** end-to-end encryption for admin chat, Plans & Issues, draft minutes, signatures and document history.
+5. **Phases 5–7:** governance features, public archive and integrations, external security review.
 
 ## Highlights
 - One community (`ghmo-site`) backed by Firebase + GoFundMe Pro; no multi-tenant routing.
-- Admins authenticate via whitelist-only email magic links (OTP); `sessionToken` (with `__session` fallback) is the source of truth for guarded pages/API routes.
+- Admins authenticate via allowlist-only email magic links; a revocable Firebase session cookie named `__session` is the source of truth for guarded pages/API routes.
 - Modules: Plans & Issues (Admin Communication Log) for governed admin-only decision threads (conclusion required to close, append-only comments, read-only after closure, full auditability), Admin Chat (WhatsApp-style coordination for quick updates only; decisions belong in Plans & Issues), Meeting Minutes (agenda/decisions/action items + structured attendance), Document Generator (GHMO letterhead preview + PDF/JPEG export), Admin dashboard overview (KPIs/quick actions/recents/system status), Multimedia hub.
 - Audit logs cover auth attempts, admin actions, document generation, webhook receipts, and reconciliation runs.
 
@@ -35,7 +37,11 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 - No third-party UI dependencies were added for the communication log UI.
 
 ## Stack
-- Next.js 14 App Router, TypeScript, TailwindCSS
+- Next.js 16.4 App Router, React 19.3, TypeScript 5.9, Tailwind CSS 4.3
+- UI: shadcn/ui-style primitives in `src/components/ui` (Radix), semantic design tokens with light/dark themes in `app/globals.css`, self-hosted Inter, lucide icons, sonner toasts
+- Passkeys: `@simplewebauthn/server` + `@simplewebauthn/browser`
+- Node.js 22.12 or newer
+- Tooling: ESLint 9 (flat config, `eslint-config-next`), Vitest (unit), Playwright (browser smoke tests), GitHub Actions CI
 - Firebase Client SDK (Auth/Firestore) + Firebase Admin SDK
 - GoFundMe Pro webhook placeholder + reconcile endpoint
 - @react-pdf/renderer + html-to-image for exports
@@ -51,7 +57,7 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
-- Auth: `/login` (magic link request) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (gated and disabled in production).
+- Auth: `/admin/login` (admin magic link) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (always disabled in production). `/login` is the member magic-link page.
 - API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
 
 ## Admin Dashboard Search
@@ -59,10 +65,17 @@ Single-community App Router site for GHMO with admin-only magic-link authenticat
 - Shortcut: Cmd+K / Ctrl+K focuses the search input; Esc clears the query (or blurs if empty).
 
 ## Authentication
-- Admins request magic links via `/login`, and Firestore stores their email in a whitelist (e.g., `organizations/{orgSlug}/members` with `status: "active"`). Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
-- Session state lives in the `sessionToken` cookie (with `__session` fallback) handled by `/api/auth/session`; public routes stay readable without a session token, while admin-only routes and APIs validate the token before running.
+- Admins request magic links via `/admin/login`. The allowlist is the `organizations/ghmo/admins` collection: each doc has `emailLower` and `status: "active"`. Magic-link login only works when `FEATURE_EMAIL_ADMIN_LOGIN=true`. Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
+- Session state lives in one `__session` cookie: a Firebase **session cookie** (HttpOnly, Secure in production, SameSite=Lax, 8 hours), checked for revocation on every request. `/api/auth/session` only issues it to active admins or allowlisted members. Signing out revokes all of the user's tokens (every device) and signs the browser's Firebase client out.
+- Firestore rules require an active `admins/{uid}` record in addition to the admin claim, so setting an admin's `status` to anything but `active` cuts off their database access immediately.
 - The dev helper `/api/auth/dev/admin-session` is disabled unless `NODE_ENV !== "production"` plus explicit flags (`NEXT_PUBLIC_DEV_LOGIN`, `DEV_LOGIN_SECRET`) are present.
-- The magic-link workflow is the only login path; there is no member login option, and all admin actions depend on the authored session token.
+- The magic-link workflow is the only supported login path; there is no member login option.
+- **PIN login has been removed** (plan decision D3). The PIN routes, the `pins` collection rules and `FEATURE_PIN_LOGIN` no longer exist; any old `organizations/ghmo/pins` documents can be deleted.
+- **First admin:** set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters) and call `POST /api/admin/bootstrap` with `{ "secret", "email", "name" }`. It creates one `super_admin` in `organizations/ghmo/admins` and then locks itself permanently. Remove the secret afterwards.
+- **Passkeys are required** for every admin (decision D2). Admins sign in at `/admin/login` with a passkey (fingerprint, face or device PIN). The email magic link only starts a limited session that can create a passkey; it cannot open admin pages, admin APIs or admin data in Firestore.
+- **Recovery:** if an admin who already has a passkey adds a new one through a magic link, the new passkey stays *pending* until **another** admin approves it under Admin → Security, so access to someone's email alone is not enough. If no other admin with a passkey exists, it activates immediately (audited).
+- **Security page** (`/admin/security`): list, add and remove your passkeys (you can't remove your last one), and approve other admins' pending passkeys. Super admins can remove another admin's passkey (lost device).
+- Sessions record how they were created (`authMethod` claim: `passkey`, `magic_link` or local-only `dev`); `requireActiveAdmin` and the Firestore rules both require `passkey`.
 
 ## Data Model (single community)
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
@@ -97,6 +110,8 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Without tokens, the page renders embeds/profile links and curated placeholder cards.
 
 ## Upcoming Roadmap
+> **Superseded:** the current plan — security hardening, end-to-end encryption and the UI upgrade — is in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). The list below is kept for history.
+
 - **Governance & Compliance**
   - Approval/sign-off workflow for minutes (draft → submitted → approved with attribution/signatures).
   - Minutes versioning and revision history to track changes over time.
@@ -127,26 +142,49 @@ Legacy community paths are no longer supported; please migrate any old data into
 1) Install deps: `npm install`
 2) Copy envs: `cp .env.example .env.local` and fill Firebase client config, Admin service account fields, GoFundMe secrets, social handles.
 3) Run dev server: `npm run dev`
-4) Whitelist admin emails by creating documents under `organizations/ghmo/members` (set `emailLower`, `status: "active"`, and optional profile data) so the magic-link auth flow recognizes them.
-5) Configure GoFundMe Pro webhook + reconcile schedule when ready.
+4) Set `FEATURE_EMAIL_ADMIN_LOGIN=true`. For a brand-new project, create the first admin with `POST /api/admin/bootstrap` (see Authentication).
+5) Allowlist admin emails by creating documents under `organizations/ghmo/admins` (set `emailLower`, `status: "active"`, `roles`, and optional `name`) so the magic-link flow recognizes them.
+6) Configure GoFundMe Pro webhook + reconcile schedule when ready.
+
+## End-to-End Encryption
+- Admin → **Encryption** (`/admin/encryption`) manages end-to-end encryption keys. The design and owner steps are in `docs/PROJECT_PLAN.md` §4 and §8 (Phase 3).
+- Each admin device has its own keys. They are stored in the browser, locked with the admin's passkey (or a passphrase if the passkey can't), and unlocked once per session.
+- A shared workspace key per key generation ("epoch") is wrapped for each approved device and for the **recovery key**. Two named trustees each hold a paper copy of the recovery key.
+- **New devices** must be approved by another admin after comparing a 12-digit safety code, or activated with the paper recovery key.
+- **Lost devices:** revoking a lost device rotates to a new epoch it can't read.
+- The server only ever stores public keys and wrapped keys (`organizations/ghmo/e2ee/**`, server-only in Firestore rules).
+- Phase 4 moves Admin Chat, Plans & Issues, draft minutes, signatures and document history onto these keys.
+
+## Development Checks
+| Command | What it does |
+|---|---|
+| `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
+| `npm run lint` | ESLint. Fails on any error, or on more than 132 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
+| `npm test` | Vitest unit tests in `tests/unit/` |
+| `npm run test:coverage` | Unit tests with the coverage gate for the E2EE library (`src/lib/e2ee`) |
+| `npm run build` | Production build. Works without Firebase secrets |
+| `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |
+| `npm run test:emulators` | Firestore rules tests and auth/session/passkey/signing integration tests against the Firebase emulators (needs Java 11+) |
+| `npm run test:e2e:auth` | Real-browser passkey sign-in and E2EE setup/unlock/approval (Chromium virtual authenticator with PRF) against the emulators. Run `npm run build` first |
+| `npm run check` | typecheck + lint + unit tests |
+
+CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push to `main`, and fails on critical production advisories from `npm audit`. Dependabot opens weekly update PRs.
 
 ## Security Notes
+> The full threat model, the 17 known findings (S-01 to S-17) and the end-to-end encryption design are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §2–§4. Notable open issues until Phase 1 ships: the GoFundMe script loads on admin pages, disabling an admin does not end their session, and the rate limiter is in-memory only.
+
 - Magic-link auth endpoints are rate-limited, return generic responses, and only honor allowlisted emails in Firestore so the attacker cannot enumerate addresses.
-- Sessions are anchored to the `sessionToken` cookie (with `__session` fallback) and verified via `requireActiveAdmin` before any admin page/API executes logic.
-- The dev helper `/api/auth/dev/admin-session` is gated by `NODE_ENV !== "production"` plus `NEXT_PUBLIC_DEV_LOGIN` and `DEV_LOGIN_SECRET`, and it remains disabled unless those flags are explicitly set.
-- Webhooks are validated via the shared-secret HMAC placeholder; replace that check with a provider-backed verification when credentials are available.
-- Firestore rules are deny-by-default and access is controlled by the `admin: true` custom claim.
+- Rate limits are stored in Firestore (`organizations/ghmo/rateLimits`, keys SHA-256 hashed) so they hold across serverless instances, and fail closed if Firestore is unavailable. **Owner action:** in the Firebase console, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.
+- Client IPs come from the right-most `X-Forwarded-For` entry (configurable with `TRUSTED_PROXY_HOPS`), or `x-real-ip` on Vercel, so clients cannot spoof their IP to dodge limits.
+- Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
+- The dev helper `/api/auth/dev/admin-session` only works when the build is not production, `ALLOW_DEV_ADMIN_LOGIN=true`, and a 32+ character `DEV_ADMIN_LOGIN_TOKEN` is sent in the `x-dev-login-token` header. (Before Phase 1 the code did not check the environment and the token was optional.)
+- Webhooks are validated with a constant-time HMAC-SHA256 check, a 64 KB size cap and a Zod schema; the target organization is never taken from the payload. Replace the HMAC placeholder with the provider's documented verification when credentials are available.
+- Signing links: the session ID must be 64 hex characters; submissions are rate-limited, must be a real PNG under 200 KB, and are accepted exactly once (Firestore transaction). Signatures are encrypted with AES-256-GCM bound to their session, with key IDs for rotation. QR codes for signing links are generated in the browser.
+- Firestore rules are deny-by-default; admin access needs the `admin` custom claim **and** an active admin record. Rules are tested against the emulator (`npm run test:emulators`).
 - All communication log features are admin-only, and closed threads are immutable.
 
-## Feature Enhancements (Planned)
-- Admin Activity Analytics (Planned)
-  - Silent instrumentation (no UI yet).
-  - Tracks thread creation, comments posted, documents generated, meeting participation, and admin visits/interactions.
-- Admin Leaderboard (Future / Optional)
-  - Derived from analytics (not active).
-  - Time-boxed (monthly / quarterly).
-  - Category-based (participation, governance, documentation).
-  - Intended for insights, not competition; future and opt-in.
+## Dropped Features
+- **Admin Activity Analytics** (silent instrumentation) and the **Admin Leaderboard** were dropped on 2026-10-21 (plan decision D4). They conflict with the privacy and end-to-end encryption goals. Aggregate governance stats from approved minutes are still allowed.
 
 ## Reset Build Artifacts & Start Dev Server
 

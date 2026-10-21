@@ -1,0 +1,24 @@
+import { expect, test } from "@playwright/test";
+
+test("admin area redirects to login when signed out", async ({ page }) => {
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin/);
+});
+
+test("admin login page renders", async ({ page }) => {
+  const response = await page.goto("/admin/login");
+  expect(response?.status()).toBe(200);
+  await expect(page.locator("body")).toBeVisible();
+});
+
+test("debug routes do not exist", async ({ request }) => {
+  for (const path of ["/api/debug/cookies", "/api/debug/env"]) {
+    expect((await request.get(path)).status()).toBe(404);
+  }
+});
+
+test("unknown URLs get the global 404 page", async ({ page }) => {
+  const response = await page.goto("/this-page-does-not-exist");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
