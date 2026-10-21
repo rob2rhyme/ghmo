@@ -2,7 +2,8 @@
 import { redirect } from "next/navigation";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import DocBuilder from "@/src/features/docgen/components/DocBuilder";
+import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
+import SavedDocBuilder from "@/src/features/docgen/components/SavedDocBuilder";
 import { TEMPLATE_META } from "@/src/features/docgen/templates";
 import { getDocument } from "@/src/features/docgen/firestore/docRepo";
 
@@ -10,9 +11,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type DocumentGeneratorPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     docId?: string;
-  };
+  }>;
 };
 
 export default async function DocumentGeneratorPage({
@@ -27,7 +28,7 @@ export default async function DocumentGeneratorPage({
     throw error;
   }
 
-  const docId = searchParams?.docId;
+  const { docId } = (await searchParams) ?? {};
   const savedDocument = docId ? await getDocument(docId) : null;
   const docMissing = Boolean(docId && !savedDocument);
   const templateId = savedDocument?.templateId ?? TEMPLATE_META[0]?.id;
@@ -40,12 +41,15 @@ export default async function DocumentGeneratorPage({
           Showing a fresh builder below.
         </div>
       ) : null}
-      <DocBuilder
-        templatesMeta={TEMPLATE_META}
-        initialTemplateId={templateId}
-        initialInputs={savedDocument?.inputs}
-        initialDocId={savedDocument?.id}
-      />
+      <EncryptionGate what="Document Generator">
+        <SavedDocBuilder
+          templatesMeta={TEMPLATE_META}
+          initialTemplateId={templateId}
+          initialInputs={savedDocument?.inputs}
+          initialDocId={savedDocument?.id}
+          enc={savedDocument?.enc}
+        />
+      </EncryptionGate>
     </div>
   );
 }

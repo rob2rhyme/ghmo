@@ -10,6 +10,7 @@ import {
   MAX_SIGNATURE_BYTES,
   parsePngDataUrl
 } from "@/src/lib/signatureEncryption";
+import { currentSealingKey, sealedSignatureSchema } from "@/src/lib/sealedSignature.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,8 @@ export const dynamic = "force-dynamic";
 const MAX_DATA_URL_LENGTH = Math.ceil((MAX_SIGNATURE_BYTES * 4) / 3) + 64;
 
 const bodySchema = z.object({
-  dataUrl: z.string().min(1).max(MAX_DATA_URL_LENGTH),
+  dataUrl: z.string().min(1).max(MAX_DATA_URL_LENGTH).optional(),
+  signatureSealed: sealedSignatureSchema.optional(),
   signerName: z.string().trim().max(120).optional().nullable()
 });
 
@@ -55,15 +57,30 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
   }
 
-  let bytes: Buffer;
+  // With encryption on, only a signature sealed in the signer's browser is accepted:
+  // the server never sees the image.
+  const sealKey = await currentSealingKey();
+  if (sealKey) {
+    if (!parsed.data.signatureSealed || parsed.data.dataUrl) {
+      return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
+    }
+    if (parsed.data.signatureSealed.epoch !== sealKey.epoch) {
+      return NextResponse.json({ error: "Signing keys changed. Reload this page and sign again." }, { status: 409 });
+    }
+  } else if (!parsed.data.dataUrl || parsed.data.signatureSealed) {
+    return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
+  }
+
+  let signatureField: Record<string, unknown>;
   try {
-    bytes = parsePngDataUrl(parsed.data.dataUrl);
+    signatureField = sealKey
+      ? { signatureSealed: parsed.data.signatureSealed }
+      : { signatureEnc: encryptSignature(parsePngDataUrl(parsed.data.dataUrl!), sessionId) };
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid signature" }, { status: 400 });
   }
 
   try {
-    const signatureEnc = encryptSignature(bytes, sessionId);
     const db = getAdminDb();
     const sessionRef = db.collection("signingSessions").doc(sessionId);
 
@@ -82,7 +99,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
         status: "signed",
         signedAt: FieldValue.serverTimestamp(),
         signerName: parsed.data.signerName || null,
-        signatureEnc,
+        ...signatureField,
         updatedAt: FieldValue.serverTimestamp()
       });
       return { status: 200 } as const;

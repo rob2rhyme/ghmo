@@ -11,11 +11,14 @@ import {
   kekFromPassphrase,
   kekFromPrf,
   openDeviceKeys,
+  openSealingPrivateKey,
+  openSignature,
   PBKDF2_ITERATIONS,
   sealDeviceKeys,
   type KeyWrap,
   type OpenedDeviceKeys,
-  type PublicJwk
+  type PublicJwk,
+  type SealedSignature
 } from "../keys";
 import {
   createInitialEpoch,
@@ -99,6 +102,8 @@ type E2eeContextValue = {
    * Prepares the private part of a record for storage: `{ enc }` when encryption is on,
    * the fields themselves (plaintext) otherwise. Spread the result into the document.
    */
+  /** Opens a signature that a signer sealed to the workspace key. */
+  openSealedSignature: (sealed: SealedSignature, sessionId: string) => Promise<Uint8Array<ArrayBuffer>>;
   packPrivate: (location: RecordLocation, privateFields: Record<string, unknown>) => Promise<Record<string, unknown>>;
   /**
    * Reads a stored record: decrypts its `enc` envelope and merges the private fields in.
@@ -446,6 +451,15 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const openSealedSignature = useCallback<E2eeContextValue["openSealedSignature"]>(async (sealed, sessionId) => {
+    const session = requireUnlocked();
+    const epochRecord = overviewRef.current?.epochs.find(e => e.epoch === sealed.epoch);
+    const raw = session.epochKeys.get(sealed.epoch);
+    if (!epochRecord || !raw) throw new Error("This device doesn't have the key for that signature");
+    const sealingPrivate = await openSealingPrivateKey(await aesKeyFromRaw(raw), sealed.epoch, epochRecord.sealingPrivate);
+    return openSignature(sealed, sealingPrivate, sessionId);
+  }, []);
+
   const packPrivate = useCallback<E2eeContextValue["packPrivate"]>(
     async (location, privateFields) => {
       if (!overviewRef.current?.state.enabled) return privateFields;
@@ -495,6 +509,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     finishRecoveryReplacement,
     encrypt,
     decrypt,
+    openSealedSignature,
     packPrivate,
     unpackPrivate
   };

@@ -10,6 +10,28 @@ import TemplateTabs from "./TemplateTabs";
 import LocalQrCode from "@/src/components/LocalQrCode";
 import { DocField, DocTemplateMeta, DocTemplateStep } from "../types";
 import { getTemplateById } from "../templates";
+import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { documentLoc, newDocumentId } from "@/src/lib/documentRecords";
+
+async function toJpegDataUrl(pngUrl: string, quality = 0.82) {
+  const image = new Image();
+  image.src = pngUrl;
+  await image.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d")!;
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+function pngDataUrl(bytes: Uint8Array) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:image/png;base64,${btoa(binary)}`;
+}
 
 type DocBuilderProps = {
   templatesMeta: DocTemplateMeta[];
@@ -122,6 +144,7 @@ export default function DocBuilder({
   initialInputs,
   initialDocId
 }: DocBuilderProps) {
+  const { openSealedSignature, packPrivate, enabled: encrypted } = useE2ee();
   const defaultTemplateId = initialTemplateId ?? templatesMeta[0]?.id ?? "";
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [inputsByTemplate, setInputsByTemplate] = useState<Record<string, Record<string, string>>>(() => {
@@ -244,11 +267,14 @@ export default function DocBuilder({
               );
               if (!signedResponse.ok) return;
               const signedPayload = await signedResponse.json();
-              if (signedPayload.signatureDataUrl) {
-                handleFieldChange(
-                  SIGNATURE_IMAGE_BY_ROLE[session.role],
-                  signedPayload.signatureDataUrl as string
-                );
+              let signatureDataUrl = signedPayload.signatureDataUrl as string | undefined;
+              if (!signatureDataUrl && signedPayload.signatureSealed) {
+                // Sealed by the signer: only an unlocked admin device can open it.
+                const bytes = await openSealedSignature(signedPayload.signatureSealed, session.sessionId);
+                signatureDataUrl = pngDataUrl(bytes);
+              }
+              if (signatureDataUrl) {
+                handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[session.role], signatureDataUrl);
               }
             }
           } catch (error) {
@@ -264,7 +290,7 @@ export default function DocBuilder({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [signatureSessions, currentInputs]);
+  }, [signatureSessions, currentInputs, openSealedSignature]);
 
   const handleExport = async (format: ExportFormat) => {
     if (!previewRef.current || !selectedTemplate || !selectedTemplateMeta || !letterheadReady) return;
@@ -314,6 +340,9 @@ export default function DocBuilder({
         return acc;
       }, {});
       const lockedInputs = { ...sanitizedInputs, ...LOCKED_FIELD_VALUES };
+      const savedId = initialDocId ?? newDocumentId();
+      // With encryption on this is {enc}; before that it is {inputs}, as always.
+      const privateFields = await packPrivate(documentLoc(savedId), { inputs: lockedInputs });
       const response = await fetch("/api/admin/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -321,8 +350,8 @@ export default function DocBuilder({
           templateId: selectedTemplateMeta.id,
           templateTitle: selectedTemplateMeta.title,
           category: selectedTemplateMeta.category,
-          inputs: lockedInputs,
-          docId: initialDocId
+          ...privateFields,
+          docId: savedId
         })
       });
       if (!response.ok) {
@@ -410,6 +439,18 @@ export default function DocBuilder({
         return acc;
       }, {});
       const lockedInputs = { ...sanitizedInputs, ...LOCKED_FIELD_VALUES };
+      let sealedCertificate: Record<string, unknown>;
+      if (encrypted) {
+        // The PDF is built and encrypted here, so the server never sees the signed certificate.
+        // JPEG keeps the encrypted PDF under the 1 MiB document limit.
+        const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
+        pdf.addImage(await toJpegDataUrl(dataUrl), "JPEG", 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+        const pdfBase64 = pdf.output("datauristring").split(",")[1];
+        const docId = newDocumentId();
+        sealedCertificate = { docId, ...(await packPrivate(documentLoc(docId), { inputs: lockedInputs, pdfBase64 })) };
+      } else {
+        sealedCertificate = { inputs: lockedInputs, pngDataUrl: dataUrl };
+      }
       const response = await fetch(
         `/api/admin/signing-sessions/${signedSessions[0].sessionId}/finalize`,
         {
@@ -420,9 +461,8 @@ export default function DocBuilder({
               templateId: selectedTemplateMeta.id,
               templateTitle: selectedTemplateMeta.title,
               category: selectedTemplateMeta.category,
-              inputs: lockedInputs,
               certificateId: currentInputs.certificateNumber || "",
-              pngDataUrl: dataUrl
+              ...sealedCertificate
             },
             signatures: signatureMap
           })

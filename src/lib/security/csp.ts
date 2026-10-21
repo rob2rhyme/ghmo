@@ -55,7 +55,7 @@ export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDoma
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
-    "base-uri 'none'",
+    "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
     upgradeInsecure && "upgrade-insecure-requests"

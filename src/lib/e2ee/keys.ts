@@ -221,3 +221,22 @@ export async function deviceSafetyCode(ecdhPublic: PublicJwk, ecdsaPublic: Publi
 }
 
 export { ECDH as ECDH_PARAMS, ECDSA as ECDSA_PARAMS };
+
+// ---------- sealed signatures ----------
+// A signer without an account encrypts their signature to the workspace sealing key;
+// only an unlocked admin device can open it. The signing session ID and epoch are bound
+// in, so a sealed signature can't be moved to another session.
+
+export type SealedSignature = KeyWrap & { v: 1; epoch: number };
+
+const signatureContext = (sessionId: string, epoch: number) => `signature/v1/${sessionId}/${epoch}`;
+
+export async function sealSignature(png: Uint8Array<ArrayBuffer>, sealingPublic: PublicJwk, epoch: number, sessionId: string): Promise<SealedSignature> {
+  return { v: 1, epoch, ...(await wrapToPublicKey(png, sealingPublic, signatureContext(sessionId, epoch))) };
+}
+
+export async function openSignature(sealed: SealedSignature, sealingPrivate: CryptoKey, sessionId: string): Promise<Uint8Array<ArrayBuffer>> {
+  const { v, epoch, ...wrap } = sealed;
+  if (v !== 1) throw new Error("Unsupported sealed signature");
+  return unwrapWithPrivateKey(wrap, sealingPrivate, signatureContext(sessionId, epoch));
+}

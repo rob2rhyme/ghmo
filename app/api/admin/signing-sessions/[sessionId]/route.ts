@@ -57,9 +57,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
     };
 
     const includeSignature = req.nextUrl.searchParams.get("includeSignature") === "1";
-    if (includeSignature && data.status === "signed" && data.signatureEnc) {
-      const decrypted = decryptSignature(data.signatureEnc, params.sessionId);
-      responsePayload.signatureDataUrl = toPngDataUrl(decrypted);
+    if (includeSignature && data.status === "signed") {
+      if (data.signatureSealed) {
+        // Sealed to the workspace key: the browser opens it.
+        responsePayload.signatureSealed = data.signatureSealed;
+      } else if (data.signatureEnc) {
+        const decrypted = decryptSignature(data.signatureEnc, params.sessionId);
+        responsePayload.signatureDataUrl = toPngDataUrl(decrypted);
+      }
     }
 
     return NextResponse.json(responsePayload);

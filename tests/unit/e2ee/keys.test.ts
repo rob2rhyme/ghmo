@@ -12,8 +12,10 @@ import {
   kekFromPrf,
   openDeviceKeys,
   openSealingPrivateKey,
+  openSignature,
   randomBytes,
   sealDeviceKeys,
+  sealSignature,
   toBase64Url,
   unwrapWithPrivateKey,
   wrapToPublicKey
@@ -114,5 +116,23 @@ describe("safety codes", () => {
     expect(code).toMatch(/^\d{4} \d{4} \d{4}$/);
     expect(await deviceSafetyCode(aEcdh, aEcdsa)).toBe(code);
     expect(await deviceSafetyCode(bEcdh, aEcdsa)).not.toBe(code);
+  });
+});
+
+describe("sealed signatures", () => {
+  it("opens only with the sealing key, for the same session and epoch", async () => {
+    const wdk = await aesKeyFromRaw(generateWorkspaceKey());
+    const { publicJwk, sealedPrivate } = await generateSealingKeys(wdk, 2);
+    const priv = await openSealingPrivateKey(wdk, 2, sealedPrivate);
+    const png = randomBytes(64);
+    const sealed = await sealSignature(png, publicJwk, 2, "a".repeat(64));
+    expect(await openSignature(sealed, priv, "a".repeat(64))).toEqual(png);
+    // Moved to another session: refused.
+    await expect(openSignature(sealed, priv, "b".repeat(64))).rejects.toThrow();
+    // Re-labelled as another epoch: refused.
+    await expect(openSignature({ ...sealed, epoch: 3 }, priv, "a".repeat(64))).rejects.toThrow();
+    // A different workspace's key can't open it.
+    const other = await generateSealingKeys(wdk, 2);
+    await expect(openSignature(sealed, await openSealingPrivateKey(wdk, 2, other.sealedPrivate), "a".repeat(64))).rejects.toThrow();
   });
 });

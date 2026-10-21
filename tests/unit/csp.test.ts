@@ -31,10 +31,11 @@ describe("buildSecureCsp", () => {
     expect(prod).not.toContain("unsafe-eval");
   });
 
-  it("blocks framing, plugins and base-tag hijacking", () => {
+  it("blocks framing, plugins and cross-origin base tags", () => {
     expect(prod).toContain("frame-ancestors 'none'");
     expect(prod).toContain("object-src 'none'");
-    expect(prod).toContain("base-uri 'none'");
+    // html-to-image (document exports) needs a same-origin <base>; anything else is refused.
+    expect(prod).toContain("base-uri 'self'");
   });
 
   it("allows the Firebase auth domain in frames", () => {
