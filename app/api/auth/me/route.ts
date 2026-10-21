@@ -47,8 +47,7 @@ export async function GET(req: NextRequest) {
         orgSlug: ctx.orgSlug,
         role: ctx.role,
         email: ctx.email,
-        emailLower: ctx.emailLower,
-        pinId: (ctx as any).pinId
+        emailLower: ctx.emailLower
       }
     : null;
   console.debug("Auth/me request", {

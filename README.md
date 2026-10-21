@@ -67,7 +67,8 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - Session state lives in the `sessionToken` cookie (with `__session` fallback) handled by `/api/auth/session`; public routes stay readable without a session token, while admin-only routes and APIs validate the token before running.
 - The dev helper `/api/auth/dev/admin-session` is disabled unless `NODE_ENV !== "production"` plus explicit flags (`NEXT_PUBLIC_DEV_LOGIN`, `DEV_LOGIN_SECRET`) are present.
 - The magic-link workflow is the only supported login path; there is no member login option.
-- **PIN login is being removed** (plan decision D3). It is still in the code and still **on by default**, so set `FEATURE_PIN_LOGIN=false` in every environment now. The code is deleted in Phase 1.
+- **PIN login has been removed** (plan decision D3). The PIN routes, the `pins` collection rules and `FEATURE_PIN_LOGIN` no longer exist; any old `organizations/ghmo/pins` documents can be deleted.
+- **First admin:** set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters) and call `POST /api/admin/bootstrap` with `{ "secret", "email", "name" }`. It creates one `super_admin` in `organizations/ghmo/admins` and then locks itself permanently. Remove the secret afterwards.
 - **Passkeys will be required** for every admin from Phase 2 (decision D2). Magic links will then be used only for first enrollment and lost-device recovery.
 
 ## Data Model (single community)
@@ -135,7 +136,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 1) Install deps: `npm install`
 2) Copy envs: `cp .env.example .env.local` and fill Firebase client config, Admin service account fields, GoFundMe secrets, social handles.
 3) Run dev server: `npm run dev`
-4) Set `FEATURE_EMAIL_ADMIN_LOGIN=true` and `FEATURE_PIN_LOGIN=false`.
+4) Set `FEATURE_EMAIL_ADMIN_LOGIN=true`. For a brand-new project, create the first admin with `POST /api/admin/bootstrap` (see Authentication).
 5) Allowlist admin emails by creating documents under `organizations/ghmo/admins` (set `emailLower`, `status: "active"`, `roles`, and optional `name`) so the magic-link flow recognizes them.
 6) Configure GoFundMe Pro webhook + reconcile schedule when ready.
 
@@ -143,7 +144,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | Generates Next route types, then runs TypeScript (no emit) |
-| `npm run lint` | ESLint. Fails on any error, or on more than 159 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
+| `npm run lint` | ESLint. Fails on any error, or on more than 154 warnings (legacy debt ceiling; lower it as code is cleaned up, never raise it) |
 | `npm test` | Vitest unit tests in `tests/unit/` |
 | `npm run build` | Production build. Works without Firebase secrets |
 | `npm run test:e2e` | Playwright smoke tests in `tests/e2e/` against the production build (run `npm run build` first). In this sandbox set `PLAYWRIGHT_CHROMIUM_PATH` to a local Chromium |

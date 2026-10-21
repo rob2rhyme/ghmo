@@ -3,6 +3,7 @@
 import { firebaseInitError, getFirebaseAuth, missingEnvKeys } from "@/src/lib/firebaseClient";
 import { isSignInWithEmailLink, signInWithEmailLink, signOut } from "firebase/auth";
 import type { Route } from "next";
+import { safeRedirectPath } from "@/src/lib/security/redirect";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
@@ -12,7 +13,7 @@ function MemberLoginInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { session } = useAuthSession();
-  const nextRoute = ((searchParams.get("next") as Route | null) ?? "/admin") as Route;
+  const nextRoute = safeRedirectPath(searchParams.get("next"), "/admin") as Route;
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -82,7 +83,7 @@ function MemberLoginInner() {
           return;
         }
 
-        const next = ((searchParams.get("next") as Route | null) ?? `/`) as Route;
+        const next = safeRedirectPath(searchParams.get("next"), "/") as Route;
         router.replace(next);
       } catch (err: any) {
         console.error(err);

@@ -1,6 +1,5 @@
 // Organization paths (canonical).
 export const orgDocPath = (orgSlug: string) => `organizations/${orgSlug}`;
-export const orgPinsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/pins`;
 export const orgMembersCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/members`;
 export const orgDonationsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/donations`;
 export const orgDonationsStatsDocPath = (orgSlug: string) => `${orgDonationsCollectionPath(orgSlug)}/stats`;

@@ -6,19 +6,20 @@ import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getServerEnv } from "@/src/lib/env.server";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
+import { safeRedirectPath } from "@/src/lib/security/redirect";
 import AdminLoginClient from "./AdminLoginClient";
 
 type AdminLoginPageProps = {
-  searchParams: {
-    next?: string;
-  };
+  searchParams: Promise<{
+    next?: string | string[];
+  }>;
 };
 
 export default async function AdminLoginPage({
   searchParams,
 }: AdminLoginPageProps) {
-  const nextRoute = searchParams.next;
-  const adminRoute = (nextRoute?.startsWith("/") ? nextRoute : "/admin") as Route;
+  const { next } = await searchParams;
+  const adminRoute = safeRedirectPath(typeof next === "string" ? next : null, "/admin") as Route;
   const ctx = await getAuthContextFromRequest();
   try {
     await requireActiveAdmin(ctx ?? undefined, COMMUNITY_SLUG);
@@ -36,7 +37,6 @@ export default async function AdminLoginPage({
     <AdminLoginClient
       orgSlug={COMMUNITY_SLUG}
       featureEmailLogin={env.FEATURE_EMAIL_ADMIN_LOGIN}
-      featurePinLogin={env.FEATURE_PIN_LOGIN}
     />
   );
 }

@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       action: "member_created",
       actor: {
         uid: actor.uid,
-        adminId: admin.pinId,
+        adminId: admin.id,
         role: actor.roles[0] ?? "admin",
         name: admin.name,
         email: admin.email

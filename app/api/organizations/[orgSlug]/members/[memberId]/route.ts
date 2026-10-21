@@ -84,7 +84,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
       action: "member_updated",
       actor: {
         uid: actor.uid,
-        adminId: admin.pinId,
+        adminId: admin.id,
         role: actor.roles[0] ?? "admin",
         name: admin.name,
         email: admin.email

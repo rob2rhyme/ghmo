@@ -37,10 +37,6 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    match /organizations/{orgSlug}/pins/{doc=**} {
-      allow read, write: if isAdmin();
-    }
-
     match /organizations/{orgSlug}/members/{doc=**} {
       allow read, write: if isAdmin();
     }

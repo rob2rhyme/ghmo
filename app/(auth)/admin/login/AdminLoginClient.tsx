@@ -1,13 +1,11 @@
 "use client";
 
-import { firebaseInitError, getFirebaseAuth } from "@/src/lib/firebaseClient";
-import { signInWithCustomToken } from "firebase/auth";
+import { firebaseInitError } from "@/src/lib/firebaseClient";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type AdminLoginClientProps = {
   featureEmailLogin: boolean;
-  featurePinLogin: boolean;
   orgSlug: string;
 };
 
@@ -20,12 +18,8 @@ const emailMessaging = {
 
 export default function AdminLoginClient({
   featureEmailLogin,
-  featurePinLogin,
   orgSlug,
 }: AdminLoginClientProps) {
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [pinLoading, setPinLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<string>(
     emailMessaging.default
@@ -48,8 +42,6 @@ export default function AdminLoginClient({
   const normalizedEmail = email.trim();
   const devLoginEnabled =
     process.env.NEXT_PUBLIC_ALLOW_DEV_ADMIN_LOGIN === "true";
-  const enableAdminPin =
-    process.env.NEXT_PUBLIC_ENABLE_ADMIN_PIN_LOGIN === "true";
   const enableMemberLogin =
     process.env.NEXT_PUBLIC_ENABLE_MEMBER_LOGIN === "true";
 
@@ -147,34 +139,6 @@ export default function AdminLoginClient({
     };
   }, []);
 
-  const handlePinSubmit = async () => {
-    setPinError(null);
-    setPinLoading(true);
-    try {
-      const res = await fetch("/api/auth/pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, requestedRole: "admin" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login failed");
-      const auth = getFirebaseAuth();
-      const cred = await signInWithCustomToken(auth, data.customToken);
-      const idToken = await cred.user.getIdToken();
-      await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      });
-      window.dispatchEvent(new Event("auth:changed"));
-      router.replace("/admin");
-    } catch (err: any) {
-      setPinError(err.message || "Login failed");
-    } finally {
-      setPinLoading(false);
-    }
-  };
-
   const handleEmailStart = async () => {
     const emailForStart = email.trim();
     if (!emailForStart) {
@@ -192,7 +156,7 @@ export default function AdminLoginClient({
       if (!res.ok) {
         if (data.code === "QUOTA_EXCEEDED") {
           setEmailStatus(
-            "Daily email quota exceeded. Use PIN or Dev Login locally."
+            "Daily email quota exceeded. Try again tomorrow, or use Dev Login locally."
           );
           return;
         }
@@ -283,86 +247,47 @@ export default function AdminLoginClient({
               ) : null}
             </div>
           ) : null}
-          {featurePinLogin ? (
-            <>
-              {enableAdminPin && (
-                <>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="admin-pin"
-                      className="text-sm font-medium text-slate-800 dark:text-slate-200"
-                    >
-                      Admin PIN
-                    </label>
-                    <input
-                      id="admin-pin"
-                      name="pin"
-                      type="password"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value)}
-                      placeholder="Enter admin PIN"
-                      autoComplete="one-time-code"
-                      inputMode="numeric"
-                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    />
-                  </div>
-                  {pinError ? (
-                    <p className="text-sm text-red-500">{pinError}</p>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={handlePinSubmit}
-                    disabled={pinLoading}
-                    className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60"
-                  >
-                    {pinLoading ? "Signing in..." : "Sign in with PIN"}
-                  </button>
-                </>
-              )}
-              {devLoginEnabled && (
-                <div className="mt-4 space-y-2 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm dark:border-yellow-600 dark:bg-yellow-900/40">
-                  <p className="font-semibold text-yellow-800 dark:text-yellow-200">
-                    Dev login (local only)
-                  </p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                    Use your allowlisted admin email plus the dev token when
-                    email delivery or quotas block magic links.
-                  </p>
-                  <input
-                    value={devLoginToken}
-                    onChange={(e) => setDevLoginToken(e.target.value)}
-                    type="password"
-                    placeholder="Dev login token"
-                    className="w-full rounded-md border border-yellow-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-yellow-400 dark:border-yellow-600 dark:bg-yellow-800 dark:text-slate-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleDevLogin}
-                    disabled={
-                      devLoginLoading || !devLoginToken || !normalizedEmail
-                    }
-                    className="w-full rounded-md bg-yellow-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-yellow-600 disabled:opacity-60"
-                  >
-                    {devLoginLoading
-                      ? "Starting dev session…"
-                      : "Start dev session"}
-                  </button>
-                  {devLoginStatus && (
-                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                      {devLoginStatus}
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            !featureEmailLogin && (
-              <p className="text-sm text-slate-500">
-                Admin login is currently disabled; reach out to your admin to
-                unblock.
+          {devLoginEnabled && (
+            <div className="mt-4 space-y-2 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm dark:border-yellow-600 dark:bg-yellow-900/40">
+              <p className="font-semibold text-yellow-800 dark:text-yellow-200">
+                Dev login (local only)
               </p>
-            )
+              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                Use your allowlisted admin email plus the dev token when
+                email delivery or quotas block magic links.
+              </p>
+              <input
+                value={devLoginToken}
+                onChange={(e) => setDevLoginToken(e.target.value)}
+                type="password"
+                placeholder="Dev login token"
+                className="w-full rounded-md border border-yellow-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-yellow-400 dark:border-yellow-600 dark:bg-yellow-800 dark:text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={handleDevLogin}
+                disabled={
+                  devLoginLoading || !devLoginToken || !normalizedEmail
+                }
+                className="w-full rounded-md bg-yellow-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-yellow-600 disabled:opacity-60"
+              >
+                {devLoginLoading
+                  ? "Starting dev session…"
+                  : "Start dev session"}
+              </button>
+              {devLoginStatus && (
+                <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  {devLoginStatus}
+                </p>
+              )}
+            </div>
           )}
+          {!featureEmailLogin && !devLoginEnabled ? (
+            <p className="text-sm text-slate-500">
+              Admin login is currently disabled; reach out to your admin to
+              unblock.
+            </p>
+          ) : null}
           {mounted && firebaseInitError ? (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-400/50 dark:bg-red-900/30 dark:text-red-100">
               Firebase web config is missing. Add NEXT_PUBLIC_FIREBASE_* vars to

@@ -28,7 +28,7 @@ export default async function CommunityLanding() {
           />
         </div>
         <p className="max-w-3xl text-lg text-slate-600 dark:text-slate-200">
-          Secure, member-first hub with magic-link access, admin PIN controls,
+          Secure, member-first hub with magic-link access, hardened admin controls,
           fundraising, document generation, and multimedia highlights.
         </p>
       </div>
@@ -62,7 +62,7 @@ export default async function CommunityLanding() {
         <div className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase text-slate-500">Admins</p>
         <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-          PIN-based login, content blocks, meeting minutes, and GoFundMe
+          Magic-link login, meeting minutes, document tools, and GoFundMe
           reconciliation.
         </p>
         </div>

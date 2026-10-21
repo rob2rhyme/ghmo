@@ -16,7 +16,6 @@ export type AdminProfile = {
   createdBy?: string;
   lastLoginAt?: Date;
   lastLogoutAt?: Date;
-  pinId?: string;
   authUid?: string;
 };
 
@@ -57,7 +56,6 @@ function mapAdminDoc(id: string, data: Record<string, unknown>): AdminProfile {
     createdBy: data.createdBy as string | undefined,
     lastLoginAt: toDate(data.lastLoginAt),
     lastLogoutAt: toDate(data.lastLogoutAt),
-    pinId: data.pinId as string | undefined,
     authUid: data.authUid as string | undefined
   };
 }
