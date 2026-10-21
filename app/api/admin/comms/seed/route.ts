@@ -4,6 +4,7 @@ import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { getState } from "@/src/lib/e2eeStore";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,11 @@ export async function POST(req: NextRequest) {
     const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
     if ("response" in guard) return guard.response;
     const { actor } = guard;
+
+    // Sample threads would be stored as plaintext, which end-to-end encryption forbids.
+    if ((await getState()).enabled) {
+      return NextResponse.json({ error: "Sample threads are unavailable once encryption is on." }, { status: 409 });
+    }
 
     const db = getAdminDb();
     const existing = await db.collection("organizations").doc("ghmo").collection("commsThreads").limit(1).get();

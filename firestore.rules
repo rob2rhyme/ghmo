@@ -205,9 +205,14 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time;
     }
 
+    // The vote's value is private once encryption is on; which admin voted (the document ID) is not.
     function isValidConclusionVote() {
-      return request.resource.data.value == "approve" ||
-        request.resource.data.value == "reject";
+      let d = request.resource.data;
+      return e2eeOn()
+        ? (d.keys().hasOnly(['enc', 'createdAt', 'createdBy']) &&
+           d.get('createdBy', {}).get('uid', null) == request.auth.uid &&
+           isFreshEnvelope(d.get('enc', null)))
+        : (d.get('value', null) == "approve" || d.get('value', null) == "reject");
     }
 
     function isValidChatMessageCreate() {

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
+import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import CommsBoardClient from "@/src/components/admin/comms/CommsBoardClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -31,7 +32,9 @@ export default async function AdminCommsPage() {
         description="Governed threads for proposals, plans, and issues that require admin decisions."
       />
       <FirebaseAdminAuthBootstrap>
-        <CommsBoardClient actor={toPlain(actorInfo)} />
+        <EncryptionGate what="Plans & Issues">
+          <CommsBoardClient actor={toPlain(actorInfo)} />
+        </EncryptionGate>
       </FirebaseAdminAuthBootstrap>
     </div>
   );

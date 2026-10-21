@@ -54,6 +54,15 @@ describe("before encryption is turned on, plaintext still works", () => {
       addDoc(collection(as("alice"), `${ORG}/adminChatMessages`), { enc: envelope(ALICE_DEVICE), createdBy: { uid: "alice" }, createdAt: serverTimestamp() })
     );
   });
+
+  it("accepts plaintext votes", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/commsThreads/t1`), { title: "T", body: "B", status: "closing", createdBy: { uid: "alice" } });
+    });
+    await assertSucceeds(
+      setDoc(doc(as("bob"), `${ORG}/commsThreads/t1/conclusionVotes/bob`), { value: "approve", createdAt: serverTimestamp(), createdBy: { uid: "bob" } })
+    );
+  });
 });
 
 describe("once encryption is on", () => {
@@ -154,6 +163,23 @@ describe("once encryption is on", () => {
       await assertSucceeds(addDoc(collection(as("bob"), `${ref.path}/comments`), { enc: envelope(BOB_DEVICE), ...base }));
       await assertFails(addDoc(collection(as("bob"), `${ref.path}/comments`), { body: "plaintext", ...base }));
       await assertFails(addDoc(collection(as("bob"), `${ref.path}/comments`), { enc: envelope(ALICE_DEVICE), ...base }));
+    });
+
+    it("conclusion votes: the value is an envelope from the voter's own device; plaintext values are refused", async () => {
+      const ref = await addDoc(collection(as("alice"), `${ORG}/commsThreads`), newThread());
+      await env.withSecurityRulesDisabled(async ctx => {
+        await updateDoc(doc(ctx.firestore(), ref.path), { status: "closing" });
+      });
+      const vote = (uid: string, data: Record<string, unknown>) => setDoc(doc(as(uid), `${ref.path}/conclusionVotes/${uid}`), data);
+      const meta = (uid: string) => ({ createdAt: serverTimestamp(), createdBy: { uid } });
+      await assertSucceeds(vote("bob", { enc: envelope(BOB_DEVICE), ...meta("bob") }));
+      await assertFails(vote("bob", { value: "approve", ...meta("bob") }));
+      await assertFails(vote("bob", { enc: envelope(BOB_DEVICE), value: "approve", ...meta("bob") }));
+      await assertFails(vote("bob", { enc: envelope(ALICE_DEVICE), ...meta("bob") }));
+      // Changing a vote replaces the whole document (no leftover plaintext field).
+      await assertSucceeds(vote("bob", { enc: envelope(BOB_DEVICE, "E".repeat(40)), ...meta("bob") }));
+      // You can only vote as yourself.
+      await assertFails(setDoc(doc(as("bob"), `${ref.path}/conclusionVotes/alice`), { enc: envelope(BOB_DEVICE), ...meta("bob") }));
     });
 
     it("anyone but admins still can't read", async () => {
