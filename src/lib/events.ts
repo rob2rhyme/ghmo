@@ -35,3 +35,15 @@ export function ensureOrgSlug(slug: string) {
 }
 
 export { DEFAULT_TIMEZONE };
+
+/** Published events for public views (calendar feeds), using the same path fallbacks as the events API. */
+export async function listPublishedEvents(): Promise<EventRecord[]> {
+  const { getAdminDb } = await import("./firebaseAdmin");
+  const { COMMUNITY_ID } = await import("./community");
+  const db = getAdminDb();
+  for (const path of [eventsCollectionPath(COMMUNITY_SLUG), eventsCollectionPath(COMMUNITY_ID), `community/${COMMUNITY_ID}/events`]) {
+    const snap = await db.collection(path).where("status", "==", "published").limit(200).get();
+    if (!snap.empty) return snap.docs.map(normalizeEvent);
+  }
+  return [];
+}

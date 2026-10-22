@@ -60,6 +60,10 @@ function SiteFooter() {
           <span className="mx-2 inline-block">|</span>
           Copyright © {new Date().getFullYear()} GHMO, All Rights Reserved.
           <span className="mx-2 inline-block">|</span>
+          <Link href="/minutes" className="underline-offset-4 hover:underline">
+            Meeting minutes
+          </Link>
+          <span className="mx-2 inline-block">|</span>
           <Link href="/admin/login" className="underline-offset-4 hover:underline">
             Admin sign in
           </Link>
