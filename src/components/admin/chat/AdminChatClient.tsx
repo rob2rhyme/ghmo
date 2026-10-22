@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyActivity } from "@/src/lib/notifyClient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
@@ -98,6 +99,7 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
         createdAt: serverTimestamp(),
         createdBy: { uid: actor.uid, name: actor.name }
       });
+      notifyActivity("chat");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

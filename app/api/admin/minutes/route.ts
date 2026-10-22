@@ -17,6 +17,7 @@ import { deviceBelongsTo, envelopeSchema, type EnvelopeInput } from "@/src/lib/e
 import { CONTENT_FIELDS, adminView, auditView } from "@/src/lib/minutesRecords";
 import { normalizeAttendance, normalizeContent } from "@/src/lib/minutesContent";
 import { planTransition } from "@/src/lib/minutesWorkflow";
+import { notifyAdmins } from "@/src/lib/notify.server";
 
 export const dynamic = "force-dynamic";
 
@@ -493,6 +494,8 @@ export async function PATCH(req: NextRequest) {
       meta: { minutesId: id, route: "/api/admin/minutes", action, ...(payload.reason ? { reason: payload.reason } : {}) }
     });
 
+    // Tell the other opted-in admins there is something to approve (content-free, best effort).
+    if (outcome.audit === "minutes_submitted") void notifyAdmins("minutes_submitted", actor.uid, req.nextUrl.origin);
     return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id, ...afterSnap.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {

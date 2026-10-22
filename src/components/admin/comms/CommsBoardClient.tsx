@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -137,6 +138,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
         priority,
         pinned
       });
+      notifyActivity("thread");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

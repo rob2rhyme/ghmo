@@ -23,7 +23,11 @@ export const EMULATOR_ENV = {
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-ghmo",
   NEXT_PUBLIC_USE_FIREBASE_EMULATORS: "true",
   FEATURE_EMAIL_ADMIN_LOGIN: "true",
-  CERTIFICATE_SIGNING_KEY_BASE64: "dGVzdC1jZXJ0aWZpY2F0ZS1rZXktMzItYnl0ZXMtbG9uZyEh"
+  CERTIFICATE_SIGNING_KEY_BASE64: "dGVzdC1jZXJ0aWZpY2F0ZS1rZXktMzItYnl0ZXMtbG9uZyEh",
+  // Notification emails go to a stub server that the notifications test starts on this port.
+  RESEND_API_KEY: "test-key",
+  NOTIFY_FROM_EMAIL: "GHMO <no-reply@example.org>",
+  MAIL_API_URL: "http://127.0.0.1:4010/emails"
 };
 Object.assign(process.env, EMULATOR_ENV);
 

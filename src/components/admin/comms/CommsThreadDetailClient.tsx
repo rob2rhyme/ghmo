@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -296,6 +297,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           lastActivityAt: serverTimestamp()
         });
       });
+      notifyActivity("thread");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -347,6 +349,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           lastActivityAt: serverTimestamp()
         });
       });
+      notifyActivity("thread");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
