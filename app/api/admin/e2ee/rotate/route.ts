@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isSuperAdmin } from "@/src/lib/admin";
-import { deviceIdSchema, epochRecordSchema, wrapRecordSchema } from "@/src/lib/e2ee/schemas";
+import { deviceIdSchema, epochRecordSchema, rosterEntrySchema, wrapRecordSchema } from "@/src/lib/e2ee/schemas";
 import { rotate } from "@/src/lib/e2eeStore";
 import { auditKeyring, e2eeRoute } from "@/src/lib/e2eeRoute";
 import { parseJsonBody } from "@/src/lib/validation";
@@ -12,7 +12,8 @@ const bodySchema = z.object({
   byDeviceId: deviceIdSchema,
   revokeDeviceIds: z.array(deviceIdSchema).max(50),
   epoch: epochRecordSchema,
-  wraps: z.array(wrapRecordSchema).min(1).max(500)
+  wraps: z.array(wrapRecordSchema).min(1).max(500),
+  entry: rosterEntrySchema.optional()
 });
 
 /** Starts a new epoch, optionally revoking devices (lost phone, admin leaving). */

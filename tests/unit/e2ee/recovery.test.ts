@@ -7,6 +7,7 @@ import {
   generateRecoveryKey,
   generateWorkspaceKey,
   importRecoveryPrivateKey,
+  importRecoverySigningKey,
   normalizeRecoveryKeyInput,
   parseRecoveryKey,
   pickVerificationGroups,
@@ -67,6 +68,15 @@ describe("recovery key unwraps workspace keys", () => {
     );
     await expect(attempt).rejects.toThrow();
     await expect(importRecoveryPrivateKey(other.printable, recovery.publicJwk)).rejects.toThrow(/doesn't belong/);
+  });
+});
+
+describe("recovery key as a signing key", () => {
+  it("refuses a paper key that doesn't match the stored public key", async () => {
+    const recovery = await generateRecoveryKey();
+    const other = await generateRecoveryKey();
+    await expect(importRecoverySigningKey(other.printable, recovery.publicJwk)).rejects.toThrow(/doesn't belong/);
+    await expect(importRecoverySigningKey(recovery.printable, recovery.publicJwk)).resolves.toBeDefined();
   });
 });
 

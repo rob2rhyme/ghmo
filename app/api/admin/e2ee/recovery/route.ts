@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isSuperAdmin } from "@/src/lib/admin";
-import { publicJwkSchema, recoveryCheckSchema, trusteeSchema, wrapRecordSchema } from "@/src/lib/e2ee/schemas";
+import { publicJwkSchema, recoveryCheckSchema, rosterEntrySchema, trusteeSchema, wrapRecordSchema } from "@/src/lib/e2ee/schemas";
 import { RECOVERY_REPLACE_MAX_AGE_MS, recoveryReplaceMessage, verifyBytes } from "@/src/lib/e2ee";
 import { listDevices, replaceRecoveryKey } from "@/src/lib/e2eeStore";
 import { auditKeyring, e2eeRoute } from "@/src/lib/e2eeRoute";
@@ -15,6 +15,7 @@ const bodySchema = z.object({
   wraps: z.array(wrapRecordSchema).min(1).max(10_000),
   trustees: z.array(trusteeSchema).length(2),
   trusteesConfirmed: z.literal(true),
+  entry: rosterEntrySchema.optional(),
   // Signed by one of the caller's active devices over the new recovery key (see recoveryReplaceMessage).
   authorization: z.object({ deviceId: z.string().max(64), issuedAt: z.number().int(), sig: z.string().max(200) })
 });
@@ -34,7 +35,7 @@ export const POST = e2eeRoute(async (req, guard) => {
   if (!signed) {
     return NextResponse.json({ error: "Approve the change from one of your unlocked devices (the approval is missing, stale or invalid)." }, { status: 403 });
   }
-  await replaceRecoveryKey(replacement);
+  await replaceRecoveryKey({ ...replacement, byDeviceId: authorization.deviceId });
   await auditKeyring(req, guard, "e2ee_recovery_replaced", `Recovery key replaced; held by ${parsed.data.trustees.map(t => t.name).join(" and ")}`);
   return NextResponse.json({ ok: true });
 });
