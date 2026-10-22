@@ -125,7 +125,7 @@ export async function enrollAndApprove(approver: Page, newAdmin: Page, newAdminN
   if (await unlockButton.isVisible()) await unlockButton.click();
   await expect(approver.getByText("Devices waiting for approval")).toBeVisible();
   await expect(approver.getByLabel(`Safety code ${code}`).first()).toBeVisible();
-  await approver.getByText(`I compared this code with ${newAdminName} and it matches`).click();
+  await approver.getByText(new RegExp(`I compared this code.* with ${newAdminName} and (it|both) match`)).click();
   await approver.getByRole("button", { name: "Approve device" }).click();
   await expect(approver.getByText("Devices waiting for approval")).toHaveCount(0);
 

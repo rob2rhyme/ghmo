@@ -49,6 +49,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 3. Remember what the attacker could and couldn't read: encrypted records (chat, threads, draft minutes, documents, signatures) are ciphertext; **approved minutes, member lists, events, donation records, audit logs and metadata are not encrypted**. Backups made before encryption was turned on contain plaintext.
 4. An attacker with database write access could have tampered with ciphertext, key records or the device list. After a database compromise, do a full device check: compare safety codes of every listed device with its owner, revoke any you can't account for, and rotate keys.
 5. Review `firestore.rules` is still deployed as in the repository.
+6. If the Encryption page shows **"The device list failed its integrity check"**, a browser found the database disagreeing with the signed device log (an unlisted device, swapped keys, a missing or changed key copy, or a rewritten log). Nothing is unlocked or written from that browser. Tell the other admins, compare device safety codes and the workspace fingerprint by phone, and treat it as a database compromise (steps 1–4). Do not approve new devices until it is understood.
 
 ## F. A forged or doubtful certificate
 

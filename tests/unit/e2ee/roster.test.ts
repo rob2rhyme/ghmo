@@ -11,6 +11,7 @@ import {
   generateDeviceKeys,
   generateRecoveryKey,
   genesisEntry,
+  keyringFromOverview,
   importRecoverySigningKey,
   recoveryEntry,
   rosterDevice,
@@ -341,5 +342,12 @@ describe("roster: the server must match the signed log", () => {
     // Anything above the current epoch is ignored by callers that pass the current epoch.
     await expect(checkWrapsAgainstRoster(state, bob.record.deviceId, [...mine, { ...mine[0], epoch: 3 }])).resolves.toBeUndefined();
     expect(RECOVERY_RECIPIENT).toBe(RECOVERY_SIGNER);
+  });
+});
+
+describe("roster: overview adapter", () => {
+  it("reshapes an API overview into a server keyring", () => {
+    const keyring = keyringFromOverview({ state: { recoveryPublic: null, currentEpoch: 4 }, devices: [], epochs: [] });
+    expect(keyring).toEqual({ devices: [], recoveryPublic: null, currentEpoch: 4, epochs: [] });
   });
 });

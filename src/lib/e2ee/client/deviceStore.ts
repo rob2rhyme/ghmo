@@ -17,6 +17,8 @@ export type StoredDeviceIdentity = {
     | { method: "prf"; credentialId: string; salt: string }
     | { method: "passphrase"; salt: string; iterations: number };
   createdAt: string;
+  /** The newest device-log entry this device has verified; the log must never shrink or change behind it. */
+  rosterPin?: { seq: number; hash: string };
 };
 
 const DB_NAME = "ghmo-e2ee";

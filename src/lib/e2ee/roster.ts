@@ -57,8 +57,8 @@ export type RosterState = {
   head: { seq: number; hash: string };
   genesisHash: string;
   devices: Map<string, RosterDevice>;
-  /** Every device that was ever active and later revoked. */
-  revoked: Set<string>;
+  /** Every device that was active and later revoked (kept so records they signed can still be checked). */
+  revoked: Map<string, RosterDevice>;
   recovery: RosterKey;
   currentEpoch: number;
   epochs: Map<number, { sealing: RosterKey; wraps: Map<string, string> }>;
@@ -170,7 +170,7 @@ function freshState(entry: RosterEntry & { type: "genesis" }, hash: string): Ros
     head: { seq: 1, hash },
     genesisHash: hash,
     devices: new Map(b.devices.map(d => [d.id, d])),
-    revoked: new Set(),
+    revoked: new Map(),
     recovery: b.recovery,
     currentEpoch: b.epochs.length,
     epochs
@@ -182,7 +182,7 @@ function applyEntry(state: RosterState, entry: RosterEntry, hash: string): Roste
     ...state,
     head: { seq: entry.seq, hash },
     devices: new Map(state.devices),
-    revoked: new Set(state.revoked),
+    revoked: new Map(state.revoked),
     epochs: new Map([...state.epochs].map(([n, e]) => [n, { sealing: e.sealing, wraps: new Map(e.wraps) }]))
   };
   switch (entry.type) {
@@ -213,8 +213,8 @@ function applyEntry(state: RosterState, entry: RosterEntry, hash: string): Roste
       sameSet(b.devices, remaining, "The devices that keep access");
       checkDigests(b.wraps, [...remaining, RECOVERY_SIGNER].map(recipient => ({ epoch: b.epoch, recipient })), "Rotation");
       for (const id of b.revoked) {
+        next.revoked.set(id, state.devices.get(id)!);
         next.devices.delete(id);
-        next.revoked.add(id);
         for (const e of next.epochs.values()) e.wraps.delete(id);
       }
       const wraps = new Map<string, string>();

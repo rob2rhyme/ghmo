@@ -151,6 +151,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Each admin device has its own keys. They are stored in the browser, locked with the admin's passkey (or a passphrase if the passkey can't), and unlocked once per session.
 - A shared workspace key per key generation ("epoch") is wrapped for each approved device and for the **recovery key**. Two named trustees each hold a paper copy of the recovery key.
 - **New devices** must be approved by another admin after comparing a 20-digit safety code, or activated with the paper recovery key.
+- **Signed device list.** Every device, key change and rotation is recorded in a signed, hash-chained log that each browser verifies and pins. An existing workspace needs a super admin to press "Seal the device list" once on the Encryption page (after checking the listed devices with their owners). When adding a device, also compare the 20-digit workspace fingerprint shown on both screens.
 - **Lost devices:** revoking a lost device rotates to a new epoch it can't read.
 - The server only ever stores public keys and wrapped keys (`organizations/ghmo/e2ee/**`, server-only in Firestore rules).
 - **What is encrypted:** Admin Chat; Plans & Issues (titles, details, comments, conclusions, votes); draft and submitted minutes; signatures (sealed in the signer's browser); saved documents and finalized certificates. Approved minutes are public by design and are published as a plaintext copy on approval.
