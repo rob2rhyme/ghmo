@@ -29,17 +29,23 @@ const millis = (value: unknown): number | undefined => {
 /** Null unless the record is approved. */
 export function toArchiveEntry(doc: Record<string, unknown>): ArchiveEntry | null {
   if (doc.status !== "approved") return null;
-  const view = publicView(doc) as Record<string, any>;
+  const view = publicView(doc) as Record<string, unknown> & {
+    agenda?: string[];
+    decisions?: string[];
+    discussionSummary?: string;
+    actionItems?: { task: string; dueDate?: unknown }[];
+    signatures?: { chairName?: string; secretaryName?: string };
+  };
   const attendance = view.attendance as { present?: string[]; absent?: string[]; guests?: string[] } | undefined;
   return {
     id: String(view.id),
     eventTitle: String(view.eventTitle ?? "Meeting"),
     eventDate: millis(view.eventDate),
     meetingType: String(view.meetingType ?? "Meeting"),
-    agenda: (view.agenda ?? []) as string[],
+    agenda: view.agenda ?? [],
     discussionSummary: view.discussionSummary,
-    decisions: (view.decisions ?? []) as string[],
-    actionItems: ((view.actionItems ?? []) as { task: string; dueDate?: unknown }[]).map(item => ({ task: item.task, dueDate: millis(item.dueDate) })),
+    decisions: view.decisions ?? [],
+    actionItems: (view.actionItems ?? []).map(item => ({ task: item.task, dueDate: millis(item.dueDate) })),
     ...(attendance
       ? { attendance: { present: attendance.present?.length ?? 0, absent: attendance.absent?.length ?? 0, guests: attendance.guests?.length ?? 0 } }
       : {}),
