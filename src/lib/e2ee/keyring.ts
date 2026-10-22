@@ -100,12 +100,29 @@ export async function wrapAllEpochsForRecovery(keys: EpochKeys, recoveryPublic: 
   return Promise.all([...keys].map(([epoch, raw]) => wrapEpoch(epoch, raw, RECOVERY_RECIPIENT, recoveryPublic)));
 }
 
-/** Opens the wraps addressed to `recipient` with its private key. Skips none silently: any bad wrap throws. */
-export async function unwrapEpochKeys(wraps: WrapRecord[], recipient: string, privateKey: CryptoKey): Promise<EpochKeys> {
+/**
+ * Opens the wraps addressed to `recipient` with its private key.
+ *
+ * - Wraps for an epoch above `maxEpoch` (the workspace's current epoch) are ignored, so a server can't make
+ *   devices start encrypting under an epoch it invented.
+ * - A wrap for an older epoch that fails to open is skipped (that history just stays unreadable), but
+ *   the newest wrap must open, otherwise this throws: a wrong key must never look like success.
+ */
+export async function unwrapEpochKeys(
+  wraps: WrapRecord[],
+  recipient: string,
+  privateKey: CryptoKey,
+  options: { maxEpoch?: number } = {}
+): Promise<EpochKeys> {
+  const mine = wraps.filter(w => w.recipient === recipient && (options.maxEpoch === undefined || w.epoch <= options.maxEpoch));
   const keys: EpochKeys = new Map();
-  for (const w of wraps) {
-    if (w.recipient !== recipient) continue;
-    keys.set(w.epoch, await unwrapWithPrivateKey(w.wrap, privateKey, epochWrapContext(w.epoch, recipient)));
+  const newest = Math.max(0, ...mine.map(w => w.epoch));
+  for (const w of mine) {
+    try {
+      keys.set(w.epoch, await unwrapWithPrivateKey(w.wrap, privateKey, epochWrapContext(w.epoch, recipient)));
+    } catch (error) {
+      if (w.epoch === newest) throw error;
+    }
   }
   return keys;
 }

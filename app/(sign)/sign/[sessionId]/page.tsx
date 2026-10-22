@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { fromBase64Url, sealSignature, type PublicJwk } from "@/src/lib/e2ee";
 
 type SigningStatus = "pending" | "signed" | "expired" | "finalized" | "cancelled";
 
@@ -11,7 +13,17 @@ const ROLE_LABELS: Record<string, string> = {
   issuingAuthority: "Issuing Authority"
 };
 
-export default function SigningPage({ params }: { params: { sessionId: string } }) {
+type SealTarget = { epoch: number; publicJwk: PublicJwk };
+
+function pngBytes(dataUrl: string) {
+  const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return fromBase64Url(base64);
+}
+
+export default function SigningPage() {
+  // Next 16 hands page params over as a promise; the hook reads them synchronously in a client page.
+  const params = useParams<{ sessionId: string }>();
+  const [seal, setSeal] = useState<SealTarget | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<SigningStatus | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -34,6 +46,7 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
         setStatus(payload.status ?? "pending");
         setRole(payload.role ?? null);
         setExpiresAt(payload.expiresAt ?? null);
+        setSeal(payload.seal ?? null);
       } catch (error) {
         console.error("Failed to load signing session", error);
         setMessage("Unable to load session.");
@@ -126,10 +139,14 @@ export default function SigningPage({ params }: { params: { sessionId: string } 
     setMessage(null);
     try {
       const dataUrl = canvas.toDataURL("image/png");
+      // When the workspace is end-to-end encrypted, the signature is sealed here and the server only stores ciphertext.
+      const signature = seal
+        ? { signatureSealed: await sealSignature(pngBytes(dataUrl), seal.publicJwk, seal.epoch, params.sessionId) }
+        : { dataUrl };
       const response = await fetch(`/api/signing-sessions/${params.sessionId}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl, signerName: signerName.trim() || undefined })
+        body: JSON.stringify({ ...signature, signerName: signerName.trim() || undefined })
       });
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));

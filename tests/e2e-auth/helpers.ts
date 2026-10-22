@@ -81,3 +81,54 @@ export function collectCspViolations(page: Page) {
   });
   return violations;
 }
+
+/** Runs the setup wizard as a super admin on /admin/encryption. Returns the 14 recovery key groups. */
+export async function turnOnEncryption(page: Page, deviceName: string): Promise<string[]> {
+  const { expect } = await import("@playwright/test");
+  await page.goto("/admin/encryption");
+  await page.getByLabel("Name this device").fill(deviceName);
+  await page.getByRole("button", { name: "Create keys with my passkey" }).click();
+  await page.getByRole("button", { name: "Create recovery key" }).click();
+  const groups = await page.getByRole("list", { name: "Recovery key groups" }).locator("li > span:last-child").allTextContents();
+  expect(groups).toHaveLength(14);
+  await page.getByRole("button", { name: "I have written it down" }).click();
+  for (const field of await page.getByLabel(/^Group \d+$/).all()) {
+    const label = await field.evaluate(el => document.querySelector(`label[for="${el.id}"]`)?.textContent ?? "");
+    await field.fill(groups[Number(label.replace("Group ", "")) - 1]);
+  }
+  await page.getByRole("button", { name: "Check" }).click();
+  await page.getByLabel("Trustee 1", { exact: true }).fill("Trustee One");
+  await page.getByLabel("Trustee 2", { exact: true }).fill("Trustee Two");
+  await page.getByText("Trustee One has their own paper copy").click();
+  await page.getByText("Trustee Two has their own paper copy").click();
+  await page.getByRole("button", { name: "Turn on end-to-end encryption" }).click();
+  await expect(page.getByText("End-to-end encryption is on", { exact: true })).toBeVisible({ timeout: 15_000 });
+  return groups;
+}
+
+/**
+ * `newAdmin` has just signed in with a passkey and sets up this browser as a device;
+ * `approver` (an unlocked, active device) compares the safety code and approves it.
+ */
+export async function enrollAndApprove(approver: Page, newAdmin: Page, newAdminName: string, deviceName: string) {
+  const { expect } = await import("@playwright/test");
+  await newAdmin.goto("/admin/encryption");
+  await newAdmin.getByLabel("Name this device").fill(deviceName);
+  await newAdmin.getByRole("button", { name: "Create keys with my passkey" }).click();
+  await expect(newAdmin.getByRole("heading", { name: "Waiting for approval" })).toBeVisible();
+  const code = (await newAdmin.getByLabel(/^Safety code /).first().textContent())!.trim();
+
+  await approver.goto("/admin/encryption");
+  // After a page load the approver is either locked (unlock first) or already showing devices.
+  const unlockButton = approver.getByRole("button", { name: "Unlock with passkey" });
+  await expect(unlockButton.or(approver.getByText("Devices with encryption keys"))).toBeVisible();
+  if (await unlockButton.isVisible()) await unlockButton.click();
+  await expect(approver.getByText("Devices waiting for approval")).toBeVisible();
+  await expect(approver.getByLabel(`Safety code ${code}`).first()).toBeVisible();
+  await approver.getByText(`I compared this code with ${newAdminName} and it matches`).click();
+  await approver.getByRole("button", { name: "Approve device" }).click();
+  await expect(approver.getByText("Devices waiting for approval")).toHaveCount(0);
+
+  await newAdmin.getByRole("button", { name: "Check again" }).click();
+  await expect(newAdmin.getByText("Devices with encryption keys")).toBeVisible();
+}

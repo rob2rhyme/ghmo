@@ -11,11 +11,16 @@ import {
   kekFromPassphrase,
   kekFromPrf,
   openDeviceKeys,
+  openSealingPrivateKey,
+  openSignature,
+  recoveryReplaceMessage,
+  signBytes,
   PBKDF2_ITERATIONS,
   sealDeviceKeys,
   type KeyWrap,
   type OpenedDeviceKeys,
-  type PublicJwk
+  type PublicJwk,
+  type SealedSignature
 } from "../keys";
 import {
   createInitialEpoch,
@@ -30,6 +35,7 @@ import {
   type WrapRecord
 } from "../keyring";
 import { answerRecoveryCheck, createRecoveryCheck, generateRecoveryKey, importRecoveryPrivateKey } from "../recovery";
+import { clearLocalDrafts } from "@/src/lib/localDrafts";
 import { deleteIdentity, loadIdentity, saveIdentity, type StoredDeviceIdentity } from "./deviceStore";
 import { evaluatePrf } from "./prf";
 
@@ -67,8 +73,14 @@ export type PreparedRecovery = {
   recoveryCheck: Awaited<ReturnType<typeof createRecoveryCheck>>;
 };
 
+/** How a stored record was read: decrypted, plaintext from before encryption, or unreadable. */
+export type RecordState = "encrypted" | "legacy" | "failed";
+export type Unpacked<T> = T & { _e2ee: RecordState; _e2eeError?: string };
+
 type E2eeContextValue = {
   status: E2eeStatus;
+  /** Encryption is on for the workspace: new private data must be stored as envelopes. */
+  enabled: boolean;
   /** This device's own keys are open in memory (also true for a pending device). */
   keysOpen: boolean;
   error: string | null;
@@ -89,6 +101,18 @@ type E2eeContextValue = {
   finishRecoveryReplacement: (prepared: PreparedRecovery, trustees: string[]) => Promise<void>;
   encrypt: (location: RecordLocation, data: unknown) => Promise<Envelope>;
   decrypt: <T>(envelope: unknown, location: RecordLocation) => Promise<T>;
+  /**
+   * Prepares the private part of a record for storage: `{ enc }` when encryption is on,
+   * the fields themselves (plaintext) otherwise. Spread the result into the document.
+   */
+  /** Opens a signature that a signer sealed to the workspace key. */
+  openSealedSignature: (sealed: SealedSignature, sessionId: string) => Promise<Uint8Array<ArrayBuffer>>;
+  packPrivate: (location: RecordLocation, privateFields: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  /**
+   * Reads a stored record: decrypts its `enc` envelope and merges the private fields in.
+   * Records stored before encryption was turned on are returned as they are (`_e2ee: "legacy"`).
+   */
+  unpackPrivate: <T extends Record<string, unknown>>(raw: Record<string, unknown>, location: RecordLocation) => Promise<Unpacked<T>>;
 };
 
 const E2eeContext = createContext<E2eeContextValue | null>(null);
@@ -121,6 +145,15 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
   // State drives rendering; the ref gives callbacks the latest keys without re-creating them.
   const [isUnlocked, setIsUnlocked] = useState(false);
   const unlockedRef = useRef<Unlocked | null>(null);
+  // Decrypted records by envelope signature (snapshots re-deliver unchanged documents often).
+  // Holds plaintext, so it is emptied whenever the keys are dropped.
+  const decryptCache = useRef(new Map<string, Record<string, unknown>>());
+  // Latest overview for the stable encrypt/decrypt callbacks below (components subscribe to
+  // Firestore with these, so their identity must not change on every status refresh).
+  const overviewRef = useRef<Overview | null>(null);
+  useEffect(() => {
+    overviewRef.current = overview;
+  }, [overview]);
 
   const refresh = useCallback(async () => {
     try {
@@ -137,7 +170,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const self = stored ? devices.find(d => d.deviceId === stored.deviceId) : undefined;
       if (session && self?.status === "active" && session.epochKeys.size < data.state.currentEpoch) {
         const { wraps } = await api<{ wraps: WrapRecord[] }>(`/api/admin/e2ee/wraps?recipient=${self.deviceId}`);
-        const epochKeys = await unwrapEpochKeys(wraps, self.deviceId, session.keys.ecdhPrivate);
+        const epochKeys = await unwrapEpochKeys(wraps, self.deviceId, session.keys.ecdhPrivate, { maxEpoch: data.state.currentEpoch });
         unlockedRef.current = { ...session, epochKeys };
       }
       setError(null);
@@ -175,6 +208,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
 
   const setUnlocked = (value: Unlocked | null) => {
     unlockedRef.current = value;
+    if (!value) decryptCache.current.clear();
     setIsUnlocked(value !== null);
   };
 
@@ -246,6 +280,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       await fetch(`/api/admin/e2ee/devices/${stored.deviceId}`, { method: "DELETE" });
     }
     await deleteIdentity(overview.me.uid);
+    clearLocalDrafts();
     setUnlocked(null);
     await refresh();
   }, [overview, refresh, thisDevice]);
@@ -258,11 +293,11 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       let epochKeys: EpochKeys = new Map();
       if (thisDevice?.status === "active") {
         const { wraps } = await api<{ wraps: WrapRecord[] }>(`/api/admin/e2ee/wraps?recipient=${identity.deviceId}`);
-        epochKeys = await unwrapEpochKeys(wraps, identity.deviceId, keys.ecdhPrivate);
+        epochKeys = await unwrapEpochKeys(wraps, identity.deviceId, keys.ecdhPrivate, { maxEpoch: overview?.state.currentEpoch });
       }
       setUnlocked({ identity, keys, epochKeys });
     },
-    [identity, openKeys, thisDevice]
+    [identity, openKeys, thisDevice, overview?.state.currentEpoch]
   );
 
   const lock = useCallback(() => setUnlocked(null), []);
@@ -349,7 +384,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       let epochKeys: EpochKeys;
       let token: string;
       try {
-        epochKeys = await unwrapEpochKeys(wraps, "recovery", recoveryPrivate);
+        epochKeys = await unwrapEpochKeys(wraps, "recovery", recoveryPrivate, { maxEpoch: overview.state.currentEpoch });
         token = await answerRecoveryCheck(overview.state.recoveryCheckWrap, recoveryPrivate);
       } catch {
         throw new Error("This recovery key doesn't belong to this workspace (or was replaced).");
@@ -383,7 +418,13 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
   const finishRecoveryReplacement = useCallback<E2eeContextValue["finishRecoveryReplacement"]>(
     async (prepared, trustees) => {
       const session = requireUnlocked();
+      const issuedAt = Date.now();
       await api("/api/admin/e2ee/recovery", {
+        authorization: {
+          deviceId: session.identity.deviceId,
+          issuedAt,
+          sig: await signBytes(session.keys.ecdsaPrivate, recoveryReplaceMessage(session.identity.deviceId, issuedAt, prepared.recoveryPublic))
+        },
         recoveryPublic: prepared.recoveryPublic,
         recoveryCheck: prepared.recoveryCheck,
         wraps: await wrapAllEpochsForRecovery(session.epochKeys, prepared.recoveryPublic),
@@ -414,14 +455,51 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const session = requireUnlocked();
       return decryptRecord<T>(envelope, location, {
         workspaceKeyFor: async epoch => (session.epochKeys.has(epoch) ? aesKeyFromRaw(session.epochKeys.get(epoch)!) : null),
-        signingKeyFor: deviceId => overview?.devices.find(d => d.deviceId === deviceId)?.ecdsaPublic ?? null
+        signingKeyFor: deviceId => overviewRef.current?.devices.find(d => d.deviceId === deviceId)?.ecdsaPublic ?? null
       });
     },
-    [overview]
+    []
+  );
+
+  const openSealedSignature = useCallback<E2eeContextValue["openSealedSignature"]>(async (sealed, sessionId) => {
+    const session = requireUnlocked();
+    const epochRecord = overviewRef.current?.epochs.find(e => e.epoch === sealed.epoch);
+    const raw = session.epochKeys.get(sealed.epoch);
+    if (!epochRecord || !raw) throw new Error("This device doesn't have the key for that signature");
+    const sealingPrivate = await openSealingPrivateKey(await aesKeyFromRaw(raw), sealed.epoch, epochRecord.sealingPrivate);
+    return openSignature(sealed, sealingPrivate, sessionId);
+  }, []);
+
+  const packPrivate = useCallback<E2eeContextValue["packPrivate"]>(
+    async (location, privateFields) => {
+      if (!overviewRef.current?.state.enabled) return privateFields;
+      return { enc: await encrypt(location, privateFields) };
+    },
+    [encrypt]
+  );
+
+  const unpackPrivate = useCallback<E2eeContextValue["unpackPrivate"]>(
+    async <T extends Record<string, unknown>>(raw: Record<string, unknown>, location: RecordLocation) => {
+      const { enc, ...rest } = raw;
+      if (enc === undefined) return { ...raw, _e2ee: "legacy" } as Unpacked<T>;
+      const cacheKey = `${location.path}/${location.docId}:${(enc as { sig?: string }).sig ?? ""}`;
+      try {
+        let fields = decryptCache.current.get(cacheKey);
+        if (!fields) {
+          fields = await decrypt<Record<string, unknown>>(enc, location);
+          decryptCache.current.set(cacheKey, fields);
+        }
+        return { ...rest, ...fields, _e2ee: "encrypted" } as Unpacked<T>;
+      } catch (err) {
+        return { ...rest, _e2ee: "failed", _e2eeError: err instanceof Error ? err.message : "Could not decrypt" } as Unpacked<T>;
+      }
+    },
+    [decrypt]
   );
 
   const value: E2eeContextValue = {
     status,
+    enabled: Boolean(overview?.state.enabled),
     keysOpen: isUnlocked,
     error,
     overview,
@@ -440,7 +518,10 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     checkRecoveryKey,
     finishRecoveryReplacement,
     encrypt,
-    decrypt
+    decrypt,
+    openSealedSignature,
+    packPrivate,
+    unpackPrivate
   };
 
   return <E2eeContext.Provider value={value}>{children}</E2eeContext.Provider>;

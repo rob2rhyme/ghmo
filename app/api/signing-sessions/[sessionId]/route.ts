@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { currentSealingKey } from "@/src/lib/sealedSignature.server";
 import { isValidSigningSessionId } from "@/src/lib/signatureEncryption";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,9 @@ export async function GET(_: Request, context: { params: Promise<{ sessionId: st
       sessionId: snapshot.id,
       status: data.status ?? "pending",
       role: data.role ?? null,
-      expiresAt: expiresAt?.toISOString()
+      expiresAt: expiresAt?.toISOString(),
+      // When encryption is on, signers encrypt their signature in the browser to this public key.
+      seal: data.status === "pending" ? await currentSealingKey() : null
     });
   } catch (error) {
     if (error instanceof AdminEnvError) {

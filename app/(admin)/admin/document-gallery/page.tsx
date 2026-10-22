@@ -72,7 +72,7 @@ export default async function DocumentGalleryPage() {
                       {doc.templateTitle}
                     </p>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {doc.category || "General"}
+                      {doc.category || "General"}{doc.templateVersion ? ` · template v${doc.templateVersion}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}

@@ -303,7 +303,7 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 - **Recovery key:** the **private half of a P-256 key pair**. The paper copy is that private scalar: 14 groups of Crockford base32 plus a checksum, with look-alike letters tolerated. Every epoch is wrapped to the recovery *public* key, so rotation never needs the paper copy.
   - **Proof of possession:** to activate a device with the recovery key, the client decrypts a token that was wrapped to the recovery key; the server stores only the token's hash.
 - **Record envelopes:** AES-256-GCM with AAD = exact Firestore path + document ID + epoch + writing device, plus an ECDSA signature by that device. Ready for Phase 4.
-- **Safety codes:** 12 digits computed from a device's public keys, compared by phone or in person before approving it.
+- **Safety codes:** 20 digits computed from a device's public keys, compared by phone or in person before approving it.
 
 **Server rules (transactions):**
 - Setup is super admin only, happens once, and needs two different trustees.
@@ -339,4 +339,137 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 1. A super admin opens Admin → Encryption and runs setup. Do this with both trustees present, so each can take a paper copy straight away.
 2. Every other admin sets up each of their devices; another admin approves each one after comparing the safety code by phone or in person.
 3. Put a yearly reminder on the calendar: test the recovery key (Admin → Encryption → Test).
+
+
+### Phase 4 — E2EE rollout · done 2026-10-21
+**Design as built** (refines §4.4 and §6):
+- **Gating:** rules treat the workspace as "encrypted" once `e2ee/state.enabled` is true. From then on, private fields must be stored as an envelope written by one of the caller's own active devices, and plaintext writes are refused. Before that, plaintext still works. Pages that show private data ask the admin to unlock first (`EncryptionGate`).
+- **Admin Chat:** `{body}` is encrypted. The audit log records that a message was sent, never what it said (the audit route ignores `summary`).
+- **Plans & Issues:** title and body, the conclusion text, comments and each vote's value are encrypted. Status, priority, timestamps, authors and who voted stay readable (rules need them). Vote counts are no longer stored on the thread: each browser decrypts the votes and tallies them, because public counts would have revealed how each admin voted.
+- **Meeting minutes:** drafts and submitted minutes keep their content (chair, agenda, summary, decisions, action items, attendance, signatures) inside `enc`; approval notes inside `approvalEnc`. Minutes are server-written only (rules deny direct writes); the API validates the envelope and the writing device, and refuses plaintext content once encryption is on. **Approval publishes a plaintext copy** (`published`) for the public pages, supplied by the approver's browser; returning to draft deletes it. Approving and saving content are separate requests. Lists and search decrypt on the client.
+- **Signatures:** the signing page seals the image to the workspace sealing key (ephemeral ECDH → HKDF → AES-GCM, bound to the session and epoch). The server stores only ciphertext; an unlocked admin device opens it. The old server-side AES key is used only for signatures collected before encryption.
+- **Document history:** saved documents keep inputs inside `enc`. On finalize, the browser builds the PDF (as JPEG, to stay under the 1 MiB document limit) and encrypts it with the inputs. Finalized documents now get `status: "finalized"`, so the existing edit lock works.
+- **Migration:** Admin → Encryption → "Encrypt existing records". An unlocked device encrypts each legacy record, decrypts it again to prove it matches, and the server swaps plaintext for the envelope only if the record is unchanged and the envelope comes from the caller's own device. Covers chat, threads, conclusions, comments, votes, draft/submitted minutes and saved documents. **Approved minutes stay public.** Safe to run again.
+
+**Exit criteria met:**
+- With encryption on, browser tests read the stored data directly and find only ciphertext for chat, threads, comments, conclusions, votes, draft minutes, signatures and saved documents; audit entries contain no content.
+- Migration test: seeds plaintext in every area, runs the job, finds none left, and the data is still readable afterwards.
+- Tests: 116 unit, 67 rules, 7 real-browser (virtual passkey with PRF) including a second admin reading and voting.
+
+**Bugs found and fixed during the phase:**
+- Chat audit entries sent the first 80 characters of every message in plaintext.
+- Next 16 passes `params`/`searchParams` as promises: the thread detail page, the minutes page (`?mode=records` was ignored), the document generator (`?docId=` was ignored) and the signing page all read them synchronously.
+- The admin events list returned timestamps the minutes editor couldn't parse, so no past event could be selected.
+- Finalized certificates never got `status: "finalized"`, so the edit lock never applied.
+- CSP `base-uri 'none'` blocked html-to-image (document exports); it is now `'self'`. Cross-origin base tags are still refused.
+- Removed the unused `AdminDashboardClient` (it still wrote plaintext minutes).
+
+**Known limits:**
+- **Backups made before the migration still contain the old plaintext.** Delete them once they are no longer needed (Firestore exports/PITR retention, any manual exports).
+- Approval trusts the approver's browser to supply the content to publish; Phase 5 adds separation of duties and server-side checks.
+- The migrated record's envelope is signed by the migrating admin's device, not the original author's (the readable `createdBy` is unchanged).
+- Encrypted finalized certificates are capped near 1 MiB; Phase 5 moves PDFs to Cloud Storage.
+- The events collection is read from two paths (`organizations/ghmo-site/events` by the admin list, `organizations/ghmo/events` by the public minutes route). Worth unifying.
+- Metadata stays readable: who wrote what and when, thread status, event titles, who voted.
+
+**Owner actions after deploying Phase 4**
+1. Make sure encryption is on and every admin has an approved device (Admin → Encryption).
+2. A super admin (or any admin with an unlocked device) opens Admin → Encryption and runs **Encrypt existing records** once. Keep the page open until it says Done.
+3. Deploy the updated `firestore.rules` (`firebase deploy --only firestore:rules`).
+4. Delete older Firestore backups/exports, and review who can still read the Firebase console.
+5. Any signatures collected before encryption was turned on must be finalized or discarded; they expire within minutes.
+
+### Phase 5 — Governance features · done 2026-10-21
+**Built:**
+- **Minutes approval workflow.** `planTransition` (pure, unit-tested) decides every status change inside a Firestore transaction.
+  - The approver can't be the submitter.
+  - Submitting stores a SHA-256 of the canonical content (the browser computes it for encrypted minutes). Approving must publish content with the same hash, so approval can't change the minutes. A mismatch is refused (`CONTENT_CHANGED`).
+  - Editing submitted minutes returns them to draft.
+  - Every approval writes an immutable `versions/{n}` snapshot (published content, hash, who submitted and approved).
+  - Reopening approved minutes needs a reason of at least 10 characters, unpublishes them, and is audited (`minutes_reopened`).
+- **Action-item tracking.** Admin → Action Items lists items from approved minutes (public content). Status and notes are separate records keyed by minutes ID + a hash of the task, encrypted once encryption is on (rules enforce the envelope), and covered by the migration job.
+- **Attendance export.** CSV of the filtered records, one row per person. Cells starting with `= + - @` are defused against spreadsheet formula injection.
+- **Template versioning.** Each template has a `version`; documents store it and warn when opened against a newer template.
+- **Certificate verification.**
+  - Each certificate gets a random 16-character code, shown as a QR code on the certificate.
+  - On issue, the server writes a record (certificate number, template, version, issue time, SHA-256 of the issued PDF) signed with an HMAC. The key is `CERTIFICATE_SIGNING_KEY_BASE64`, kept out of the database, so someone who can only write to Firestore can't forge a record.
+  - `/verify/{code}` shows the number, type and date, never names. Visitors can check a PDF against the issued file; hashing happens in their browser.
+  - Finalize now checks every signature: it was collected for this certificate number and for the role it's placed under, and no signature fills two roles. The certificate, its verification record and the used sessions are written in one batch.
+  - The issued PDF downloads on finalize.
+
+**Decisions and limits:**
+- **Cloud Storage for PDFs was not built.** New Firebase projects may need a paid plan for Storage, which conflicts with the free-tier rule. Encrypted certificates stay inside their Firestore document (about 1 MiB cap, JPEG-compressed). Revisit if the owner enables billing.
+- **The server does not rebuild the certificate from stored inputs.** With end-to-end encryption on, the server can't read the inputs. The browser builds the PDF and sends its hash; the server verifies who signed what and for which certificate, then signs the record. An admin could still issue a certificate with wording that differs from the signed template; this is bounded by trust in the issuing admins and the audit log.
+- **Only one admin?** The approver can't be the submitter, so minutes can't be approved. Keep at least two active admins.
+- A reopen reason is stored in plain text on the minutes record and in the audit log.
+- The verification page has no revoke screen yet. The record has a `status` field, and an admin can set `revoked` in Firestore for now.
+
+**Owner actions after deploying Phase 5**
+1. Set `CERTIFICATE_SIGNING_KEY_BASE64` in the hosting environment (`openssl rand -base64 32`). Back it up with your other secrets; losing it invalidates every QR code.
+2. Deploy the updated `firestore.rules`.
+3. Make sure at least two admins are active.
+
+### Phase 6 — Public & integrations · done 2026-10-22
+**Built:**
+- **Public minutes archive** (`/minutes`, `/minutes/{id}`, linked from the footer). Approved minutes only, grouped by year. The page shows agenda, discussion, decisions, action items and signatories, but **attendance only as counts** (names are not shown, since the pages are indexable), and nothing about who recorded, submitted or approved. Drafts and submitted minutes are not reachable by id.
+- **Calendar export:** `/api/calendar` (subscribable feed of published events) and `/api/calendar/{id}` ("Add to calendar" on the event page). Output is escaped and line-folded per RFC 5545, in UTC, and a title can't inject extra properties.
+- **Notification emails (content-free, opt-in):**
+  - Each admin turns them on under Admin → Security.
+  - They say that something happened and link to the page: new Admin Chat activity, new Plans & Issues activity, or minutes waiting for approval. They never include titles, names or text.
+  - At most one email of each kind per person every 30 minutes. The person who caused the activity is not emailed.
+  - They are sent through Resend's free tier, and only when `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` are set; otherwise nothing is sent.
+  - Chat and thread activity is written straight to Firestore, so the browser asks the server to send the email (`POST /api/admin/notify`, which takes only the kind of activity). Minutes submissions trigger it server-side.
+- **Encrypted local autosave:** unsent minutes and new-thread forms are saved in the browser, encrypted with the workspace key and bound to the admin. They are offered back as "Restore draft" after a reload or crash, removed when the form is sent or discarded, and wiped on sign-out or when the device is forgotten. Nothing is saved while encryption is off or the device is locked, and drafts never go to the server.
+
+**Decisions and limits:**
+- The email provider sees recipient addresses and that activity happened (timing), though never content. If that is too much, leave the two env vars unset.
+- Autosave covers minutes and new threads. Comments, chat compose and the document builder are not autosaved yet.
+- A draft is readable by any admin who unlocks a device in the same browser profile; sign out when sharing a computer (sign-out wipes drafts).
+- The calendar feed is public for published events only; unpublished events never appear.
+
+**Owner actions after deploying Phase 6**
+1. Optional: create a Resend account (free), verify the sending domain, and set `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Security.
+2. Nothing else; no rules or data changes.
+
+### Phase 7 — Assurance · in progress (what could be done without outside people is done, 2026-10-22)
+**Done in this session:**
+- **Independent code review.** A separate reviewer, given only the code and a threat model, traced the encryption design, the Firestore rules, the key routes and the auth flows. Its 16 findings were triaged by reading the code paths; results below.
+- **Automated anonymous and wrong-user sweep** (`tests/e2e-auth/route-sweep.spec.ts`): every API route is called (a) with no credentials and (b) as a stranger, a disabled admin and a magic-link-only admin. Everything not public by design must answer 401/403/404/405, and nothing may answer an anonymous write with success or a server error. A new route that forgets its guard fails here. Also checks that cross-site, cookie-authenticated writes are refused.
+- **Key-rotation drill automated** (`tests/e2e-auth/rotation-drill.spec.ts`) and written up as a yearly manual drill (`docs/KEY_ROTATION_DRILL.md`).
+- **Incident-response runbook** (`docs/RUNBOOK_INCIDENT.md`): lost device, stolen session, departed admin, lost recovery key, database compromise, forged certificate, wrongly published minutes.
+- **Dependency audit.** `npm audit --omit=dev` reports 11 findings, all in transitive packages of `firebase-admin` / the Firebase client (`@grpc/grpc-js` advisories about gRPC *servers*, `uuid` when a caller passes a buffer). We run no gRPC server and pass no buffers, so they are not reachable; the suggested "fixes" are a major upgrade of `firebase-admin` and a downgrade of `firebase`. Accepted; Dependabot (weekly) will propose the safe upgrade when one exists.
+
+**Fixed (from the review and the drill):**
+| # | Finding | Fix |
+|---|---|---|
+| R3 | Donation webhook payloads were publicly readable: Firestore ORs overlapping `match` blocks, so the public read of `donations/**` also covered `webhookEvents`. | Donations are admin-only in the client SDK (public totals come from the API route). Rules test added. |
+| R8 | Any admin could erase or forge audit logs. | `auditLogs` is read-only for admins; the server writes them. Rules test added. |
+| R7 | Writes weren't tied to the current epoch, so a device that missed a rotation (or a revoked device) could keep writing under an old key. | Rules and server routes require `enc.epoch == currentEpoch` for new envelopes. Rules test added. |
+| R5 | The 12-digit safety code (~40 bits) was short enough to search for a look-alike key pair. | 20 digits (~66 bits). Docs updated. |
+| R4 | A stolen super-admin session cookie could replace the recovery key, so the attacker could read data after the next rotation. | The change must be signed by one of the admin's active devices over the exact new key (2-minute window). Integration tests added. |
+| R1 (part) | A server could offer wraps for an invented future epoch. | Clients ignore wraps above the current epoch. |
+| R11 | One bad wrap blocked unlock. | Unreadable older epochs are skipped; the newest must open. Unit tests added. |
+| R6 (part) | A thread could go from open straight to closed. | Rules refuse it. |
+| R13 | An approver could change the meeting type during approval (not covered by the content fingerprint). | Meeting type can't change with a status change. |
+| R15 | Notification links used the request origin. | They use the configured app URL. |
+| — | Defense in depth against cross-site requests. | Cookie-authenticated writes marked cross-site / same-site by the browser (`Sec-Fetch-Site`) are refused. |
+| Drill | Pending, revoked and no-device admins saw "Something went wrong" instead of guidance (the gate's button crashed). | Button `asChild` fixed. Found by the rotation drill. |
+
+**Accepted, in writing (owner to sign off):**
+| # | Finding | Why accepted for now |
+|---|---|---|
+| R1/R2 | Key wraps, epoch records and the device roster aren't signed, so an attacker with **database write access** could swap in keys they control for future data. | Needs control of the database (or the hosting) and acts only on data written afterwards; existing ciphertext stays safe. A server that also serves the site's JavaScript could do worse regardless. Mitigations in place: safety-code approval of new devices, current-epoch checks, device-signed recovery changes, tamper-evident audit log. **Proper fix** (a signed, chained device roster pinned by each device) is a design change that should be done with the external cryptography review. |
+| R9 | Rollback/replay: a database writer can restore an older valid envelope or delete records; signatures of revoked devices still verify on old records. | Same attacker as above; integrity of old records is not a stated goal beyond tamper-evidence of *who wrote* them. Revisit with the signed-roster work. |
+| R6 (rest) | Rules don't count votes: any admin can overwrite a conclusion while earlier approvals stand, or finalize without quorum. | The board is a small trusted group, actions are audited, and the UI enforces the workflow. A server-side finalize route is the fix if quorum must be enforced. |
+| R10 | Any admin can overwrite another admin's draft document or migrate someone else's legacy record. | Admins share these documents by design; every change is audited. |
+| R12 | One admin can create, sign and finalize a certificate; with encryption on, the server endorses the browser's PDF hash. | By design for a small organization; the certificate record names the issuing admin. Require two finalizers if that is wanted. |
+| R14 | Rate limits depend on `TRUSTED_PROXY_HOPS` matching the real proxy chain. | Hosting-specific. **Owner action:** confirm the setting after deploying. |
+| R16 | Rules accept `authMethod == "dev"` tokens. | Only the dev login can mint them and it is disabled in production. **Owner rule:** never point a local/dev environment at the production Firebase project. |
+
+**Still needs people outside this session (Phase 7 is not complete until these are done):**
+1. **External review** of `src/lib/e2ee/` and the key-handling routes by someone qualified in applied cryptography, including the signed-roster design above.
+2. **Penetration test** of sign-in (passkeys, magic link), session handling and the public pages by an independent tester on the real deployment.
+3. **Run the manual key-rotation drill** and the **recovery-key test** with both trustees, and record the date.
+4. Fill in names and numbers in `docs/RUNBOOK_INCIDENT.md`, and print it with the recovery keys.
+5. Confirm `TRUSTED_PROXY_HOPS`, delete pre-encryption backups, set `CERTIFICATE_SIGNING_KEY_BASE64`.
 

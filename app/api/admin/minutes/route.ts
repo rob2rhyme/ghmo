@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
@@ -11,6 +12,13 @@ import { meetingTypes, MeetingAttendance, MeetingType } from "@/src/lib/minutes"
 import { resolveActorName } from "@/src/lib/actor";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
+import { getState } from "@/src/lib/e2eeStore";
+import { deviceBelongsTo, envelopeSchema, type EnvelopeInput } from "@/src/lib/e2eeEnvelope.server";
+import { CONTENT_FIELDS, adminView, auditView } from "@/src/lib/minutesRecords";
+import { normalizeAttendance, normalizeContent } from "@/src/lib/minutesContent";
+import { planTransition } from "@/src/lib/minutesWorkflow";
+import { getAppOrigin } from "@/src/lib/appUrl";
+import { notifyAdmins } from "@/src/lib/notify.server";
 
 export const dynamic = "force-dynamic";
 
@@ -62,9 +70,24 @@ const minutesFieldsSchema = {
   signatures: signaturesSchema.nullish()
 };
 
+// With encryption on, content travels only as `enc` (and approval notes as `approvalEnc`).
+// Approving also publishes a plaintext copy of the saved content, which the approver's browser supplies.
+const publishedSchema = z.object({
+  chairedBy: minutesFieldsSchema.chairedBy,
+  agenda: minutesFieldsSchema.agenda,
+  discussionSummary: minutesFieldsSchema.discussionSummary,
+  decisions: minutesFieldsSchema.decisions,
+  actionItems: minutesFieldsSchema.actionItems,
+  attendance: minutesFieldsSchema.attendance,
+  signatures: minutesFieldsSchema.signatures
+});
+
 const createMinutesSchema = z.object({
   ...minutesFieldsSchema,
-  eventId: docIdSchema
+  eventId: docIdSchema,
+  // Chosen by the browser so the ciphertext can be bound to its document.
+  id: docIdSchema.optional(),
+  enc: envelopeSchema.optional()
 });
 
 const updateMinutesSchema = z.object({
@@ -72,8 +95,41 @@ const updateMinutesSchema = z.object({
   meetingType: meetingTypeSchema.optional(),
   id: docIdSchema,
   action: z.enum(["submit", "approve", "returnToDraft"]).optional(),
-  approvalNotes: z.string().max(5000).nullish()
+  approvalNotes: z.string().max(5000).nullish(),
+  enc: envelopeSchema.optional(),
+  approvalEnc: envelopeSchema.optional(),
+  published: publishedSchema.optional(),
+  // Hash of the content being submitted (see minutesContent.ts); needed for encrypted minutes.
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  // Why approved minutes are being reopened.
+  reason: z.string().trim().max(1000).optional()
 });
+
+const E2EE_REQUIRED = { error: "Encryption is on: minutes content must be sent encrypted.", code: "E2EE_REQUIRED" };
+
+function hasPlainContent(payload: Record<string, unknown>) {
+  return [...CONTENT_FIELDS, "approvalNotes"].some(key => payload[key] !== undefined);
+}
+
+function auditLabel(action: string) {
+  return (
+    { minutes_submitted: "Submitted minutes", minutes_approved: "Approved minutes", minutes_reopened: "Reopened minutes", minutes_returned_to_draft: "Returned minutes to draft" }[action] ??
+    "Updated minutes"
+  );
+}
+
+/** Plaintext content fields in the request (only used before encryption is on), in stored form. */
+function legacyContentUpdates(payload: Record<string, any>) {
+  const updates: Record<string, unknown> = {};
+  if (payload.chairedBy !== undefined) updates.chairedBy = sanitizeText(payload.chairedBy) ?? null;
+  if (payload.discussionSummary !== undefined) updates.discussionSummary = sanitizeText(payload.discussionSummary) ?? null;
+  if (Array.isArray(payload.agenda)) updates.agenda = ensureStringArray(payload.agenda);
+  if (Array.isArray(payload.decisions)) updates.decisions = ensureStringArray(payload.decisions);
+  if (payload.attendance !== undefined) updates.attendance = normalizeAttendance(payload.attendance) ?? null;
+  if (Array.isArray(payload.actionItems)) updates.actionItems = normalizeContent({ actionItems: payload.actionItems }).actionItems;
+  if (payload.signatures !== undefined) updates.signatures = sanitizeSignatures(payload.signatures) ?? null;
+  return updates;
+}
 
 type MinutesActionItem = { task: string; assignedTo?: string; dueDate?: Date };
 
@@ -124,7 +180,7 @@ function sanitizeActionItems(value?: unknown[]): MinutesActionItem[] {
       const normalizedDueDate = dueDate instanceof Date && !isNaN(dueDate.getTime()) ? dueDate : undefined;
       return {
         task,
-        assignedTo: assignedTo || undefined,
+        ...(assignedTo ? { assignedTo } : {}),
         ...(normalizedDueDate ? { dueDate: normalizedDueDate } : {})
       };
     })
@@ -187,6 +243,18 @@ export async function GET(req: NextRequest) {
     if ("response" in guard) return guard.response;
 
     const { searchParams } = new URL(req.url);
+    const versionsFor = searchParams.get("versionsFor");
+    if (versionsFor) {
+      const idCheck = docIdSchema.safeParse(versionsFor);
+      if (!idCheck.success) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+      const versions = await getAdminDb()
+        .collection(orgMinutesCollectionPath(COMMUNITY_SLUG))
+        .doc(idCheck.data)
+        .collection("versions")
+        .orderBy("version", "desc")
+        .get();
+      return NextResponse.json({ ok: true, versions: versions.docs.map(d => toPlain(d.data())) });
+    }
     const filterEventId = searchParams.get("eventId");
     const minutesPath = orgMinutesCollectionPath(COMMUNITY_SLUG);
     const db = getAdminDb();
@@ -196,7 +264,7 @@ export async function GET(req: NextRequest) {
     }
     query = query.orderBy("eventDate", "desc").limit(100);
     const snap = await query.get();
-    const items = snap.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }));
+    const items = snap.docs.map(doc => toPlain(adminView({ id: doc.id, ...doc.data() })));
 
     return NextResponse.json({ ok: true, minutes: items });
   } catch (error) {
@@ -235,6 +303,16 @@ export async function POST(req: NextRequest) {
 
     const meetingType = payload.meetingType;
 
+    const e2eeOn = (await getState()).enabled;
+    if (e2eeOn && hasPlainContent(payload)) return NextResponse.json(E2EE_REQUIRED, { status: 400 });
+    if (payload.enc) {
+      if (!e2eeOn) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
+      if (!payload.id) return NextResponse.json({ error: "id is required for encrypted minutes" }, { status: 400 });
+      if (!(await deviceBelongsTo(payload.enc as EnvelopeInput, actor.uid))) {
+        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+      }
+    }
+
     const eventSnap = await resolveEventDocument(eventId);
     if (!eventSnap) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -257,20 +335,25 @@ export async function POST(req: NextRequest) {
     const signatures = sanitizeSignatures(payload.signatures);
 
     const minutesRef = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
+    const newRef = payload.id ? minutesRef.doc(payload.id) : minutesRef.doc();
     const now = new Date();
     const document: Record<string, unknown> = {
       eventId,
       eventTitle: eventData.title || "Untitled Event",
       eventDate: eventData.startsAt || null,
       meetingType,
-      chairedBy: sanitizeText(payload.chairedBy),
       recordedBy: resolveActorName(actor),
-      agenda,
-      discussionSummary: sanitizeText(payload.discussionSummary),
-      decisions,
-      actionItems,
-      ...(attendance ? { attendance } : {}),
-      ...(signatures ? { signatures } : {}),
+      ...(payload.enc
+        ? { enc: payload.enc }
+        : {
+            chairedBy: sanitizeText(payload.chairedBy),
+            agenda,
+            discussionSummary: sanitizeText(payload.discussionSummary),
+            decisions,
+            actionItems,
+            ...(attendance ? { attendance } : {}),
+            ...(signatures ? { signatures } : {})
+          }),
       status: "draft",
       createdAt: now,
       updatedAt: now
@@ -285,7 +368,9 @@ export async function POST(req: NextRequest) {
       delete document.signatures;
     }
 
-    const createdDoc = await minutesRef.add(document);
+    // create() refuses an id that already exists, so a client can't overwrite someone else's minutes.
+    await newRef.create(document);
+    const createdDoc = newRef;
 
     await logAuditEvent({
       orgSlug: COMMUNITY_SLUG,
@@ -302,7 +387,7 @@ export async function POST(req: NextRequest) {
     });
 
     const savedDoc = await createdDoc.get();
-    return NextResponse.json({ ok: true, minutes: toPlain({ id: createdDoc.id, ...savedDoc.data() }) });
+    return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id: createdDoc.id, ...savedDoc.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
@@ -340,53 +425,67 @@ export async function PATCH(req: NextRequest) {
     }
 
     const ref = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    const beforeData = snap.data() || {};
     const action: MinutesAction | undefined = payload.action;
-    const updates: Record<string, any> = { updatedAt: new Date() };
-    if (payload.meetingType) updates.meetingType = payload.meetingType;
-    if (payload.chairedBy !== undefined) updates.chairedBy = sanitizeText(payload.chairedBy) ?? null;
-    if (payload.discussionSummary !== undefined) updates.discussionSummary = sanitizeText(payload.discussionSummary) ?? null;
-    if (Array.isArray(payload.agenda)) updates.agenda = ensureStringArray(payload.agenda);
-    if (Array.isArray(payload.decisions)) updates.decisions = ensureStringArray(payload.decisions);
-    if (payload.attendance !== undefined) {
-      const attendanceUpdate = sanitizeAttendancePayload(payload.attendance);
-      updates.attendance = attendanceUpdate ?? null;
-    }
-    if (Array.isArray(payload.actionItems)) {
-      updates.actionItems = sanitizeActionItems(payload.actionItems);
-    }
-    if (payload.signatures !== undefined) {
-      const sig = sanitizeSignatures(payload.signatures);
-      updates.signatures = sig ?? null;
+    // The meeting type is shown publicly but isn't part of the approval fingerprint, so it can only change while editing.
+    if (action && payload.meetingType) {
+      return NextResponse.json({ error: "Change the meeting type while editing, not with a status change." }, { status: 400 });
     }
 
-    if (action) {
-      const statusChanged = applyStatusAction(
-        updates,
+    const e2eeOn = (await getState()).enabled;
+    if (e2eeOn && hasPlainContent(payload)) return NextResponse.json(E2EE_REQUIRED, { status: 400 });
+    if (!e2eeOn && (payload.enc || payload.approvalEnc || payload.published)) {
+      return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
+    }
+    for (const envelope of [payload.enc, payload.approvalEnc]) {
+      if (envelope && !(await deviceBelongsTo(envelope as EnvelopeInput, actor.uid))) {
+        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+      }
+    }
+
+    // Read, decide and write in one transaction, so two admins can't act on the same stale record.
+    const outcome = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { error: "Not found", status: 404 } as const;
+      const before = snap.data() || {};
+      const plainEdits = legacyContentUpdates(payload);
+      const editsContent = Boolean(payload.enc) || Object.keys(plainEdits).length > 0;
+
+      const plan = await planTransition({
+        before,
         action,
-        beforeData,
-        actor.uid,
-        payload.approvalNotes ?? undefined
-      );
-      if (!statusChanged) {
-        return NextResponse.json({ error: "Action not allowed" }, { status: 400 });
-      }
-    } else {
-      if (beforeData.status === "approved") {
-        return NextResponse.json({ error: "Cannot edit approved minutes" }, { status: 403 });
-      }
-    }
-    await ref.set(updates, { merge: true });
-    const afterSnap = await ref.get();
+        editsContent,
+        actorUid: actor.uid,
+        now: new Date(),
+        deleteField: FieldValue.delete(),
+        contentHash: payload.contentHash,
+        published: payload.published as Record<string, unknown> | undefined,
+        approvalEnc: payload.approvalEnc,
+        approvalNotes: payload.approvalNotes ?? undefined,
+        reason: payload.reason
+      });
+      if (!plan.ok) return { error: plan.error, status: plan.status, code: plan.code } as const;
 
+      const updates: Record<string, unknown> = { updatedAt: new Date(), ...plainEdits, ...plan.updates };
+      if (payload.meetingType) updates.meetingType = payload.meetingType;
+      if (payload.enc) {
+        updates.enc = payload.enc;
+        // Saving encrypted content replaces any plaintext left from before encryption was on.
+        for (const field of [...CONTENT_FIELDS, "approvalNotes"]) {
+          if (before[field] !== undefined) updates[field] = FieldValue.delete();
+        }
+      }
+      tx.update(ref, updates);
+      if (plan.version) tx.set(ref.collection("versions").doc(String(plan.version.version)), plan.version);
+      return { before, audit: plan.audit } as const;
+    });
+    if ("error" in outcome) {
+      return NextResponse.json({ error: outcome.error, ...("code" in outcome && outcome.code ? { code: outcome.code } : {}) }, { status: outcome.status });
+    }
+
+    const afterSnap = await ref.get();
     await logAuditEvent({
       orgSlug: COMMUNITY_SLUG,
-      action: "minutes_updated",
+      action: outcome.audit,
       actor: {
         uid: actor.uid,
         adminId: actor.adminDocId,
@@ -394,13 +493,15 @@ export async function PATCH(req: NextRequest) {
         email: actor.email,
         role: actor.roles[0] ?? "admin"
       },
-      resource: { type: "meeting_minutes", id, summary: `Updated minutes for ${afterSnap.data()?.eventTitle || id}` },
-      before: toPlain({ id, ...beforeData }),
-      after: toPlain({ id, ...afterSnap.data() }),
-      meta: { minutesId: id, route: "/api/admin/minutes", action }
+      resource: { type: "meeting_minutes", id, summary: `${auditLabel(outcome.audit)} for ${afterSnap.data()?.eventTitle || id}` },
+      before: toPlain(auditView({ id, ...outcome.before })),
+      after: toPlain(auditView({ id, ...afterSnap.data() })),
+      meta: { minutesId: id, route: "/api/admin/minutes", action, ...(payload.reason ? { reason: payload.reason } : {}) }
     });
 
-    return NextResponse.json({ ok: true, minutes: toPlain({ id, ...afterSnap.data() }) });
+    // Tell the other opted-in admins there is something to approve (content-free, best effort).
+    if (outcome.audit === "minutes_submitted") void notifyAdmins("minutes_submitted", actor.uid, getAppOrigin(req));
+    return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id, ...afterSnap.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
@@ -410,49 +511,4 @@ export async function PATCH(req: NextRequest) {
     }
     throw error;
   }
-}
-
-function applyStatusAction(
-  updates: Record<string, any>,
-  action: MinutesAction,
-  beforeData: Record<string, any>,
-  actorUid: string,
-  approvalNotes?: string
-) {
-  const now = new Date();
-  let changed = false;
-  switch (action) {
-    case "submit":
-      if (beforeData.status === "submitted") break;
-      if (beforeData.status === "approved") break;
-      updates.status = "submitted";
-      updates.submittedAt = now;
-      updates.submittedByUid = actorUid;
-      updates.approvedAt = null;
-      updates.approvedByUid = null;
-      updates.approvalNotes = null;
-      changed = true;
-      break;
-    case "approve":
-      if (beforeData.status !== "submitted") return false;
-      updates.status = "approved";
-      updates.approvedAt = now;
-      updates.approvedByUid = actorUid;
-      if (approvalNotes !== undefined) {
-        updates.approvalNotes = approvalNotes.trim() || null;
-      }
-      changed = true;
-      break;
-    case "returnToDraft":
-      if (beforeData.status === "draft") break;
-      updates.status = "draft";
-      updates.submittedAt = null;
-      updates.submittedByUid = null;
-      updates.approvedAt = null;
-      updates.approvedByUid = null;
-      updates.approvalNotes = approvalNotes?.trim() ? approvalNotes.trim() : null;
-      changed = true;
-      break;
-  }
-  return changed;
 }

@@ -5,6 +5,7 @@ import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug }
 import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { z } from "zod";
+import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
 
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     }
     query = query.orderBy("startsAt", "desc");
     const snap = await query.limit(200).get();
-    const events = snap.docs.map(normalizeEvent);
+    const events = snap.docs.map(doc => toPlain(normalizeEvent(doc)));
     return NextResponse.json({ ok: true, events });
   } catch (error) {
     if (error instanceof AdminEnvError) {

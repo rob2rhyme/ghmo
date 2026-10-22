@@ -207,17 +207,46 @@ export async function verifyBytes(publicJwk: PublicJwk, signature: string, data:
 // ---------- fingerprints / safety codes ----------
 
 /**
- * 12-digit safety code for a device's public keys, shown as "1234 5678 9012".
+ * 20-digit safety code (about 66 bits) for a device's public keys, shown as "12345 67890 12345 67890".
  * Two admins compare it in person or by phone before a device is approved, so a
  * malicious server cannot slip in its own key. Digits read aloud well in any language.
+ * (12 digits, about 40 bits, was short enough that an attacker could search for a look-alike key pair.)
  */
 export async function deviceSafetyCode(ecdhPublic: PublicJwk, ecdsaPublic: PublicJwk): Promise<string> {
   const canonical = utf8(`ghmo-e2ee/safety/v1|${ecdhPublic.x}|${ecdhPublic.y}|${ecdsaPublic.x}|${ecdsaPublic.y}`);
   const digest = new Uint8Array(await subtle().digest("SHA-256", canonical));
   let value = 0n;
-  for (let i = 0; i < 8; i++) value = (value << 8n) | BigInt(digest[i]);
-  const digits = (value % 10n ** 12n).toString().padStart(12, "0");
-  return `${digits.slice(0, 4)} ${digits.slice(4, 8)} ${digits.slice(8)}`;
+  for (let i = 0; i < 16; i++) value = (value << 8n) | BigInt(digest[i]);
+  const digits = (value % 10n ** 20n).toString().padStart(20, "0");
+  return [0, 5, 10, 15].map(start => digits.slice(start, start + 5)).join(" ");
 }
 
 export { ECDH as ECDH_PARAMS, ECDSA as ECDSA_PARAMS };
+
+// ---------- authorizing a recovery-key change ----------
+// Replacing the recovery key lets whoever holds the new one read data from the next rotation on, so a
+// stolen session cookie must not be enough: an active device of the admin signs the exact new key.
+
+export const RECOVERY_REPLACE_MAX_AGE_MS = 2 * 60 * 1000;
+
+export const recoveryReplaceMessage = (deviceId: string, issuedAt: number, recoveryPublic: PublicJwk) =>
+  utf8(`ghmo-e2ee/recovery-replace/v1|${deviceId}|${issuedAt}|${recoveryPublic.x}|${recoveryPublic.y}`);
+
+// ---------- sealed signatures ----------
+// A signer without an account encrypts their signature to the workspace sealing key;
+// only an unlocked admin device can open it. The signing session ID and epoch are bound
+// in, so a sealed signature can't be moved to another session.
+
+export type SealedSignature = KeyWrap & { v: 1; epoch: number };
+
+const signatureContext = (sessionId: string, epoch: number) => `signature/v1/${sessionId}/${epoch}`;
+
+export async function sealSignature(png: Uint8Array<ArrayBuffer>, sealingPublic: PublicJwk, epoch: number, sessionId: string): Promise<SealedSignature> {
+  return { v: 1, epoch, ...(await wrapToPublicKey(png, sealingPublic, signatureContext(sessionId, epoch))) };
+}
+
+export async function openSignature(sealed: SealedSignature, sealingPrivate: CryptoKey, sessionId: string): Promise<Uint8Array<ArrayBuffer>> {
+  const { v, epoch, ...wrap } = sealed;
+  if (v !== 1) throw new Error("Unsupported sealed signature");
+  return unwrapWithPrivateKey(wrap, sealingPrivate, signatureContext(sessionId, epoch));
+}

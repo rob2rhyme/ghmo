@@ -25,7 +25,10 @@ function mapDocRecord(doc: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.
     templateId: data.templateId as string,
     templateTitle: data.templateTitle as string,
     category: data.category as string,
+    templateVersion: typeof data.templateVersion === "number" ? data.templateVersion : undefined,
     inputs: (data.inputs as Record<string, string>) ?? {},
+    /** Encrypted inputs (and PDF) when the document was saved with encryption on. */
+    enc: (data.enc as Record<string, unknown> | undefined) ?? undefined,
     createdByUid: data.createdByUid as string,
     createdByEmail: data.createdByEmail as string | undefined,
     createdByName: data.createdByName as string | undefined,
@@ -41,7 +44,9 @@ export type CreateDocumentInput = {
   templateId: string;
   templateTitle: string;
   category: string;
-  inputs: Record<string, string>;
+  templateVersion?: number;
+  inputs?: Record<string, string>;
+  enc?: Record<string, unknown>;
   createdByUid: string;
   createdByEmail?: string;
   createdByName?: string;
@@ -62,7 +67,11 @@ export async function createDocument(payload: CreateDocumentInput) {
     templateId: payload.templateId,
     templateTitle: payload.templateTitle,
     category: payload.category,
-    inputs: payload.inputs,
+    ...(payload.templateVersion ? { templateVersion: payload.templateVersion } : {}),
+    ...(payload.enc
+      ? // Encrypted content replaces any plaintext inputs saved earlier.
+        { enc: payload.enc, inputs: FieldValue.delete() }
+      : { inputs: payload.inputs ?? {} }),
     createdByUid: payload.createdByUid,
     createdByEmail: payload.createdByEmail ?? null,
     createdByName: payload.createdByName ?? null,

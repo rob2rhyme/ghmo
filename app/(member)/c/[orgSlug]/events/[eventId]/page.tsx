@@ -137,6 +137,12 @@ export default function EventDetailPage() {
           ) : null}
           {event.location ? <p className="text-sm text-muted-foreground">{event.location}</p> : null}
         </div>
+        <a
+          href={`/api/calendar/${event.id}`}
+          className="rounded-md border border-border px-3 py-2 text-sm font-semibold text-foreground hover:border-primary"
+        >
+          Add to calendar
+        </a>
         <Link
           href={`/api/organizations/${params.orgSlug}/events/${event.id}/announcement.pdf`}
           className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90"
@@ -173,6 +179,9 @@ export default function EventDetailPage() {
                 {isAdminMinutesView ? (
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <p>{adminStatusDescriptions[meetingMinutes.status]}</p>
+                    {meetingMinutes.encrypted && meetingMinutes.status !== "approved" ? (
+                      <p>The content of unapproved minutes is encrypted. Open Meeting Minutes to read it.</p>
+                    ) : null}
                     {meetingMinutes.submittedAt ? (
                       <p>
                         Submitted by {resolveActorLabel({ roles: ["admin"] })} •{" "}

@@ -1,10 +1,12 @@
 "use client";
 
+import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  addDoc,
   collection,
+  doc,
+  setDoc,
   onSnapshot,
   orderBy,
   query,
@@ -13,9 +15,12 @@ import {
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
+import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
+import { DraftBanner } from "@/src/components/admin/encryption/DraftBanner";
+import { THREADS_PATH, threadLoc, unpackThread, type ThreadView } from "@/src/lib/commsRecords";
 import type {
   CommsActorSnapshot,
-  CommsThread,
   CommsThreadPriority,
   CommsThreadStatus
 } from "@/src/lib/comms";
@@ -39,7 +44,8 @@ const PRIORITY_LABELS: Record<CommsThreadPriority, string> = {
 };
 
 export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
-  const [threads, setThreads] = useState<CommsThread[]>([]);
+  const { enabled: encrypted, unpackPrivate, packPrivate } = useE2ee();
+  const [threads, setThreads] = useState<ThreadView[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [queryText, setQueryText] = useState("");
@@ -53,6 +59,12 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [seedStatus, setSeedStatus] = useState<string | null>(null);
+  const draft = useEncryptedDraft({
+    uid: actor.uid,
+    name: "thread:new",
+    value: { title, body },
+    hasContent: Boolean(title.trim() || body.trim())
+  });
 
   useEffect(() => {
     if (!firestore) {
@@ -62,6 +74,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
     }
     setLoading(true);
     setLoadError(null);
+    let cancelled = false;
     const threadQuery = query(
       collection(firestore, "organizations", "ghmo", "commsThreads"),
       orderBy("lastActivityAt", "desc")
@@ -69,20 +82,29 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
     const unsubscribe = onSnapshot(
       threadQuery,
       snapshot => {
-        const nextThreads = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...(doc.data() as Omit<CommsThread, "id">)
-        }));
-        setThreads(nextThreads);
-        setLoading(false);
+        const raw = snapshot.docs.map(d => ({ id: d.id, data: d.data() as Record<string, unknown> }));
+        void Promise.all(raw.map(item => unpackThread(unpackPrivate, item.id, item.data)))
+          .then(nextThreads => {
+            if (cancelled) return;
+            setThreads(nextThreads);
+            setLoading(false);
+          })
+          .catch(error => {
+            if (cancelled) return;
+            setLoadError(error?.message || "Unable to load threads");
+            setLoading(false);
+          });
       },
       error => {
         setLoadError(error.message || "Unable to load threads");
         setLoading(false);
       }
     );
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [unpackPrivate]);
 
   const normalizedQuery = queryText.trim().toLowerCase();
 
@@ -112,9 +134,10 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
     setIsSubmitting(true);
     setCreateStatus(null);
     try {
-      const docRef = await addDoc(collection(firestore, "organizations", "ghmo", "commsThreads"), {
-        title: trimmedTitle,
-        body: trimmedBody,
+      const docRef = doc(collection(firestore, THREADS_PATH));
+      const privateFields = await packPrivate(threadLoc(docRef.id), { title: trimmedTitle, body: trimmedBody });
+      await setDoc(docRef, {
+        ...privateFields,
         createdAt: serverTimestamp(),
         createdBy: actor,
         status: "open",
@@ -123,6 +146,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
         priority,
         pinned
       });
+      notifyActivity("thread");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -130,11 +154,11 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           action: "comms_thread_created",
           resource: {
             type: "comms_thread",
-            id: docRef.id,
-            summary: trimmedTitle
+            id: docRef.id
           }
         })
       });
+      draft.clear();
       setTitle("");
       setBody("");
       setPriority("normal");
@@ -164,6 +188,19 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
 
   return (
     <div className="space-y-6">
+      {draft.pending ? (
+        <DraftBanner
+          savedAt={draft.pending.savedAt}
+          onRestore={() => {
+            const restored = draft.restore();
+            if (restored) {
+              setTitle(restored.title);
+              setBody(restored.body);
+            }
+          }}
+          onDiscard={draft.discard}
+        />
+      ) : null}
       <AdminSectionCard
         title="Plans & Issues"
         description="For decisions, proposals, and issues. Close threads with a clear conclusion."
@@ -239,7 +276,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
         title="Threads"
         description="Track active proposals, discussion, and outcomes across the admin team."
         actions={
-          threads.length === 0 ? (
+          threads.length === 0 && !encrypted ? (
             <button
               type="button"
               onClick={handleSeedThreads}

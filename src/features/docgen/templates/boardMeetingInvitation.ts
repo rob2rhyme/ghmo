@@ -3,6 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const boardMeetingInvitation: DocTemplate = {
   id: "board_meeting_invitation",
+  version: 1,
   title: "Board Meeting Invitation",
   category: "Governance",
   description: "Formal invitation for GHMO board members to attend a board meeting.",

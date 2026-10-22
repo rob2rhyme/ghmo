@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import NotificationsPanel from "@/src/components/admin/security/NotificationsPanel";
 import PasskeysPanel from "@/src/components/admin/security/PasskeysPanel";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -21,6 +22,7 @@ export default async function AdminSecurityPage() {
         description="Your passkeys, and new passkeys from other admins that are waiting for approval."
       />
       <PasskeysPanel />
+      <NotificationsPanel />
     </div>
   );
 }

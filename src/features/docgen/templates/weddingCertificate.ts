@@ -4,6 +4,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const weddingCertificate: DocTemplate = {
   id: "wedding-certificate",
+  version: 1,
   title: "Wedding Certificate",
   category: "Certificate",
   description: "Create a Magar Community marriage certificate with bilingual cultural acknowledgements.",
@@ -208,6 +209,8 @@ export const weddingCertificate: DocTemplate = {
     const certificateNumber = escapeHtml(inputs.certificateNumber) || emptyLine;
     const issueDate = formatDate(inputs.issueDate) || emptyLine;
     const officialSeal = escapeHtml(inputs.officialSeal) || emptyLine;
+    const verificationQr = escapeHtml(inputs.verificationQrImage);
+    const verificationUrl = escapeHtml(inputs.verificationUrl);
     const witness1Name = escapeHtml(inputs.witness1Name) || emptyLine;
     const witness1Signature = escapeHtml(inputs.witness1Signature) || emptyLine;
     const witness1SignatureImage = escapeHtml(inputs.witness1SignatureImage);
@@ -387,6 +390,16 @@ export const weddingCertificate: DocTemplate = {
             display: flex;
             align-items: flex-end;
             line-height: 1.2;
+          }
+          .ghmo-cert-qr {
+            display: block;
+            width: 3.2rem;
+            height: 3.2rem;
+          }
+          .ghmo-cert-verify-url {
+            display: block;
+            font-size: 0.5rem;
+            word-break: break-all;
           }
           .ghmo-cert-signature-image {
             display: block;
@@ -648,6 +661,14 @@ export const weddingCertificate: DocTemplate = {
                 <span class="ghmo-cert-label">Certificate Number:</span>
                 <span class="ghmo-cert-value">${certificateNumber}</span>
               </div>
+              ${
+                verificationQr
+                  ? `<div class="ghmo-cert-row">
+                <span class="ghmo-cert-label">Verify / प्रमाणित:</span>
+                <span class="ghmo-cert-value"><img class="ghmo-cert-qr" src="${verificationQr}" alt="Verification QR code" /><span class="ghmo-cert-verify-url">${verificationUrl}</span></span>
+              </div>`
+                  : ""
+              }
             </section>
           </div>
         </div>

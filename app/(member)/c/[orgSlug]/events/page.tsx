@@ -66,6 +66,10 @@ export default function EventsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Events</h1>
           <p className="text-sm text-muted-foreground">Organization events and announcements</p>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a calendar file download, not a page */}
+          <a href="/api/calendar" className="text-sm font-semibold text-primary">
+            Subscribe in your calendar app (.ics)
+          </a>
         </div>
         <div className="flex flex-wrap gap-2">
           {(["calendar", "list", "grid"] as ViewMode[]).map(mode => (

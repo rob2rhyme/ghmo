@@ -3,6 +3,7 @@ import {
   CalendarDays,
   FileSignature,
   FolderOpen,
+  ListChecks,
   Landmark,
   LayoutDashboard,
   LockKeyhole,
@@ -33,7 +34,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/comms", label: "Plans & Issues", icon: ScrollText },
       { href: "/admin/chat", label: "Admin Chat", icon: MessagesSquare },
-      { href: "/admin/minutes", label: "Meeting Minutes", icon: NotebookPen }
+      { href: "/admin/minutes", label: "Meeting Minutes", icon: NotebookPen },
+      { href: "/admin/action-items", label: "Action Items", icon: ListChecks }
     ]
   },
   {

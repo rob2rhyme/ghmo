@@ -4,6 +4,7 @@ import { ensureOrgSlug } from "@/src/lib/events";
 import { eventsCollectionPath } from "@/src/lib/events";
 import { COMMUNITY_ID } from "@/src/lib/community";
 import { orgMinutesCollectionPath } from "@/src/lib/firestorePaths";
+import { publicView } from "@/src/lib/minutesRecords";
 import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     if (data.status !== "approved") {
       return NextResponse.json({ ok: true, minutes: null });
     }
-    return NextResponse.json({ ok: true, minutes: toPlain({ id: doc.id, ...data }) });
+    return NextResponse.json({ ok: true, minutes: toPlain(publicView({ id: doc.id, ...data })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(

@@ -19,6 +19,12 @@ import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/compone
 import { COMMUNITY_SLUG } from "@/src/lib/community.constants";
 import { resolveActorName } from "@/src/lib/actor";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { approvalLoc, minutesLoc, unpackMinutes } from "@/src/lib/minutesRecords";
+import { hashContent } from "@/src/lib/minutesContent";
+import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
+import { DraftBanner } from "@/src/components/admin/encryption/DraftBanner";
+import { useUnpackedMinutes } from "./useUnpackedMinutes";
 
 type AdminActor = {
   uid: string;
@@ -30,7 +36,8 @@ type AdminActor = {
 type AdminEvent = {
   id: string;
   title?: string;
-  startsAt?: string | null;
+  /** Milliseconds from the API (ISO strings are accepted too). */
+  startsAt?: number | string | null;
   timezone?: string;
   location?: string;
 };
@@ -57,14 +64,32 @@ const statusHelperText: Record<MinutesStatus, string> = {
 };
 const isNonNull = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
-export default function MinutesEditorClient({ minutes, adminActor }: MinutesEditorClientProps) {
+/** A random Firestore-style document id; chosen here so the ciphertext can be bound to it. */
+function newMinutesId() {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from(crypto.getRandomValues(new Uint8Array(20)), byte => alphabet[byte % alphabet.length]).join("");
+}
+
+export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }: MinutesEditorClientProps) {
+  const { enabled: encrypted, packPrivate, unpackPrivate } = useE2ee();
+  const decryptedMinutes = useUnpackedMinutes(rawMinutes);
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
-  const [minutesEntries, setMinutesEntries] = useState<MeetingMinutesRecord[]>(minutes ?? []);
+  // Records saved in this session replace the loaded copy until the page is reloaded.
+  const [savedEntries, setSavedEntries] = useState<MeetingMinutesRecord[]>([]);
+  const minutesEntries = useMemo(() => {
+    const loadedIds = new Set(decryptedMinutes.map(entry => entry.id));
+    return [
+      ...savedEntries.filter(entry => !loadedIds.has(entry.id)),
+      ...decryptedMinutes.map(entry => savedEntries.find(saved => saved.id === entry.id) ?? entry)
+    ];
+  }, [decryptedMinutes, savedEntries]);
   const [formState, setFormState] = useState<MeetingMinutesFormInput>(() => createEmptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The form as last loaded or cleared: a draft is only worth keeping once it differs and has some text.
+  const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyForm()));
   const [minutesSaveStatus, setMinutesSaveStatus] = useState<string | null>(null);
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
   const minutesPreviewRef = useRef<HTMLDivElement | null>(null);
@@ -72,8 +97,21 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
   const [isExportingMinutes, setIsExportingMinutes] = useState(false);
   const [minutesExportStatus, setMinutesExportStatus] = useState<string | null>(null);
   const [approvalNotesInput, setApprovalNotesInput] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
+  const [versions, setVersions] = useState<{ version: number; approvedAt?: number; contentHash: string }[]>([]);
   const [statusActionStatus, setStatusActionStatus] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const hasText =
+    Boolean(formState.discussionSummary?.trim() || formState.chairedBy?.trim()) ||
+    formState.agenda.some(item => item.trim()) ||
+    formState.decisions.some(item => item.trim()) ||
+    formState.actionItems.some(item => item.task.trim());
+  const draft = useEncryptedDraft({
+    uid: adminActor.uid,
+    name: `minutes:${editingId ?? "new"}`,
+    value: formState,
+    hasContent: hasText && JSON.stringify(formState) !== baseline
+  });
   const [attendanceExpanded, setAttendanceExpanded] = useState(false);
   const [signaturesExpanded, setSignaturesExpanded] = useState(false);
   const [previewZoomMode, setPreviewZoomMode] = useState<PreviewZoomMode>("fit");
@@ -110,10 +148,6 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
   }, [editingId, searchParams]);
 
   useEffect(() => {
-    setMinutesEntries(minutes ?? []);
-  }, [minutes]);
-
-  useEffect(() => {
     const minutesId = searchParams.get("minutesId");
     if (!minutesId || editingId === minutesId) return;
     const entry = minutesEntries.find(record => record.id === minutesId);
@@ -123,11 +157,12 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
   const cancelMinutesEdit = () => {
     setEditingId(null);
     setFormState(createEmptyForm());
+    setBaseline(JSON.stringify(createEmptyForm()));
     setMinutesSaveStatus(null);
   };
 
   const loadMinutesIntoForm = (entry: MeetingMinutesRecord) => {
-    setFormState({
+    const next: MeetingMinutesFormInput = {
       eventId: entry.eventId,
       meetingType: entry.meetingType,
       chairedBy: entry.chairedBy || "",
@@ -147,7 +182,9 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
         chairName: entry.signatures?.chairName || "",
         secretaryName: entry.signatures?.secretaryName || ""
       }
-    });
+    };
+    setFormState(next);
+    setBaseline(JSON.stringify(next));
     setEditingId(entry.id);
     setMinutesSaveStatus(null);
     setApprovalNotesInput(entry.approvalNotes || "");
@@ -273,8 +310,13 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
       payload.signatures = signaturesPayload;
     }
     const method = editingId ? "PATCH" : "POST";
-    const body = editingId ? { id: editingId, ...payload } : payload;
     try {
+      if (editingEntry?._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device, so they can't be edited here.");
+      const id = editingId ?? newMinutesId();
+      const { eventId, meetingType, ...content } = payload;
+      // With encryption on this is {enc}; before that it is the plain fields, as always.
+      const privateFields = await packPrivate(minutesLoc(id), content);
+      const body = editingId ? { id, meetingType, ...privateFields } : { id, eventId, meetingType, ...privateFields };
       const res = await fetch("/api/admin/minutes", {
         method,
         headers: { "Content-Type": "application/json" },
@@ -282,12 +324,12 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
-      const saved = data.minutes;
-      setMinutesEntries(prev =>
-        editingId ? prev.map(entry => (entry.id === editingId ? saved : entry)) : [saved, ...prev]
-      );
+      const saved = await unpackMinutes(unpackPrivate, data.minutes);
+      setSavedEntries(prev => [saved, ...prev.filter(entry => entry.id !== saved.id)]);
       setMinutesSaveStatus(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
+      draft.clear();
       setFormState(createEmptyForm());
+      setBaseline(JSON.stringify(createEmptyForm()));
       setEditingId(null);
     } catch (err: any) {
       setMinutesSaveStatus(`Error: ${err.message || "Unable to save minutes"}`);
@@ -353,22 +395,34 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
     setIsUpdatingStatus(true);
     setStatusActionStatus("Updating status...");
     try {
+      const notes = action === "approve" ? approvalNotesInput.trim() : "";
+      const extra: Record<string, unknown> = {};
+      if (action === "approve" && encrypted && editingEntry?.encrypted) {
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        // Approving publishes the saved content as a plaintext copy for the public pages.
+        const { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures } = editingEntry;
+        extra.published = { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures };
+        if (notes) extra.approvalEnc = (await packPrivate(approvalLoc(editingId), { approvalNotes: notes })).enc;
+      } else if (notes) {
+        extra.approvalNotes = notes;
+      }
+      if (action === "submit" && editingEntry?.encrypted) {
+        // The approver's copy must hash to exactly this, so the minutes can't change during approval.
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        extra.contentHash = await hashContent(editingEntry as unknown as Record<string, unknown>);
+      }
+      if (action === "returnToDraft" && editingStatus === "approved") extra.reason = reopenReason.trim();
       const res = await fetch("/api/admin/minutes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingId,
-          action,
-          approvalNotes: action === "approve" ? approvalNotesInput.trim() || undefined : undefined
-        })
+        body: JSON.stringify({ id: editingId, action, ...extra })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update status");
-      const updated = data.minutes;
-      setMinutesEntries(prev =>
-        prev.map(entry => (entry.id === updated.id ? updated : entry))
-      );
+      const updated = await unpackMinutes(unpackPrivate, data.minutes);
+      setSavedEntries(prev => [updated, ...prev.filter(entry => entry.id !== updated.id)]);
       loadMinutesIntoForm(updated);
+      setReopenReason("");
       setStatusActionStatus(
         action === "approve"
           ? "Minutes approved."
@@ -387,7 +441,7 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
     const now = Date.now();
     return events
       .map(evt => {
-        const startMs = evt.startsAt ? Date.parse(evt.startsAt) : NaN;
+        const startMs = typeof evt.startsAt === "number" ? evt.startsAt : evt.startsAt ? Date.parse(evt.startsAt) : NaN;
         if (isNaN(startMs) || !isFinite(startMs)) return null;
         return { ...evt, startsAtMs: startMs };
       })
@@ -454,11 +508,35 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
     setPreviewReady(false);
   }, [previewMinutesData]);
 
+  const editingVersion = editingEntry?.version;
+  useEffect(() => {
+    if (!editingId || !editingVersion) return;
+    let cancelled = false;
+    void fetch(`/api/admin/minutes?versionsFor=${editingId}`, { cache: "no-store" })
+      .then(res => (res.ok ? res.json() : { versions: [] }))
+      .then(data => {
+        if (!cancelled) setVersions(data.versions ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId, editingVersion]);
+
   const attendanceState = ensureAttendanceState(formState.attendance);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
       <div className="space-y-6">
+        {draft.pending ? (
+          <DraftBanner
+            savedAt={draft.pending.savedAt}
+            onRestore={() => {
+              const restored = draft.restore();
+              if (restored) setFormState(restored);
+            }}
+            onDiscard={draft.discard}
+          />
+        ) : null}
         <AdminSectionCard>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -821,6 +899,33 @@ export default function MinutesEditorClient({ minutes, adminActor }: MinutesEdit
                 placeholder="Optional context for approvers"
               />
             </div>
+            {editingStatus === "submitted" && editingEntry?.submittedByUid === adminActor.uid ? (
+              <p className="mt-3 text-xs text-muted-foreground">You submitted these minutes, so another admin must approve them.</p>
+            ) : null}
+            {editingStatus === "approved" ? (
+              <div className="mt-4 space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reason for reopening</label>
+                <textarea
+                  className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+                  value={reopenReason}
+                  onChange={e => setReopenReason(e.target.value)}
+                  rows={2}
+                  placeholder="Required. Recorded in the audit log; reopening unpublishes the minutes."
+                />
+              </div>
+            ) : null}
+            {versions.length ? (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved versions</p>
+                <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                  {versions.map(v => (
+                    <li key={v.version}>
+                      Version {v.version} · {v.approvedAt ? new Date(v.approvedAt).toLocaleString() : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {statusActionStatus ? <p className="mt-2 text-xs text-muted-foreground">{statusActionStatus}</p> : null}
           </AdminSectionCard>
         ) : null}

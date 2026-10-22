@@ -150,10 +150,31 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Admin → **Encryption** (`/admin/encryption`) manages end-to-end encryption keys. The design and owner steps are in `docs/PROJECT_PLAN.md` §4 and §8 (Phase 3).
 - Each admin device has its own keys. They are stored in the browser, locked with the admin's passkey (or a passphrase if the passkey can't), and unlocked once per session.
 - A shared workspace key per key generation ("epoch") is wrapped for each approved device and for the **recovery key**. Two named trustees each hold a paper copy of the recovery key.
-- **New devices** must be approved by another admin after comparing a 12-digit safety code, or activated with the paper recovery key.
+- **New devices** must be approved by another admin after comparing a 20-digit safety code, or activated with the paper recovery key.
 - **Lost devices:** revoking a lost device rotates to a new epoch it can't read.
 - The server only ever stores public keys and wrapped keys (`organizations/ghmo/e2ee/**`, server-only in Firestore rules).
-- Phase 4 moves Admin Chat, Plans & Issues, draft minutes, signatures and document history onto these keys.
+- **What is encrypted:** Admin Chat; Plans & Issues (titles, details, comments, conclusions, votes); draft and submitted minutes; signatures (sealed in the signer's browser); saved documents and finalized certificates. Approved minutes are public by design and are published as a plaintext copy on approval.
+- **Existing data:** after turning encryption on, run Admin → Encryption → **Encrypt existing records** once. Backups taken earlier still contain plaintext; delete them when no longer needed.
+- **Tests:** `npm run test:e2e:auth` runs the real-browser encryption tests (needs Chromium; set `PLAYWRIGHT_CHROMIUM_PATH` if the bundled browser is missing).
+
+## Governance workflow (Phase 5)
+- **Minutes:** the admin who submits minutes can't approve them. Approval is tied to a fingerprint of the submitted content, so nothing can change during approval; editing submitted minutes sends them back to draft. Each approval keeps an immutable version, and reopening approved minutes needs a written reason and is audited.
+- **Action items:** Admin → Action Items tracks tasks from approved minutes. Status and notes are private (encrypted once encryption is on).
+- **Attendance:** Meeting Minutes → Records → "Export attendance (CSV)" exports what the filters show.
+- **Certificates:** issuing a signed certificate prints a QR code that leads to `/verify/{code}`. The page shows the certificate number, type and issue date (never names) and lets anyone check a PDF copy against the issued file in their browser. Records are HMAC-signed with `CERTIFICATE_SIGNING_KEY_BASE64`, which you must set to issue certificates. The issued PDF downloads when you finalize; keep that file, since re-exported copies won't match its fingerprint.
+- **Templates:** each document template has a version; saved documents remember it.
+
+## Public pages & integrations (Phase 6)
+- **Minutes archive:** `/minutes` lists approved minutes (attendance as counts only). Drafts are never shown.
+- **Calendar:** `/api/calendar` is a subscribable `.ics` feed of published events; each event page has "Add to calendar".
+- **Notification emails:** off unless `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` are set. Admins opt in under Admin → Security. Emails contain no content, only a link.
+- **Draft autosave:** with encryption on and the device unlocked, unsent minutes and new threads are kept encrypted in the browser and offered back after a reload. Signing out wipes them.
+
+## Security operations (Phase 7)
+- **Incident runbook:** `docs/RUNBOOK_INCIDENT.md` (lost device, stolen session, departed admin, recovery key, database compromise). Fill in the names and print it with the recovery keys.
+- **Yearly drill:** `docs/KEY_ROTATION_DRILL.md`. The automated version runs with `npm run test:e2e:auth`.
+- **Route sweep:** `tests/e2e-auth/route-sweep.spec.ts` calls every API route as anonymous / stranger / disabled / magic-link-only users and fails if one is open.
+- **Known limits and accepted risks:** see the Phase 7 entry in `docs/PROJECT_PLAN.md`.
 
 ## Development Checks
 | Command | What it does |
@@ -179,7 +200,7 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push
 - Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
 - The dev helper `/api/auth/dev/admin-session` only works when the build is not production, `ALLOW_DEV_ADMIN_LOGIN=true`, and a 32+ character `DEV_ADMIN_LOGIN_TOKEN` is sent in the `x-dev-login-token` header. (Before Phase 1 the code did not check the environment and the token was optional.)
 - Webhooks are validated with a constant-time HMAC-SHA256 check, a 64 KB size cap and a Zod schema; the target organization is never taken from the payload. Replace the HMAC placeholder with the provider's documented verification when credentials are available.
-- Signing links: the session ID must be 64 hex characters; submissions are rate-limited, must be a real PNG under 200 KB, and are accepted exactly once (Firestore transaction). Signatures are encrypted with AES-256-GCM bound to their session, with key IDs for rotation. QR codes for signing links are generated in the browser.
+- Signing links: the session ID must be 64 hex characters; submissions are rate-limited, must be a real PNG under 200 KB, and are accepted exactly once (Firestore transaction). With end-to-end encryption on, the signer's browser seals the signature to the workspace key and the server stores only ciphertext; before that, signatures use server-side AES-256-GCM bound to their session. QR codes for signing links are generated in the browser.
 - Firestore rules are deny-by-default; admin access needs the `admin` custom claim **and** an active admin record. Rules are tested against the emulator (`npm run test:emulators`).
 - All communication log features are admin-only, and closed threads are immutable.
 

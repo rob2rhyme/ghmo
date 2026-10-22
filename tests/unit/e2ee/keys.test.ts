@@ -12,8 +12,13 @@ import {
   kekFromPrf,
   openDeviceKeys,
   openSealingPrivateKey,
+  openSignature,
   randomBytes,
+  recoveryReplaceMessage,
+  signBytes,
+  verifyBytes,
   sealDeviceKeys,
+  sealSignature,
   toBase64Url,
   unwrapWithPrivateKey,
   wrapToPublicKey
@@ -102,7 +107,7 @@ describe("workspace sealing keys", () => {
 });
 
 describe("safety codes", () => {
-  it("are 12 digits, stable for the same keys and different for different keys", async () => {
+  it("are 20 digits, stable for the same keys and different for different keys", async () => {
     const a = await generateDeviceKeys();
     const b = await generateDeviceKeys();
     const [aEcdh, aEcdsa, bEcdh] = await Promise.all([
@@ -111,8 +116,40 @@ describe("safety codes", () => {
       exportPublicJwk(b.ecdh.publicKey)
     ]);
     const code = await deviceSafetyCode(aEcdh, aEcdsa);
-    expect(code).toMatch(/^\d{4} \d{4} \d{4}$/);
+    expect(code).toMatch(/^\d{5} \d{5} \d{5} \d{5}$/);
     expect(await deviceSafetyCode(aEcdh, aEcdsa)).toBe(code);
     expect(await deviceSafetyCode(bEcdh, aEcdsa)).not.toBe(code);
+  });
+});
+
+describe("sealed signatures", () => {
+  it("opens only with the sealing key, for the same session and epoch", async () => {
+    const wdk = await aesKeyFromRaw(generateWorkspaceKey());
+    const { publicJwk, sealedPrivate } = await generateSealingKeys(wdk, 2);
+    const priv = await openSealingPrivateKey(wdk, 2, sealedPrivate);
+    const png = randomBytes(64);
+    const sealed = await sealSignature(png, publicJwk, 2, "a".repeat(64));
+    expect(await openSignature(sealed, priv, "a".repeat(64))).toEqual(png);
+    // Moved to another session: refused.
+    await expect(openSignature(sealed, priv, "b".repeat(64))).rejects.toThrow();
+    // Re-labelled as another epoch: refused.
+    await expect(openSignature({ ...sealed, epoch: 3 }, priv, "a".repeat(64))).rejects.toThrow();
+    // A different workspace's key can't open it.
+    const other = await generateSealingKeys(wdk, 2);
+    await expect(openSignature(sealed, await openSealingPrivateKey(wdk, 2, other.sealedPrivate), "a".repeat(64))).rejects.toThrow();
+  });
+});
+
+describe("authorizing a recovery-key change", () => {
+  it("is a signature over the exact device, time and new key, so it can't be reused for another key", async () => {
+    const device = await generateDeviceKeys();
+    const devicePublic = await exportPublicJwk(device.ecdsa.publicKey);
+    const newKey = await exportPublicJwk((await generateDeviceKeys()).ecdh.publicKey);
+    const otherKey = await exportPublicJwk((await generateDeviceKeys()).ecdh.publicKey);
+    const sig = await signBytes(device.ecdsa.privateKey, recoveryReplaceMessage("dev-1", 1000, newKey));
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-1", 1000, newKey))).toBe(true);
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-1", 1000, otherKey))).toBe(false);
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-2", 1000, newKey))).toBe(false);
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-1", 1001, newKey))).toBe(false);
   });
 });

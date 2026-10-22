@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/src/components/ui/button";
 import { signOut } from "firebase/auth";
 import { getFirebaseAuth } from "@/src/lib/firebaseClient";
+import { clearLocalDrafts } from "@/src/lib/localDrafts";
 
 export default function SignOutButton() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function SignOutButton() {
   const handleSignOut = async () => {
     try {
       setLoading(true);
+      clearLocalDrafts();
       await fetch("/api/auth/session", { method: "DELETE" });
       try {
         // Also drop the browser's Firebase login (kept in IndexedDB) so this device

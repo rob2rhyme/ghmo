@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
+import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import AdminChatClient from "@/src/components/admin/chat/AdminChatClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -31,7 +32,9 @@ export default async function AdminChatPage() {
         description="WhatsApp-style coordination for quick admin updates."
       />
       <FirebaseAdminAuthBootstrap>
-        <AdminChatClient actor={toPlain(actorInfo)} />
+        <EncryptionGate what="Admin Chat">
+          <AdminChatClient actor={toPlain(actorInfo)} />
+        </EncryptionGate>
       </FirebaseAdminAuthBootstrap>
     </div>
   );

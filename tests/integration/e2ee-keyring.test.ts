@@ -17,6 +17,8 @@ import {
   generateRecoveryKey,
   importRecoveryPrivateKey,
   randomBytes,
+  recoveryReplaceMessage,
+  signBytes,
   toBase64Url,
   unwrapWithPrivateKey
 } from "@/src/lib/e2ee";
@@ -286,7 +288,7 @@ describe("E2EE keyring API", () => {
   });
 
   it("recovery: the paper key activates a new device; a wrong token or someone else's device is refused", async () => {
-    const { recovery } = await bootstrapWithAlice();
+    const { recovery, laptop } = await bootstrapWithAlice();
     const newLaptop = await newDevice("alice", "newlaptop");
 
     // Recover: unwrap every epoch with the paper key, prove possession, wrap for the new device.
@@ -328,13 +330,27 @@ describe("E2EE keyring API", () => {
 
     // Then the recovery key is replaced; the old paper copy no longer opens the stored wraps.
     const fresh = await generateRecoveryKey();
-    const replaced = await call(replaceRecovery, "alice", "/api/admin/e2ee/recovery", {
+    const body = async (deviceId: string, issuedAt: number, signer: CryptoKey) => ({
       recoveryPublic: fresh.publicJwk,
       recoveryCheck: await recoveryCheckFor(fresh.publicJwk),
       wraps: await wrapAllEpochsForRecovery(recoveredKeys, fresh.publicJwk),
       trustees: [{ name: "Trustee Three" }, { name: "Trustee Four" }],
-      trusteesConfirmed: true
+      trusteesConfirmed: true,
+      authorization: { deviceId, issuedAt, sig: await signBytes(signer, recoveryReplaceMessage(deviceId, issuedAt, fresh.publicJwk)) }
     });
+    const signer = laptop.keys.ecdsa.privateKey;
+    const replace = (b: unknown) => call(replaceRecovery, "alice", "/api/admin/e2ee/recovery", b);
+
+    // A stolen session cookie isn't enough: the change must be signed by one of the admin's active devices.
+    const unsigned = { ...(await body(laptop.id, Date.now(), signer)), authorization: undefined };
+    expect((await replace(unsigned)).status).toBe(400);
+    expect((await replace(await body(laptop.id, Date.now() - 10 * 60 * 1000, signer))).status).toBe(403);
+    expect((await replace(await body(laptop.id, Date.now(), (await generateDeviceKeys()).ecdsa.privateKey))).status).toBe(403);
+    const forOtherDevice = await body("some-other-device-00001", Date.now(), signer);
+    expect((await replace(forOtherDevice)).status).toBe(403);
+    expect(((await wrapsFor("alice", "recovery")).wraps)).toHaveLength(1);
+
+    const replaced = await replace(await body(laptop.id, Date.now(), signer));
     expect(replaced.status).toBe(200);
     const stored = (await wrapsFor("alice", "recovery")).wraps;
     await expect(unwrapEpochKeys(stored, "recovery", recoveryPrivate)).rejects.toThrow();

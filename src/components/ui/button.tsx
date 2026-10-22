@@ -44,8 +44,15 @@ function Button({ className, variant, size, asChild = false, loading = false, di
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading && !asChild ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-      {children}
+      {asChild ? (
+        // Slot needs exactly one child element, so no spinner here.
+        children
+      ) : (
+        <>
+          {loading ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+          {children}
+        </>
+      )}
     </Comp>
   );
 }

@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { notifyActivity } from "@/src/lib/notifyClient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
+import { useE2ee, type Unpacked } from "@/src/lib/e2ee/client/E2eeProvider";
 import type { CommsActorSnapshot } from "@/src/lib/comms";
 
 type AdminChatClientProps = {
   actor: CommsActorSnapshot;
 };
 
-type AdminChatMessage = {
+type AdminChatMessage = Unpacked<{
   id: string;
   body: string;
   createdAt?: { toDate?: () => Date } | null;
   createdBy?: CommsActorSnapshot;
-};
+}>;
+
+const CHAT_PATH = "organizations/ghmo/adminChatMessages";
 
 export default function AdminChatClient({ actor }: AdminChatClientProps) {
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
@@ -26,6 +30,24 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const { packPrivate, unpackPrivate, status } = useE2ee();
+  // Messages are decrypted as snapshots arrive; unlocking later re-reads them.
+  const canRead = status === "unlocked" || status === "not-setup";
+  const latestDocs = useRef<{ id: string; data: Record<string, unknown> }[]>([]);
+
+  const decryptAll = useCallback(async () => {
+    const decoded = await Promise.all(
+      latestDocs.current.map(d =>
+        unpackPrivate<Omit<AdminChatMessage, "id" | "_e2ee" | "_e2eeError">>(d.data, { path: CHAT_PATH, docId: d.id }).then(m => ({ id: d.id, ...m }) as AdminChatMessage)
+      )
+    );
+    setMessages(decoded);
+    setLoading(false);
+  }, [unpackPrivate]);
+
+  useEffect(() => {
+    if (canRead) void decryptAll();
+  }, [canRead, decryptAll]);
 
   useEffect(() => {
     if (!firestore) {
@@ -40,12 +62,8 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
     const unsubscribe = onSnapshot(
       chatQuery,
       snapshot => {
-        const nextMessages = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...(doc.data() as Omit<AdminChatMessage, "id">)
-        }));
-        setMessages(nextMessages);
-        setLoading(false);
+        latestDocs.current = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() as Record<string, unknown> }));
+        void decryptAll();
       },
       error => {
         setLoadError(error.message || "Unable to load chat");
@@ -53,7 +71,7 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [decryptAll]);
 
   const lastMessageCount = useMemo(() => messages.length, [messages]);
 
@@ -73,21 +91,19 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
     setIsSending(true);
     setSendStatus(null);
     try {
-      await addDoc(collection(firestore, "organizations", "ghmo", "adminChatMessages"), {
-        body: trimmed,
+      // The document ID is chosen first because the ciphertext is bound to it.
+      const messageRef = doc(collection(firestore, "organizations", "ghmo", "adminChatMessages"));
+      const privateFields = await packPrivate({ path: CHAT_PATH, docId: messageRef.id }, { body: trimmed });
+      await setDoc(messageRef, {
+        ...privateFields,
         createdAt: serverTimestamp(),
-        createdBy: actor
+        createdBy: { uid: actor.uid, name: actor.name }
       });
+      notifyActivity("chat");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "admin_chat_message_sent",
-          resource: {
-            type: "admin_chat",
-            summary: trimmed.slice(0, 80)
-          }
-        })
+        body: JSON.stringify({ action: "admin_chat_message_sent", resource: { type: "admin_chat", id: messageRef.id } })
       });
       setBody("");
     } catch (error: any) {
@@ -132,7 +148,11 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
                   <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
                     {resolveActorName(message.createdBy)}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap">{message.body}</p>
+                  {message._e2ee === "failed" ? (
+                    <p className="mt-1 italic opacity-80">Can&apos;t decrypt this message on this device.</p>
+                  ) : (
+                    <p className="mt-1 whitespace-pre-wrap">{message.body}</p>
+                  )}
                   <p className="mt-2 text-[11px] opacity-70">
                     {formatTimestamp(message.createdAt)}
                   </p>

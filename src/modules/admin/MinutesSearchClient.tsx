@@ -9,7 +9,9 @@ import {
   minutesStatusLabels,
   minutesStatusPillClasses
 } from "@/src/lib/minutes";
+import { useUnpackedMinutes } from "@/src/components/admin/minutes/useUnpackedMinutes";
 import { resolveActorLabel } from "@/src/lib/actor";
+import { attendanceCsv } from "@/src/lib/attendanceCsv";
 
 const statusOptions: MinutesStatus[] = ["draft", "submitted", "approved"];
 
@@ -17,7 +19,8 @@ type MinutesSearchClientProps = {
   initialMinutes: MeetingMinutesRecord[];
 };
 
-export default function MinutesSearchClient({ initialMinutes }: MinutesSearchClientProps) {
+export default function MinutesSearchClient({ initialMinutes: rawMinutes }: MinutesSearchClientProps) {
+  const initialMinutes = useUnpackedMinutes(rawMinutes);
   const [query, setQuery] = useState("");
   const [meetingTypeFilter, setMeetingTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -40,6 +43,16 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
       })
       .sort((a, b) => Number(b.eventDate || 0) - Number(a.eventDate || 0));
   }, [initialMinutes, query, meetingTypeFilter, statusFilter, startDate, endDate]);
+
+  // Exports exactly what the filters show, generated here from the decrypted minutes.
+  const exportAttendance = () => {
+    const url = URL.createObjectURL(new Blob([attendanceCsv(filteredMinutes)], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `attendance-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
@@ -108,9 +121,19 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">{filteredMinutes.length} result{filteredMinutes.length === 1 ? "" : "s"}</p>
-          <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
-            Go to minutes editor
-          </Link>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={exportAttendance}
+              disabled={filteredMinutes.length === 0}
+              className="text-sm font-semibold text-primary disabled:opacity-50"
+            >
+              Export attendance (CSV)
+            </button>
+            <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
+              Go to minutes editor
+            </Link>
+          </div>
         </div>
         <div className="divide-y divide-border">
           {filteredMinutes.length === 0 ? (
@@ -139,6 +162,9 @@ export default function MinutesSearchClient({ initialMinutes }: MinutesSearchCli
                     </Link>
                   </div>
                 </div>
+                {entry._e2ee === "failed" ? (
+                  <p className="text-xs text-destructive">Can&apos;t be decrypted on this device.</p>
+                ) : null}
                 {entry.agenda.length ? (
                   <p className="text-xs text-muted-foreground">
                     Agenda: {entry.agenda.slice(0, 3).join(", ")}

@@ -43,10 +43,36 @@ describe("admin access requires an active admin record", () => {
     await assertSucceeds(getDoc(doc(admin(), `${ORG}/adminChatMessages/msg1`)));
   });
 
+  it("keeps minutes server-written: admins can read them but not write them directly", async () => {
+    await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m1`), { title: "Tampered" }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m2`), { title: "New" }));
+  });
+
   it("blocks a disabled admin even though the token still has the admin claim", async () => {
     const db = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
     await assertFails(getDoc(doc(db, `${ORG}/minutes/m1`)));
     await assertFails(getDoc(doc(db, `${ORG}/adminChatMessages/msg1`)));
+  });
+
+  it("keeps donation records and webhook payloads admin-only", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `${ORG}/donations/stats`), { totalRaised: 5 });
+      await setDoc(doc(db, `${ORG}/donations/webhookEvents/events/e1`), { donor: "Someone" });
+    });
+    const anon = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, `${ORG}/donations/stats`)));
+    await assertFails(getDoc(doc(anon, `${ORG}/donations/webhookEvents/events/e1`)));
+    await assertSucceeds(getDoc(doc(admin(), `${ORG}/donations/webhookEvents/events/e1`)));
+  });
+
+  it("lets admins read audit logs but never write them", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/auditLogs/a1`), { action: "x" });
+    });
+    await assertSucceeds(getDoc(doc(admin(), `${ORG}/auditLogs/a1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/auditLogs/a1`), { action: "erased" }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/auditLogs/a2`), { action: "forged" }));
   });
 
   it("blocks a removed admin (no record) with a leftover admin claim", async () => {

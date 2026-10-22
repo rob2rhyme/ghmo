@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -16,7 +17,18 @@ import {
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
-import type { CommsActorSnapshot, CommsComment, CommsThread } from "@/src/lib/comms";
+import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import {
+  commentLoc,
+  conclusionLoc,
+  unpackComment,
+  unpackThread,
+  unpackVote,
+  voteLoc,
+  type CommentView,
+  type ThreadView
+} from "@/src/lib/commsRecords";
+import type { CommsActorSnapshot, CommsConclusionVoteValue } from "@/src/lib/comms";
 
 type CommsThreadDetailClientProps = {
   threadId: string;
@@ -36,8 +48,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function CommsThreadDetailClient({ threadId, actor }: CommsThreadDetailClientProps) {
-  const [thread, setThread] = useState<CommsThread | null>(null);
-  const [comments, setComments] = useState<CommsComment[]>([]);
+  const { packPrivate, unpackPrivate } = useE2ee();
+  const [thread, setThread] = useState<ThreadView | null>(null);
+  const [comments, setComments] = useState<CommentView[]>([]);
+  const [storedTally, setVoteTally] = useState<{ approve: number; reject: number; mine: CommsConclusionVoteValue | null }>({
+    approve: 0,
+    reject: 0,
+    mine: null
+  });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -50,7 +68,6 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
   const [likeStatus, setLikeStatus] = useState<string | null>(null);
   const [isLiking, setIsLiking] = useState(false);
 
-  const [conclusionVote, setConclusionVote] = useState<"approve" | "reject" | null>(null);
   const [conclusionVoteStatus, setConclusionVoteStatus] = useState<string | null>(null);
   const [isVotingConclusion, setIsVotingConclusion] = useState(false);
 
@@ -71,45 +88,56 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       return;
     }
     const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
+    let cancelled = false;
     const unsubscribe = onSnapshot(
       threadRef,
       snapshot => {
         if (!snapshot.exists()) {
           setLoadError("Thread not found.");
           setThread(null);
-        } else {
-          setThread({ id: snapshot.id, ...(snapshot.data() as Omit<CommsThread, "id">) });
-          setLoadError(null);
+          setLoading(false);
+          return;
         }
-        setLoading(false);
+        void unpackThread(unpackPrivate, snapshot.id, snapshot.data() as Record<string, unknown>).then(next => {
+          if (cancelled) return;
+          setThread(next);
+          setLoadError(null);
+          setLoading(false);
+        });
       },
       error => {
         setLoadError(error.message || "Unable to load thread");
         setLoading(false);
       }
     );
-    return () => unsubscribe();
-  }, [threadId]);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [threadId, unpackPrivate]);
 
   useEffect(() => {
     if (!firestore) return;
+    let cancelled = false;
     const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
     const commentQuery = query(collection(threadRef, "comments"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(
       commentQuery,
       snapshot => {
-        const nextComments = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...(doc.data() as Omit<CommsComment, "id">)
-        }));
-        setComments(nextComments);
+        const raw = snapshot.docs.map(d => ({ id: d.id, data: d.data() as Record<string, unknown> }));
+        void Promise.all(raw.map(item => unpackComment(unpackPrivate, threadId, item.id, item.data))).then(next => {
+          if (!cancelled) setComments(next);
+        });
       },
       error => {
         setCommentStatus(error.message || "Unable to load comments");
       }
     );
-    return () => unsubscribe();
-  }, [threadId]);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [threadId, unpackPrivate]);
 
   useEffect(() => {
     if (!firestore || !actor.uid) return;
@@ -135,36 +163,39 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     };
   }, [comments, threadId, actor.uid]);
 
+  const threadStatus = thread?.status;
   useEffect(() => {
-    if (!firestore || !actor.uid || !thread || thread.status !== "closing") {
-      setConclusionVote(null);
+    if (!firestore || !actor.uid || threadStatus !== "closing") {
       return;
     }
-    const voteRef = doc(
-      firestore,
-      "organizations",
-      "ghmo",
-      "commsThreads",
-      threadId,
-      "conclusionVotes",
-      actor.uid
-    );
+    let cancelled = false;
+    const votesRef = collection(firestore, "organizations", "ghmo", "commsThreads", threadId, "conclusionVotes");
     const unsubscribe = onSnapshot(
-      voteRef,
+      votesRef,
       snapshot => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as { value?: "approve" | "reject" };
-          setConclusionVote(data.value ?? null);
-        } else {
-          setConclusionVote(null);
-        }
+        const raw = snapshot.docs.map(d => ({ uid: d.id, data: d.data() as Record<string, unknown> }));
+        void Promise.all(
+          raw.map(async item => ({ uid: item.uid, value: await unpackVote(unpackPrivate, threadId, item.uid, item.data) }))
+        ).then(votes => {
+          if (cancelled) return;
+          setVoteTally({
+            approve: votes.filter(v => v.value === "approve").length,
+            reject: votes.filter(v => v.value === "reject").length,
+            mine: votes.find(v => v.uid === actor.uid)?.value ?? null
+          });
+        });
       },
       error => {
         setConclusionVoteStatus(error.message || "Unable to load votes");
       }
     );
-    return () => unsubscribe();
-  }, [threadId, actor.uid, thread]);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [threadId, actor.uid, threadStatus, unpackPrivate]);
+  const voteTally = threadStatus === "closing" ? storedTally : { approve: 0, reject: 0, mine: null };
+  const conclusionVote = voteTally.mine;
 
   const status = thread?.status || "open";
   const isOpen = status === "open";
@@ -212,60 +243,21 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     setIsVotingConclusion(true);
     setConclusionVoteStatus(null);
     try {
-      const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
-      const voteRef = doc(threadRef, "conclusionVotes", actor.uid);
-      let didChange = false;
-      await runTransaction(firestore, async transaction => {
-        const [threadSnap, voteSnap] = await Promise.all([
-          transaction.get(threadRef),
-          transaction.get(voteRef)
-        ]);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
-        const threadData = threadSnap.data() as CommsThread;
-        if ((threadData.status || "open") !== "closing") {
-          throw new Error("Thread is not in closing");
-        }
-        const currentVote = voteSnap.exists()
-          ? ((voteSnap.data() as { value?: "approve" | "reject" }).value ?? null)
-          : null;
-        if (currentVote === nextVote) return;
-        didChange = true;
-        const approvedCount = threadData.approvedCount || 0;
-        const rejectedCount = threadData.rejectedCount || 0;
-        const nextApproved =
-          approvedCount + (nextVote === "approve" ? 1 : 0) - (currentVote === "approve" ? 1 : 0);
-        const nextRejected =
-          rejectedCount + (nextVote === "reject" ? 1 : 0) - (currentVote === "reject" ? 1 : 0);
-        transaction.set(
-          voteRef,
-          {
-            value: nextVote,
-            createdAt: serverTimestamp(),
-            createdBy: actor
-          },
-          { merge: true }
-        );
-        transaction.update(threadRef, {
-          approvedCount: Math.max(nextApproved, 0),
-          rejectedCount: Math.max(nextRejected, 0),
-          lastActivityAt: serverTimestamp()
-        });
+      const voteRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId, "conclusionVotes", actor.uid);
+      const privateFields = await packPrivate(voteLoc(threadId, actor.uid), { value: nextVote });
+      // Replaces the whole document: a changed vote never leaves an old field behind.
+      await setDoc(voteRef, { ...privateFields, createdAt: serverTimestamp(), createdBy: actor });
+      void fetch("/api/admin/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "comms_conclusion_vote",
+          resource: {
+            type: "comms_thread",
+            id: threadId
+          }
+        })
       });
-      if (didChange) {
-        void fetch("/api/admin/audit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "comms_conclusion_vote",
-            resource: {
-              type: "comms_thread",
-              id: threadId,
-              summary: thread.title
-            },
-            meta: { value: nextVote }
-          })
-        });
-      }
     } catch (error: any) {
       setConclusionVoteStatus(error.message || "Unable to submit vote");
     } finally {
@@ -286,15 +278,16 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     try {
       const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
       const commentRef = doc(collection(threadRef, "comments"));
+      const privateFields = await packPrivate(commentLoc(threadId, commentRef.id), { body: trimmed });
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
         if (!threadSnap.exists()) throw new Error("Thread unavailable");
-        const threadData = threadSnap.data() as CommsThread;
+        const threadData = threadSnap.data() as { status?: string; commentCount?: number };
         if ((threadData.status || "open") !== "open") {
           throw new Error("Thread is closed");
         }
         transaction.set(commentRef, {
-          body: trimmed,
+          ...privateFields,
           createdAt: serverTimestamp(),
           createdBy: actor,
           ...(replyToId ? { parentId: replyToId } : {})
@@ -304,6 +297,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           lastActivityAt: serverTimestamp()
         });
       });
+      notifyActivity("thread");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -311,8 +305,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           action: "comms_comment_created",
           resource: {
             type: "comms_thread",
-            id: threadId,
-            summary: thread.title
+            id: threadId
           }
         })
       });
@@ -338,25 +331,25 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     setProposeStatus(null);
     try {
       const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
+      const privateFields = await packPrivate(conclusionLoc(threadId), { text: trimmed });
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
         if (!threadSnap.exists()) throw new Error("Thread unavailable");
-        const threadData = threadSnap.data() as CommsThread;
+        const threadData = threadSnap.data() as { status?: string };
         if ((threadData.status || "open") !== "open") {
           throw new Error("Thread is not open");
         }
         transaction.update(threadRef, {
           status: "closing",
           conclusion: {
-            text: trimmed,
+            ...privateFields,
             proposedAt: serverTimestamp(),
             proposedBy: actor
           },
-          approvedCount: 0,
-          rejectedCount: 0,
           lastActivityAt: serverTimestamp()
         });
       });
+      notifyActivity("thread");
       void fetch("/api/admin/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -364,8 +357,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           action: "comms_conclusion_proposed",
           resource: {
             type: "comms_thread",
-            id: threadId,
-            summary: thread.title
+            id: threadId
           }
         })
       });
@@ -388,12 +380,11 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
         if (!threadSnap.exists()) throw new Error("Thread unavailable");
-        const threadData = threadSnap.data() as CommsThread;
+        const threadData = threadSnap.data() as { status?: string; conclusion?: { text?: string; enc?: unknown } };
         if ((threadData.status || "open") !== "closing") {
           throw new Error("Thread is not in closing");
         }
-        const conclusionText = threadData.conclusion?.text?.trim();
-        if (!conclusionText) {
+        if (!threadData.conclusion?.text?.trim() && !threadData.conclusion?.enc) {
           throw new Error("Conclusion is required");
         }
         transaction.update(threadRef, {
@@ -410,8 +401,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           action: "comms_thread_closed",
           resource: {
             type: "comms_thread",
-            id: threadId,
-            summary: thread.title
+            id: threadId
           }
         })
       });
@@ -429,8 +419,6 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       createdBy: resolveActorName(thread.createdBy),
       status: thread.status || "open",
       commentCount: thread.commentCount ?? 0,
-      approvedCount: thread.approvedCount ?? 0,
-      rejectedCount: thread.rejectedCount ?? 0,
       priority: thread.priority,
       pinned: thread.pinned
     };
@@ -439,7 +427,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
   const topLevelComments = useMemo(() => comments.filter(comment => !comment.parentId), [comments]);
 
   const repliesByParent = useMemo(() => {
-    const grouped: Record<string, CommsComment[]> = {};
+    const grouped: Record<string, CommentView[]> = {};
     comments.forEach(comment => {
       if (!comment.parentId) return;
       if (!grouped[comment.parentId]) grouped[comment.parentId] = [];
@@ -529,10 +517,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                   {isClosing ? (
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase">
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                        {threadMeta.approvedCount} approve
+                        {voteTally.approve} approve
                       </span>
                       <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-destructive">
-                        {threadMeta.rejectedCount} reject
+                        {voteTally.reject} reject
                       </span>
                     </div>
                   ) : null}

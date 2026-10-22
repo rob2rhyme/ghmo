@@ -7,6 +7,7 @@ import { toPlain } from "@/src/lib/serialize.server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import MinutesEditorClient from "@/src/components/admin/minutes/MinutesEditorClient";
 import MinutesRecordsClient from "@/src/components/admin/minutes/MinutesRecordsClient";
 
@@ -14,10 +15,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type AdminMinutesPageProps = {
-  searchParams?: { mode?: string };
+  searchParams?: Promise<{ mode?: string }>;
 };
 
 export default async function AdminMinutesPage({ searchParams }: AdminMinutesPageProps) {
+  const { mode: modeParam } = (await searchParams) ?? {};
   let actorInfo: Awaited<ReturnType<typeof requireActiveAdmin>>["actor"] | null = null;
   try {
     const guard = await requireActiveAdmin(undefined, COMMUNITY_SLUG);
@@ -40,7 +42,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
   const data = await minutesRes.json();
   const minutes = toPlain(data.minutes ?? []) as MeetingMinutesRecord[];
 
-  const mode = searchParams?.mode === "records" ? "records" : "new";
+  const mode = modeParam === "records" ? "records" : "new";
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8">
@@ -88,11 +90,13 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
         </Link>
       </div>
 
-      {mode === "records" ? (
-        <MinutesRecordsClient initialMinutes={minutes} />
-      ) : (
-        <MinutesEditorClient minutes={minutes} adminActor={toPlain(actorInfo)} />
-      )}
+      <EncryptionGate what="Meeting Minutes">
+        {mode === "records" ? (
+          <MinutesRecordsClient initialMinutes={minutes} />
+        ) : (
+          <MinutesEditorClient minutes={minutes} adminActor={toPlain(actorInfo)} />
+        )}
+      </EncryptionGate>
     </div>
   );
 }

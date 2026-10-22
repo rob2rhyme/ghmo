@@ -36,12 +36,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Donation totals reach the public site through /api/organizations/ghmo/donations/stats, not the
+    // client SDK. (Rules from overlapping matches are OR-ed, so a public read here would also expose
+    // the stored webhook payloads beneath it.)
     match /organizations/{orgSlug}/donations/{doc=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /organizations/{orgSlug}/donations/webhookEvents/events/{doc=**} {
       allow read, write: if isAdmin();
     }
 
@@ -58,8 +56,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Audit entries are written by the server only, so no admin can erase or forge them.
     match /organizations/{orgSlug}/auditLogs/{doc=**} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Deprecated: Timeline entries are being replaced by meeting minutes.
@@ -68,9 +68,54 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Minutes are written only through /api/admin/minutes (status rules, device checks, audit);
+    // admins may read them, and their content is ciphertext once encryption is on.
     match /organizations/{orgSlug}/minutes/{doc=**} {
       allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---- End-to-end encryption (plan Phase 4) ----
+    // Once the keyring is enabled, private fields must be stored as an encrypted
+    // envelope and plaintext copies are refused. Before that, plaintext still works.
+    function e2eeOn() {
+      let statePath = /databases/$(database)/documents/organizations/ghmo/e2ee/state;
+      return exists(statePath) && get(statePath).data.enabled == true;
+    }
+
+    // The writing device must be an ACTIVE device owned by the signed-in admin.
+    function deviceBelongsTo(deviceId, uid) {
+      let devicePath = /databases/$(database)/documents/organizations/ghmo/e2ee/state/devices/$(deviceId);
+      return exists(devicePath) &&
+        get(devicePath).data.uid == uid &&
+        get(devicePath).data.status == "active";
+    }
+
+    function isEnvelope(e) {
+      return e is map &&
+        e.keys().hasOnly(['v', 'epoch', 'dev', 'iv', 'ct', 'sig']) &&
+        e.keys().hasAll(['v', 'epoch', 'dev', 'iv', 'ct', 'sig']) &&
+        e.v == 1 &&
+        e.epoch is int && e.epoch >= 1 &&
+        e.dev is string && e.dev.size() >= 16 && e.dev.size() <= 64 &&
+        e.iv is string && e.iv.size() == 16 &&
+        e.ct is string && e.ct.size() >= 22 && e.ct.size() <= 200000 &&
+        e.sig is string && e.sig.size() >= 64 && e.sig.size() <= 200;
+    }
+
+    // A newly written envelope: well-formed, written by one of the caller's own devices, and under the
+    // current epoch (a device that missed a rotation can't keep writing under a key a revoked device holds).
+    function isFreshEnvelope(e) {
+      return isEnvelope(e) && deviceBelongsTo(e.dev, request.auth.uid) &&
+        e.epoch == get(/databases/$(database)/documents/organizations/ghmo/e2ee/state).data.currentEpoch;
+    }
+
+    // On updates, an envelope may also be carried over unchanged from the existing document
+    // (another admin bumping a counter must not need the author's device).
+    function envelopeOkOnUpdate(field) {
+      return (resource.data.get(field, null) == request.resource.data.get(field, null) &&
+              isEnvelope(request.resource.data.get(field, null))) ||
+        isFreshEnvelope(request.resource.data.get(field, null));
     }
 
     function isNonEmptyString(value) {
@@ -86,17 +131,44 @@ service cloud.firestore {
     }
 
     function isValidThreadCreate() {
-      return isNonEmptyString(request.resource.data.title) &&
-        isNonEmptyString(request.resource.data.body) &&
+      return (e2eeOn()
+          ? (!('title' in request.resource.data) && !('body' in request.resource.data) &&
+             isFreshEnvelope(request.resource.data.get('enc', null)))
+          : (isNonEmptyString(request.resource.data.get('title', null)) &&
+             isNonEmptyString(request.resource.data.get('body', null)) &&
+             !('enc' in request.resource.data))) &&
         request.resource.data.status == "open" &&
         request.resource.data.createdBy.uid == request.auth.uid &&
         request.resource.data.createdAt == request.time &&
         request.resource.data.lastActivityAt == request.time;
     }
 
+    // A conclusion is plaintext {text} (before encryption is on) or an envelope {enc}.
     function hasConclusionText() {
-      return request.resource.data.conclusion is map &&
-        isNonEmptyString(request.resource.data.conclusion.text);
+      let c = request.resource.data.get('conclusion', null);
+      return c is map &&
+        (e2eeOn()
+          ? ((c.get('enc', null) != null &&
+              ((resource.data.get('conclusion', {}).get('enc', null) == c.get('enc', null) && isEnvelope(c.enc)) ||
+               isFreshEnvelope(c.enc)) &&
+              !('text' in c)) ||
+             // legacy plaintext conclusion carried over unchanged
+             (isNonEmptyString(c.get('text', null)) &&
+              resource.data.get('conclusion', {}).get('text', null) == c.text))
+          : isNonEmptyString(c.get('text', null)));
+    }
+
+    // Title/body: plaintext before encryption is on; an envelope after. Legacy plaintext
+    // threads stay editable by counters until the migration job encrypts them.
+    function threadPrivateFieldsOk() {
+      let d = request.resource.data;
+      return e2eeOn()
+        ? ((('enc' in d) && !('title' in d) && !('body' in d) && envelopeOkOnUpdate('enc')) ||
+           (!('enc' in d) &&
+            isNonEmptyString(d.get('title', null)) && isNonEmptyString(d.get('body', null)) &&
+            d.get('title', null) == resource.data.get('title', null) &&
+            d.get('body', null) == resource.data.get('body', null)))
+        : (isNonEmptyString(d.get('title', null)) && isNonEmptyString(d.get('body', null)) && !('enc' in d));
     }
 
     function isTransitioningToClosing() {
@@ -110,8 +182,9 @@ service cloud.firestore {
     }
 
     function isValidThreadUpdate() {
-      return isNonEmptyString(request.resource.data.title) &&
-        isNonEmptyString(request.resource.data.body) &&
+      return threadPrivateFieldsOk() &&
+        // A thread is closed through the closing stage, never straight from open.
+        !(resource.data.status == "open" && request.resource.data.status == "closed") &&
         (request.resource.data.status == "open" ||
           request.resource.data.status == "closing" ||
           request.resource.data.status == "closed") &&
@@ -130,21 +203,32 @@ service cloud.firestore {
     }
 
     function isValidCommentCreate() {
-      return isNonEmptyString(request.resource.data.body) &&
-        (request.resource.data.parentId == null || isNonEmptyString(request.resource.data.parentId)) &&
+      return (e2eeOn()
+          ? (!('body' in request.resource.data) && isFreshEnvelope(request.resource.data.get('enc', null)))
+          : (isNonEmptyString(request.resource.data.get('body', null)) && !('enc' in request.resource.data))) &&
+        (request.resource.data.get('parentId', null) == null || isNonEmptyString(request.resource.data.parentId)) &&
         request.resource.data.createdBy.uid == request.auth.uid &&
         request.resource.data.createdAt == request.time;
     }
 
+    // The vote's value is private once encryption is on; which admin voted (the document ID) is not.
     function isValidConclusionVote() {
-      return request.resource.data.value == "approve" ||
-        request.resource.data.value == "reject";
+      let d = request.resource.data;
+      return e2eeOn()
+        ? (d.keys().hasOnly(['enc', 'createdAt', 'createdBy']) &&
+           d.get('createdBy', {}).get('uid', null) == request.auth.uid &&
+           isFreshEnvelope(d.get('enc', null)))
+        : (d.get('value', null) == "approve" || d.get('value', null) == "reject");
     }
 
     function isValidChatMessageCreate() {
-      return isNonEmptyString(request.resource.data.body) &&
-        request.resource.data.createdBy.uid == request.auth.uid &&
-        request.resource.data.createdAt == request.time;
+      return request.resource.data.createdBy.uid == request.auth.uid &&
+        request.resource.data.createdAt == request.time &&
+        (e2eeOn()
+          ? (request.resource.data.keys().hasOnly(['enc', 'createdAt', 'createdBy']) &&
+             isFreshEnvelope(request.resource.data.get('enc', null)))
+          : (request.resource.data.keys().hasOnly(['body', 'createdAt', 'createdBy']) &&
+             isNonEmptyString(request.resource.data.get('body', null))));
     }
 
     match /organizations/ghmo/commsThreads/{threadId} {
@@ -178,6 +262,24 @@ service cloud.firestore {
           isValidConclusionVote();
         allow delete: if false;
       }
+    }
+
+    // Private tracking of action items from approved minutes. The document ID is minutes ID + task hash.
+    function isValidActionStatus() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['enc', 'status', 'note', 'updatedAt', 'updatedBy']) &&
+        d.get('updatedBy', null) == request.auth.uid &&
+        d.get('updatedAt', null) == request.time &&
+        (e2eeOn()
+          ? (!('status' in d) && !('note' in d) && isFreshEnvelope(d.get('enc', null)))
+          : (!('enc' in d) && d.get('status', null) in ['open', 'done', 'dropped'] &&
+             (!('note' in d) || (d.note is string && d.note.size() <= 1000))));
+    }
+
+    match /organizations/ghmo/actionItemStatus/{key} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && isValidActionStatus();
+      allow delete: if false;
     }
 
     match /organizations/ghmo/adminChatMessages/{messageId} {

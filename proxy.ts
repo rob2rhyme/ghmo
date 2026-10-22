@@ -32,7 +32,8 @@ export function proxy(req: NextRequest) {
     nonce,
     isDev,
     upgradeInsecure,
-    firebaseAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    firebaseAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    allowEmulators: process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true"
   });
 
   // Next.js reads the CSP request header to stamp its own scripts with the nonce.

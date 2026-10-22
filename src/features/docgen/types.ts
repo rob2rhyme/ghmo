@@ -25,6 +25,8 @@ export type DocTemplateStep = {
 
 export type DocTemplateMeta = {
   id: string;
+  /** Bump when the wording or layout changes. Saved documents remember the version they were made with. */
+  version: number;
   title: string;
   category: string;
   description: string;
