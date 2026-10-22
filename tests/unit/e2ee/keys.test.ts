@@ -14,6 +14,9 @@ import {
   openSealingPrivateKey,
   openSignature,
   randomBytes,
+  recoveryReplaceMessage,
+  signBytes,
+  verifyBytes,
   sealDeviceKeys,
   sealSignature,
   toBase64Url,
@@ -134,5 +137,19 @@ describe("sealed signatures", () => {
     // A different workspace's key can't open it.
     const other = await generateSealingKeys(wdk, 2);
     await expect(openSignature(sealed, await openSealingPrivateKey(wdk, 2, other.sealedPrivate), "a".repeat(64))).rejects.toThrow();
+  });
+});
+
+describe("authorizing a recovery-key change", () => {
+  it("is a signature over the exact device, time and new key, so it can't be reused for another key", async () => {
+    const device = await generateDeviceKeys();
+    const devicePublic = await exportPublicJwk(device.ecdsa.publicKey);
+    const newKey = await exportPublicJwk((await generateDeviceKeys()).ecdh.publicKey);
+    const otherKey = await exportPublicJwk((await generateDeviceKeys()).ecdh.publicKey);
+    const sig = await signBytes(device.ecdsa.privateKey, recoveryReplaceMessage("dev-1", 1000, newKey));
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-1", 1000, newKey))).toBe(true);
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-1", 1000, otherKey))).toBe(false);
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-2", 1000, newKey))).toBe(false);
+    expect(await verifyBytes(devicePublic, sig, recoveryReplaceMessage("dev-1", 1001, newKey))).toBe(false);
   });
 });
