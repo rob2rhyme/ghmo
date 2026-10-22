@@ -13,6 +13,8 @@ import {
   openDeviceKeys,
   openSealingPrivateKey,
   openSignature,
+  recoveryReplaceMessage,
+  signBytes,
   PBKDF2_ITERATIONS,
   sealDeviceKeys,
   type KeyWrap,
@@ -168,7 +170,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const self = stored ? devices.find(d => d.deviceId === stored.deviceId) : undefined;
       if (session && self?.status === "active" && session.epochKeys.size < data.state.currentEpoch) {
         const { wraps } = await api<{ wraps: WrapRecord[] }>(`/api/admin/e2ee/wraps?recipient=${self.deviceId}`);
-        const epochKeys = await unwrapEpochKeys(wraps, self.deviceId, session.keys.ecdhPrivate);
+        const epochKeys = await unwrapEpochKeys(wraps, self.deviceId, session.keys.ecdhPrivate, { maxEpoch: data.state.currentEpoch });
         unlockedRef.current = { ...session, epochKeys };
       }
       setError(null);
@@ -291,11 +293,11 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       let epochKeys: EpochKeys = new Map();
       if (thisDevice?.status === "active") {
         const { wraps } = await api<{ wraps: WrapRecord[] }>(`/api/admin/e2ee/wraps?recipient=${identity.deviceId}`);
-        epochKeys = await unwrapEpochKeys(wraps, identity.deviceId, keys.ecdhPrivate);
+        epochKeys = await unwrapEpochKeys(wraps, identity.deviceId, keys.ecdhPrivate, { maxEpoch: overview?.state.currentEpoch });
       }
       setUnlocked({ identity, keys, epochKeys });
     },
-    [identity, openKeys, thisDevice]
+    [identity, openKeys, thisDevice, overview?.state.currentEpoch]
   );
 
   const lock = useCallback(() => setUnlocked(null), []);
@@ -382,7 +384,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       let epochKeys: EpochKeys;
       let token: string;
       try {
-        epochKeys = await unwrapEpochKeys(wraps, "recovery", recoveryPrivate);
+        epochKeys = await unwrapEpochKeys(wraps, "recovery", recoveryPrivate, { maxEpoch: overview.state.currentEpoch });
         token = await answerRecoveryCheck(overview.state.recoveryCheckWrap, recoveryPrivate);
       } catch {
         throw new Error("This recovery key doesn't belong to this workspace (or was replaced).");
@@ -416,7 +418,13 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
   const finishRecoveryReplacement = useCallback<E2eeContextValue["finishRecoveryReplacement"]>(
     async (prepared, trustees) => {
       const session = requireUnlocked();
+      const issuedAt = Date.now();
       await api("/api/admin/e2ee/recovery", {
+        authorization: {
+          deviceId: session.identity.deviceId,
+          issuedAt,
+          sig: await signBytes(session.keys.ecdsaPrivate, recoveryReplaceMessage(session.identity.deviceId, issuedAt, prepared.recoveryPublic))
+        },
         recoveryPublic: prepared.recoveryPublic,
         recoveryCheck: prepared.recoveryCheck,
         wraps: await wrapAllEpochsForRecovery(session.epochKeys, prepared.recoveryPublic),

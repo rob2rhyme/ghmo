@@ -104,7 +104,7 @@ describe("workspace sealing keys", () => {
 });
 
 describe("safety codes", () => {
-  it("are 12 digits, stable for the same keys and different for different keys", async () => {
+  it("are 20 digits, stable for the same keys and different for different keys", async () => {
     const a = await generateDeviceKeys();
     const b = await generateDeviceKeys();
     const [aEcdh, aEcdsa, bEcdh] = await Promise.all([
@@ -113,7 +113,7 @@ describe("safety codes", () => {
       exportPublicJwk(b.ecdh.publicKey)
     ]);
     const code = await deviceSafetyCode(aEcdh, aEcdsa);
-    expect(code).toMatch(/^\d{4} \d{4} \d{4}$/);
+    expect(code).toMatch(/^\d{5} \d{5} \d{5} \d{5}$/);
     expect(await deviceSafetyCode(aEcdh, aEcdsa)).toBe(code);
     expect(await deviceSafetyCode(bEcdh, aEcdsa)).not.toBe(code);
   });

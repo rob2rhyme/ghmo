@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { listDevices } from "./e2eeStore";
+import { getState, listDevices } from "./e2eeStore";
 
 /** Same shape the Firestore rules accept for `isEnvelope`. */
 export const envelopeSchemaWithLimit = (maxCiphertext: number) =>
@@ -26,7 +26,10 @@ export async function deviceBelongsTo(
   envelope: EnvelopeInput,
   uid: string,
 ): Promise<boolean> {
-  const devices = await listDevices();
+  // Only the current epoch counts: a device that missed a rotation (or a revoked device that still holds
+  // an old key) can't keep adding records under the old key.
+  const [devices, state] = await Promise.all([listDevices(), getState()]);
+  if (envelope.epoch !== state.currentEpoch) return false;
   return devices.some(
     (d) =>
       d.deviceId === envelope.dev && d.uid === uid && d.status === "active",

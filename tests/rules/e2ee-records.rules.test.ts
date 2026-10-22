@@ -21,7 +21,7 @@ beforeAll(async () => {
 afterAll(async () => env?.cleanup());
 
 /** A structurally valid envelope written by `dev` (the rules check shape and device ownership, not the crypto). */
-const envelope = (dev: string, ct = "A".repeat(40)) => ({ v: 1, epoch: 1, dev, iv: "A".repeat(16), ct, sig: "B".repeat(86) });
+const envelope = (dev: string, ct = "A".repeat(40), epoch = 2) => ({ v: 1, epoch, dev, iv: "A".repeat(16), ct, sig: "B".repeat(86) });
 
 async function seed({ e2ee }: { e2ee: boolean }) {
   await env.clearFirestore();
@@ -30,7 +30,7 @@ async function seed({ e2ee }: { e2ee: boolean }) {
     await setDoc(doc(db, `${ORG}/admins/alice`), { status: "active" });
     await setDoc(doc(db, `${ORG}/admins/bob`), { status: "active" });
     if (e2ee) {
-      await setDoc(doc(db, `${ORG}/e2ee/state`), { enabled: true });
+      await setDoc(doc(db, `${ORG}/e2ee/state`), { enabled: true, currentEpoch: 2 });
       await setDoc(doc(db, `${ORG}/e2ee/state/devices/${ALICE_DEVICE}`), { uid: "alice", status: "active" });
       await setDoc(doc(db, `${ORG}/e2ee/state/devices/${BOB_DEVICE}`), { uid: "bob", status: "active" });
       await setDoc(doc(db, `${ORG}/e2ee/state/devices/revoked-device-00001`), { uid: "alice", status: "revoked" });
@@ -198,6 +198,19 @@ describe("once encryption is on", () => {
       await assertFails(setDoc(ref("bob"), { enc: envelope(ALICE_DEVICE), ...stamp("bob") }));
       await assertFails(setDoc(ref("bob"), { enc: envelope(BOB_DEVICE), ...stamp("alice") }));
       await assertFails(setDoc(ref("bob"), { enc: envelope(BOB_DEVICE), status: "done", ...stamp("bob") }));
+    });
+
+    it("refuses new writes under an old epoch (a device that missed a rotation), but keeps old records readable", async () => {
+      const chat = (epoch: number) =>
+        addDoc(collection(as("alice"), `${ORG}/adminChatMessages`), { enc: envelope(ALICE_DEVICE, "A".repeat(40), epoch), createdBy: { uid: "alice" }, createdAt: serverTimestamp() });
+      await assertSucceeds(chat(2));
+      await assertFails(chat(1));
+      await assertFails(chat(3));
+    });
+
+    it("won't let a thread jump from open straight to closed", async () => {
+      const ref = await addDoc(collection(as("alice"), `${ORG}/commsThreads`), newThread());
+      await assertFails(updateDoc(doc(as("bob"), ref.path), { status: "closed", finalizedBy: { uid: "bob" } }));
     });
 
     it("anyone but admins still can't read", async () => {

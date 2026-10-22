@@ -38,7 +38,7 @@ export default function OnboardingDocPage() {
           page open until it says Done. Then delete older backups, which still contain the earlier plaintext.
         </li>
         <li>
-          Each admin sets up encryption on each device they use; another admin approves it after comparing the 12-digit
+          Each admin sets up encryption on each device they use; another admin approves it after comparing the 20-digit
           safety code by phone or in person.
         </li>
       </ul>

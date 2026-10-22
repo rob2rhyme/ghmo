@@ -36,12 +36,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Donation totals reach the public site through /api/organizations/ghmo/donations/stats, not the
+    // client SDK. (Rules from overlapping matches are OR-ed, so a public read here would also expose
+    // the stored webhook payloads beneath it.)
     match /organizations/{orgSlug}/donations/{doc=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /organizations/{orgSlug}/donations/webhookEvents/events/{doc=**} {
       allow read, write: if isAdmin();
     }
 
@@ -58,8 +56,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Audit entries are written by the server only, so no admin can erase or forge them.
     match /organizations/{orgSlug}/auditLogs/{doc=**} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Deprecated: Timeline entries are being replaced by meeting minutes.
@@ -103,9 +103,11 @@ service cloud.firestore {
         e.sig is string && e.sig.size() >= 64 && e.sig.size() <= 200;
     }
 
-    // A newly written envelope: well-formed and written by one of the caller's own devices.
+    // A newly written envelope: well-formed, written by one of the caller's own devices, and under the
+    // current epoch (a device that missed a rotation can't keep writing under a key a revoked device holds).
     function isFreshEnvelope(e) {
-      return isEnvelope(e) && deviceBelongsTo(e.dev, request.auth.uid);
+      return isEnvelope(e) && deviceBelongsTo(e.dev, request.auth.uid) &&
+        e.epoch == get(/databases/$(database)/documents/organizations/ghmo/e2ee/state).data.currentEpoch;
     }
 
     // On updates, an envelope may also be carried over unchanged from the existing document
@@ -181,6 +183,8 @@ service cloud.firestore {
 
     function isValidThreadUpdate() {
       return threadPrivateFieldsOk() &&
+        // A thread is closed through the closing stage, never straight from open.
+        !(resource.data.status == "open" && request.resource.data.status == "closed") &&
         (request.resource.data.status == "open" ||
           request.resource.data.status == "closing" ||
           request.resource.data.status == "closed") &&

@@ -150,7 +150,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Admin → **Encryption** (`/admin/encryption`) manages end-to-end encryption keys. The design and owner steps are in `docs/PROJECT_PLAN.md` §4 and §8 (Phase 3).
 - Each admin device has its own keys. They are stored in the browser, locked with the admin's passkey (or a passphrase if the passkey can't), and unlocked once per session.
 - A shared workspace key per key generation ("epoch") is wrapped for each approved device and for the **recovery key**. Two named trustees each hold a paper copy of the recovery key.
-- **New devices** must be approved by another admin after comparing a 12-digit safety code, or activated with the paper recovery key.
+- **New devices** must be approved by another admin after comparing a 20-digit safety code, or activated with the paper recovery key.
 - **Lost devices:** revoking a lost device rotates to a new epoch it can't read.
 - The server only ever stores public keys and wrapped keys (`organizations/ghmo/e2ee/**`, server-only in Firestore rules).
 - **What is encrypted:** Admin Chat; Plans & Issues (titles, details, comments, conclusions, votes); draft and submitted minutes; signatures (sealed in the signer's browser); saved documents and finalized certificates. Approved minutes are public by design and are published as a plaintext copy on approval.
@@ -169,6 +169,12 @@ Legacy community paths are no longer supported; please migrate any old data into
 - **Calendar:** `/api/calendar` is a subscribable `.ics` feed of published events; each event page has "Add to calendar".
 - **Notification emails:** off unless `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` are set. Admins opt in under Admin → Security. Emails contain no content, only a link.
 - **Draft autosave:** with encryption on and the device unlocked, unsent minutes and new threads are kept encrypted in the browser and offered back after a reload. Signing out wipes them.
+
+## Security operations (Phase 7)
+- **Incident runbook:** `docs/RUNBOOK_INCIDENT.md` (lost device, stolen session, departed admin, recovery key, database compromise). Fill in the names and print it with the recovery keys.
+- **Yearly drill:** `docs/KEY_ROTATION_DRILL.md`. The automated version runs with `npm run test:e2e:auth`.
+- **Route sweep:** `tests/e2e-auth/route-sweep.spec.ts` calls every API route as anonymous / stranger / disabled / magic-link-only users and fails if one is open.
+- **Known limits and accepted risks:** see the Phase 7 entry in `docs/PROJECT_PLAN.md`.
 
 ## Development Checks
 | Command | What it does |

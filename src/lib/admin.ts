@@ -92,6 +92,14 @@ export async function requireActiveAdmin(
     ? await getAuthContextFromRequest(input)
     : (input ?? (await getAuthContextFromRequest()));
 
+  // Defense in depth on top of SameSite cookies: a browser says when a request was started by another site.
+  if (isNextRequest(input) && !["GET", "HEAD", "OPTIONS"].includes(input.method)) {
+    const site = input.headers.get("sec-fetch-site");
+    if (site && site !== "same-origin" && site !== "none") {
+      throw new AdminAccessError(403, "Cross-site request refused", "CROSS_SITE");
+    }
+  }
+
   if (!ctx) throw new AdminAccessError(401, "Unauthorized", "NO_CONTEXT");
   if (!ctx.orgSlug) throw new AdminAccessError(403, "Organization missing", "ORGSLUG_MISSING");
   if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "Organization mismatch", "ORGSLUG_MISMATCH");

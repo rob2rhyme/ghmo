@@ -17,6 +17,7 @@ import { deviceBelongsTo, envelopeSchema, type EnvelopeInput } from "@/src/lib/e
 import { CONTENT_FIELDS, adminView, auditView } from "@/src/lib/minutesRecords";
 import { normalizeAttendance, normalizeContent } from "@/src/lib/minutesContent";
 import { planTransition } from "@/src/lib/minutesWorkflow";
+import { getAppOrigin } from "@/src/lib/appUrl";
 import { notifyAdmins } from "@/src/lib/notify.server";
 
 export const dynamic = "force-dynamic";
@@ -425,6 +426,10 @@ export async function PATCH(req: NextRequest) {
 
     const ref = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).doc(id);
     const action: MinutesAction | undefined = payload.action;
+    // The meeting type is shown publicly but isn't part of the approval fingerprint, so it can only change while editing.
+    if (action && payload.meetingType) {
+      return NextResponse.json({ error: "Change the meeting type while editing, not with a status change." }, { status: 400 });
+    }
 
     const e2eeOn = (await getState()).enabled;
     if (e2eeOn && hasPlainContent(payload)) return NextResponse.json(E2EE_REQUIRED, { status: 400 });
@@ -495,7 +500,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     // Tell the other opted-in admins there is something to approve (content-free, best effort).
-    if (outcome.audit === "minutes_submitted") void notifyAdmins("minutes_submitted", actor.uid, req.nextUrl.origin);
+    if (outcome.audit === "minutes_submitted") void notifyAdmins("minutes_submitted", actor.uid, getAppOrigin(req));
     return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id, ...afterSnap.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {

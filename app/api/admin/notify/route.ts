@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
+import { getAppOrigin } from "@/src/lib/appUrl";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { CLIENT_NOTIFICATION_KINDS } from "@/src/lib/notifications";
 import { notifyAdmins } from "@/src/lib/notify.server";
@@ -24,6 +25,6 @@ export async function POST(req: NextRequest) {
   if (!(await checkRateLimit(`notify-call:${guard.actor.uid}`, 60, 60 * 60 * 1000)).success) {
     return NextResponse.json({ ok: true, sent: 0 });
   }
-  const sent = await notifyAdmins(parsed.data.kind, guard.actor.uid, req.nextUrl.origin);
+  const sent = await notifyAdmins(parsed.data.kind, guard.actor.uid, getAppOrigin(req));
   return NextResponse.json({ ok: true, sent });
 }

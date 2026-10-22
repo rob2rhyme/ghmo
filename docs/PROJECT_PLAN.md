@@ -303,7 +303,7 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 - **Recovery key:** the **private half of a P-256 key pair**. The paper copy is that private scalar: 14 groups of Crockford base32 plus a checksum, with look-alike letters tolerated. Every epoch is wrapped to the recovery *public* key, so rotation never needs the paper copy.
   - **Proof of possession:** to activate a device with the recovery key, the client decrypts a token that was wrapped to the recovery key; the server stores only the token's hash.
 - **Record envelopes:** AES-256-GCM with AAD = exact Firestore path + document ID + epoch + writing device, plus an ECDSA signature by that device. Ready for Phase 4.
-- **Safety codes:** 12 digits computed from a device's public keys, compared by phone or in person before approving it.
+- **Safety codes:** 20 digits computed from a device's public keys, compared by phone or in person before approving it.
 
 **Server rules (transactions):**
 - Setup is super admin only, happens once, and needs two different trustees.
@@ -430,4 +430,46 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 **Owner actions after deploying Phase 6**
 1. Optional: create a Resend account (free), verify the sending domain, and set `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Security.
 2. Nothing else; no rules or data changes.
+
+### Phase 7 — Assurance · in progress (what could be done without outside people is done, 2026-10-22)
+**Done in this session:**
+- **Independent code review.** A separate reviewer, given only the code and a threat model, traced the encryption design, the Firestore rules, the key routes and the auth flows. Its 16 findings were triaged by reading the code paths; results below.
+- **Automated anonymous and wrong-user sweep** (`tests/e2e-auth/route-sweep.spec.ts`): every API route is called (a) with no credentials and (b) as a stranger, a disabled admin and a magic-link-only admin. Everything not public by design must answer 401/403/404/405, and nothing may answer an anonymous write with success or a server error. A new route that forgets its guard fails here. Also checks that cross-site, cookie-authenticated writes are refused.
+- **Key-rotation drill automated** (`tests/e2e-auth/rotation-drill.spec.ts`) and written up as a yearly manual drill (`docs/KEY_ROTATION_DRILL.md`).
+- **Incident-response runbook** (`docs/RUNBOOK_INCIDENT.md`): lost device, stolen session, departed admin, lost recovery key, database compromise, forged certificate, wrongly published minutes.
+- **Dependency audit.** `npm audit --omit=dev` reports 11 findings, all in transitive packages of `firebase-admin` / the Firebase client (`@grpc/grpc-js` advisories about gRPC *servers*, `uuid` when a caller passes a buffer). We run no gRPC server and pass no buffers, so they are not reachable; the suggested "fixes" are a major upgrade of `firebase-admin` and a downgrade of `firebase`. Accepted; Dependabot (weekly) will propose the safe upgrade when one exists.
+
+**Fixed (from the review and the drill):**
+| # | Finding | Fix |
+|---|---|---|
+| R3 | Donation webhook payloads were publicly readable: Firestore ORs overlapping `match` blocks, so the public read of `donations/**` also covered `webhookEvents`. | Donations are admin-only in the client SDK (public totals come from the API route). Rules test added. |
+| R8 | Any admin could erase or forge audit logs. | `auditLogs` is read-only for admins; the server writes them. Rules test added. |
+| R7 | Writes weren't tied to the current epoch, so a device that missed a rotation (or a revoked device) could keep writing under an old key. | Rules and server routes require `enc.epoch == currentEpoch` for new envelopes. Rules test added. |
+| R5 | The 12-digit safety code (~40 bits) was short enough to search for a look-alike key pair. | 20 digits (~66 bits). Docs updated. |
+| R4 | A stolen super-admin session cookie could replace the recovery key, so the attacker could read data after the next rotation. | The change must be signed by one of the admin's active devices over the exact new key (2-minute window). Integration tests added. |
+| R1 (part) | A server could offer wraps for an invented future epoch. | Clients ignore wraps above the current epoch. |
+| R11 | One bad wrap blocked unlock. | Unreadable older epochs are skipped; the newest must open. Unit tests added. |
+| R6 (part) | A thread could go from open straight to closed. | Rules refuse it. |
+| R13 | An approver could change the meeting type during approval (not covered by the content fingerprint). | Meeting type can't change with a status change. |
+| R15 | Notification links used the request origin. | They use the configured app URL. |
+| — | Defense in depth against cross-site requests. | Cookie-authenticated writes marked cross-site / same-site by the browser (`Sec-Fetch-Site`) are refused. |
+| Drill | Pending, revoked and no-device admins saw "Something went wrong" instead of guidance (the gate's button crashed). | Button `asChild` fixed. Found by the rotation drill. |
+
+**Accepted, in writing (owner to sign off):**
+| # | Finding | Why accepted for now |
+|---|---|---|
+| R1/R2 | Key wraps, epoch records and the device roster aren't signed, so an attacker with **database write access** could swap in keys they control for future data. | Needs control of the database (or the hosting) and acts only on data written afterwards; existing ciphertext stays safe. A server that also serves the site's JavaScript could do worse regardless. Mitigations in place: safety-code approval of new devices, current-epoch checks, device-signed recovery changes, tamper-evident audit log. **Proper fix** (a signed, chained device roster pinned by each device) is a design change that should be done with the external cryptography review. |
+| R9 | Rollback/replay: a database writer can restore an older valid envelope or delete records; signatures of revoked devices still verify on old records. | Same attacker as above; integrity of old records is not a stated goal beyond tamper-evidence of *who wrote* them. Revisit with the signed-roster work. |
+| R6 (rest) | Rules don't count votes: any admin can overwrite a conclusion while earlier approvals stand, or finalize without quorum. | The board is a small trusted group, actions are audited, and the UI enforces the workflow. A server-side finalize route is the fix if quorum must be enforced. |
+| R10 | Any admin can overwrite another admin's draft document or migrate someone else's legacy record. | Admins share these documents by design; every change is audited. |
+| R12 | One admin can create, sign and finalize a certificate; with encryption on, the server endorses the browser's PDF hash. | By design for a small organization; the certificate record names the issuing admin. Require two finalizers if that is wanted. |
+| R14 | Rate limits depend on `TRUSTED_PROXY_HOPS` matching the real proxy chain. | Hosting-specific. **Owner action:** confirm the setting after deploying. |
+| R16 | Rules accept `authMethod == "dev"` tokens. | Only the dev login can mint them and it is disabled in production. **Owner rule:** never point a local/dev environment at the production Firebase project. |
+
+**Still needs people outside this session (Phase 7 is not complete until these are done):**
+1. **External review** of `src/lib/e2ee/` and the key-handling routes by someone qualified in applied cryptography, including the signed-roster design above.
+2. **Penetration test** of sign-in (passkeys, magic link), session handling and the public pages by an independent tester on the real deployment.
+3. **Run the manual key-rotation drill** and the **recovery-key test** with both trustees, and record the date.
+4. Fill in names and numbers in `docs/RUNBOOK_INCIDENT.md`, and print it with the recovery keys.
+5. Confirm `TRUSTED_PROXY_HOPS`, delete pre-encryption backups, set `CERTIFICATE_SIGNING_KEY_BASE64`.
 
