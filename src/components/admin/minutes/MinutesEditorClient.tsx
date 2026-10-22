@@ -22,6 +22,8 @@ import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { approvalLoc, minutesLoc, unpackMinutes } from "@/src/lib/minutesRecords";
 import { hashContent } from "@/src/lib/minutesContent";
+import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
+import { DraftBanner } from "@/src/components/admin/encryption/DraftBanner";
 import { useUnpackedMinutes } from "./useUnpackedMinutes";
 
 type AdminActor = {
@@ -86,6 +88,8 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   }, [decryptedMinutes, savedEntries]);
   const [formState, setFormState] = useState<MeetingMinutesFormInput>(() => createEmptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The form as last loaded or cleared: a draft is only worth keeping once it differs and has some text.
+  const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyForm()));
   const [minutesSaveStatus, setMinutesSaveStatus] = useState<string | null>(null);
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
   const minutesPreviewRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +101,17 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const [versions, setVersions] = useState<{ version: number; approvedAt?: number; contentHash: string }[]>([]);
   const [statusActionStatus, setStatusActionStatus] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const hasText =
+    Boolean(formState.discussionSummary?.trim() || formState.chairedBy?.trim()) ||
+    formState.agenda.some(item => item.trim()) ||
+    formState.decisions.some(item => item.trim()) ||
+    formState.actionItems.some(item => item.task.trim());
+  const draft = useEncryptedDraft({
+    uid: adminActor.uid,
+    name: `minutes:${editingId ?? "new"}`,
+    value: formState,
+    hasContent: hasText && JSON.stringify(formState) !== baseline
+  });
   const [attendanceExpanded, setAttendanceExpanded] = useState(false);
   const [signaturesExpanded, setSignaturesExpanded] = useState(false);
   const [previewZoomMode, setPreviewZoomMode] = useState<PreviewZoomMode>("fit");
@@ -142,11 +157,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const cancelMinutesEdit = () => {
     setEditingId(null);
     setFormState(createEmptyForm());
+    setBaseline(JSON.stringify(createEmptyForm()));
     setMinutesSaveStatus(null);
   };
 
   const loadMinutesIntoForm = (entry: MeetingMinutesRecord) => {
-    setFormState({
+    const next: MeetingMinutesFormInput = {
       eventId: entry.eventId,
       meetingType: entry.meetingType,
       chairedBy: entry.chairedBy || "",
@@ -166,7 +182,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
         chairName: entry.signatures?.chairName || "",
         secretaryName: entry.signatures?.secretaryName || ""
       }
-    });
+    };
+    setFormState(next);
+    setBaseline(JSON.stringify(next));
     setEditingId(entry.id);
     setMinutesSaveStatus(null);
     setApprovalNotesInput(entry.approvalNotes || "");
@@ -309,7 +327,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       const saved = await unpackMinutes(unpackPrivate, data.minutes);
       setSavedEntries(prev => [saved, ...prev.filter(entry => entry.id !== saved.id)]);
       setMinutesSaveStatus(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
+      draft.clear();
       setFormState(createEmptyForm());
+      setBaseline(JSON.stringify(createEmptyForm()));
       setEditingId(null);
     } catch (err: any) {
       setMinutesSaveStatus(`Error: ${err.message || "Unable to save minutes"}`);
@@ -507,6 +527,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
       <div className="space-y-6">
+        {draft.pending ? (
+          <DraftBanner
+            savedAt={draft.pending.savedAt}
+            onRestore={() => {
+              const restored = draft.restore();
+              if (restored) setFormState(restored);
+            }}
+            onDiscard={draft.discard}
+          />
+        ) : null}
         <AdminSectionCard>
           <div className="flex items-start justify-between gap-4">
             <div>

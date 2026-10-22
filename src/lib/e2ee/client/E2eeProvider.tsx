@@ -33,6 +33,7 @@ import {
   type WrapRecord
 } from "../keyring";
 import { answerRecoveryCheck, createRecoveryCheck, generateRecoveryKey, importRecoveryPrivateKey } from "../recovery";
+import { clearLocalDrafts } from "@/src/lib/localDrafts";
 import { deleteIdentity, loadIdentity, saveIdentity, type StoredDeviceIdentity } from "./deviceStore";
 import { evaluatePrf } from "./prf";
 
@@ -277,6 +278,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       await fetch(`/api/admin/e2ee/devices/${stored.deviceId}`, { method: "DELETE" });
     }
     await deleteIdentity(overview.me.uid);
+    clearLocalDrafts();
     setUnlocked(null);
     await refresh();
   }, [overview, refresh, thisDevice]);

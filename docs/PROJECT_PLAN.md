@@ -408,3 +408,26 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 1. Set `CERTIFICATE_SIGNING_KEY_BASE64` in the hosting environment (`openssl rand -base64 32`). Back it up with your other secrets; losing it invalidates every QR code.
 2. Deploy the updated `firestore.rules`.
 3. Make sure at least two admins are active.
+
+### Phase 6 — Public & integrations · done 2026-10-22
+**Built:**
+- **Public minutes archive** (`/minutes`, `/minutes/{id}`, linked from the footer). Approved minutes only, grouped by year. The page shows agenda, discussion, decisions, action items and signatories, but **attendance only as counts** (names are not shown, since the pages are indexable), and nothing about who recorded, submitted or approved. Drafts and submitted minutes are not reachable by id.
+- **Calendar export:** `/api/calendar` (subscribable feed of published events) and `/api/calendar/{id}` ("Add to calendar" on the event page). Output is escaped and line-folded per RFC 5545, in UTC, and a title can't inject extra properties.
+- **Notification emails (content-free, opt-in):**
+  - Each admin turns them on under Admin → Security.
+  - They say that something happened and link to the page: new Admin Chat activity, new Plans & Issues activity, or minutes waiting for approval. They never include titles, names or text.
+  - At most one email of each kind per person every 30 minutes. The person who caused the activity is not emailed.
+  - They are sent through Resend's free tier, and only when `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` are set; otherwise nothing is sent.
+  - Chat and thread activity is written straight to Firestore, so the browser asks the server to send the email (`POST /api/admin/notify`, which takes only the kind of activity). Minutes submissions trigger it server-side.
+- **Encrypted local autosave:** unsent minutes and new-thread forms are saved in the browser, encrypted with the workspace key and bound to the admin. They are offered back as "Restore draft" after a reload or crash, removed when the form is sent or discarded, and wiped on sign-out or when the device is forgotten. Nothing is saved while encryption is off or the device is locked, and drafts never go to the server.
+
+**Decisions and limits:**
+- The email provider sees recipient addresses and that activity happened (timing), though never content. If that is too much, leave the two env vars unset.
+- Autosave covers minutes and new threads. Comments, chat compose and the document builder are not autosaved yet.
+- A draft is readable by any admin who unlocks a device in the same browser profile; sign out when sharing a computer (sign-out wipes drafts).
+- The calendar feed is public for published events only; unpublished events never appear.
+
+**Owner actions after deploying Phase 6**
+1. Optional: create a Resend account (free), verify the sending domain, and set `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Security.
+2. Nothing else; no rules or data changes.
+

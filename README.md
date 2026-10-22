@@ -164,6 +164,12 @@ Legacy community paths are no longer supported; please migrate any old data into
 - **Certificates:** issuing a signed certificate prints a QR code that leads to `/verify/{code}`. The page shows the certificate number, type and issue date (never names) and lets anyone check a PDF copy against the issued file in their browser. Records are HMAC-signed with `CERTIFICATE_SIGNING_KEY_BASE64`, which you must set to issue certificates. The issued PDF downloads when you finalize; keep that file, since re-exported copies won't match its fingerprint.
 - **Templates:** each document template has a version; saved documents remember it.
 
+## Public pages & integrations (Phase 6)
+- **Minutes archive:** `/minutes` lists approved minutes (attendance as counts only). Drafts are never shown.
+- **Calendar:** `/api/calendar` is a subscribable `.ics` feed of published events; each event page has "Add to calendar".
+- **Notification emails:** off unless `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` are set. Admins opt in under Admin → Security. Emails contain no content, only a link.
+- **Draft autosave:** with encryption on and the device unlocked, unsent minutes and new threads are kept encrypted in the browser and offered back after a reload. Signing out wipes them.
+
 ## Development Checks
 | Command | What it does |
 |---|---|

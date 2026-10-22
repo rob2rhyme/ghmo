@@ -16,6 +16,8 @@ import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
+import { DraftBanner } from "@/src/components/admin/encryption/DraftBanner";
 import { THREADS_PATH, threadLoc, unpackThread, type ThreadView } from "@/src/lib/commsRecords";
 import type {
   CommsActorSnapshot,
@@ -57,6 +59,12 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [seedStatus, setSeedStatus] = useState<string | null>(null);
+  const draft = useEncryptedDraft({
+    uid: actor.uid,
+    name: "thread:new",
+    value: { title, body },
+    hasContent: Boolean(title.trim() || body.trim())
+  });
 
   useEffect(() => {
     if (!firestore) {
@@ -150,6 +158,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           }
         })
       });
+      draft.clear();
       setTitle("");
       setBody("");
       setPriority("normal");
@@ -179,6 +188,19 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
 
   return (
     <div className="space-y-6">
+      {draft.pending ? (
+        <DraftBanner
+          savedAt={draft.pending.savedAt}
+          onRestore={() => {
+            const restored = draft.restore();
+            if (restored) {
+              setTitle(restored.title);
+              setBody(restored.body);
+            }
+          }}
+          onDiscard={draft.discard}
+        />
+      ) : null}
       <AdminSectionCard
         title="Plans & Issues"
         description="For decisions, proposals, and issues. Close threads with a clear conclusion."
