@@ -87,6 +87,12 @@
     },
     "@firebase/firestore-compat": {
       "@grpc/grpc-js": "1.14.6"
+    },
+    "gaxios": {
+      "uuid": "11.1.1"
+    },
+    "@google-cloud/pubsub": {
+      "@opentelemetry/core": "2.8.0"
     }
   },
   "engines": {
