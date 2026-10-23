@@ -431,7 +431,8 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 1. Optional: create a Resend account (free), verify the sending domain, and set `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Security.
 2. Nothing else; no rules or data changes.
 
-### Phase 7 — Assurance · in progress (what could be done without outside people is done, 2026-10-22)
+### Phase 7 — Assurance · built and merged; remaining work needs people outside the codebase (updated 2026-10-23)
+All code, tests and documents for this phase are done and merged (the signed device list closed R1/R2/R9). What is left is in the checklist below and, in order, in `docs/GO_LIVE_CHECKLIST.md`.
 **Done in this session:**
 - **Independent code review.** A separate reviewer, given only the code and a threat model, traced the encryption design, the Firestore rules, the key routes and the auth flows. Its 16 findings were triaged by reading the code paths; results below.
 - **Automated anonymous and wrong-user sweep** (`tests/e2e-auth/route-sweep.spec.ts`): every API route is called (a) with no credentials and (b) as a stranger, a disabled admin and a magic-link-only admin. Everything not public by design must answer 401/403/404/405, and nothing may answer an anonymous write with success or a server error. A new route that forgets its guard fails here. Also checks that cross-site, cookie-authenticated writes are refused.
@@ -468,7 +469,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 | R14 | Rate limits depend on `TRUSTED_PROXY_HOPS` matching the real proxy chain. | Hosting-specific. **Owner action:** confirm the setting after deploying. |
 | R16 | Rules accept `authMethod == "dev"` tokens. | Only the dev login can mint them and it is disabled in production. **Owner rule:** never point a local/dev environment at the production Firebase project. |
 
-**Still needs people outside this session (Phase 7 is not complete until these are done):**
+**Still needs people outside this session (Phase 7 is not complete until these are done; see also `docs/GO_LIVE_CHECKLIST.md`):**
 1. **External review** of `src/lib/e2ee/` and the key-handling routes by someone qualified in applied cryptography, including the signed-roster design above.
 2. **Penetration test** of sign-in (passkeys, magic link), session handling and the public pages by an independent tester on the real deployment.
 3. **Run the manual key-rotation drill** and the **recovery-key test** with both trustees, and record the date.
