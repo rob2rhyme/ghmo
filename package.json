@@ -27,10 +27,10 @@
     "@tailwindcss/postcss": "4.3.3",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "firebase": "10.14.1",
-    "firebase-admin": "13.10.0",
+    "firebase": "^13.1.0",
+    "firebase-admin": "^14.5.0",
     "html-to-image": "1.11.11",
-    "jsonwebtoken": "9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "4.2.1",
     "lucide-react": "1.52.0",
     "nanoid": "5.1.16",
@@ -48,7 +48,7 @@
     "zod": "3.22.4"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "3.0.4",
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@playwright/test": "1.64.1",
     "@types/jsonwebtoken": "9.0.5",
     "@types/node": "22.19.1",
@@ -70,17 +70,24 @@
     "glob": "10.5.0",
     "undici": "6.29.1",
     "protobufjs": "7.6.6",
-    "lodash": "4.17.23",
+    "lodash": "4.18.1",
     "@jsdoc/salty": {
-      "lodash": "4.17.23"
+      "lodash": "4.18.1"
     },
     "requizzle": {
-      "lodash": "4.17.23"
+      "lodash": "4.18.1"
     },
     "catharsis": {
-      "lodash": "4.17.23"
+      "lodash": "4.18.1"
     },
-    "@google-cloud/storage": "file:stubs/google-cloud-storage"
+    "@google-cloud/storage": "file:stubs/google-cloud-storage",
+    "basic-ftp": "6.2.3",
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.6"
+    },
+    "@firebase/firestore-compat": {
+      "@grpc/grpc-js": "1.14.6"
+    }
   },
   "engines": {
     "node": ">=22.12.0"
