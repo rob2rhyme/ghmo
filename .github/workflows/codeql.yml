@@ -66,7 +66,7 @@ jobs:
           console.log(`CodeQL: ${total} finding(s), ${errors} at error level.`);
           if (errors > 0) process.exit(1);
           JS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: codeql-sarif
