@@ -60,7 +60,7 @@
     "dotenv": "^17.2.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.2",
-    "firebase-tools": "15.33.0",
+    "firebase-tools": "15.34.0",
     "html-to-image": "^1.11.11",
     "postcss": "8.5.31",
     "typescript": "5.9.3",
