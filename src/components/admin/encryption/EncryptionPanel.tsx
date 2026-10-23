@@ -140,8 +140,73 @@ function BootstrapWizard() {
   );
 }
 
+/** Whether the server's key records match the signed device log, and the fingerprint that identifies the workspace. */
+function IntegrityCard() {
+  const { integrity, overview, sealRoster, status } = useE2ee();
+  const [busy, setBusy] = useState(false);
+  if (integrity.status === "none") return null;
+
+  if (integrity.status === "verified") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Device list verified</CardTitle>
+          <CardDescription>
+            Every device and key here is covered by a signed, tamper-evident history ({integrity.entries} entries) that this browser checks against the
+            server each time. Workspace fingerprint: <SafetyCode code={integrity.fingerprint} />. It never changes. When you add a device, the new owner
+            reads it to an admin, so the workspace they see is the real one.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (integrity.status === "unsealed") {
+    return (
+      <Alert variant="warning">
+        <ShieldAlert />
+        <AlertTitle>The device list isn&apos;t sealed yet</AlertTitle>
+        <AlertDescription>
+          <p>
+            This workspace was set up before devices were recorded in a signed history, so someone with access to the database could swap in keys
+            without being noticed.
+          </p>
+          {overview?.me.superAdmin && status === "unlocked" ? (
+            <>
+              <p className="mt-2">
+                Check the device list below with each owner (their safety codes must match), then seal it. From then on, every change is signed.
+              </p>
+              <Button
+                className="mt-2"
+                loading={busy}
+                onClick={async () => {
+                  if (!window.confirm("Have you checked every device below with its owner? Sealing records exactly this list.")) return;
+                  setBusy(true);
+                  try {
+                    await sealRoster();
+                    toast.success("Device list sealed");
+                  } catch (err) {
+                    toast.error(errorText(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Seal the device list
+              </Button>
+            </>
+          ) : (
+            <p className="mt-2">A super admin should unlock this page and seal the list.</p>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  return null;
+}
+
 function DevicesSection() {
-  const { overview, identity, approveDevice, rotate } = useE2ee();
+  const { overview, identity, approveDevice, rotate, integrity } = useE2ee();
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -199,6 +264,12 @@ function DevicesSection() {
                   </p>
                   <SafetyCode code={d.safetyCode} large />
                 </div>
+                {integrity.status === "verified" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Also ask {d.ownerName} to read the <strong>workspace fingerprint</strong> shown on their screen. It must be{" "}
+                    <SafetyCode code={integrity.fingerprint} />.
+                  </p>
+                ) : null}
                 <label className="flex items-start gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -206,7 +277,7 @@ function DevicesSection() {
                     checked={!!confirmed[d.deviceId]}
                     onChange={e => setConfirmed(c => ({ ...c, [d.deviceId]: e.target.checked }))}
                   />
-                  I compared this code with {d.ownerName} and it matches
+                  I compared this code{integrity.status === "verified" ? " and the workspace fingerprint" : ""} with {d.ownerName} and {integrity.status === "verified" ? "both match" : "it matches"}
                 </label>
                 <Button className="self-start" onClick={() => approve(d)} disabled={!confirmed[d.deviceId]} loading={busy === d.deviceId}>
                   Approve device
@@ -341,7 +412,7 @@ function RecoverySection() {
 
 /** Admin → Encryption: device keys, approvals, rotation and recovery (plan Phase 3). */
 export default function EncryptionPanel() {
-  const { status, error, overview, thisDevice, refresh, forgetThisDevice, lock } = useE2ee();
+  const { status, error, overview, thisDevice, refresh, forgetThisDevice, lock, integrity } = useE2ee();
 
   if (status === "loading") {
     return (
@@ -355,6 +426,25 @@ export default function EncryptionPanel() {
 
   if (status === "error" || !overview) {
     return <EmptyState icon={<ShieldAlert />} title="Could not load encryption status" description={error ?? undefined} action={<Button onClick={refresh}>Try again</Button>} />;
+  }
+
+  if (status === "integrity-error") {
+    return (
+      <Alert variant="destructive">
+        <ShieldAlert />
+        <AlertTitle>The device list failed its integrity check</AlertTitle>
+        <AlertDescription>
+          <p>{integrity.status === "failed" ? integrity.reason : "It could not be verified."}</p>
+          <p className="mt-2">
+            Encryption is paused on this device: nothing is unlocked, approved or written. This can mean the database was changed outside the app. Tell the
+            other admins, compare device safety codes with their owners, and follow the incident runbook (docs/RUNBOOK_INCIDENT.md, case E).
+          </p>
+          <Button className="mt-2" variant="outline" onClick={refresh}>
+            Check again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   if (status === "not-setup") {
@@ -399,6 +489,14 @@ export default function EncryptionPanel() {
             </CardDescription>
           </CardHeader>
           <SafetyCode code={thisDevice.safetyCode} large />
+          {integrity.status === "verified" ? (
+            <div className="flex flex-col gap-1">
+              <p className="text-sm text-muted-foreground">
+                Also read them the <strong>workspace fingerprint</strong>. This is how you know the server is showing you the real workspace:
+              </p>
+              <SafetyCode code={integrity.fingerprint} large />
+            </div>
+          ) : null}
           <div className="flex gap-2">
             <Button variant="outline" onClick={refresh}>
               <RefreshCw aria-hidden="true" />
@@ -455,6 +553,7 @@ export default function EncryptionPanel() {
           ) : null}
         </div>
       </Card>
+      <IntegrityCard />
       {status === "locked" ? <UnlockCard /> : null}
       {status === "unlocked" ? (
         <>

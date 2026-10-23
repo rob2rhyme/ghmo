@@ -41,3 +41,62 @@ export const recoveryCheckSchema = z.object({
   wrap: keyWrapSchema,
   tokenHash: z.string().regex(/^[0-9a-f]{64}$/)
 });
+
+// ---------- signed device log (see roster.ts) ----------
+
+const rosterKeySchema = z.object({ x: b64url(64), y: b64url(64) }).strict();
+const rosterDeviceSchema = z.object({ id: deviceIdSchema, uid: z.string().min(1).max(128), ecdh: rosterKeySchema, ecdsa: rosterKeySchema }).strict();
+const rosterDigestSchema = z
+  .object({ epoch: epochNumberSchema, recipient: z.union([deviceIdSchema, z.literal("recovery")]), h: z.string().regex(/^[0-9a-f]{64}$/) })
+  .strict();
+const rosterBase = {
+  v: z.literal(1),
+  seq: z.number().int().min(1).max(1_000_000),
+  prev: z.string().regex(/^([0-9a-f]{64})?$/),
+  by: z.union([deviceIdSchema, z.literal("recovery")]),
+  at: z.string().max(40),
+  sig: b64url(200)
+};
+const digests = z.array(rosterDigestSchema).max(5_000);
+
+export const rosterEntrySchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      ...rosterBase,
+      type: z.literal("genesis"),
+      body: z
+        .object({
+          devices: z.array(rosterDeviceSchema).min(1).max(500),
+          recovery: rosterKeySchema,
+          epochs: z.array(z.object({ epoch: epochNumberSchema, sealing: rosterKeySchema }).strict()).min(1).max(1000),
+          wraps: digests
+        })
+        .strict()
+    })
+    .strict(),
+  z
+    .object({
+      ...rosterBase,
+      type: z.literal("add"),
+      body: z.object({ device: rosterDeviceSchema, via: z.enum(["device", "recovery"]), wraps: digests }).strict()
+    })
+    .strict(),
+  z
+    .object({
+      ...rosterBase,
+      type: z.literal("rotate"),
+      body: z
+        .object({
+          epoch: epochNumberSchema,
+          sealing: rosterKeySchema,
+          revoked: z.array(deviceIdSchema).max(500),
+          devices: z.array(deviceIdSchema).max(500),
+          wraps: digests
+        })
+        .strict()
+    })
+    .strict(),
+  z
+    .object({ ...rosterBase, type: z.literal("recovery"), body: z.object({ recovery: rosterKeySchema, wraps: digests }).strict() })
+    .strict()
+]);

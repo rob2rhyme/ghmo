@@ -34,7 +34,27 @@ import {
   type EpochRecord,
   type WrapRecord
 } from "../keyring";
-import { answerRecoveryCheck, createRecoveryCheck, generateRecoveryKey, importRecoveryPrivateKey } from "../recovery";
+import { answerRecoveryCheck, createRecoveryCheck, generateRecoveryKey, importRecoveryPrivateKey, importRecoverySigningKey } from "../recovery";
+import {
+  RECOVERY_SIGNER,
+  RosterError,
+  addEntry,
+  checkPin,
+  checkServerAgainstRoster,
+  checkWrapsAgainstRoster,
+  genesisEntry,
+  keyringFromOverview,
+  recoveryEntry,
+  rosterDevice,
+  rosterKeyToJwk,
+  rotateEntry,
+  verifyRoster,
+  workspaceFingerprint,
+  signEntry,
+  type GenesisBody,
+  type RosterEntry,
+  type RosterState
+} from "../roster";
 import { clearLocalDrafts } from "@/src/lib/localDrafts";
 import { deleteIdentity, loadIdentity, saveIdentity, type StoredDeviceIdentity } from "./deviceStore";
 import { evaluatePrf } from "./prf";
@@ -63,7 +83,20 @@ export type Overview = {
   devices: DeviceView[];
 };
 
-export type E2eeStatus = "loading" | "error" | "not-setup" | "no-device" | "pending" | "locked" | "unlocked" | "revoked";
+export type E2eeStatus = "loading" | "error" | "not-setup" | "no-device" | "pending" | "locked" | "unlocked" | "revoked" | "integrity-error";
+
+/**
+ * Whether the server's key records match the signed device log this browser checks.
+ *  - none: encryption isn't on
+ *  - unsealed: encryption is on but the device log hasn't been started (workspaces set up before it existed)
+ *  - verified: the log checks out, matches the server, and extends what this device saw last
+ *  - failed: it doesn't; nothing is unlocked or shared until someone looks into it
+ */
+export type Integrity =
+  | { status: "none" }
+  | { status: "unsealed" }
+  | { status: "verified"; fingerprint: string; entries: number }
+  | { status: "failed"; reason: string };
 
 type Unlocked = { identity: StoredDeviceIdentity; keys: OpenedDeviceKeys; epochKeys: EpochKeys };
 
@@ -84,6 +117,9 @@ type E2eeContextValue = {
   /** This device's own keys are open in memory (also true for a pending device). */
   keysOpen: boolean;
   error: string | null;
+  integrity: Integrity;
+  /** Starts the signed device log for a workspace that has none (super admin). */
+  sealRoster: () => Promise<void>;
   overview: Overview | null;
   identity: StoredDeviceIdentity | null;
   thisDevice: DeviceView | null;
@@ -133,6 +169,28 @@ function newDeviceId() {
   return toBase64Url(randomBytes(18));
 }
 
+/** Fetches the signed device log, verifies it, and compares it with the server's records and this device's pin. */
+async function checkIntegrity(
+  overview: { state: Overview["state"]; epochs: EpochRecord[]; devices: unknown[]; me: Overview["me"] },
+  stored: StoredDeviceIdentity | null
+): Promise<{ roster: RosterState | null; integrity: Integrity; entries: RosterEntry[] }> {
+  if (!overview.state.enabled) return { roster: null, integrity: { status: "none" }, entries: [] };
+  const { entries } = await api<{ entries: RosterEntry[] }>("/api/admin/e2ee/roster");
+  if (entries.length === 0) return { roster: null, integrity: { status: "unsealed" }, entries };
+  try {
+    const roster = await verifyRoster(entries);
+    await checkPin(entries, stored?.rosterPin);
+    checkServerAgainstRoster(roster, keyringFromOverview(overview as Parameters<typeof keyringFromOverview>[0]));
+    if (stored && (!stored.rosterPin || stored.rosterPin.seq < roster.head.seq)) {
+      await saveIdentity({ ...stored, rosterPin: { ...roster.head } });
+    }
+    return { roster, integrity: { status: "verified", fingerprint: workspaceFingerprint(roster.genesisHash), entries: entries.length }, entries };
+  } catch (error) {
+    if (!(error instanceof RosterError)) throw error;
+    return { roster: null, integrity: { status: "failed", reason: error.message }, entries };
+  }
+}
+
 /**
  * Holds this browser's E2EE state for the admin area. Decrypted keys live only in
  * memory and are dropped on lock, sign-out or page close.
@@ -142,6 +200,10 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<StoredDeviceIdentity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [integrity, setIntegrity] = useState<Integrity>({ status: "none" });
+  // The verified device log, for the callbacks below (null until verified, or on workspaces without one).
+  const rosterRef = useRef<RosterState | null>(null);
+  const integrityRef = useRef<Integrity>({ status: "none" });
   // State drives rendering; the ref gives callbacks the latest keys without re-creating them.
   const [isUnlocked, setIsUnlocked] = useState(false);
   const unlockedRef = useRef<Unlocked | null>(null);
@@ -161,8 +223,13 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const devices = await Promise.all(
         data.devices.map(async d => ({ ...d, safetyCode: await deviceSafetyCode(d.ecdhPublic, d.ecdsaPublic) }))
       );
-      setOverview({ ...data, devices });
       const stored = (await loadIdentity(data.me.uid)) ?? null;
+      // Check the server's key records against the signed device log before anything uses them.
+      const checked = await checkIntegrity(data, stored);
+      rosterRef.current = checked.roster;
+      integrityRef.current = checked.integrity;
+      setIntegrity(checked.integrity);
+      setOverview({ ...data, devices });
       setIdentity(stored);
       // A device whose own keys are open (e.g. just set up) that has since been approved:
       // fetch its copies of the workspace keys now, instead of looking unlocked while empty.
@@ -170,6 +237,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const self = stored ? devices.find(d => d.deviceId === stored.deviceId) : undefined;
       if (session && self?.status === "active" && session.epochKeys.size < data.state.currentEpoch) {
         const { wraps } = await api<{ wraps: WrapRecord[] }>(`/api/admin/e2ee/wraps?recipient=${self.deviceId}`);
+        if (rosterRef.current) await checkWrapsAgainstRoster(rosterRef.current, self.deviceId, wraps, data.state.currentEpoch);
         const epochKeys = await unwrapEpochKeys(wraps, self.deviceId, session.keys.ecdhPrivate, { maxEpoch: data.state.currentEpoch });
         unlockedRef.current = { ...session, epochKeys };
       }
@@ -200,11 +268,12 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
   const status: E2eeStatus = useMemo(() => {
     if (!loaded) return "loading";
     if (error || !overview) return "error";
+    if (integrity.status === "failed") return "integrity-error";
     if (!identity || !thisDevice) return overview.state.enabled ? "no-device" : "not-setup";
     if (thisDevice.status === "revoked") return "revoked";
     if (thisDevice.status === "pending") return overview.state.enabled ? "pending" : "not-setup";
     return isUnlocked ? "unlocked" : "locked";
-  }, [loaded, error, overview, identity, thisDevice, isUnlocked]);
+  }, [loaded, error, overview, identity, thisDevice, isUnlocked, integrity]);
 
   const setUnlocked = (value: Unlocked | null) => {
     unlockedRef.current = value;
@@ -293,6 +362,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       let epochKeys: EpochKeys = new Map();
       if (thisDevice?.status === "active") {
         const { wraps } = await api<{ wraps: WrapRecord[] }>(`/api/admin/e2ee/wraps?recipient=${identity.deviceId}`);
+        if (rosterRef.current) await checkWrapsAgainstRoster(rosterRef.current, identity.deviceId, wraps, overview?.state.currentEpoch);
         epochKeys = await unwrapEpochKeys(wraps, identity.deviceId, keys.ecdhPrivate, { maxEpoch: overview?.state.currentEpoch });
       }
       setUnlocked({ identity, keys, epochKeys });
@@ -303,9 +373,17 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
   const lock = useCallback(() => setUnlocked(null), []);
 
   const requireUnlocked = () => {
+    if (integrityRef.current.status === "failed") throw new Error("The device list failed its integrity check. Don't use encryption until an admin looks into it.");
     if (!unlockedRef.current) throw new Error("Unlock encryption on this device first");
     return unlockedRef.current;
   };
+
+  /** The newest device log, fetched and verified now (an operation's entry must extend the real head). */
+  const freshLog = async (): Promise<{ log: RosterEntry[]; roster: RosterState | null }> => {
+    const { entries } = await api<{ entries: RosterEntry[] }>("/api/admin/e2ee/roster");
+    return { log: entries, roster: entries.length > 0 ? await verifyRoster(entries) : null };
+  };
+  const deviceSigner = (session: Unlocked) => ({ id: session.identity.deviceId, key: session.keys.ecdsaPrivate });
 
   const toPublicRecords = (devices: DeviceView[]): DevicePublicRecord[] =>
     devices.map(d => ({ deviceId: d.deviceId, uid: d.uid, name: d.name, ecdhPublic: d.ecdhPublic, ecdsaPublic: d.ecdsaPublic, status: d.status, unlock: d.unlock }));
@@ -321,7 +399,16 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const device = toPublicRecords(overview?.devices ?? []).find(d => d.deviceId === session.identity.deviceId);
       if (!device) throw new Error("Register this device first");
       const initial = await createInitialEpoch({ device: { ...device, status: "active" }, recoveryPublic: prepared.recoveryPublic });
+      // The first entry of the signed device log: this device, the recovery key, the first epoch.
+      const entry = await genesisEntry({
+        signer: deviceSigner(session),
+        devices: [rosterDevice(device)],
+        recovery: prepared.recoveryPublic,
+        epochs: [{ epoch: 1, sealingPublic: initial.epoch.sealingPublic }],
+        wraps: initial.wraps
+      });
       await api("/api/admin/e2ee/bootstrap", {
+        entry,
         deviceId: device.deviceId,
         epoch: initial.epoch,
         wraps: initial.wraps,
@@ -342,8 +429,12 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const target = toPublicRecords(overview?.devices ?? []).find(d => d.deviceId === deviceId);
       if (!target) throw new Error("Device not found");
       const wraps = await wrapAllEpochsForDevice(session.epochKeys, target);
+      // With a device log, the approval is a signed entry: the other devices will only trust this device because of it.
+      const { log } = rosterRef.current ? await freshLog() : { log: [] };
+      const entry = log.length ? await addEntry({ log, signer: deviceSigner(session), device: rosterDevice(target), wraps }) : undefined;
       await api(`/api/admin/e2ee/devices/${deviceId}/approve`, {
         wraps,
+        entry,
         via: { kind: "device", approverDeviceId: session.identity.deviceId }
       });
       await refresh();
@@ -355,20 +446,43 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     async revokeDeviceIds => {
       const session = requireUnlocked();
       if (!overview?.state.recoveryPublic) throw new Error("Encryption is not set up");
-      const devices = toPublicRecords(overview.devices).map(d =>
-        revokeDeviceIds.includes(d.deviceId) ? { ...d, status: "revoked" as const } : d
-      );
+      // With a device log, who keeps access and the recovery key come from the verified log, not from the server's say-so.
+      const { log, roster } = rosterRef.current ? await freshLog() : { log: [], roster: null };
+      const trusted = roster
+        ? [...roster.devices.values()].map(d => ({
+            deviceId: d.id,
+            uid: d.uid,
+            name: d.id,
+            ecdhPublic: rosterKeyToJwk(d.ecdh),
+            ecdsaPublic: rosterKeyToJwk(d.ecdsa),
+            status: "active" as const,
+            unlock: "prf" as const
+          }))
+        : toPublicRecords(overview.devices);
+      const devices = trusted.map(d => (revokeDeviceIds.includes(d.deviceId) ? { ...d, status: "revoked" as const } : d));
       const rotated = await rotateEpoch({
         keys: session.epochKeys,
         createdByDevice: session.identity.deviceId,
         activeDevices: devices,
-        recoveryPublic: overview.state.recoveryPublic
+        recoveryPublic: roster ? rosterKeyToJwk(roster.recovery) : overview.state.recoveryPublic
       });
+      const entry = log.length
+        ? await rotateEntry({
+            log,
+            signer: deviceSigner(session),
+            epoch: rotated.epoch.epoch,
+            sealingPublic: rotated.epoch.sealingPublic,
+            revoked: revokeDeviceIds,
+            remaining: devices.filter(d => d.status === "active").map(d => d.deviceId),
+            wraps: rotated.wraps
+          })
+        : undefined;
       await api("/api/admin/e2ee/rotate", {
         byDeviceId: session.identity.deviceId,
         revokeDeviceIds,
         epoch: rotated.epoch,
-        wraps: rotated.wraps
+        wraps: rotated.wraps,
+        entry
       });
       setUnlocked({ ...session, epochKeys: rotated.keys });
       await refresh();
@@ -381,6 +495,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       if (!overview?.state.recoveryPublic || !overview.state.recoveryCheckWrap) throw new Error("Encryption is not set up");
       const recoveryPrivate = await importRecoveryPrivateKey(printable, overview.state.recoveryPublic);
       const { wraps } = await api<{ wraps: WrapRecord[] }>("/api/admin/e2ee/wraps?recipient=recovery");
+      if (rosterRef.current) await checkWrapsAgainstRoster(rosterRef.current, RECOVERY_SIGNER, wraps, overview.state.currentEpoch);
       let epochKeys: EpochKeys;
       let token: string;
       try {
@@ -400,8 +515,20 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const self = toPublicRecords(overview?.devices ?? []).find(d => d.deviceId === session.identity.deviceId);
       if (!self) throw new Error("Register this device first");
       const { epochKeys, token } = await unwrapWithRecovery(printable);
+      const wraps = await wrapAllEpochsForDevice(epochKeys, self);
+      // The paper key signs this device into the log (the recovery public key in the log must be the one on the paper).
+      const { log, roster } = rosterRef.current ? await freshLog() : { log: [], roster: null };
+      const entry = log.length
+        ? await addEntry({
+            log,
+            signer: { id: RECOVERY_SIGNER, key: await importRecoverySigningKey(printable, rosterKeyToJwk(roster!.recovery)) },
+            device: rosterDevice(self),
+            wraps
+          })
+        : undefined;
       await api(`/api/admin/e2ee/devices/${self.deviceId}/approve`, {
-        wraps: await wrapAllEpochsForDevice(epochKeys, self),
+        wraps,
+        entry,
         via: { kind: "recovery", recoveryToken: token }
       });
       setUnlocked({ ...session, epochKeys });
@@ -419,7 +546,11 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     async (prepared, trustees) => {
       const session = requireUnlocked();
       const issuedAt = Date.now();
+      const replacementWraps = await wrapAllEpochsForRecovery(session.epochKeys, prepared.recoveryPublic);
+      const { log } = rosterRef.current ? await freshLog() : { log: [] };
+      const entry = log.length ? await recoveryEntry({ log, signer: deviceSigner(session), recovery: prepared.recoveryPublic, wraps: replacementWraps }) : undefined;
       await api("/api/admin/e2ee/recovery", {
+        entry,
         authorization: {
           deviceId: session.identity.deviceId,
           issuedAt,
@@ -427,7 +558,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
         },
         recoveryPublic: prepared.recoveryPublic,
         recoveryCheck: prepared.recoveryCheck,
-        wraps: await wrapAllEpochsForRecovery(session.epochKeys, prepared.recoveryPublic),
+        wraps: replacementWraps,
         trustees: trustees.map(name => ({ name })),
         trusteesConfirmed: true
       });
@@ -435,6 +566,17 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     },
     [refresh]
   );
+
+  const sealRoster = useCallback<E2eeContextValue["sealRoster"]>(async () => {
+    const session = requireUnlocked();
+    const { candidate } = await api<{ candidate: GenesisBody }>("/api/admin/e2ee/roster?candidate=1");
+    const entry = await signEntry(
+      { v: 1, seq: 1, prev: "", type: "genesis", by: session.identity.deviceId, at: new Date().toISOString(), body: candidate },
+      session.keys.ecdsaPrivate
+    );
+    await api("/api/admin/e2ee/roster", { deviceId: session.identity.deviceId, entry });
+    await refresh();
+  }, [refresh]);
 
   const encrypt = useCallback<E2eeContextValue["encrypt"]>(async (location, data) => {
     const session = requireUnlocked();
@@ -455,7 +597,12 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const session = requireUnlocked();
       return decryptRecord<T>(envelope, location, {
         workspaceKeyFor: async epoch => (session.epochKeys.has(epoch) ? aesKeyFromRaw(session.epochKeys.get(epoch)!) : null),
-        signingKeyFor: deviceId => overviewRef.current?.devices.find(d => d.deviceId === deviceId)?.ecdsaPublic ?? null
+        // Prefer the verified device log; revoked devices stay listed there so their older records still verify.
+        signingKeyFor: deviceId => {
+          const trusted = rosterRef.current?.devices.get(deviceId) ?? rosterRef.current?.revoked.get(deviceId);
+          if (rosterRef.current) return trusted ? rosterKeyToJwk(trusted.ecdsa) : null;
+          return overviewRef.current?.devices.find(d => d.deviceId === deviceId)?.ecdsaPublic ?? null;
+        }
       });
     },
     []
@@ -502,6 +649,8 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(overview?.state.enabled),
     keysOpen: isUnlocked,
     error,
+    integrity,
+    sealRoster,
     overview,
     identity,
     thisDevice,

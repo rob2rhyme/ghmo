@@ -16,7 +16,7 @@ import { UnlockCard } from "./UnlockCard";
  * While encryption is not turned on yet, the page works as before with a reminder.
  */
 export function EncryptionGate({ children, what = "This page" }: { children: ReactNode; what?: string }) {
-  const { status, enabled, overview, error, refresh } = useE2ee();
+  const { status, enabled, overview, error, refresh, integrity } = useE2ee();
 
   if (status === "loading") {
     return (
@@ -58,6 +58,22 @@ export function EncryptionGate({ children, what = "This page" }: { children: Rea
         </Alert>
         {children}
       </div>
+    );
+  }
+
+  if (status === "integrity-error") {
+    return (
+      <Alert variant="destructive">
+        <ShieldOff />
+        <AlertTitle>{what} is paused: the device list failed its check</AlertTitle>
+        <AlertDescription>
+          {integrity.status === "failed" ? integrity.reason : "The device list could not be verified."} Don&apos;t approve devices or share anything until an
+          admin you trust confirms what changed.{" "}
+          <Link href="/admin/encryption" className="font-semibold underline">
+            Open Encryption
+          </Link>
+        </AlertDescription>
+      </Alert>
     );
   }
 

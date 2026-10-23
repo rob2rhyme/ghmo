@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isSuperAdmin } from "@/src/lib/admin";
-import { deviceIdSchema, epochRecordSchema, publicJwkSchema, recoveryCheckSchema, trusteeSchema, wrapRecordSchema } from "@/src/lib/e2ee/schemas";
+import { deviceIdSchema, epochRecordSchema, publicJwkSchema, recoveryCheckSchema, rosterEntrySchema, trusteeSchema, wrapRecordSchema } from "@/src/lib/e2ee/schemas";
 import { bootstrap } from "@/src/lib/e2eeStore";
 import { auditKeyring, e2eeRoute } from "@/src/lib/e2eeRoute";
 import { parseJsonBody } from "@/src/lib/validation";
@@ -15,7 +15,8 @@ const bodySchema = z.object({
   recoveryPublic: publicJwkSchema,
   recoveryCheck: recoveryCheckSchema,
   trustees: z.array(trusteeSchema).length(2),
-  trusteesConfirmed: z.literal(true)
+  trusteesConfirmed: z.literal(true),
+  entry: rosterEntrySchema
 });
 
 /** Turns on end-to-end encryption (super admin, once). */

@@ -2,6 +2,17 @@ import "server-only";
 import crypto from "node:crypto";
 import type { Transaction } from "firebase-admin/firestore";
 import type { z } from "zod";
+import {
+  RosterError,
+  canonicalJson,
+  type GenesisBody,
+  rosterDevice,
+  rosterKey,
+  verifyRoster,
+  wrapDigests,
+  type RosterEntry,
+  type RosterState
+} from "./e2ee/roster";
 import { COMMUNITY_SLUG } from "./community";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgDocPath } from "./firestorePaths";
@@ -61,6 +72,8 @@ const stateRef = () => getAdminDb().doc(base());
 const devicesCol = () => getAdminDb().collection(`${base()}/devices`);
 const epochsCol = () => getAdminDb().collection(`${base()}/epochs`);
 const wrapsCol = () => getAdminDb().collection(`${base()}/wraps`);
+const rosterCol = () => getAdminDb().collection(`${base()}/roster`);
+const rosterId = (seq: number) => String(seq).padStart(6, "0");
 const wrapId = (epoch: number, recipient: string) => `${epoch}_${recipient}`;
 
 export class KeyringError extends Error {
@@ -119,6 +132,54 @@ export async function registerDevice(device: Omit<StoredDevice, "status" | "crea
   });
 }
 
+export async function readRoster(tx?: Transaction): Promise<RosterEntry[]> {
+  const query = rosterCol().orderBy("seq");
+  const snap = tx ? await tx.get(query) : await query.get();
+  return snap.docs.map(d => d.data() as RosterEntry);
+}
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
+
+/** The digests in a signed entry must be exactly those of the key copies being stored. */
+async function digestsMatch(entryWraps: { epoch: number; recipient: string; h: string }[], wraps: WrapRecordInput[]) {
+  const key = (d: { epoch: number; recipient: string; h: string }) => `${d.epoch}|${d.recipient}|${d.h}`;
+  return sameSet(entryWraps.map(key), (await wrapDigests(wraps)).map(key));
+}
+
+/**
+ * Checks the signed device-log entry that must accompany a change to who holds keys. Returns it (to be
+ * stored in the same transaction) or null for a workspace whose log hasn't been started yet.
+ * The browsers re-verify everything; this stops a stolen session or a buggy client from adding to the log.
+ */
+async function acceptEntry<T extends RosterEntry["type"]>(
+  roster: RosterEntry[],
+  entry: RosterEntry | undefined,
+  type: T,
+  matches: (entry: Extract<RosterEntry, { type: T }>) => boolean | Promise<boolean>
+): Promise<RosterEntry | null> {
+  if (roster.length === 0 && type !== "genesis") {
+    if (entry) throw new KeyringError(409, "Seal the device list before making signed changes");
+    return null;
+  }
+  if (!entry) throw new KeyringError(409, "This change needs a signed device-list entry");
+  if (entry.type !== type || !(await matches(entry as Extract<RosterEntry, { type: T }>))) {
+    throw new KeyringError(400, "The signed device-list entry doesn't match this change");
+  }
+  try {
+    await verifyRoster([...roster, entry]);
+  } catch (error) {
+    if (error instanceof RosterError) throw new KeyringError(400, `Signed entry refused: ${error.message}`);
+    throw error;
+  }
+  return entry;
+}
+
+function storeEntry(tx: Transaction, entry: RosterEntry | null) {
+  if (entry) tx.create(rosterCol().doc(rosterId(entry.seq)), entry);
+}
+
+export type { RosterState };
+
 export function hashRecoveryToken(tokenB64Url: string): string {
   return crypto.createHash("sha256").update(Buffer.from(tokenB64Url, "base64url")).digest("hex");
 }
@@ -140,6 +201,7 @@ export async function bootstrap(params: {
   recoveryPublic: PublicJwk;
   recoveryCheck: RecoveryCheck;
   trustees: { name: string }[];
+  entry?: RosterEntry;
 }) {
   if (params.epoch.epoch !== 1) throw new KeyringError(400, "Setup starts at epoch 1");
   if (params.epoch.createdByDevice !== params.deviceId) throw new KeyringError(400, "Epoch must be created by your device");
@@ -158,6 +220,23 @@ export async function bootstrap(params: {
     if (!device.exists || (device.data() as StoredDevice).uid !== params.uid) {
       throw new KeyringError(400, "Register this device first");
     }
+    const roster = await readRoster(tx);
+    const stored = device.data() as StoredDevice;
+    const entry = await acceptEntry(roster, params.entry, "genesis", async e => {
+      const b = e.body;
+      return (
+        e.by === params.deviceId &&
+        b.devices.length === 1 &&
+        canonicalJson(b.devices[0]) === canonicalJson(rosterDevice(stored)) &&
+        canonicalJson(b.recovery) === canonicalJson(rosterKey(params.recoveryPublic)) &&
+        b.epochs.length === 1 &&
+        b.epochs[0].epoch === 1 &&
+        canonicalJson(b.epochs[0].sealing) === canonicalJson(rosterKey(params.epoch.sealingPublic)) &&
+        (await digestsMatch(b.wraps, params.wraps))
+      );
+    });
+    if (!entry) throw new KeyringError(400, "Setup needs the signed first entry of the device list");
+    storeEntry(tx, entry);
     const now = new Date().toISOString();
     tx.update(deviceRef, { status: "active", approvedBy: params.uid, approvedVia: "bootstrap" });
     tx.set(epochsCol().doc("1"), params.epoch);
@@ -184,12 +263,14 @@ export async function approveDevice(params: {
   deviceId: string;
   wraps: WrapRecordInput[];
   via: { kind: "device"; approverDeviceId: string } | { kind: "recovery"; recoveryToken: string };
+  entry?: RosterEntry;
 }) {
   await getAdminDb().runTransaction(async tx => {
     const state = await getState(tx);
     if (!state.enabled) throw new KeyringError(409, "End-to-end encryption is not set up yet");
     const targetRef = devicesCol().doc(params.deviceId);
     const target = await tx.get(targetRef);
+    const roster = await readRoster(tx);
     if (!target.exists) throw new KeyringError(404, "Device not found");
     const device = target.data() as StoredDevice;
     if (device.status !== "pending") throw new KeyringError(409, "Device is not waiting for approval");
@@ -211,6 +292,13 @@ export async function approveDevice(params: {
 
     const expected = Array.from({ length: state.currentEpoch }, (_, i) => ({ epoch: i + 1, recipient: params.deviceId }));
     checkWrapsCover(params.wraps, expected);
+    const entry = await acceptEntry(roster, params.entry, "add", async e =>
+      e.by === (params.via.kind === "device" ? params.via.approverDeviceId : "recovery") &&
+      e.body.via === params.via.kind &&
+      canonicalJson(e.body.device) === canonicalJson(rosterDevice(device)) &&
+      (await digestsMatch(e.body.wraps, params.wraps))
+    );
+    storeEntry(tx, entry);
     for (const w of params.wraps) tx.set(wrapsCol().doc(wrapId(w.epoch, w.recipient)), w);
     tx.update(targetRef, { status: "active", approvedBy: params.approverUid, approvedVia: params.via.kind });
   });
@@ -228,6 +316,7 @@ export async function rotate(params: {
   epoch: EpochRecordInput;
   wraps: WrapRecordInput[];
   canRevokeOthers: boolean;
+  entry?: RosterEntry;
 }) {
   const revokedWrapDocs = await Promise.all(
     params.revokeDeviceIds.map(id => wrapsCol().where("recipient", "==", id).get())
@@ -239,6 +328,7 @@ export async function rotate(params: {
     if (params.epoch.createdByDevice !== params.byDeviceId) throw new KeyringError(400, "Epoch must be created by your device");
 
     const devices = (await tx.get(devicesCol())).docs.map(d => d.data() as StoredDevice);
+    const roster = await readRoster(tx);
     const byDevice = devices.find(d => d.deviceId === params.byDeviceId);
     if (!byDevice || byDevice.uid !== params.uid || byDevice.status !== "active") {
       throw new KeyringError(403, "Rotate from one of your active devices");
@@ -256,6 +346,15 @@ export async function rotate(params: {
       { epoch: params.epoch.epoch, recipient: "recovery" }
     ]);
 
+    const entry = await acceptEntry(roster, params.entry, "rotate", async e =>
+      e.by === params.byDeviceId &&
+      e.body.epoch === params.epoch.epoch &&
+      canonicalJson(e.body.sealing) === canonicalJson(rosterKey(params.epoch.sealingPublic)) &&
+      sameSet(e.body.revoked, params.revokeDeviceIds) &&
+      sameSet(e.body.devices, remaining.map(d => d.deviceId)) &&
+      (await digestsMatch(e.body.wraps, params.wraps))
+    );
+    storeEntry(tx, entry);
     const now = new Date().toISOString();
     for (const id of params.revokeDeviceIds) {
       tx.update(devicesCol().doc(id), { status: "revoked", revokedAt: now });
@@ -273,16 +372,25 @@ export async function replaceRecoveryKey(params: {
   recoveryCheck: RecoveryCheck;
   wraps: WrapRecordInput[];
   trustees: { name: string }[];
+  byDeviceId?: string;
+  entry?: RosterEntry;
 }) {
   const names = params.trustees.map(t => t.name.trim().toLowerCase());
   if (names.length !== 2 || names[0] === names[1]) throw new KeyringError(400, "Two different trustees are required");
   await getAdminDb().runTransaction(async tx => {
     const state = await getState(tx);
+    const roster = await readRoster(tx);
     if (!state.enabled) throw new KeyringError(409, "End-to-end encryption is not set up yet");
     checkWrapsCover(
       params.wraps,
       Array.from({ length: state.currentEpoch }, (_, i) => ({ epoch: i + 1, recipient: "recovery" }))
     );
+    const entry = await acceptEntry(roster, params.entry, "recovery", async e =>
+      e.by === params.byDeviceId &&
+      canonicalJson(e.body.recovery) === canonicalJson(rosterKey(params.recoveryPublic)) &&
+      (await digestsMatch(e.body.wraps, params.wraps))
+    );
+    storeEntry(tx, entry);
     const now = new Date().toISOString();
     for (const w of params.wraps) tx.set(wrapsCol().doc(wrapId(w.epoch, w.recipient)), w);
     tx.update(stateRef(), {
@@ -305,3 +413,36 @@ export async function withdrawPendingDevice(uid: string, deviceId: string) {
   });
 }
 
+
+/**
+ * What the device log would say if it were started now from the server's own records. Used once, to give
+ * a workspace that was set up before the log existed a signed starting point: a super admin checks the
+ * device list (safety codes) and signs this.
+ */
+export async function snapshotCandidate(tx?: Transaction): Promise<GenesisBody> {
+  const state = await getState(tx);
+  if (!state.enabled || !state.recoveryPublic) throw new KeyringError(409, "End-to-end encryption is not set up yet");
+  const [devicesSnap, epochsSnap, wrapsSnap] = tx
+    ? await Promise.all([tx.get(devicesCol()), tx.get(epochsCol().orderBy("epoch")), tx.get(wrapsCol())])
+    : await Promise.all([devicesCol().get(), epochsCol().orderBy("epoch").get(), wrapsCol().get()]);
+  const devices = devicesSnap.docs.map(d => d.data() as StoredDevice).filter(d => d.status === "active");
+  return {
+    devices: devices.map(rosterDevice).sort((a, b) => (a.id < b.id ? -1 : 1)),
+    recovery: rosterKey(state.recoveryPublic),
+    epochs: epochsSnap.docs.map(d => d.data() as EpochRecordInput).map(e => ({ epoch: e.epoch, sealing: rosterKey(e.sealingPublic) })),
+    wraps: await wrapDigests(wrapsSnap.docs.map(d => d.data() as WrapRecordInput))
+  };
+}
+
+/** Starts the device log for a workspace that has none (see snapshotCandidate). */
+export async function sealRoster(params: { uid: string; deviceId: string; entry: RosterEntry }) {
+  await getAdminDb().runTransaction(async tx => {
+    const roster = await readRoster(tx);
+    if (roster.length > 0) throw new KeyringError(409, "The device list is already sealed");
+    const device = (await tx.get(devicesCol().doc(params.deviceId))).data() as StoredDevice | undefined;
+    if (!device || device.uid !== params.uid || device.status !== "active") throw new KeyringError(403, "Seal from one of your active devices");
+    const candidate = await snapshotCandidate(tx);
+    const entry = await acceptEntry([], params.entry, "genesis", e => e.by === params.deviceId && canonicalJson(e.body) === canonicalJson(candidate));
+    storeEntry(tx, entry);
+  });
+}

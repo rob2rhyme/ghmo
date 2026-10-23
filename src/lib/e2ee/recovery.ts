@@ -106,6 +106,26 @@ export async function importRecoveryPrivateKey(printable: string, publicJwk: Pub
   }
 }
 
+/**
+ * The same paper key, as a signing key. Only used to sign the roster entry that approves a device
+ * "by recovery key" (the entries are signed under their own prefix, so signatures can't be confused
+ * with anything else this scalar does).
+ */
+export async function importRecoverySigningKey(printable: string, publicJwk: PublicJwk): Promise<CryptoKey> {
+  const d = await parseRecoveryKey(printable);
+  try {
+    return await globalThis.crypto.subtle.importKey(
+      "jwk",
+      { kty: "EC", crv: "P-256", d: toBase64Url(d), x: publicJwk.x, y: publicJwk.y },
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+  } catch {
+    throw new RecoveryKeyMismatchError();
+  }
+}
+
 export class RecoveryKeyMismatchError extends Error {
   constructor() {
     super("This recovery key doesn't belong to this workspace.");
