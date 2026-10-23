@@ -30,17 +30,28 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   if (getAdminEnvStatus().ok) {
     const ctx = await getAuthContextFromRequest();
     if (ctx) {
+      let signedInAdmin = false;
       try {
         await requireActiveAdmin(ctx, COMMUNITY_SLUG);
-        redirect(nextPath as Route);
+        signedInAdmin = true;
       } catch (error) {
-        if (!(error instanceof AdminAccessError)) throw error;
-        if (error.reason === "PASSKEY_REQUIRED") {
-          const [passkeys, profile] = await Promise.all([listPasskeys(ctx.uid), getAdminProfile(COMMUNITY_SLUG, ctx.uid)]);
-          stage = passkeys.some(p => p.status === "pending") ? "pending" : "setup";
-          adminName = profile?.name ?? null;
+        if (error instanceof AdminAccessError) {
+          if (error.reason === "PASSKEY_REQUIRED") {
+            try {
+              const [passkeys, profile] = await Promise.all([listPasskeys(ctx.uid), getAdminProfile(COMMUNITY_SLUG, ctx.uid)]);
+              stage = passkeys.some(p => p.status === "pending") ? "pending" : "setup";
+              adminName = profile?.name ?? null;
+            } catch (lookupError) {
+              // Show the sign-in options instead of a blank error page, and leave the cause in the server log.
+              console.error("Admin login: could not load passkey status", lookupError);
+            }
+          }
+        } else {
+          console.error("Admin login: could not check the current session", error);
         }
       }
+      // Outside the try block: redirect() works by throwing.
+      if (signedInAdmin) redirect(nextPath as Route);
     }
   }
 
