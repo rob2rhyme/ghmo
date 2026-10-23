@@ -93,6 +93,9 @@
     },
     "@google-cloud/pubsub": {
       "@opentelemetry/core": "2.8.0"
+    },
+    "firebase-admin": {
+      "jwks-rsa": "3.2.2"
     }
   },
   "engines": {
