@@ -58,7 +58,7 @@
     "@vitest/coverage-v8": "5.0.5",
     "audit-ci": "^7.1.0",
     "dotenv": "^17.2.3",
-    "eslint": "9.39.5",
+    "eslint": "10.13.0",
     "eslint-config-next": "16.4.2",
     "firebase-tools": "15.34.0",
     "html-to-image": "^1.11.11",
