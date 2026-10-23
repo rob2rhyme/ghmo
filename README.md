@@ -197,6 +197,7 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push
 
 - Magic-link auth endpoints are rate-limited, return generic responses, and only honor allowlisted emails in Firestore so the attacker cannot enumerate addresses.
 - Rate limits are stored in Firestore (`organizations/ghmo/rateLimits`, keys SHA-256 hashed) so they hold across serverless instances, and fail closed if Firestore is unavailable. **Owner action:** in the Firebase console, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.
+- **Going live / owner tasks:** `docs/GO_LIVE_CHECKLIST.md` lists every setting, secret, rule deployment and person-dependent step in order.
 - **Vercel deployments.** `vercel.json` runs `scripts/vercel-ignore-build.sh`, which skips preview builds for `dependabot/*` branches and for pushes that only change docs, tests or CI config, so the free plan's daily deployment limit goes to changes that can affect the site. `main` always builds.
 - Client IPs come from the right-most `X-Forwarded-For` entry (configurable with `TRUSTED_PROXY_HOPS`), or `x-real-ip` on Vercel, so clients cannot spoof their IP to dodge limits.
 - Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
