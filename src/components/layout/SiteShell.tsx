@@ -4,6 +4,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import Providers from "@/src/components/Providers";
 import { CommunityHeader } from "@/src/components/community/CommunityHeader";
+import { ScrollToTopButton } from "@/src/components/ScrollToTopButton";
 import { getCommunity } from "@/src/lib/community";
 
 type SiteShellProps = {
@@ -17,6 +18,8 @@ type SiteShellProps = {
    * the page render per request, which nonces require.
    */
   secure?: boolean;
+  /** Floating back-to-top button with a scroll-progress ring (public pages). */
+  scrollToTop?: boolean;
 };
 
 /**
@@ -26,7 +29,7 @@ type SiteShellProps = {
  * navigating between root layouts, so third-party scripts loaded on public pages
  * can never stay alive in the browser after the user moves into the admin area.
  */
-export async function SiteShell({ children, bodyStart, chrome = true, secure = false }: SiteShellProps) {
+export async function SiteShell({ children, bodyStart, chrome = true, secure = false, scrollToTop = false }: SiteShellProps) {
   const community = await getCommunity();
   const nonce = secure ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
 
@@ -44,6 +47,7 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
           ) : (
             children
           )}
+          {scrollToTop ? <ScrollToTopButton /> : null}
         </Providers>
       </body>
     </html>

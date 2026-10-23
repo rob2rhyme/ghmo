@@ -12,6 +12,7 @@ export default async function PublicRootLayout({ children }: { children: ReactNo
   const community = await getCommunity();
   return (
     <SiteShell
+      scrollToTop
       bodyStart={
         <GoFundMeProInstallSnippet
           enabled={community.gofundmePro?.enabled}
