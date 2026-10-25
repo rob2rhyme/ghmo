@@ -9,11 +9,14 @@ service cloud.firestore {
       return exists(adminPath) && get(adminPath).data.status == "active";
     }
 
-    // Admin data needs a passkey-backed token (plan decision D2). Tokens are minted by
-    // /api/auth/firebase-custom-token, which copies the session's `authMethod` claim. "dev" is
-    // only ever issued by the local dev bypass, which is disabled in production.
+    // Admin data needs a strong sign-in: a passkey (plan decision D2) or an email link followed by an
+    // authenticator-app code (decision D6). Tokens are minted by /api/auth/firebase-custom-token, which
+    // copies the session's `authMethod` claim. "dev" is only ever issued by the local dev bypass, which
+    // is disabled in production. A plain email-link session ("magic_link") is never enough.
     function hasStrongAuth() {
-      return request.auth.token.authMethod == "passkey" || request.auth.token.authMethod == "dev";
+      return request.auth.token.authMethod == "passkey" ||
+        request.auth.token.authMethod == "totp" ||
+        request.auth.token.authMethod == "dev";
     }
 
     function isAdmin() {

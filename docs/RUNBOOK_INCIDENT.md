@@ -16,9 +16,9 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 
 ## A. A device was lost, stolen or is suspected compromised
 
-*The data on the device is protected by the admin's passkey, but assume the worst.*
+*The data on the device is protected by the admin's passkey or encryption passphrase, but assume the worst.*
 
-1. The owner signs in on another device and goes to **Admin → Security** and removes the passkey for the lost device.
+1. The owner signs in on another device and goes to **Admin → Security**. If the lost device was a phone with their **authenticator app**, they sign in with a recovery code and move the app to a new phone (a super admin can **reset** it from Admin → Security; the owner is signed out everywhere and sets up a new app at their next email-link sign-in). If it held a passkey, they remove that passkey.
 2. A **super admin** opens **Admin → Encryption**, ticks the lost device, and clicks **Revoke selected and rotate keys**. This stops it reading anything written from now on. It keeps whatever it already decrypted; that can't be undone.
 3. Everything written **before** the rotation was readable by that device. If it held sensitive material (minutes drafts, documents), treat that as exposed and decide whether to tell the people concerned.
 4. The owner sets up encryption on their new device; another admin approves it after comparing the 20-digit safety code **by phone or in person**.
@@ -26,7 +26,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 
 ## B. An admin session may be stolen (cookie theft, shared computer left signed in)
 
-1. Ask the admin to **Sign out** everywhere, then sign in again with their passkey. Sign-out ends the session on the server.
+1. Ask the admin to **Sign out** everywhere, then sign in again (passkey, or email link plus authenticator code). Sign-out ends the session on the server.
 2. If you can't reach them: a super admin sets the admin's status to disabled (Firestore console → `organizations/ghmo/admins/{uid}` → `status: "disabled"`). Their access ends within about a minute.
 3. A stolen session alone cannot read encrypted data (it has no device keys) and cannot replace the recovery key (that needs the admin's unlocked device). Check the audit log for what it did anyway.
 
@@ -34,7 +34,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 
 1. Disable them (case B step 2).
 2. A super admin revokes **all** of their devices and rotates keys (case A step 2).
-3. Remove their passkeys. Rotate any shared secrets they knew.
+3. Remove their passkeys and reset their authenticator app (Admin → Security, super admin). Rotate any shared secrets they knew.
 
 ## D. Paper recovery key lost or exposed
 

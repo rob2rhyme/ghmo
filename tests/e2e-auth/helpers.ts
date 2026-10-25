@@ -83,11 +83,18 @@ export function collectCspViolations(page: Page) {
 }
 
 /** Runs the setup wizard as a super admin on /admin/encryption. Returns the 14 recovery key groups. */
-export async function turnOnEncryption(page: Page, deviceName: string): Promise<string[]> {
+export async function turnOnEncryption(page: Page, deviceName: string, options: { passphrase?: string } = {}): Promise<string[]> {
   const { expect } = await import("@playwright/test");
   await page.goto("/admin/encryption");
   await page.getByLabel("Name this device").fill(deviceName);
-  await page.getByRole("button", { name: "Create keys with my passkey" }).click();
+  if (options.passphrase) {
+    // Admins without a passkey (authenticator-app sign-in) lock this device's keys with a passphrase.
+    await page.getByLabel("Encryption passphrase").fill(options.passphrase);
+    await page.getByLabel("Repeat passphrase").fill(options.passphrase);
+    await page.getByRole("button", { name: "Create keys with passphrase" }).click();
+  } else {
+    await page.getByRole("button", { name: "Create keys with my passkey" }).click();
+  }
   await page.getByRole("button", { name: "Create recovery key" }).click();
   const groups = await page.getByRole("list", { name: "Recovery key groups" }).locator("li > span:last-child").allTextContents();
   expect(groups).toHaveLength(14);

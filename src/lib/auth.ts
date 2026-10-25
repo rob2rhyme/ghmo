@@ -10,11 +10,12 @@ export type Role = "member" | "admin";
 
 /**
  * How the session was created (custom-token claim `authMethod`, copied into the session cookie).
- * - passkey: WebAuthn sign-in. Required for admin access (plan decision D2).
+ * - passkey: WebAuthn sign-in. Counts as strong admin authentication (plan decision D2).
+ * - totp: email link + authenticator-app code. Also strong (plan decision D6).
  * - magic_link: email link. Only good for setting up or recovering a passkey.
  * - dev: local dev bypass (never in production).
  */
-export type AuthMethod = "passkey" | "magic_link" | "dev";
+export type AuthMethod = "passkey" | "totp" | "magic_link" | "dev";
 
 /**
  * The only session cookie. Firebase Hosting forwards only a cookie named `__session`.
@@ -91,7 +92,10 @@ function toAuthContext(decoded: DecodedIdToken): AuthContext | null {
     orgSlug,
     role,
     authMethod:
-      claims.authMethod === "passkey" || claims.authMethod === "magic_link" || claims.authMethod === "dev"
+      claims.authMethod === "passkey" ||
+      claims.authMethod === "totp" ||
+      claims.authMethod === "magic_link" ||
+      claims.authMethod === "dev"
         ? claims.authMethod
         : null,
     email: decoded.email,

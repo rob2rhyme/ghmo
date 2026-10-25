@@ -60,6 +60,19 @@ function keyById(kid: string): Buffer {
   return match;
 }
 
+/**
+ * The server's data-encryption keys, current first then any previous ones kept for rotation.
+ * Other server-side secrets (such as authenticator-app seeds) derive their own keys from these.
+ */
+export function serverEncryptionKeys(): Buffer[] {
+  const previous = (process.env.DOCGEN_SIGNATURE_ENC_PREVIOUS_KEYS_BASE64 ?? "")
+    .split(",")
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => decodeKey(part, "DOCGEN_SIGNATURE_ENC_PREVIOUS_KEYS_BASE64"));
+  return [currentKey(), ...previous];
+}
+
 function aad(sessionId: string): Buffer {
   return Buffer.from(`ghmo:signature:v2:${sessionId}`, "utf8");
 }

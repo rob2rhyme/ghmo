@@ -5,7 +5,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 ## 1. Hosting and settings (Vercel / Firebase)
 
 - [ ] **Environment variables are set** in Vercel for Production: all `NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`, and `NEXT_PUBLIC_APP_URL` (the exact production origin; passkeys are bound to it).
-- [ ] `DOCGEN_SIGNATURE_ENC_KEY_BASE64` is set. `CERTIFICATE_SIGNING_KEY_BASE64` is set (`openssl rand -base64 32`) and backed up with your other secrets; losing it invalidates every certificate QR code.
+- [ ] `DOCGEN_SIGNATURE_ENC_KEY_BASE64` is set (**required**: authenticator-app sign-in encrypts its seeds with a key derived from it). `CERTIFICATE_SIGNING_KEY_BASE64` is set (`openssl rand -base64 32`) and backed up with your other secrets; losing it invalidates every certificate QR code.
 - [ ] **Removed from production:** `FEATURE_PIN_LOGIN`, `ALLOW_DEV_ADMIN_LOGIN`, `NEXT_PUBLIC_ALLOW_DEV_ADMIN_LOGIN`, `DEV_ADMIN_LOGIN_TOKEN`. Old `organizations/ghmo/pins` documents are deleted.
 - [ ] **Never** point a local or dev environment at the production Firebase project.
 - [ ] `TRUSTED_PROXY_HOPS` matches the real proxy chain (on Vercel the default `x-real-ip` handling applies; confirm after deploying).
@@ -29,7 +29,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 ## 4. People and keys
 
 - [ ] At least two admins are active.
-- [ ] Each admin signs in once at `/admin/login` (email link), creates a passkey, and adds a second passkey on another device under Admin → Security. Everyone has to sign in again after the session change.
+- [ ] Each admin signs in once at `/admin/login` (email link), sets up the **authenticator app** (scan the QR code, type the first code) and saves the 8 recovery codes **somewhere other than their email**. A passkey is optional. Everyone has to sign in again after the session change.
 - [ ] A super admin opens Admin → Encryption and runs setup **with both trustees present**; each takes a paper copy of the recovery key straight away.
 - [ ] Every other admin sets up each of their devices; another admin approves each after comparing the **safety code and the workspace fingerprint** by phone or in person.
 - [ ] **Existing workspace (encryption was already on before the signed device list):** a super admin presses **Seal the device list** once, after checking every listed device with its owner.

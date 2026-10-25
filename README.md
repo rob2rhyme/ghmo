@@ -72,10 +72,12 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - The magic-link workflow is the only supported login path; there is no member login option.
 - **PIN login has been removed** (plan decision D3). The PIN routes, the `pins` collection rules and `FEATURE_PIN_LOGIN` no longer exist; any old `organizations/ghmo/pins` documents can be deleted.
 - **First admin:** set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters) and call `POST /api/admin/bootstrap` with `{ "secret", "email", "name" }`. It creates one `super_admin` in `organizations/ghmo/admins` and then locks itself permanently. Remove the secret afterwards.
-- **Passkeys are required** for every admin (decision D2). Admins sign in at `/admin/login` with a passkey (fingerprint, face or device PIN). The email magic link only starts a limited session that can create a passkey; it cannot open admin pages, admin APIs or admin data in Firestore.
+- **Strong sign-in is required** for every admin: an authenticator-app code after the email link (decision D6, the default), or a passkey (optional, decision D2). The sections below about passkeys apply to admins who choose them.
+- **Passkeys** (decision D2). Admins sign in at `/admin/login` with a passkey (fingerprint, face or device PIN). The email magic link only starts a limited session that can create a passkey; it cannot open admin pages, admin APIs or admin data in Firestore.
 - **Recovery:** if an admin who already has a passkey adds a new one through a magic link, the new passkey stays *pending* until **another** admin approves it under Admin → Security, so access to someone's email alone is not enough. If no other admin with a passkey exists, it activates immediately (audited).
 - **Security page** (`/admin/security`): list, add and remove your passkeys (you can't remove your last one), and approve other admins' pending passkeys. Super admins can remove another admin's passkey (lost device).
-- Sessions record how they were created (`authMethod` claim: `passkey`, `magic_link` or local-only `dev`); `requireActiveAdmin` and the Firestore rules both require `passkey`.
+- Sessions record how they were created (`authMethod` claim: `passkey`, `totp`, `magic_link` or local-only `dev`); `requireActiveAdmin` and the Firestore rules both require `passkey` or `totp`.
+- **Authenticator app (D6):** after the email link the admin enters a 6-digit code (Google Authenticator, Authy, 1Password...). Set-up shows a QR code and 8 one-time recovery codes. Codes can't be replayed and attempts are rate limited. A super admin can reset an admin's app from Admin → Security. Seeds are encrypted with a key derived from `DOCGEN_SIGNATURE_ENC_KEY_BASE64`, so that variable must be set.
 
 ## Data Model (single community)
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
@@ -148,7 +150,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 
 ## End-to-End Encryption
 - Admin → **Encryption** (`/admin/encryption`) manages end-to-end encryption keys. The design and owner steps are in `docs/PROJECT_PLAN.md` §4 and §8 (Phase 3).
-- Each admin device has its own keys. They are stored in the browser, locked with the admin's passkey (or a passphrase if the passkey can't), and unlocked once per session.
+- Each admin device has its own keys. They are stored in the browser, locked with a passphrase (or with the admin's passkey, if they have one that supports it), and unlocked once per session.
 - A shared workspace key per key generation ("epoch") is wrapped for each approved device and for the **recovery key**. Two named trustees each hold a paper copy of the recovery key.
 - **New devices** must be approved by another admin after comparing a 20-digit safety code, or activated with the paper recovery key.
 - **Signed device list.** Every device, key change and rotation is recorded in a signed, hash-chained log that each browser verifies and pins. An existing workspace needs a super admin to press "Seal the device list" once on the Encryption page (after checking the listed devices with their owners). When adding a device, also compare the 20-digit workspace fingerprint shown on both screens.

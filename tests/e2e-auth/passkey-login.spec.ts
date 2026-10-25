@@ -14,11 +14,11 @@ test("magic link -> create passkey -> admin area, then passkey-only sign-in", as
   await setSession(context, await magicLinkSession("alice"));
   await page.goto("/admin/minutes");
   await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fminutes/);
-  await expect(page.getByRole("heading", { name: "Set up your passkey" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Set up your sign-in" })).toBeVisible();
   await expect(page.getByText("Welcome, Alice.")).toBeVisible();
 
   // Create the passkey; the page then signs in with it and lands on the requested page.
-  await page.getByLabel("Name this device").fill("Test laptop");
+  await page.getByLabel("Passkey device name").fill("Test laptop");
   await page.getByRole("button", { name: "Create passkey" }).click();
   await expect(page).toHaveURL(/\/admin\/minutes$/, { timeout: 15_000 });
 
