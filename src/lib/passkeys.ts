@@ -6,6 +6,7 @@ import { getAppOrigin } from "./appUrl";
 import { COMMUNITY_SLUG } from "./community";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgAdminDocPath, orgAdminsCollectionPath, orgDocPath } from "./firestorePaths";
+import { wrongAddressMessage } from "./security/appHost";
 
 /**
  * Passkey (WebAuthn) storage for admins (plan Phase 2, decision D2).
@@ -40,6 +41,11 @@ export type StoredPasskey = {
 };
 
 export type WebAuthnConfig = { rpID: string; rpName: string; origin: string };
+
+/** A plain-language error when the site is opened at an address passkeys are not set up for, else null. */
+export function passkeyAddressError(req: NextRequest): string | null {
+  return wrongAddressMessage(getAppOrigin(req), req.headers);
+}
 
 export function getWebAuthnConfig(req: NextRequest): WebAuthnConfig {
   const origin = getAppOrigin(req);

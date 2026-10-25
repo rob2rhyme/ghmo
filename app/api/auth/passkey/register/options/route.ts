@@ -3,7 +3,7 @@ import { generateRegistrationOptions } from "@simplewebauthn/server";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
-import { getWebAuthnConfig, listPasskeys, saveChallenge } from "@/src/lib/passkeys";
+import { getWebAuthnConfig, listPasskeys, passkeyAddressError, saveChallenge } from "@/src/lib/passkeys";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
     const rate = await checkRateLimit(`passkey-register:${actor.uid}`, 10, 10 * 60 * 1000);
     if (!rate.success) return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+
+    const wrongAddress = passkeyAddressError(req);
+    if (wrongAddress) return NextResponse.json({ error: wrongAddress, code: "wrong_address" }, { status: 409 });
 
     const { rpID, rpName } = getWebAuthnConfig(req);
     const existing = await listPasskeys(actor.uid);
