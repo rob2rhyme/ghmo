@@ -85,6 +85,16 @@ describe("admin access requires an active admin record", () => {
     await assertFails(getDoc(doc(db, `${ORG}/minutes/m1`)));
   });
 
+  it("lets an admin whose session used an authenticator-app code read admin data", async () => {
+    const db = env.authenticatedContext("active-admin", { ...ADMIN_CLAIMS, authMethod: "totp" }).firestore();
+    await assertSucceeds(getDoc(doc(db, `${ORG}/minutes/m1`)));
+  });
+
+  it("still blocks an unknown sign-in method", async () => {
+    const db = env.authenticatedContext("active-admin", { ...ADMIN_CLAIMS, authMethod: "password" }).firestore();
+    await assertFails(getDoc(doc(db, `${ORG}/minutes/m1`)));
+  });
+
   it("blocks admin tokens minted before passkeys (no authMethod claim)", async () => {
     const legacyClaims = { orgSlug: "ghmo", role: "admin", admin: true };
     const db = env.authenticatedContext("active-admin", legacyClaims).firestore();
@@ -102,7 +112,7 @@ describe("admin access requires an active admin record", () => {
 });
 
 describe("server-only collections", () => {
-  it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "e2ee/state", "e2ee/state/devices/d1", "e2ee/state/wraps/1_recovery", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
+  it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "admins/active-admin/totp/main", "e2ee/state", "e2ee/state/devices/d1", "e2ee/state/wraps/1_recovery", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
     "denies client access to %s, even for admins",
     async path => {
       await assertFails(getDoc(doc(admin(), `${ORG}/${path}`)));

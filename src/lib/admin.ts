@@ -67,11 +67,11 @@ function isNextRequest(value: AdminAuthInput): value is NextRequest {
 }
 
 /**
- * True when the session counts as strong admin authentication: a passkey sign-in,
- * or the local dev bypass outside production.
+ * True when the session counts as strong admin authentication: a passkey sign-in, an
+ * authenticator-app code after the email link (D6), or the local dev bypass outside production.
  */
 export function isStrongAdminAuth(authMethod: AuthMethod | null): boolean {
-  if (authMethod === "passkey") return true;
+  if (authMethod === "passkey" || authMethod === "totp") return true;
   return authMethod === "dev" && isDevLoginAllowed(process.env);
 }
 
@@ -110,7 +110,7 @@ export async function requireActiveAdmin(
   if (profile.status !== "active")
     throw new AdminAccessError(403, "Admin is disabled", "ADMIN_INACTIVE");
   if (!isStrongAdminAuth(ctx.authMethod) && !options.allowMagicLink) {
-    throw new AdminAccessError(403, "Sign in with your passkey to continue", "PASSKEY_REQUIRED");
+    throw new AdminAccessError(403, "Finish signing in to continue", "PASSKEY_REQUIRED");
   }
 
   const actor: AdminActor = {
