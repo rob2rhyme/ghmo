@@ -10,8 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Separator } from "@/src/components/ui/separator";
+import { AuthenticatorCodeForm, AuthenticatorSetup } from "./AuthenticatorSteps";
+import { postJson } from "./postJson";
 
-export type LoginStage = "signin" | "setup" | "pending";
+export type LoginStage = "signin" | "setup" | "pending" | "totp";
 
 type AdminLoginClientProps = {
   orgSlug: string;
@@ -20,18 +22,9 @@ type AdminLoginClientProps = {
   featureEmailLogin: boolean;
   devLoginAvailable: boolean;
   adminName?: string | null;
+  /** The admin already has an approved passkey, so an email link alone may not add an authenticator app. */
+  hasActivePasskey?: boolean;
 };
-
-async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
-  if (!res.ok) throw new Error(data.error || data.message || "Request failed");
-  return data;
-}
 
 /** Turns WebAuthn browser errors into plain language. */
 function passkeyErrorMessage(error: unknown): string {
@@ -58,7 +51,8 @@ export default function AdminLoginClient({
   nextPath,
   featureEmailLogin,
   devLoginAvailable,
-  adminName
+  adminName,
+  hasActivePasskey = false
 }: AdminLoginClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -189,7 +183,9 @@ export default function AdminLoginClient({
           <>
             <CardHeader>
               <CardTitle className="text-2xl">Admin sign in</CardTitle>
-              <CardDescription>Use the passkey on your phone or computer (fingerprint, face or device PIN).</CardDescription>
+              <CardDescription>
+                Use your passkey, or get an email link and then enter the code from your authenticator app.
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {busy === "verify" ? (
@@ -212,11 +208,11 @@ export default function AdminLoginClient({
                 <>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <Separator className="flex-1" />
-                    First time, or lost your device?
+                    No passkey, first time, or lost your device?
                     <Separator className="flex-1" />
                   </div>
                   <form onSubmit={handleEmail} className="flex flex-col gap-3">
-                    <Field label="Admin email" description="We'll email a one-time link so you can set up a passkey.">
+                    <Field label="Admin email" description="We'll email a one-time link. Then you enter the 6-digit code from your authenticator app (or set the app up the first time).">
                       <Input
                         type="email"
                         autoComplete="email"
@@ -238,31 +234,64 @@ export default function AdminLoginClient({
           </>
         ) : null}
 
-        {stage === "setup" ? (
+        {stage === "totp" ? (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">Set up your passkey</CardTitle>
+              <CardTitle className="text-2xl">Enter your code</CardTitle>
               <CardDescription>
-                {adminName ? `Welcome, ${adminName}. ` : null}
-                Admins sign in with a passkey: it stays on your device and works with your fingerprint, face or device PIN.
-                It can&apos;t be phished or guessed.
+                {adminName ? `Welcome back, ${adminName}. ` : null}
+                Your email link worked. Now enter the 6-digit code from your authenticator app to finish signing in.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <Field label="Name this device" description="So you can recognise it later, e.g. “Sita’s iPhone”.">
+              <AuthenticatorCodeForm onDone={finishSignIn} onError={setError} />
+            </CardContent>
+          </>
+        ) : null}
+
+        {stage === "setup" ? (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl">{hasActivePasskey ? "Add a passkey" : "Set up your sign-in"}</CardTitle>
+              <CardDescription>
+                {adminName ? `Welcome, ${adminName}. ` : null}
+                {hasActivePasskey
+                  ? "You already have a passkey, so a new one must be approved by another admin before it works."
+                  : "Admins sign in with an email link plus a code from an authenticator app. It takes about two minutes."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {!hasActivePasskey ? (
+                <>
+                  <AuthenticatorSetup onDone={finishSignIn} onError={setError} />
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <Separator className="flex-1" />
+                    or use a passkey instead
+                    <Separator className="flex-1" />
+                  </div>
+                </>
+              ) : null}
+              <Field label="Passkey device name" description="So you can recognise it later, e.g. “Sita’s iPhone”.">
                 <Input value={deviceName} onChange={e => setDeviceName(e.target.value)} maxLength={60} placeholder="My phone" />
               </Field>
-              <Button size="lg" onClick={handleRegister} loading={busy === "register"} disabled={!supported || busy !== null}>
+              <Button
+                size="lg"
+                variant={hasActivePasskey ? "default" : "outline"}
+                onClick={handleRegister}
+                loading={busy === "register"}
+                disabled={!supported || busy !== null}
+              >
                 <ShieldCheck aria-hidden="true" />
                 Create passkey
               </Button>
               <Button variant="ghost" onClick={handlePasskeySignIn} loading={busy === "passkey"} disabled={!supported || busy !== null}>
                 I already have a passkey on this device
               </Button>
-              <p className="text-xs text-muted-foreground">
-                If you already have a passkey on another device, this new one has to be approved by another admin before it
-                works.
-              </p>
+              {hasActivePasskey ? null : (
+                <p className="text-xs text-muted-foreground">
+                  A passkey stays on your device and works with your fingerprint, face or device PIN. It is optional.
+                </p>
+              )}
             </CardContent>
           </>
         ) : null}

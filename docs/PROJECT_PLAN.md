@@ -223,6 +223,7 @@ The owner accepted every recommendation.
 | D3 | **PIN login is removed.** | Set `FEATURE_PIN_LOGIN=false` now; code, collection and rules deleted in Phase 1 (S-05, S-17). |
 | D4 | **Silent admin analytics and the leaderboard are dropped.** | Removed from the roadmap (§6). |
 | D5 | **UI library: shadcn/ui.** | Tailwind v4 upgrade + shadcn primitives in Phase 2 (§5.1). |
+| D6 | **2026-10-25: authenticator app is the default strong sign-in; passkeys are optional.** Supersedes the "required" part of D2. Admins found passkeys too hard to set up. | Sign-in = email link + 6-digit authenticator code (TOTP), or a passkey. Both count as strong (`authMethod` `totp` / `passkey`). Device keys unlock with a passphrase unless the admin has a PRF passkey (D2's PRF unlock still works for those who choose it). |
 
 ---
 
@@ -476,3 +477,21 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 4. Fill in names and numbers in `docs/RUNBOOK_INCIDENT.md`, and print it with the recovery keys.
 5. Confirm `TRUSTED_PROXY_HOPS`, delete pre-encryption backups, set `CERTIFICATE_SIGNING_KEY_BASE64`.
 
+### Authenticator-app sign-in (decision D6) · built 2026-10-25
+**Why:** passkeys were too hard for some admins. The replacement has to stay strong against a stolen email inbox and against guessing.
+
+**Built:**
+- **Flow.** Email link (first factor) then a 6-digit code from an authenticator app (second factor) → session with `authMethod: "totp"`. First time: the admin scans a QR code, types the first code, and is shown 8 one-time **recovery codes** once. Passkeys still work and are optional.
+- **Code checking** (`src/lib/totp.ts`, RFC 6238 SHA-1/30 s/6 digits, tested against the RFC vectors): ±1 step for clock drift; a step at or before the last one used is refused (no replay), checked inside a Firestore transaction; 6 tries per admin and 30 per IP per 10 minutes; every failure and success is audited.
+- **Seeds** are stored encrypted (AES-256-GCM, key derived per admin from the server's `DOCGEN_SIGNATURE_ENC_KEY_BASE64` via HKDF, bound to the admin; supports the existing previous-keys rotation). The Firestore rules give clients no access to `admins/{uid}/totp`. Recovery codes are stored only as SHA-256 hashes and work once.
+- **Takeover protection.** An admin who already has an approved passkey cannot add an authenticator app from an email link alone (they must be signed in with the passkey). An admin who has an authenticator app cannot replace it from an email link: they sign in with a code or a recovery code, or a **super admin resets it** (Security page; signs the admin out everywhere). A first-time enrolment from an email link is trusted exactly as a first passkey was: whoever controls the inbox at that moment.
+- **Encryption unlock.** Admins without a passkey lock their device keys with a passphrase (12+ characters, PBKDF2-SHA-256 600k, entered at each unlock); the setup form now defaults to that when the admin has no passkey.
+- **Rules / gates.** `isStrongAdminAuth` and the Firestore `hasStrongAuth()` accept `totp`; `magic_link` alone is still never enough. Rules tests cover it.
+- **Tests.** `tests/unit/totp.test.ts`; `tests/e2e-auth/authenticator.spec.ts` (setup, wrong and replayed codes, recovery code once, no email-only enrolment next to a passkey, super-admin reset and sign-out, passphrase encryption setup and unlock).
+
+**Trade-offs to know about:**
+- An email link plus the code is weaker than a passkey (a phishing page can relay both live) but far stronger than an email link alone. Admins who can use a passkey are still better protected.
+- TOTP seeds are readable by the server, so someone who gets both the database and `DOCGEN_SIGNATURE_ENC_KEY_BASE64` could generate codes. Passkeys have no such secret on the server.
+- Losing the phone and the recovery codes needs a super admin to reset the app.
+
+**Owner actions:** make sure `DOCGEN_SIGNATURE_ENC_KEY_BASE64` is set in Vercel (the authenticator feature needs it); each admin sets up their app at next sign-in; tell admins to store recovery codes somewhere other than their email.

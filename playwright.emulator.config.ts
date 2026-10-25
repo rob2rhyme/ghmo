@@ -25,6 +25,8 @@ export const EMULATOR_ENV = {
   FEATURE_EMAIL_ADMIN_LOGIN: "true",
   // A fresh throwaway key for every run.
   CERTIFICATE_SIGNING_KEY_BASE64: crypto.randomBytes(32).toString("base64"),
+  // Server data-encryption key (authenticator-app seeds, collected signatures), also fresh every run.
+  DOCGEN_SIGNATURE_ENC_KEY_BASE64: crypto.randomBytes(32).toString("base64"),
   // Notification emails go to a stub server that the notifications test starts on this port.
   RESEND_API_KEY: "test-key",
   NOTIFY_FROM_EMAIL: "GHMO <no-reply@example.org>",

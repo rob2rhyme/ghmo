@@ -1,22 +1,40 @@
 "use client";
 
 import { Fingerprint, KeyRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { PrfUnavailableError } from "@/src/lib/e2ee/client/prf";
 
-/** Creates this browser's encryption keys, locked with a passkey (preferred) or a passphrase. */
+/**
+ * Creates this browser's encryption keys, locked with a passphrase, or with a passkey when the admin has one.
+ * Admins who sign in with an authenticator app have no passkey, so they go straight to the passphrase.
+ */
 export function DeviceSetupForm({ onDone }: { onDone?: () => void }) {
   const { createDevice } = useE2ee();
   const [name, setName] = useState("");
-  const [usePassphrase, setUsePassphrase] = useState(false);
+  const [usePassphraseChoice, setUsePassphrase] = useState(false);
+  const [hasPasskey, setHasPasskey] = useState<boolean | null>(null);
   const [passphrase, setPassphrase] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const usePassphrase = usePassphraseChoice || hasPasskey === false;
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/totp")
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: { hasActivePasskey?: boolean } | null) => {
+        if (active && data && typeof data.hasActivePasskey === "boolean") setHasPasskey(data.hasActivePasskey);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -49,7 +67,10 @@ export function DeviceSetupForm({ onDone }: { onDone?: () => void }) {
       </Field>
       {usePassphrase ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Encryption passphrase" description="At least 12 characters. Needed each time you unlock.">
+          <Field
+            label="Encryption passphrase"
+            description="At least 12 characters. Needed each time you unlock this device, so pick something you can remember but others can't guess, such as four random words."
+          >
             <Input type="password" autoComplete="new-password" value={passphrase} onChange={e => setPassphrase(e.target.value)} />
           </Field>
           <Field label="Repeat passphrase">
