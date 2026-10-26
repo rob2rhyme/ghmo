@@ -9,9 +9,9 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] **Removed from production:** `FEATURE_PIN_LOGIN`, `ALLOW_DEV_ADMIN_LOGIN`, `NEXT_PUBLIC_ALLOW_DEV_ADMIN_LOGIN`, `DEV_ADMIN_LOGIN_TOKEN`. Old `organizations/ghmo/pins` documents are deleted.
 - [ ] **Never** point a local or dev environment at the production Firebase project.
 - [ ] `TRUSTED_PROXY_HOPS` matches the real proxy chain (on Vercel the default `x-real-ip` handling applies; confirm after deploying).
-- [ ] **One address for everything.** Pick the address people use (for example `https://ghmo.rob2rhyme.app`) and set `NEXT_PUBLIC_APP_URL` to exactly that in Vercel (Production, no trailing slash), then **redeploy**. Passkeys are tied to that domain, and sign-in emails link to it. If you open the site at a different address, passkey sign-in now says so in plain words.
+- [x] **One address for everything.** Pick the address people use (for example `https://ghmo.rob2rhyme.app`) and set `NEXT_PUBLIC_APP_URL` to exactly that in Vercel (Production, no trailing slash), then **redeploy**. Passkeys are tied to that domain, and sign-in emails link to it. If you open the site at a different address, passkey sign-in now says so in plain words.
 - [ ] In Vercel → Domains, make the other addresses (such as `ghmo.vercel.app`) redirect to that one.
-- [ ] Firebase Auth → Settings → Authorized domains lists that domain (and only your real domains).
+- [x] Firebase Auth → Settings → Authorized domains lists that domain (and only your real domains).
 - [ ] Node version in Vercel is 22 or later (the app requires `>=22.12`).
 - [ ] Optional: Resend account, verified sending domain, `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Admin → Security.
 
@@ -24,7 +24,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 ## 3. GitHub
 
 - [ ] Branch protection on `main`, requiring the CI, CodeQL and secret-scan checks.
-- [ ] Dependabot alerts page shows no open alerts (rescan from Insights → Dependency graph → Dependabot if it looks stale).
+- [x] Dependabot alerts page shows no open alerts (rescan from Insights → Dependency graph → Dependabot if it looks stale).
 
 ## 4. People and keys
 
