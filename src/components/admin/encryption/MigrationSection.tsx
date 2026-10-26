@@ -84,7 +84,7 @@ export function MigrationSection() {
           each one, then removes the plaintext. Approved minutes stay public. Keep this page open until it finishes.
         </CardDescription>
       </CardHeader>
-      <div className="flex flex-col gap-3 px-6 pb-6">
+      <div className="flex flex-col gap-3">
         <Button onClick={run} loading={running} className="self-start">
           {finished ? "Run again" : "Encrypt existing records"}
         </Button>

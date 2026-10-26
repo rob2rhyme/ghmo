@@ -54,7 +54,7 @@ export default function NotificationsPanel() {
           {prefs.address ? ` Sent to ${prefs.address}.` : ""}
         </CardDescription>
       </CardHeader>
-      <div className="flex flex-col gap-2 px-6 pb-6">
+      <div className="flex flex-col gap-2">
         {!prefs.configured ? <p className="text-sm text-muted-foreground">Email sending isn&apos;t set up on this site yet, so nothing will be sent.</p> : null}
         <Button onClick={toggle} loading={busy} variant={prefs.email ? "outline" : "default"} className="self-start">
           {prefs.email ? "Turn off email notifications" : "Turn on email notifications"}

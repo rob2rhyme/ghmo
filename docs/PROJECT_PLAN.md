@@ -495,3 +495,13 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 - Losing the phone and the recovery codes needs a super admin to reset the app.
 
 **Owner actions:** make sure `DOCGEN_SIGNATURE_ENC_KEY_BASE64` is set in Vercel (the authenticator feature needs it); each admin sets up their app at next sign-in; tell admins to store recovery codes somewhere other than their email.
+
+### Admin interface refresh · built 2026-10-26
+**What changed (all of `/admin`):**
+- **Shell:** wider sidebar with a branded header, an active-page marker, a signed-in user card (name and role), and the encryption status, theme switch and Sign out always in view. A slim top bar holds **"Jump to a page" (Ctrl/⌘ K)**: type a few letters, arrow keys and Enter. On phones the menu drawer keeps the user card and Sign out pinned and every page reachable.
+- **Pages:** one clean page header (no repeated "Admin" label or heavy box), consistent page width and padding on every page (five pages had added their own), calmer cards.
+- **Dashboard:** greeting with the admin's first name; stat tiles with a progress bar toward the fundraising goal and a "to approve" count; compact quick-action tiles; recent minutes with status badges that work in dark mode; a recent-activity timeline with relative times ("5 min ago"); the dashboard filter moved below the stats and is reached with the `/` key.
+- **Bug fixed on the way:** "Recent audit activity" showed no titles for real events (it read fields the audit log doesn't have). It now uses the event's summary or a readable form of its action name.
+- Small tidy-ups: double padding in the notification and encryption-migration cards, an unused icon set removed, the lint warning cap lowered from 114 to 110.
+
+**Tests:** `tests/unit/adminView.test.ts`; `tests/e2e-auth/admin-shell.spec.ts` (greeting and audit titles, user card, Ctrl+K search with keyboard, `/` filter, phone menu keeps Sign out and every page in view).

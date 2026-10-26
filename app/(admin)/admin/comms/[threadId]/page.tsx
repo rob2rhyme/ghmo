@@ -31,7 +31,7 @@ export default async function AdminCommsThreadPage({ params }: AdminCommsThreadP
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <AdminPageHeader
         title="Thread Detail"
         description="Review discussion, propose a conclusion, and finalize when resolved."

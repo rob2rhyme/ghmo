@@ -48,7 +48,7 @@ export default function NewEventPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 px-4 py-8">
+    <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">New Event</h1>
       </div>
