@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // Home blocks are free-form objects (no typed editor yet); bound the count and
 // rely on parseJsonBody's 256 KB body cap for overall size.
 const bodySchema = z.object({
-  blocks: z.array(z.record(z.unknown())).max(100)
+  blocks: z.array(z.record(z.string(), z.unknown())).max(100)
 });
 
 export async function GET(req: NextRequest) {

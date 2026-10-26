@@ -37,7 +37,7 @@ const bodySchema = z.object({
     })
     .optional(),
   meta: z
-    .record(z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]))
+    .record(z.string(), z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]))
     .refine(value => Object.keys(value).length <= 20, "Too many meta keys")
     .optional()
 });

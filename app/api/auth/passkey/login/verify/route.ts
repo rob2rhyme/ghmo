@@ -36,7 +36,7 @@ const bodySchema = z.object({
           userHandle: z.string().max(512).optional()
         })
         .passthrough(),
-      clientExtensionResults: z.record(z.unknown()).default({})
+      clientExtensionResults: z.record(z.string(), z.unknown()).default({})
     })
     .passthrough()
 });

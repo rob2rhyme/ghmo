@@ -22,7 +22,7 @@ const bodySchema = z.object({
       rawId: z.string().max(1024),
       type: z.literal("public-key"),
       response: z.object({ clientDataJSON: z.string().max(4096), attestationObject: z.string().max(16384) }).passthrough(),
-      clientExtensionResults: z.record(z.unknown()).default({})
+      clientExtensionResults: z.record(z.string(), z.unknown()).default({})
     })
     .passthrough()
 });

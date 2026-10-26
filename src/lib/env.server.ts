@@ -80,7 +80,7 @@ export function getAdminServerEnv(): FullServerEnv {
     return cachedFullEnv;
   } catch (err) {
     if (err instanceof z.ZodError) {
-      const issues = err.errors.map(error => error.path.join(".") || "server env");
+      const issues = err.issues.map(error => error.path.join(".") || "server env");
       throw new AdminEnvError(issues, err);
     }
     throw err;
