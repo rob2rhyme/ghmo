@@ -20,7 +20,7 @@ const MAX_STORED_REF_LENGTH = 2048;
 const bodySchema = z.object({
   templateId: z.string().trim().min(1).max(200),
   inputs: z
-    .record(z.string().max(5000))
+    .record(z.string(), z.string().max(5000))
     .refine(value => Object.keys(value).length <= 100, "Too many inputs")
     .optional(),
   outputRefs: z.array(z.string().max(MAX_BODY_BYTES)).max(10).optional(),

@@ -62,7 +62,7 @@ const finalizeSchema = z.object({
       )
       .optional()
   }),
-  signatures: z.record(z.enum(["witness1", "witness2", "officiant", "issuingAuthority"]), signingSessionIdSchema).optional()
+  signatures: z.partialRecord(z.enum(["witness1", "witness2", "officiant", "issuingAuthority"]), signingSessionIdSchema).optional()
 });
 
 function toDate(value: unknown): Date | undefined {
