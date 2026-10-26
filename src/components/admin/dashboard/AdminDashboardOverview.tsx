@@ -3,39 +3,87 @@
 import type { Route } from "next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  CalendarDays,
+  CalendarPlus,
+  CircleDollarSign,
+  FileSignature,
+  FolderOpen,
+  Landmark,
+  ListChecks,
+  NotebookPen,
+  Plus,
+  RefreshCw,
+  UsersRound,
+  type LucideIcon
+} from "lucide-react";
 import AdminActionCard from "@/src/components/admin/AdminActionCard";
 import AdminKpiCard from "@/src/components/admin/AdminKpiCard";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import AdminCommandPalette from "@/src/components/admin/dashboard/AdminCommandPalette";
-import { MeetingMinutesRecord, minutesStatusLabels, minutesStatusPillClasses } from "@/src/lib/minutes";
-import { IconEvents, IconGallery, IconGenerator, IconGumba, IconMinutes } from "@/src/components/admin/icons/AdminIcons";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { MeetingMinutesRecord, minutesStatusLabels, type MinutesStatus } from "@/src/lib/minutes";
 import { resolveActorLabel } from "@/src/lib/actor";
+import { auditTitle, firstName, formatMoney, formatShortDate, percentOf, relativeTime } from "@/src/lib/adminView";
+
+type AuditLogView = {
+  id: string;
+  summary?: string;
+  type?: string;
+  action?: string;
+  resource?: { summary?: string } | null;
+  actor?: Parameters<typeof resolveActorLabel>[0];
+  actorUid?: string;
+  role?: string;
+  metadata?: { action?: string } | null;
+  createdAtMs?: number | null;
+};
+
+type WebhookEventView = { id: string; receivedAt?: unknown };
 
 type AdminDashboardOverviewProps = {
   community: { id: string; name?: string };
+  adminName?: string;
   stats: { totalRaised?: number; goal?: number; donorCount?: number };
   minutes: MeetingMinutesRecord[];
-  auditLogs: any[];
-  webhookEvents: any[];
+  auditLogs: AuditLogView[];
+  webhookEvents: WebhookEventView[];
 };
 
-export default function AdminDashboardOverview({
-  community,
-  stats,
-  minutes,
-  auditLogs,
-  webhookEvents
-}: AdminDashboardOverviewProps) {
-  const [reconcileStatus, setReconcileStatus] = useState<string | null>(null);
+const MINUTES_BADGE: Record<MinutesStatus, "secondary" | "warning" | "success"> = {
+  draft: "secondary",
+  submitted: "warning",
+  approved: "success"
+};
+
+const QUICK_ACTIONS: { href: Route; title: string; description: string; icon: LucideIcon }[] = [
+  { href: "/admin/minutes" as Route, title: "Meeting Minutes", description: "Draft, approve and export minutes.", icon: NotebookPen },
+  { href: "/admin/action-items" as Route, title: "Action Items", description: "Follow up on what was agreed.", icon: ListChecks },
+  { href: "/admin/events" as Route, title: "Events", description: "Manage upcoming and past events.", icon: CalendarDays },
+  { href: "/admin/document-generator" as Route, title: "Document Generator", description: "Create formatted letters quickly.", icon: FileSignature },
+  { href: "/admin/document-gallery" as Route, title: "Document Gallery", description: "Browse saved PDF documents.", icon: FolderOpen },
+  { href: "/admin/gumba-project" as Route, title: "GUMBA Project", description: "Track project updates and tasks.", icon: Landmark }
+];
+
+function EmptyNote({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">{children}</div>;
+}
+
+export default function AdminDashboardOverview({ community, adminName, stats, minutes, auditLogs, webhookEvents }: AdminDashboardOverviewProps) {
+  const [reconcileStatus, setReconcileStatus] = useState<{ tone: "info" | "error"; text: string } | null>(null);
+  const [reconciling, setReconciling] = useState(false);
   const [query, setQuery] = useState("");
+  const [now] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // "/" jumps to the filter, Escape clears it (Ctrl/⌘ K is the page-jump search in the shell).
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const isMac = navigator.platform.toLowerCase().includes("mac");
-      const isShortcut = isMac ? event.metaKey : event.ctrlKey;
-      if (isShortcut && event.key.toLowerCase() === "k") {
+      const target = event.target as HTMLElement | null;
+      const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         inputRef.current?.focus();
       }
@@ -54,49 +102,10 @@ export default function AdminDashboardOverview({
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  const quickActions = useMemo(
-    () => [
-      {
-        href: "/admin/minutes" as Route,
-        title: "Meeting Minutes",
-        description: "Draft, approve, and export minutes.",
-        icon: <IconMinutes />
-      },
-      {
-        href: "/admin/events" as Route,
-        title: "Events",
-        description: "Manage upcoming and past events.",
-        icon: <IconEvents />
-      },
-      {
-        href: "/admin/document-generator" as Route,
-        title: "Document Generator",
-        description: "Create formatted letters quickly.",
-        icon: <IconGenerator />
-      },
-      {
-        href: "/admin/document-gallery" as Route,
-        title: "Document Gallery",
-        description: "Browse saved PDF assets.",
-        icon: <IconGallery />
-      },
-      {
-        href: "/admin/gumba-project" as Route,
-        title: "GUMBA Project",
-        description: "Track project updates and tasks.",
-        icon: <IconGumba />
-      }
-    ],
-    []
-  );
-
   const filteredQuickActions = useMemo(() => {
-    if (!normalizedQuery) return quickActions;
-    return quickActions.filter(action => {
-      const haystack = `${action.title} ${action.description}`.toLowerCase();
-      return haystack.includes(normalizedQuery);
-    });
-  }, [normalizedQuery, quickActions]);
+    if (!normalizedQuery) return QUICK_ACTIONS;
+    return QUICK_ACTIONS.filter(action => `${action.title} ${action.description}`.toLowerCase().includes(normalizedQuery));
+  }, [normalizedQuery]);
 
   const recentMinutes = useMemo(() => {
     const sorted = [...(minutes || [])].sort((a, b) => (b.eventDate || 0) - (a.eventDate || 0));
@@ -123,13 +132,7 @@ export default function AdminDashboardOverview({
     const sorted = [...(auditLogs || [])].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
     const filtered = normalizedQuery
       ? sorted.filter(log => {
-          const haystack = [
-            log.summary,
-            log.type,
-            log.actorUid,
-            log.role,
-            log.metadata?.action
-          ]
+          const haystack = [auditTitle(log), log.type, log.action, log.actorUid, log.role, log.metadata?.action, resolveActorLabel(log.actor ?? { role: log.role })]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
@@ -138,19 +141,26 @@ export default function AdminDashboardOverview({
       : sorted;
     return filtered.slice(0, 8);
   }, [auditLogs, normalizedQuery]);
-  const latestWebhookEvent = useMemo(() => {
-    if (!webhookEvents?.length) return null;
-    return webhookEvents.reduce((latest, event) => {
-      const stamp = event.receivedAt?.toDate?.() || event.receivedAt;
-      const ts = stamp ? new Date(stamp).getTime() : 0;
-      if (!latest) return { event, ts };
-      return ts > latest.ts ? { event, ts } : latest;
-    }, null as null | { event: any; ts: number });
+
+  const latestWebhookMs = useMemo(() => {
+    let latest = 0;
+    for (const event of webhookEvents || []) {
+      const raw = event.receivedAt as { toDate?: () => Date } | string | number | undefined;
+      const stamp = typeof raw === "object" && raw && typeof raw.toDate === "function" ? raw.toDate() : raw;
+      const ts = stamp ? new Date(stamp as string | number | Date).getTime() : 0;
+      if (ts > latest) latest = ts;
+    }
+    return latest || null;
   }, [webhookEvents]);
 
+  const awaitingApproval = (minutes || []).filter(entry => entry.status === "submitted").length;
+  const drafts = (minutes || []).filter(entry => entry.status === "draft").length;
+  const goalPercent = percentOf(stats.totalRaised, stats.goal);
+
   const triggerReconcile = async () => {
+    setReconciling(true);
+    setReconcileStatus({ tone: "info", text: "Syncing donations…" });
     try {
-      setReconcileStatus("Reconciling...");
       const res = await fetch("/api/gfmpro/reconcile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,191 +168,178 @@ export default function AdminDashboardOverview({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setReconcileStatus("Reconcile triggered");
-    } catch (err: any) {
-      setReconcileStatus(`Error: ${err.message}`);
+      setReconcileStatus({ tone: "info", text: "Donation sync started." });
+    } catch (err) {
+      setReconcileStatus({ tone: "error", text: `Could not sync: ${err instanceof Error ? err.message : "unknown error"}` });
+    } finally {
+      setReconciling(false);
     }
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6">
+    <div className="space-y-6 md:space-y-8">
       <AdminPageHeader
         title="Dashboard"
-        description={community.name ? `Welcome back to ${community.name}.` : "Monitor key metrics and admin activity."}
+        description={`Welcome back, ${firstName(adminName)}. ${community.name ? `Here is what is happening at ${community.name}.` : "Here is what is happening."}`}
         actions={
           <>
-            <Link
-              href="/admin/minutes?mode=new"
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90"
-            >
-              Create Minutes
-            </Link>
-            <Link
-              href="/admin/events/new"
-              className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 transition hover:border-primary hover:text-foreground"
-            >
-              New Event
-            </Link>
-            <button
-              type="button"
-              onClick={triggerReconcile}
-              className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:border-primary hover:text-foreground"
-            >
-              Manual Reconcile
-            </button>
+            <Button asChild>
+              <Link href="/admin/minutes?mode=new">
+                <Plus aria-hidden="true" />
+                Create minutes
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/admin/events/new">
+                <CalendarPlus aria-hidden="true" />
+                New event
+              </Link>
+            </Button>
           </>
         }
       />
 
-      <AdminCommandPalette
-        value={query}
-        onChange={setQuery}
-        onClear={() => setQuery("")}
-        inputRef={inputRef}
-      />
-
-      {reconcileStatus ? <p className="text-sm text-muted-foreground">{reconcileStatus}</p> : null}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <AdminKpiCard label="Raised" value={`$${(stats.totalRaised || 0).toLocaleString()}`} />
-        <AdminKpiCard label="Goal" value={`$${(stats.goal || 0).toLocaleString()}`} />
-        <AdminKpiCard label="Donors" value={stats.donorCount || 0} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <AdminKpiCard
+          label="Raised"
+          value={formatMoney(stats.totalRaised)}
+          icon={CircleDollarSign}
+          className="col-span-2 md:col-span-1"
+          progress={goalPercent}
+          hint={goalPercent === null ? "No fundraising goal set" : `${goalPercent}% of the ${formatMoney(stats.goal)} goal`}
+        />
+        <AdminKpiCard label="Donors" value={(stats.donorCount || 0).toLocaleString("en-US")} icon={UsersRound} hint="Given so far" />
+        <AdminKpiCard
+          label="To approve"
+          value={awaitingApproval}
+          icon={NotebookPen}
+          href={"/admin/minutes?mode=records" as Route}
+          hint={awaitingApproval === 0 ? "Minutes: nothing waiting" : `Minutes waiting${drafts ? ` · ${drafts} in draft` : ""}`}
+        />
       </div>
 
-      <AdminSectionCard
-        title="Quick Actions"
-        description="Jump into the tools you use most."
-      >
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {filteredQuickActions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center sm:col-span-2 lg:col-span-5">
-              <p className="text-sm text-muted-foreground">No quick actions match your search.</p>
-            </div>
-          ) : (
-            filteredQuickActions.map(action => (
-              <AdminActionCard
-                key={action.href}
-                href={action.href}
-                title={action.title}
-                description={action.description}
-                icon={action.icon}
-              />
-            ))
-          )}
+      <div className="max-w-md">
+        <AdminCommandPalette value={query} onChange={setQuery} onClear={() => setQuery("")} inputRef={inputRef} />
+      </div>
+
+      <section aria-labelledby="quick-actions-heading" className="space-y-3">
+        <div>
+          <h2 id="quick-actions-heading" className="text-base font-semibold tracking-tight text-foreground md:text-lg">
+            Quick actions
+          </h2>
+          <p className="text-sm text-muted-foreground">Jump into the tools you use most.</p>
         </div>
-      </AdminSectionCard>
+        {filteredQuickActions.length === 0 ? (
+          <EmptyNote>No quick actions match your filter.</EmptyNote>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredQuickActions.map(action => (
+              <AdminActionCard key={action.href} href={action.href} title={action.title} description={action.description} icon={action.icon} />
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AdminSectionCard
-          title="Recent Minutes"
+          title="Recent minutes"
           description="Latest records ready for approval or export."
           actions={
-            <Link href="/admin/minutes?mode=records" className="text-sm font-semibold text-primary">
-              View all
-            </Link>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/admin/minutes?mode=records">View all</Link>
+            </Button>
           }
         >
           {recentMinutes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {normalizedQuery ? "No minutes match your search." : "No minutes recorded yet."}
-              </p>
+            <EmptyNote>
+              {normalizedQuery ? "No minutes match your filter." : "No minutes recorded yet."}
               {!normalizedQuery ? (
-                <Link href="/admin/minutes?mode=new" className="mt-2 inline-block text-sm font-semibold text-primary">
+                <Link href="/admin/minutes?mode=new" className="mt-2 block font-semibold text-primary hover:underline">
                   Create your first minutes
                 </Link>
               ) : null}
-            </div>
+            </EmptyNote>
           ) : (
-            <div className="space-y-3">
+            <ul className="-mx-2 flex flex-col">
               {recentMinutes.map(entry => (
-                <div key={entry.id} className="flex items-start justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{entry.eventTitle}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {entry.meetingType} • {entry.eventDate ? new Date(entry.eventDate).toLocaleString() : "Date unavailable"}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${minutesStatusPillClasses[entry.status]}`}
+                <li key={entry.id}>
+                  <Link
+                    href={"/admin/minutes?mode=records" as Route}
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    {minutesStatusLabels[entry.status]}
-                  </span>
-                </div>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-foreground">{entry.eventTitle}</span>
+                      <span className="block text-xs text-muted-foreground" suppressHydrationWarning>
+                        {entry.meetingType} · {formatShortDate(entry.eventDate)}
+                      </span>
+                    </span>
+                    <Badge variant={MINUTES_BADGE[entry.status]}>{minutesStatusLabels[entry.status]}</Badge>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </AdminSectionCard>
 
-        <AdminSectionCard
-          title="Recent Audit Activity"
-          description="Latest admin changes and approvals."
-          actions={
-            <Link href="/admin" className="text-sm font-semibold text-primary">
-              View all
-            </Link>
-          }
-        >
+        <AdminSectionCard title="Recent activity" description="Latest admin changes and approvals.">
           {recentAuditLogs.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {normalizedQuery ? "No audit activity matches your search." : "No audit activity yet."}
-              </p>
-            </div>
+            <EmptyNote>{normalizedQuery ? "No activity matches your filter." : "No activity yet."}</EmptyNote>
           ) : (
-            <div className="space-y-3">
+            <ol className="relative flex flex-col gap-4 before:absolute before:top-2 before:bottom-2 before:left-[5px] before:w-px before:bg-border">
               {recentAuditLogs.map(log => (
-                <div key={log.id} className="rounded-xl border border-border bg-background px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-foreground">{log.summary || log.type}</p>
-                    <span className="text-xs text-muted-foreground">{formatTimestamp(log.createdAtMs)}</span>
+                <li key={log.id} className="relative flex gap-3 pl-5">
+                  <span aria-hidden="true" className="absolute top-1.5 left-0 size-[11px] rounded-full border-2 border-primary bg-card" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{auditTitle(log)}</p>
+                    <p className="text-xs text-muted-foreground" suppressHydrationWarning title={log.createdAtMs ? new Date(log.createdAtMs).toLocaleString("en-US") : undefined}>
+                      {resolveActorLabel(log.actor ?? { role: log.role })}
+                      {log.createdAtMs ? ` · ${relativeTime(log.createdAtMs, now)}` : ""}
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Actor: {resolveActorLabel(log.actor ?? { role: log.role })}
-                  </p>
-                </div>
+                </li>
               ))}
-            </div>
+            </ol>
           )}
         </AdminSectionCard>
       </div>
 
       <AdminSectionCard
-        title="Integrations & System Status"
-        description="Sync donors and review webhook health."
+        title="Integrations and system status"
+        description="Keep donor numbers in step with GoFundMe Pro."
         actions={
-          <button
-            type="button"
-            onClick={triggerReconcile}
-            className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
-          >
-            Manual Reconcile
-          </button>
+          <Button variant="outline" size="sm" onClick={triggerReconcile} loading={reconciling}>
+            <RefreshCw aria-hidden="true" />
+            Sync donations
+          </Button>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-border bg-background px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Webhook events</p>
-            <p className="mt-2 text-sm text-foreground/80">
-              {webhookEvents?.length ? `${webhookEvents.length} received` : "No recent webhook activity"}
-            </p>
-            {latestWebhookEvent?.ts ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Last received {new Date(latestWebhookEvent.ts).toLocaleString()}
-              </p>
-            ) : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start gap-3 rounded-lg border border-border p-4">
+            <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${webhookEvents?.length ? "bg-success" : "bg-muted-foreground/40"}`} />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Donation webhooks</p>
+              <p className="text-sm text-muted-foreground">{webhookEvents?.length ? `${webhookEvents.length} received recently` : "No recent webhook activity"}</p>
+              {latestWebhookMs ? (
+                <p className="mt-0.5 text-xs text-muted-foreground" suppressHydrationWarning>
+                  Last received {relativeTime(latestWebhookMs, now)}
+                </p>
+              ) : null}
+            </div>
           </div>
-          <div className="rounded-xl border border-border bg-background px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Manual reconcile</p>
-            <p className="mt-2 text-sm text-foreground/80">Trigger a donation sync when needed.</p>
-            {reconcileStatus ? <p className="mt-1 text-xs text-muted-foreground">{reconcileStatus}</p> : null}
+          <div className="flex items-start gap-3 rounded-lg border border-border p-4">
+            <span aria-hidden="true" className="mt-1.5 size-2.5 shrink-0 rounded-full bg-primary/60" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Manual donation sync</p>
+              <p className="text-sm text-muted-foreground">Run it if a gift is missing from the totals.</p>
+              {reconcileStatus ? (
+                <p role="status" className={`mt-0.5 text-xs ${reconcileStatus.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+                  {reconcileStatus.text}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       </AdminSectionCard>
     </div>
   );
-}
-
-function formatTimestamp(value?: number) {
-  return value ? new Date(value).toLocaleString() : "Date unavailable";
 }

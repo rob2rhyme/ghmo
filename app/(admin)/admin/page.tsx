@@ -59,6 +59,7 @@ export default async function AdminPage() {
   return (
     <AdminDashboardOverview
       community={toPlain(community)}
+      adminName={actorInfo.name}
       stats={toPlain(stats)}
       webhookEvents={toPlain(webhookEvents)}
       auditLogs={toPlain(auditLogs)}

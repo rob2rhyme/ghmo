@@ -26,7 +26,7 @@ export default async function AdminChatPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <AdminPageHeader
         title="Admin Chat"
         description="WhatsApp-style coordination for quick admin updates."

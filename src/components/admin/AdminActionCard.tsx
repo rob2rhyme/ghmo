@@ -1,67 +1,32 @@
-//src/components/admin/AdminActionCard.tsx
 import type { Route } from "next";
 import Link from "next/link";
-import { cloneElement, type ReactElement, type SVGProps } from "react";
-
-type IconEl = ReactElement<SVGProps<SVGSVGElement>>;
+import { ArrowUpRight, type LucideIcon } from "lucide-react";
 
 type AdminActionCardProps = {
   href: Route;
   title: string;
   description: string;
-  icon?: IconEl;
+  icon: LucideIcon;
 };
 
-export default function AdminActionCard({
-  href,
-  title,
-  description,
-  icon,
-}: AdminActionCardProps) {
-  const renderIcon = (className: string) => {
-    if (!icon) return null;
-
-    const prevClassName =
-      typeof icon.props.className === "string" ? icon.props.className : "";
-    const merged = [prevClassName, className].filter(Boolean).join(" ");
-
-    return cloneElement(icon, { className: merged });
-  };
-
+/** A compact "go there" tile for the dashboard. */
+export default function AdminActionCard({ href, title, description, icon: Icon }: AdminActionCardProps) {
   return (
     <Link
       href={href}
-      className="group flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card shadow-xs transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+      className="group relative flex items-start gap-3.5 rounded-xl border border-border bg-card p-4 shadow-xs transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none motion-reduce:hover:translate-y-0"
     >
-      <div className="relative flex h-20 items-center justify-center bg-linear-to-br from-slate-50 via-white to-slate-100 md:h-24 lg:h-28 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-950">
-        <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary/10 blur-2xl dark:bg-primary/15" />
-        <div className="absolute -left-8 bottom-0 h-16 w-16 rounded-full bg-slate-300/40 blur-2xl dark:bg-slate-700/30" />
-
-        <div className="absolute -right-2 -bottom-8 opacity-10">
-          {renderIcon("h-24 w-24 text-foreground dark:text-white")}
-        </div>
-
-        <div className="relative z-10">
-          {renderIcon(
-            "h-8 w-8 text-foreground/80 dark:text-slate-100 md:h-9 md:w-9"
-          )}
-        </div>
-      </div>
-
-      <div className="flex h-full flex-col justify-between px-4 py-4">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground dark:text-slate-100">
-            {title}
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground dark:text-slate-300">
-            {description}
-          </p>
-        </div>
-
-        <span className="mt-4 text-xs font-semibold uppercase tracking-wide text-primary">
-          Open
-        </span>
-      </div>
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+        <Icon className="size-5" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 pr-5">
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
+      </span>
+      <ArrowUpRight
+        className="absolute top-4 right-4 size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        aria-hidden="true"
+      />
     </Link>
   );
 }

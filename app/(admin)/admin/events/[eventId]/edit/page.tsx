@@ -100,10 +100,10 @@ export default function EditEventPage() {
   };
 
   if (loading)
-    return <div className="px-4 py-8 text-sm text-muted-foreground">Loading...</div>;
+    return <div className="text-sm text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 px-4 py-8">
+    <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit Event</h1>
         <button

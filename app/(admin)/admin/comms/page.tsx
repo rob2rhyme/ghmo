@@ -26,7 +26,7 @@ export default async function AdminCommsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <AdminPageHeader
         title="Plans & Issues"
         description="Governed threads for proposals, plans, and issues that require admin decisions."

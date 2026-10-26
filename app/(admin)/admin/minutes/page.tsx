@@ -45,7 +45,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
   const mode = modeParam === "records" ? "records" : "new";
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <AdminPageHeader
         title="Meeting Minutes"
         description="Create, approve, and export official minutes for each event."
