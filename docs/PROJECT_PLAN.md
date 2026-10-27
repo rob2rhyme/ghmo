@@ -1,6 +1,6 @@
 # GHMO Platform — Upgraded Project Plan (v2)
 
-_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-10-21_
+_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-10-27_
 
 This plan replaces the "Upcoming Roadmap" in `README.md` as the source of truth for what gets built next.
 It has three parts:
@@ -505,3 +505,36 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 - Small tidy-ups: double padding in the notification and encryption-migration cards, an unused icon set removed, the lint warning cap lowered from 114 to 110.
 
 **Tests:** `tests/unit/adminView.test.ts`; `tests/e2e-auth/admin-shell.spec.ts` (greeting and audit titles, user card, Ctrl+K search with keyboard, `/` filter, phone menu keeps Sign out and every page in view).
+
+---
+
+## 9. What is next (updated 2026-10-27)
+
+Phases 0–7 and decision D6 are built and merged. Nothing in the codebase is waiting; what is left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 3 of 29 items were ticked on 2026-10-27):
+
+1. **Make the repository public, or fix GitHub Actions billing.** CI cannot run while the repo is private (jobs fail in about 2 seconds with no runner), so every change has been verified by the local gate only.
+2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
+3. **Firestore:** deploy the rules, set the `expiresAt` TTL policies (`rateLimits`, `webauthnChallenges`), delete backups made before encryption was on.
+4. **People and keys:** at least two active admins, each with an authenticator app and recovery codes kept outside email; encryption set up with both trustees; every admin device approved; seal the device list; run "Encrypt existing records".
+5. **Assurance (outside the codebase):** external cryptography review, penetration test, key-rotation drill and recovery-key test, fill in `docs/RUNBOOK_INCIDENT.md`.
+6. **After going live:** open the main pages with the console open and confirm there are no red errors.
+
+**Weekly progress check.** A scheduled routine ("Weekly go-live checklist progress", Mondays 08:41 UTC) is meant to report checklist progress. As of 2026-10-27 its sessions start without the repository attached, so it fails; the same report was produced by hand from a normal session. Fix it in claude.ai (select `rob2rhyme/ghmo` on the routine) or recreate the routine there.
+
+### 9.1 Mass text or call (Text-em-All style) — not in scope today
+
+Checked 2026-10-27: **the platform has no text-message or phone-call feature.** The only outbound messaging is:
+- **Admin sign-in email** (magic link).
+- **Content-free notification emails** to other opted-in admins (Resend; a link only, at most one per kind per 30 minutes). Admin-only, not a broadcast tool.
+- No phone numbers are stored anywhere (`members` holds name, email, status and roles), and there is no SMS or voice provider, queue or opt-out handling.
+
+If the owner wants it, it would be a **new phase (proposed Phase 8, not started)**. Decisions needed first, in the plan's usual style:
+| Question | Why it matters |
+|---|---|
+| Who receives messages (members, donors, event attendees)? | Defines the audience list and where numbers live. |
+| Text, voice, or both? | Voice adds recorded or text-to-speech calls and much higher cost. |
+| Provider (for example Twilio, Telnyx) and budget | Per-message cost; US numbers need 10DLC brand and campaign registration, which takes days to weeks; Vercel's free tier limits long sends, so sending needs a queue. |
+| Consent and opt-out | Recorded consent per number, STOP/HELP handling and quiet hours are legal requirements (TCPA in the US), not options. |
+| Privacy | Phone numbers are personal data. They would sit outside the end-to-end encrypted set unless we encrypt them, and the server must see numbers to send. This conflicts with the "server sees no content" goal (§4), so it needs an explicit decision, like D4. |
+
+Cheaper stopgap: email broadcasts to members through the existing mailer (no new provider, no number registration). Nothing here is built or scheduled until the owner decides.
