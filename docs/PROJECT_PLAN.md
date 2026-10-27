@@ -575,7 +575,7 @@ Email broadcasts to members (no new provider, no number registration) are planne
 - Resend bounce and complaint webhook (signature verified) sets `emailBounced` / opt-out automatically.
 
 **Sending engine:**
-- Resend batch API, up to 100 messages per request, 20 recipients' worth of delay-free calls per run; Vercel Hobby functions are short, so the send is **chunked and resumable**: the admin page calls "send next chunk" until done (same pattern as the encryption migration job: keep the page open, progress bar, safe to close and resume). No cron needed (Hobby cron is daily only).
+- Resend batch API, up to 100 messages per request; Vercel Hobby functions are short, so the send is **chunked and resumable**: the admin page calls "send next chunk" until done (same pattern as the encryption migration job: keep the page open, progress bar, safe to close and resume). No cron needed (Hobby cron is daily only).
 - Before each chunk: re-check the broadcast is still `approved`/`sending`, the kill switch is on, and the daily quota is not exhausted; stop with a clear message when it is, and continue next day from where it left off.
 - Open and click tracking turned off at the provider. No third-party scripts, consistent with the rest of the project.
 - Plain text first; simple HTML later only if the owner wants it.
