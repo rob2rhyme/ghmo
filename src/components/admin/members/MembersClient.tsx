@@ -143,6 +143,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
     { key: "ready", label: "Can be emailed", count: counts.ready },
     { key: "no_consent", label: "No consent", count: counts.no_consent },
     { key: "opted_out", label: "Opted out", count: counts.opted_out },
+    { key: "bounced", label: "Bounced", count: counts.bounced },
     { key: "inactive", label: "Disabled", count: counts.inactive }
   ];
 

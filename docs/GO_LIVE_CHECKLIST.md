@@ -14,6 +14,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [x] Firebase Auth → Settings → Authorized domains lists that domain (and only your real domains).
 - [ ] Node version in Vercel is 22 or later (the app requires `>=22.12`).
 - [ ] Optional: Resend account, verified sending domain, `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Admin → Security.
+- [ ] **Before the first broadcast to members (Phase 8):** in Resend add a webhook to `https://<your domain>/api/resend/webhook` for `email.bounced` and `email.complained`, and set its signing secret as `RESEND_WEBHOOK_SECRET`; set `BROADCAST_ORG_NAME` and `BROADCAST_POSTAL_ADDRESS` (the footer of every broadcast); verify the sending domain (SPF, DKIM, DMARC). Test one-click unsubscribe from a real mail app.
 
 ## 2. Firestore
 

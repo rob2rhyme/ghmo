@@ -571,7 +571,7 @@ Email broadcasts to members (no new provider, no number registration) are planne
 
 **Unsubscribe (build first, before any sending):**
 - Every email carries a footer link and `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers (RFC 8058).
-- The link holds a signed token (HMAC of member id + purpose, key derived from the existing server secret by HKDF as the TOTP seeds do). Public route `/unsubscribe`: no login, rate limited, shows a confirmation page, sets `emailOptOutAt`, audited. Re-subscribing needs an admin.
+- The link holds a signed token (HMAC of member id + purpose, key derived from the existing server secret by HKDF as the TOTP seeds do). **Tokens do not expire** (decided in 8-B: an old email must still work, and a token can only opt that one member out). Public route `/unsubscribe`: no login, rate limited, shows a confirmation page, sets `emailOptOutAt`, audited. Re-subscribing needs an admin.
 - Resend bounce and complaint webhook (signature verified) sets `emailBounced` / opt-out automatically.
 
 **Sending engine:**
@@ -591,7 +591,7 @@ Email broadcasts to members (no new provider, no number registration) are planne
 | Step | Scope | Exit criteria |
 |---|---|---|
 | **8-A** | Members page + consent fields + CSV import with attestation; rules for new fields | Add, import, disable and filter members; consent shown; rules tests pass |
-| **8-B** | Unsubscribe route, signed tokens, suppression flags, bounce/complaint webhook, mailer headers and footer | One-click unsubscribe works in an e2e test; a forged or expired token is refused; bounced members are skipped |
+| **8-B** | Unsubscribe route, signed tokens, suppression flags, bounce/complaint webhook, mailer headers and footer | One-click unsubscribe works in an e2e test; a forged token is refused; bounced members are skipped |
 | **8-C** | Broadcast model, composer, test-send, second-admin approval (content-bound) | Sender cannot approve own; editing after approval resets it; audit entries written |
 | **8-D** | Chunked, resumable sender, delivery log, quota stop/resume, cancel | Kill and restart mid-send: no duplicate emails; quota stop resumes next day; unit + emulator tests |
 | **8-E** | Docs, runbook entry (wrong message sent, complaint spike), go-live checklist items, README | `docs/RUNBOOK_INCIDENT.md` and `docs/GO_LIVE_CHECKLIST.md` updated |
@@ -622,4 +622,14 @@ SMS and voice (§9.1), open and click analytics, HTML templates and drag-and-dro
 - **Rules:** members are now **server-written only**. Admins can read the list but cannot write it from a browser, so consent can only be recorded through the audited API. (Before this, any admin's browser could write member documents directly; nothing used that.)
 - **Tests:** `tests/unit/members.test.ts` (state rules, CSV parsing); two Firestore rules tests; `tests/e2e-auth/members.spec.ts` (consent only when ticked, consent/opt-out/re-subscribe/disable, import with attestation, no re-subscribe, API refuses without attestation, audit has no addresses). Two `admin-shell` tests were adjusted for the extra "Members" page (the phone menu list now scrolls while the user card and Sign out stay in view; the page-search test parks the mouse first).
 - **Not in 8-A:** no email is sent, and nothing reads `emailConsent` yet except the Members page.
+
+**8-B · Unsubscribe, bounces and complaints, mail headers and footer · built 2026-10-27 (local, not yet merged at the time of writing)**
+- **Unsubscribe page** `/unsubscribe?token=…` (secure layout, no third-party scripts, added to the strict-CSP paths). Opening it changes nothing, because mail scanners open links; the person presses "Unsubscribe me", which calls `POST /api/unsubscribe`. A bad or damaged link shows a plain message and no button.
+- **One-click unsubscribe** `POST /api/unsubscribe?token=…` for mail apps (RFC 8058). POST only (GET answers 405), public, rate limited to 30 per hour per IP, no login; the signed token is the credential. Repeating it keeps the first opt-out time and writes one audit entry.
+- **Tokens** (`src/lib/unsubscribeToken.ts`): `memberId.HMAC`, key derived by HKDF from the server master key with its own purpose label, verified against current and previous keys (so key rotation does not break old emails). No expiry (see §10.3).
+- **Resend webhook** `POST /api/resend/webhook`: Svix signature check (`src/lib/svix.ts`, 5-minute window, constant-time compare) with `RESEND_WEBHOOK_SECRET`; without the secret the route answers 404. `email.bounced` (permanent) sets `emailBounced`; transient bounces are ignored; `email.complained` opts the member out; unknown addresses are ignored; the response never says who was affected. Every change is audited.
+- **Mail pieces** (`src/lib/broadcastMail.ts`): footer (reason for the email, unsubscribe link, organization name and postal address from `BROADCAST_ORG_NAME` / `BROADCAST_POSTAL_ADDRESS`) and the `List-Unsubscribe` / `List-Unsubscribe-Post` headers; `sendMail` now accepts extra headers. Nothing sends broadcasts yet (8-D).
+- **Members page:** a "Bounced" filter.
+- **Tests:** unit (`unsubscribeToken`, `svix`, `broadcastMail`, mailer headers, CSP path); e2e `unsubscribe.spec.ts` (page changes nothing until pressed, forged links, one-click, GET refused, idempotence, webhook bounce/soft bounce/complaint/unknown address/bad signature/stale timestamp, no CSP violations); the route sweep lists the two new public routes. The Playwright config now keeps one server encryption key across test workers so tests can mint valid links.
+- **Owner to do before the first send (also in `docs/GO_LIVE_CHECKLIST.md`):** add the Resend webhook and set `RESEND_WEBHOOK_SECRET`; set the footer name and address; verify the sending domain.
 

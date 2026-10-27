@@ -25,12 +25,15 @@ export const EMULATOR_ENV = {
   FEATURE_EMAIL_ADMIN_LOGIN: "true",
   // A fresh throwaway key for every run.
   CERTIFICATE_SIGNING_KEY_BASE64: crypto.randomBytes(32).toString("base64"),
-  // Server data-encryption key (authenticator-app seeds, collected signatures), also fresh every run.
-  DOCGEN_SIGNATURE_ENC_KEY_BASE64: crypto.randomBytes(32).toString("base64"),
+  // Server data-encryption key (authenticator-app seeds, collected signatures), also fresh every run. The
+  // test workers load this file again, so they reuse the value the first load put in the environment;
+  // tests that sign things the server must accept (unsubscribe links) rely on it.
+  DOCGEN_SIGNATURE_ENC_KEY_BASE64: process.env.DOCGEN_SIGNATURE_ENC_KEY_BASE64 || crypto.randomBytes(32).toString("base64"),
   // Notification emails go to a stub server that the notifications test starts on this port.
   RESEND_API_KEY: "test-key",
   NOTIFY_FROM_EMAIL: "GHMO <no-reply@example.org>",
-  MAIL_API_URL: "http://127.0.0.1:4010/emails"
+  MAIL_API_URL: "http://127.0.0.1:4010/emails",
+  RESEND_WEBHOOK_SECRET: "whsec_" + Buffer.from("test-webhook-secret-bytes").toString("base64")
 };
 Object.assign(process.env, EMULATOR_ENV);
 
