@@ -207,6 +207,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **5** | Governance features | Original roadmap items, built on the encrypted base: minutes approval workflow + versioning (with separation of duties: an admin cannot approve minutes they submitted, approval cannot change content in the same request, and approved minutes need an explicit, audited reopen), action-item tracking, template versioning, QR verification (signed hash of the published document; finalize must build the certificate PDF server-side from stored inputs and check each signature's role and certificate ID, instead of trusting a client-rendered PNG; store PDFs in Cloud Storage, not inside Firestore documents), attendance exports. | Per-feature acceptance. |
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
+| **8** | Email broadcasts to members | **Proposed, not started** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -528,7 +529,7 @@ Checked 2026-10-27: **the platform has no text-message or phone-call feature.** 
 - **Content-free notification emails** to other opted-in admins (Resend; a link only, at most one per kind per 30 minutes). Admin-only, not a broadcast tool.
 - No phone numbers are stored anywhere (`members` holds name, email, status and roles), and there is no SMS or voice provider, queue or opt-out handling.
 
-If the owner wants it, it would be a **new phase (proposed Phase 8, not started)**. Decisions needed first, in the plan's usual style:
+If the owner wants it, it would be a **new phase**. The owner chose email first; that is **Phase 8, planned in §10**. Text/call would be a later phase and needs these decisions first:
 | Question | Why it matters |
 |---|---|
 | Who receives messages (members, donors, event attendees)? | Defines the audience list and where numbers live. |
@@ -537,4 +538,76 @@ If the owner wants it, it would be a **new phase (proposed Phase 8, not started)
 | Consent and opt-out | Recorded consent per number, STOP/HELP handling and quiet hours are legal requirements (TCPA in the US), not options. |
 | Privacy | Phone numbers are personal data. They would sit outside the end-to-end encrypted set unless we encrypt them, and the server must see numbers to send. This conflicts with the "server sees no content" goal (§4), so it needs an explicit decision, like D4. |
 
-Cheaper stopgap: email broadcasts to members through the existing mailer (no new provider, no number registration). Nothing here is built or scheduled until the owner decides.
+Email broadcasts to members (no new provider, no number registration) are planned in §10. Text and call are not scheduled.
+
+---
+
+## 10. Phase 8 — Email broadcasts to members (planned 2026-10-27, not started)
+
+**Goal.** An admin writes one message and it is emailed to all active members (or a role), with a second admin's approval, one-click unsubscribe, and a record of what went out. Email only: no SMS, voice, open tracking or click tracking.
+
+### 10.1 What exists and what is missing
+| Have | Missing |
+|---|---|
+| `members` collection and a members API (admin only; `emailLower`, `name`, `status`, `roles`) | No Members page in the admin UI, no consent or opt-out fields, no phone or address data |
+| `sendMail` (Resend over HTTPS, plain text, one recipient per call) | No bulk send, no `List-Unsubscribe` headers, no bounce handling, no quota awareness |
+| Rate limiter, audit log, Zod validation, separation-of-duties pattern from minutes | No unsubscribe page, no suppression list, no send queue |
+
+### 10.2 Decisions needed from the owner (recommendations first, as in §7)
+| ID | Question | Recommendation |
+|---|---|---|
+| D7 | **Consent.** Who may be emailed? | Only members with `emailConsent` recorded (date + source: "added by an admin on request", "signed up", "imported with attestation"). Importing a list needs an admin to tick "these people agreed to receive email". Never email donors or attendees unless they are also members. |
+| D8 | **Approval.** Can one admin send alone? | No. A second active admin must approve the exact subject and body (content-bound, like minutes). The sender cannot approve their own broadcast. |
+| D9 | **Volume and provider plan.** How many members? | Resend's free tier is about 100 emails a day and 3,000 a month. Under ~100 members the free tier works; above that, either the paid plan or sending in daily batches. The owner states the member count and the verified sending domain (SPF, DKIM, DMARC). |
+| D10 | **Stored content.** Do sent broadcasts stay in the database? | Yes, subject, body, author, approver, time and counts, because members receive them as plain email anyway. Drafts stay in the encrypted-draft store (Phase 6-D) until submitted. Per-recipient delivery rows hold member id + status only, not addresses. |
+| D11 | **Postal address and sender name.** | Required in the footer for US commercial-style mail (CAN-SPAM); the owner supplies the legal name and mailing address. If messages are purely organization updates this is still good practice. |
+
+### 10.3 Design
+**Data (server-written only; admins read):**
+- `members/{id}` gains `emailConsent` {at, source, byUid}, `emailOptOutAt` (nullable), `emailBounced` (bool). Sending requires `status == "active"`, consent present, no opt-out, not bounced.
+- `broadcasts/{id}`: `subject`, `body`, `audience` ({all} or {role}), `status` (draft → pending_approval → approved → sending → sent | cancelled), `contentHash`, `createdBy`, `approvedBy`, `createdAt`, `approvedAt`, counts (`total`, `sent`, `failed`).
+- `broadcasts/{id}/deliveries/{memberId}`: `state` (pending | sent | failed | skipped), `attempts`, `providerId`. This makes sending resumable and idempotent: a retry never emails the same member twice.
+- Firestore rules: clients read only; every write goes through the API (same approach as minutes and audit logs), with rules tests.
+
+**Unsubscribe (build first, before any sending):**
+- Every email carries a footer link and `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers (RFC 8058).
+- The link holds a signed token (HMAC of member id + purpose, key derived from the existing server secret by HKDF as the TOTP seeds do). Public route `/unsubscribe`: no login, rate limited, shows a confirmation page, sets `emailOptOutAt`, audited. Re-subscribing needs an admin.
+- Resend bounce and complaint webhook (signature verified) sets `emailBounced` / opt-out automatically.
+
+**Sending engine:**
+- Resend batch API, up to 100 messages per request; Vercel Hobby functions are short, so the send is **chunked and resumable**: the admin page calls "send next chunk" until done (same pattern as the encryption migration job: keep the page open, progress bar, safe to close and resume). No cron needed (Hobby cron is daily only).
+- Before each chunk: re-check the broadcast is still `approved`/`sending`, the kill switch is on, and the daily quota is not exhausted; stop with a clear message when it is, and continue next day from where it left off.
+- Open and click tracking turned off at the provider. No third-party scripts, consistent with the rest of the project.
+- Plain text first; simple HTML later only if the owner wants it.
+
+**Admin UI (`/admin/broadcasts`, `/admin/members`):**
+- Members page: list, add, edit, disable, import CSV (with the consent attestation), show consent/opt-out/bounce state. Prerequisite for everything else.
+- Composer: subject, body, audience, live preview exactly as sent, recipient count, "send a test to me".
+- Approval queue (second admin), then a send screen with progress and a delivery summary; failed rows can be retried.
+
+**Safety rails:** kill switch `FEATURE_BROADCASTS` (off by default); max one send per admin per hour and a daily cap per organization; maximum recipients per broadcast set by env; every step audited (create, submit, approve, cancel, chunk sent, unsubscribe); cancelling stops later chunks.
+
+### 10.4 Sub-phases (each ends deployable: lint, tests, build green)
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **8-A** | Members page + consent fields + CSV import with attestation; rules for new fields | Add, import, disable and filter members; consent shown; rules tests pass |
+| **8-B** | Unsubscribe route, signed tokens, suppression flags, bounce/complaint webhook, mailer headers and footer | One-click unsubscribe works in an e2e test; a forged or expired token is refused; bounced members are skipped |
+| **8-C** | Broadcast model, composer, test-send, second-admin approval (content-bound) | Sender cannot approve own; editing after approval resets it; audit entries written |
+| **8-D** | Chunked, resumable sender, delivery log, quota stop/resume, cancel | Kill and restart mid-send: no duplicate emails; quota stop resumes next day; unit + emulator tests |
+| **8-E** | Docs, runbook entry (wrong message sent, complaint spike), go-live checklist items, README | `docs/RUNBOOK_INCIDENT.md` and `docs/GO_LIVE_CHECKLIST.md` updated |
+
+### 10.5 Tests
+Unit: audience filter (consent, opt-out, bounce, status, role), token sign/verify/expiry, chunking and idempotency, quota arithmetic, content-hash binding. Rules: clients cannot write members' consent fields or any broadcast. Emulator/integration: approval separation of duties, resume after interruption, unsubscribe round trip. E2E: unsubscribe page, composer-to-approval flow with a stubbed mail API (`MAIL_API_URL`, as the notification tests do). The route sweep (`route-sweep.spec.ts`) must cover the new routes.
+
+### 10.6 Risks
+| Risk | Mitigation |
+|---|---|
+| Wrong or embarrassing message sent to everyone | Second-admin approval, test send, preview, cancel between chunks. It cannot be unsent; the runbook says what to do. |
+| Spam complaints or poor deliverability | Consent only, one-click unsubscribe, verified domain with DMARC, no tracking, small first send to a seed list |
+| Free-tier limits exhausted mid-send | Quota check per chunk, resume next day, count shown before sending |
+| Member list leaks | Admin-only reads (existing rules); delivery rows hold ids, not addresses; the E2EE gate is not applied to member emails because the server must see them to send (state this to admins, like §4.5) |
+| Legal | Consent record, unsubscribe, postal address in the footer; the owner should confirm local rules (CAN-SPAM, CASL, GDPR if members are outside the US) |
+
+### 10.7 Out of scope for Phase 8
+SMS and voice (§9.1), open and click analytics, HTML templates and drag-and-drop editors, scheduled sends, per-member personalization beyond name, public sign-up forms (a possible 8-F once the owner wants self-service consent).
+
