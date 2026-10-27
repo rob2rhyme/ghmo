@@ -111,6 +111,25 @@ describe("admin access requires an active admin record", () => {
   });
 });
 
+describe("members and email consent", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/members/m1`), { emailLower: "m@example.org", status: "active" });
+    });
+  });
+
+  it("lets admins read the member list but not write it, so consent can only be recorded by the server", async () => {
+    await assertSucceeds(getDoc(doc(admin(), `${ORG}/members/m1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { emailConsent: { source: "imported" } }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m2`), { emailLower: "x@example.org", status: "active" }));
+  });
+
+  it("keeps the member list away from members and visitors", async () => {
+    await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/members/m1`)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/members/m1`)));
+  });
+});
+
 describe("server-only collections", () => {
   it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "admins/active-admin/totp/main", "e2ee/state", "e2ee/state/devices/d1", "e2ee/state/wraps/1_recovery", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
     "denies client access to %s, even for admins",

@@ -207,7 +207,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **5** | Governance features | Original roadmap items, built on the encrypted base: minutes approval workflow + versioning (with separation of duties: an admin cannot approve minutes they submitted, approval cannot change content in the same request, and approved minutes need an explicit, audited reopen), action-item tracking, template versioning, QR verification (signed hash of the published document; finalize must build the certificate PDF server-side from stored inputs and check each signature's role and certificate ID, instead of trusting a client-rendered PNG; store PDFs in Cloud Storage, not inside Firestore documents), attendance exports. | Per-feature acceptance. |
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
-| **8** | Email broadcasts to members | **Proposed, not started** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
+| **8** | Email broadcasts to members | **In progress: 8-A built (§10.8); 8-B to 8-E not started.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -610,4 +610,16 @@ Unit: audience filter (consent, opt-out, bounce, status, role), token sign/verif
 
 ### 10.7 Out of scope for Phase 8
 SMS and voice (§9.1), open and click analytics, HTML templates and drag-and-drop editors, scheduled sends, per-member personalization beyond name, public sign-up forms (a possible 8-F once the owner wants self-service consent).
+
+### 10.8 Progress
+
+**Decisions D7–D11: all recommendations accepted by the owner on 2026-10-27.** Still to supply before the first real send (8-D/8-E): the member count and the verified sending domain (D9), and the legal name and postal address for the footer (D11).
+
+**8-A · Members page, consent fields, CSV import · built 2026-10-27 (local, not yet merged at the time of writing)**
+- **Members page** (`/admin/members`, under Community): list with search and filters (can be emailed / no consent / opted out / disabled), add a member (consent only if the box is ticked), record consent, record an opt-out ("they asked to stop"), "they asked to be added back" (records new consent and clears the opt-out), disable or enable.
+- **Import:** paste a list or CSV (`email` and optional `name` columns, or plain lines); a preview shows the valid addresses and the lines skipped. The admin must tick that these people agreed to receive email; the request is refused without it. Addresses already on the list are left alone, so an import can never re-subscribe someone who opted out. Up to 500 at a time, 5 imports per admin per hour. The audit log records counts only, not addresses.
+- **Data:** `members` gain `emailConsent` {at, source, byUid}, `emailOptOutAt`, and `emailBounced` (set later by the 8-B webhook). `memberEmailState()` in `src/lib/members.ts` is the single rule for who can be emailed: active, consent recorded, no opt-out, no bounce.
+- **Rules:** members are now **server-written only**. Admins can read the list but cannot write it from a browser, so consent can only be recorded through the audited API. (Before this, any admin's browser could write member documents directly; nothing used that.)
+- **Tests:** `tests/unit/members.test.ts` (state rules, CSV parsing); two Firestore rules tests; `tests/e2e-auth/members.spec.ts` (consent only when ticked, consent/opt-out/re-subscribe/disable, import with attestation, no re-subscribe, API refuses without attestation, audit has no addresses). Two `admin-shell` tests were adjusted for the extra "Members" page (the phone menu list now scrolls while the user card and Sign out stay in view; the page-search test parks the mouse first).
+- **Not in 8-A:** no email is sent, and nothing reads `emailConsent` yet except the Members page.
 

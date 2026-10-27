@@ -65,7 +65,9 @@ const createMemberSchema = z.object({
   email: z.string().trim().email().max(320),
   name: z.string().max(120).nullable().optional(),
   status: z.enum(["active", "disabled"]).optional(),
-  roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional()
+  roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional(),
+  /** Records that this person agreed to receive email (plan §10.2, D7). "imported" is only set by the import route. */
+  emailConsent: z.object({ source: z.enum(["admin_on_request", "signed_up"]) }).optional()
 });
 
 export async function POST(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
@@ -108,6 +110,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       updatedAt: now
     };
     if (name) payload.name = name;
+    if (body.emailConsent) payload.emailConsent = { at: now, source: body.emailConsent.source, byUid: actor.uid };
 
     await docRef.set(payload);
     const meta = buildAuditMeta(req, MEMBER_ROUTE_PATH);

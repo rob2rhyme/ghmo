@@ -24,7 +24,11 @@ const MEMBER_ROLES = ["member"] as const;
 const updateMemberSchema = z.object({
   name: z.string().max(120).nullable().optional(),
   status: z.enum(["active", "disabled"]).optional(),
-  roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional()
+  roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional(),
+  /** Records consent; this also clears an earlier opt-out, so it is how an admin re-subscribes someone who asked to be added back. */
+  emailConsent: z.object({ source: z.enum(["admin_on_request", "signed_up"]) }).optional(),
+  /** Records that the member asked to stop receiving email. */
+  emailOptOut: z.literal(true).optional()
 });
 
 function buildAuditMeta(req: NextRequest, route: string) {
@@ -83,6 +87,18 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
         updates.roles = roles;
         hasChange = true;
       }
+    }
+
+    const now = updates.updatedAt as Date;
+    if (body.emailConsent) {
+      updates.emailConsent = { at: now, source: body.emailConsent.source, byUid: actor.uid };
+      updates.emailOptOutAt = null;
+      hasChange = true;
+    }
+
+    if (body.emailOptOut) {
+      updates.emailOptOutAt = now;
+      hasChange = true;
     }
 
     if (!hasChange) {

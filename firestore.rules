@@ -55,8 +55,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Members are written only through /api/organizations/ghmo/members (consent, opt-out and audit
+    // are recorded there); admins may read the list.
     match /organizations/{orgSlug}/members/{doc=**} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Audit entries are written by the server only, so no admin can erase or forge them.

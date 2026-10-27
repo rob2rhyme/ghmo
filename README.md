@@ -83,6 +83,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
 - Subcollections under `organizations/ghmo`:
   - `members/{memberId}`: `emailLower`, optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
+    Email consent (Phase 8): optional `emailConsent` {`at`, `source` (`admin_on_request` / `signed_up` / `imported`), `byUid`}, `emailOptOutAt`, `emailBounced`. Only members who are active, have a recorded consent and have not opted out or bounced can be emailed. Members are written only by the server (`/api/organizations/ghmo/members`, `/members/[id]`, `/members/import`); Firestore rules let admins read the list but never write it.
   - `content/pages/home`: `{ blocks[] }`.
   - `admin/minutes`: structured meeting minutes tied to published events (admin-only).
   - `docgen/{templateId}` (Document Generator templates) and `docgen/generations/{genId}`.

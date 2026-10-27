@@ -1,0 +1,86 @@
+import { expect, test } from "@playwright/test";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "./helpers";
+
+const members = () => admin().db.collection("organizations/ghmo/members");
+const byEmail = async (email: string) => (await members().where("emailLower", "==", email).get()).docs[0]?.data();
+
+test.beforeEach(async () => {
+  await clearEmulators();
+  await seedAdmin("alice", "Alice", ["super_admin"]);
+});
+
+test("adding a member records consent only when the box is ticked", async ({ page }) => {
+  await signInWithNewPasskey(page, "alice", "/admin/members");
+  await expect(page.getByText("No members yet")).toBeVisible();
+
+  await page.getByLabel("Email", { exact: true }).fill("Sam@Example.org");
+  await page.getByLabel("Name (optional)").fill("Sam Lee");
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expect(page.getByText("No consent recorded")).toBeVisible();
+  expect((await byEmail("sam@example.org"))?.emailConsent).toBeUndefined();
+
+  await page.getByLabel("Email", { exact: true }).fill("pat@example.org");
+  await page.getByLabel("This person asked to receive email from us.").check();
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expect(page.getByText("Can be emailed", { exact: true }).first()).toBeVisible();
+  const pat = await byEmail("pat@example.org");
+  expect(pat?.emailConsent).toMatchObject({ source: "admin_on_request", byUid: "alice" });
+});
+
+test("an admin can record consent, an opt-out, and disable a member", async ({ page }) => {
+  await signInWithNewPasskey(page, "alice", "/admin/members");
+  await page.getByLabel("Email", { exact: true }).fill("sam@example.org");
+  await page.getByRole("button", { name: "Add member" }).click();
+
+  await page.getByRole("button", { name: "Record consent" }).click();
+  await expect(page.getByText("Asked to be added")).toBeVisible();
+  await page.getByRole("button", { name: "They asked to stop" }).click();
+  await expect(page.getByText("Opted out", { exact: true }).first()).toBeVisible();
+  expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeTruthy();
+
+  await page.getByRole("button", { name: "They asked to be added back" }).click();
+  await expect(page.getByText("Can be emailed", { exact: true }).first()).toBeVisible();
+  expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeNull();
+
+  await page.getByRole("button", { name: "Disable", exact: true }).click();
+  await expect(page.getByText("Disabled", { exact: true }).first()).toBeVisible();
+});
+
+test("importing needs the consent attestation, skips existing people and never re-subscribes an opt-out", async ({ page }) => {
+  await members().doc("old").set({ email: "old@example.org", emailLower: "old@example.org", status: "active", roles: ["member"], emailOptOutAt: new Date() });
+  await signInWithNewPasskey(page, "alice", "/admin/members");
+
+  await page.getByLabel("Member list").fill("email,name\nnew@example.org,New Person\nold@example.org,Old Person\nbroken\n");
+  await expect(page.getByText("2 valid addresses found.")).toBeVisible();
+  await expect(page.getByText("is not a valid email address")).toBeVisible();
+
+  const importButton = page.getByRole("button", { name: /^Import 2 members$/ });
+  await expect(importButton).toBeDisabled();
+  await page.getByLabel(/These people agreed to receive email/).check();
+  await importButton.click();
+  await expect(page.getByText("1 added, 1 already on the list")).toBeVisible();
+
+  expect((await byEmail("new@example.org"))?.emailConsent).toMatchObject({ source: "imported", byUid: "alice" });
+  const old = await byEmail("old@example.org");
+  expect(old?.emailOptOutAt).toBeTruthy();
+  expect(old?.emailConsent).toBeUndefined();
+  expect((await members().get()).size).toBe(2);
+
+  const audit = await admin().db.collection("organizations/ghmo/auditLogs").where("action", "==", "members_imported").get();
+  expect(audit.size).toBe(1);
+  expect(JSON.stringify(audit.docs[0].data())).not.toContain("new@example.org");
+});
+
+test("the import API refuses a request without the attestation", async ({ page }) => {
+  await signInWithNewPasskey(page, "alice", "/admin/members");
+  const status = await page.evaluate(async () => {
+    const res = await fetch("/api/organizations/ghmo/members/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: [{ email: "x@example.org" }], attested: false })
+    });
+    return res.status;
+  });
+  expect(status).toBe(400);
+  expect((await members().get()).size).toBe(0);
+});
