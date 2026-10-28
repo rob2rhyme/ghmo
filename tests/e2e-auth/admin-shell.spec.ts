@@ -41,19 +41,22 @@ test("Ctrl+K opens the page search; typing and Enter jump to a page, arrow keys 
   await expect(search).toBeVisible();
   await expect(search).toBeFocused();
 
+  // Scope to the dialog's list: pages such as Meeting Minutes have their own <select> options, which
+  // come earlier in the page and would otherwise be picked up as "the first option".
+  const options = page.getByRole("listbox", { name: "Pages" }).getByRole("option");
   await search.fill("minu");
-  await expect(page.getByRole("option")).toHaveCount(1);
-  await expect(page.getByRole("option", { name: /Meeting Minutes/ })).toHaveAttribute("aria-selected", "true");
+  await expect(options).toHaveCount(1);
+  await expect(options.filter({ hasText: "Meeting Minutes" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/admin\/minutes$/);
 
-  // The list highlights whatever the mouse rests on, so park the pointer out of the way first.
+  // The list also highlights whatever the mouse rests on, so keep the pointer out of the way.
   await page.mouse.move(0, 0);
   await page.keyboard.press("Control+k");
   await expect(search).toBeVisible();
-  await expect(page.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+  await expect(options.first()).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("option").nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/admin\/comms$/);
 

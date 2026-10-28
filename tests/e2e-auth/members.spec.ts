@@ -1,7 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "./helpers";
 
 const members = () => admin().db.collection("organizations/ghmo/members");
+/**
+ * Visible text inside the admin page's main area, matched exactly. Page-wide substring lookups can also
+ * hit hidden copies (for example a streamed page part that hasn't been swapped in yet) or toasts; two
+ * VISIBLE copies would still fail the test, so this cannot hide a real duplicate.
+ */
+const shown = (page: Page, text: string) => page.locator("#admin-main").getByText(text, { exact: true }).filter({ visible: true });
 const byEmail = async (email: string) => (await members().where("emailLower", "==", email).get()).docs[0]?.data();
 
 test.beforeEach(async () => {
@@ -11,18 +17,18 @@ test.beforeEach(async () => {
 
 test("adding a member records consent only when the box is ticked", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/members");
-  await expect(page.getByText("No members yet")).toBeVisible();
+  await expect(shown(page, "No members yet")).toBeVisible();
 
   await page.getByLabel("Email", { exact: true }).fill("Sam@Example.org");
   await page.getByLabel("Name (optional)").fill("Sam Lee");
   await page.getByRole("button", { name: "Add member" }).click();
-  await expect(page.getByText("No consent recorded")).toBeVisible();
+  await expect(shown(page, "No consent recorded")).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailConsent).toBeUndefined();
 
   await page.getByLabel("Email", { exact: true }).fill("pat@example.org");
   await page.getByLabel("This person asked to receive email from us.").check();
   await page.getByRole("button", { name: "Add member" }).click();
-  await expect(page.getByText("Can be emailed", { exact: true }).first()).toBeVisible();
+  await expect(shown(page, "Can be emailed").first()).toBeVisible();
   const pat = await byEmail("pat@example.org");
   expect(pat?.emailConsent).toMatchObject({ source: "admin_on_request", byUid: "alice" });
 });
@@ -33,17 +39,17 @@ test("an admin can record consent, an opt-out, and disable a member", async ({ p
   await page.getByRole("button", { name: "Add member" }).click();
 
   await page.getByRole("button", { name: "Record consent" }).click();
-  await expect(page.getByText("Asked to be added")).toBeVisible();
+  await expect(shown(page, "Asked to be added")).toBeVisible();
   await page.getByRole("button", { name: "They asked to stop" }).click();
-  await expect(page.getByText("Opted out", { exact: true }).first()).toBeVisible();
+  await expect(shown(page, "Opted out").first()).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeTruthy();
 
   await page.getByRole("button", { name: "They asked to be added back" }).click();
-  await expect(page.getByText("Can be emailed", { exact: true }).first()).toBeVisible();
+  await expect(shown(page, "Can be emailed").first()).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeNull();
 
   await page.getByRole("button", { name: "Disable", exact: true }).click();
-  await expect(page.getByText("Disabled", { exact: true }).first()).toBeVisible();
+  await expect(shown(page, "Disabled").first()).toBeVisible();
 });
 
 test("importing needs the consent attestation, skips existing people and never re-subscribes an opt-out", async ({ page }) => {
@@ -51,7 +57,7 @@ test("importing needs the consent attestation, skips existing people and never r
   await signInWithNewPasskey(page, "alice", "/admin/members");
 
   await page.getByLabel("Member list").fill("email,name\nnew@example.org,New Person\nold@example.org,Old Person\nbroken\n");
-  await expect(page.getByText("2 valid addresses found.")).toBeVisible();
+  await expect(shown(page, "2 valid addresses found.")).toBeVisible();
   await expect(page.getByText("is not a valid email address")).toBeVisible();
 
   const importButton = page.getByRole("button", { name: /^Import 2 members$/ });
