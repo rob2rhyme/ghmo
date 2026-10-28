@@ -46,6 +46,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
+    // The service worker is tested on its own (pwa.spec.ts); elsewhere it would only add caching noise.
+    serviceWorkers: "block",
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : undefined

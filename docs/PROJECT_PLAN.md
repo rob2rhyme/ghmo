@@ -643,3 +643,25 @@ SMS and voice (§9.1), open and click analytics, HTML templates and drag-and-dro
 - **Tests:** `tests/unit/broadcast.test.ts` (content limits, fingerprint, recipient selection, every transition and refusal); a Firestore rules test; `tests/e2e-auth/broadcasts.spec.ts` (writer cannot approve in the UI or API; a second admin approves; withdraw and edit clears approval; stale-hash approval refused; test email contents and recipient; cancelled broadcasts and bad input refused; audit holds no message text).
 - **Not in 8-C:** nothing is sent to members. An approved broadcast just waits for 8-D.
 
+---
+
+## 11. Installable app (PWA) · built 2026-10-28
+
+The owner asked for the site to be a Progressive Web App. Checked first: it was not one (no manifest, no service worker, no app icons).
+
+**What was added**
+- **Manifest** (`app/manifest.ts`, served at `/manifest.webmanifest`): name "Greater Harrisburg Magar Organization", short name "GHMO", opens full screen (`standalone`) at `/`, theme colour #0f766e, an "Admin" shortcut. Every page links to it.
+- **Icons** (`public/icons/`): 192 and 512 px, a 512 px *maskable* icon with the logo inside the safe zone (Android shapes it), and a 180 px Apple touch icon. Generated from `public/assets/logo-light.png` on white.
+- **iPhone/iPad:** `appleWebApp` metadata (opens full screen, titled "GHMO") and the touch icon; theme colours for light and dark mode.
+- **Service worker** (`public/sw.js`, registered in production only, `Cache-Control: no-cache` so fixes reach installed apps quickly). It is deliberately conservative because this site holds admin and end-to-end encrypted data:
+  - **Pages and API answers are never cached.** Every page load goes to the network, so admin pages, decrypted content and session-dependent pages never sit in a cache on someone's device.
+  - Only content-hashed build files (`/_next/static/…`) and the app icons are cached, for a faster start.
+  - Without a connection, page loads show a static offline page (`public/offline.html`) with a "Try again" link.
+  - Old caches are deleted when the worker is updated (bump `VERSION` in `sw.js` when its caching rules change).
+- **Security notes:** the worker script is first-party and same-origin; third-party scripts on public pages cannot register a different one (service workers must be same-origin files, not blob: URLs). The secure-page CSP already allows `worker-src 'self'` and `manifest-src 'self'`.
+- **Tests:** `tests/e2e-auth/pwa.spec.ts` (manifest fields, icons served as PNG, every page links the manifest and Apple icon, the worker activates, the offline page appears offline and "Try again" recovers, and no `/admin`, `/api` or page HTML is ever in the cache). The other browser tests block service workers so caching cannot affect them.
+
+**How people install it:** on Android/Chrome, the "Install app" prompt or menu → *Install app*; on iPhone/iPad, Safari → Share → *Add to Home Screen*; on a computer, the install icon in Chrome or Edge's address bar.
+
+**Not included (on purpose):** offline reading of pages, background sync and push notifications. Each would mean storing or delivering content on the device, which conflicts with the privacy goals in §4. They can be planned separately if wanted.
+

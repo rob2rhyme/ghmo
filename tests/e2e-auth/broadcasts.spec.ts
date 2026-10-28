@@ -93,8 +93,8 @@ test("a second admin must approve; the writer cannot; editing after approval res
   const stored = (await broadcasts().doc(id).get()).data();
   expect(stored).toMatchObject({ status: "draft", approvedByUid: null, approvedHash: null });
 
-  const actions = await auditActions();
-  for (const action of ["broadcast_created", "broadcast_submitted", "broadcast_approved", "broadcast_withdrawn", "broadcast_updated"]) expect(actions).toContain(action);
+  // The route writes the audit entry just after the record, so wait for it rather than racing it.
+  await expect.poll(auditActions).toEqual(expect.arrayContaining(["broadcast_created", "broadcast_submitted", "broadcast_approved", "broadcast_withdrawn", "broadcast_updated"]));
   // The audit log holds status and fingerprints, not the message.
   const audit = (await admin().db.collection("organizations/ghmo/auditLogs").get()).docs.map(doc => JSON.stringify(doc.data())).join("\n");
   expect(audit).not.toContain("Join us on");
@@ -135,7 +135,7 @@ test("a test email goes only to the signed-in admin, marked TEST, with the foote
   expect(body.text).toContain("Test Org");
   expect(body.text).toContain("1 Main Street, Springfield");
   expect(body.text).toContain("/unsubscribe?token=preview");
-  expect(await auditActions()).toContain("broadcast_test_sent");
+  await expect.poll(auditActions).toContain("broadcast_test_sent");
 });
 
 test("a cancelled broadcast cannot be edited, submitted or tested; the API refuses bad content", async ({ page }) => {

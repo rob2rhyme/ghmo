@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import Providers from "@/src/components/Providers";
 import { CommunityHeader } from "@/src/components/community/CommunityHeader";
 import { ScrollToTopButton } from "@/src/components/ScrollToTopButton";
+import { ServiceWorkerRegistration } from "@/src/components/ServiceWorkerRegistration";
 import { getCommunity } from "@/src/lib/community";
 
 type SiteShellProps = {
@@ -48,6 +49,7 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
             children
           )}
           {scrollToTop ? <ScrollToTopButton /> : null}
+          <ServiceWorkerRegistration />
         </Providers>
       </body>
     </html>

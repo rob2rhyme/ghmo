@@ -13,6 +13,8 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
+    // The service worker is tested on its own (pwa.spec.ts); elsewhere it would only add caching noise.
+    serviceWorkers: "block",
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH

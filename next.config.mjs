@@ -22,7 +22,9 @@ const nextConfig = {
       { source: "/:path*", headers: baseSecurityHeaders },
       // Signing links carry a secret token in the URL: never leak it via Referer.
       { source: "/sign/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
-      { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] }
+      { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      // The service worker must always be re-checked so fixes reach installed apps quickly.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Content-Type", value: "application/javascript; charset=utf-8" }] }
     ];
   }
 };
