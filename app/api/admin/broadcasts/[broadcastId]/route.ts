@@ -9,6 +9,9 @@ import { orgBroadcastsCollectionPath, orgMembersCollectionPath } from "@/src/lib
 import { toPlain } from "@/src/lib/serialize.server";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { parseJsonBody } from "@/src/lib/validation";
+import { sendingConfigFromEnv } from "@/src/lib/broadcastSending";
+import { broadcastProgress, sendingBlocker } from "@/src/lib/broadcastSender.server";
+import { isMailConfigured } from "@/src/lib/mailer.server";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +35,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ broadca
   if ("response" in guard) return guard.response;
   const found = await load((await context.params).broadcastId);
   if (!found) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
-  return NextResponse.json({ broadcast: toPlain({ id: found.ref.id, ...found.data }), recipientCount: await recipientCount() });
+  const sendingState = found.data.status === "sending" || found.data.status === "sent";
+  return NextResponse.json({
+    broadcast: toPlain({ id: found.ref.id, ...found.data }),
+    recipientCount: await recipientCount(),
+    progress: sendingState ? await broadcastProgress(found.ref) : null,
+    sendingBlocker: sendingBlocker(sendingConfigFromEnv(), isMailConfigured())
+  });
 }
 
 const patchSchema = z.union([

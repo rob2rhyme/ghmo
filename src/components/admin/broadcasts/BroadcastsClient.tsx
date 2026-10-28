@@ -21,6 +21,8 @@ export const STATUS_BADGE: Record<BroadcastStatus, { label: string; variant: "se
   draft: { label: "Draft", variant: "secondary" },
   pending_approval: { label: "Waiting for approval", variant: "warning" },
   approved: { label: "Approved", variant: "success" },
+  sending: { label: "Sending", variant: "warning" },
+  sent: { label: "Sent", variant: "success" },
   cancelled: { label: "Cancelled", variant: "destructive" }
 };
 

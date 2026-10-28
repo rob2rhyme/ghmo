@@ -34,6 +34,8 @@ export const EMULATOR_ENV = {
   NOTIFY_FROM_EMAIL: "GHMO <no-reply@example.org>",
   MAIL_API_URL: "http://127.0.0.1:4010/emails",
   BROADCAST_ORG_NAME: "Test Org",
+  FEATURE_BROADCASTS: "true",
+  BROADCAST_CHUNK_SIZE: "2",
   BROADCAST_POSTAL_ADDRESS: "1 Main Street, Springfield",
   RESEND_WEBHOOK_SECRET: "whsec_" + Buffer.from("test-webhook-secret-bytes").toString("base64")
 };
