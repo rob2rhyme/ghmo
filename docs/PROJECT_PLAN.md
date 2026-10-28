@@ -207,7 +207,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **5** | Governance features | Original roadmap items, built on the encrypted base: minutes approval workflow + versioning (with separation of duties: an admin cannot approve minutes they submitted, approval cannot change content in the same request, and approved minutes need an explicit, audited reopen), action-item tracking, template versioning, QR verification (signed hash of the published document; finalize must build the certificate PDF server-side from stored inputs and check each signature's role and certificate ID, instead of trusting a client-rendered PNG; store PDFs in Cloud Storage, not inside Firestore documents), attendance exports. | Per-feature acceptance. |
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
-| **8** | Email broadcasts to members | **In progress: 8-A to 8-D built (§10.8); 8-E (runbook and final docs) not started.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
+| **8** | Email broadcasts to members | **Built (8-A to 8-E, §10.8). Waiting on the owner's set-up steps before the first real send.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -656,6 +656,13 @@ SMS and voice (§9.1), open and click analytics, HTML templates and drag-and-dro
 - **Audit:** sending started (with the total), each completed broadcast (sent, failed, skipped counts), retries.
 - **Tests:** unit (`broadcastSending.test.ts`: config, quota day and reset, chunk sizing, stale claims, idempotency keys, start/cancel/edit rules, batch mailer); emulator integration (`broadcastSender.test.ts`: every consenting member gets one personal copy, refusals, tampered text, quota pause and next-day resume, **a crashed function does not cause duplicates**, two pages sending at once, mid-send unsubscribe skipped, provider failure to failed to retry, switched off and cancelled); browser (`broadcast-sending.spec.ts`: chunks of 2 with distinct keys, personal unsubscribe link works, close-and-resume without resending, unapproved broadcast refused).
 - **Before the first real send (owner):** the steps under 8-B, then `FEATURE_BROADCASTS=true`, set `BROADCAST_DAILY_LIMIT` to the Resend plan's daily allowance, and send a first broadcast to a small test list.
+
+**8-E · Runbook, admin guide, checklist · done 2026-10-28 (local, not yet merged at the time of writing)**
+- `docs/RUNBOOK_INCIDENT.md`: new cases **H** (a broadcast went out wrong: pause and cancel, the kill switch, who received it, correction through the normal approval path), **I** (complaints or bounces rise, or Resend warns: pause, check rates, confirm the webhook is suppressing, find the cause) and **J** (Resend API key or webhook secret leaked: rotate, check for wrong opt-outs, check provider logs).
+- `docs/BROADCASTS_GUIDE.md`: a plain-language guide for admins: consent on the Members page, writing and testing, second-admin approval, sending, pausing and resuming, the daily limit, retries.
+- `docs/GO_LIVE_CHECKLIST.md`, `README.md` and `.env.example` already carry the set-up steps and settings from 8-B and 8-D.
+
+**Phase 8 status:** all five steps are built and tested. Before the first real send the owner completes the steps in `docs/GO_LIVE_CHECKLIST.md` (verified domain, webhook and secret, footer name and address, `FEATURE_BROADCASTS=true`, daily limit) and sends a first broadcast to a small test list. Still open from D9/D11: the member count (to choose the Resend plan) and the legal name and postal address for the footer.
 
 ---
 

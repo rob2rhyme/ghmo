@@ -11,7 +11,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 ## 0. First 15 minutes (any incident)
 
 1. Write down what you saw, when, and who noticed. Don't delete anything.
-2. Decide which case below fits. If unsure, treat it as case A.
+2. Decide which case below fits. If unsure, treat it as case A. Email problems are cases H to J.
 3. Tell the other admins by phone or in person, not in Admin Chat (it may be what's compromised).
 
 ## A. A device was lost, stolen or is suspected compromised
@@ -59,6 +59,30 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 ## G. Wrongly published minutes
 
 1. Open the minutes in **Admin → Meeting Minutes** and **Return to draft** with a reason (at least 10 characters). That removes them from the public archive and is audited.
+
+## H. A broadcast email went out wrong (wrong text, wrong people, or sent by mistake)
+
+*Email can't be recalled. The aim is to stop the rest and correct it quickly.*
+
+1. **Stop it now.** If it is still sending, open it in **Admin → Broadcasts** and press **Pause**, then **Cancel broadcast**. Every remaining chunk stops. If you can't reach the page, a project owner sets `FEATURE_BROADCASTS` to anything but `true` in Vercel and redeploys: nothing more is sent from any broadcast.
+2. See who got it: the broadcast page shows how many were sent; the Firestore console lists them under `organizations/ghmo/broadcasts/{id}/deliveries` (state `sent`). Rows hold member ids, not addresses; look the ids up under `members`.
+3. Decide with another admin whether to send a short correction. It goes through the normal path (draft, a second admin approves, send). Don't reply-all from a personal mailbox.
+4. If private information went to the wrong people, treat it as a data incident: tell those affected, and note it under *After any incident*.
+5. Check the audit log for who started the broadcast and who approved it (`broadcast_sending_started`, `broadcast_approved`), and why the second-admin check didn't catch it.
+
+## I. Spam complaints or bounces suddenly rise, or Resend warns the account
+
+1. **Pause sending:** cancel any broadcast that is sending, and set `FEATURE_BROADCASTS` off if needed.
+2. In the Resend dashboard, check the complaint and bounce rates and any notice on the account. A complaint rate above roughly 0.1% or many hard bounces risks the whole domain's email, including admin sign-in links.
+3. Complaints and hard bounces are already suppressed automatically (the webhook opts out complainers and marks bounced addresses). Check **Admin → Members** (filters *Opted out* and *Bounced*) to confirm the webhook is working; if counts aren't changing, check `RESEND_WEBHOOK_SECRET` and the webhook's status in Resend.
+4. Look for the cause: an old or bought list, an import without real consent, or a message that looked like spam. Remove members without real consent (disable them) before sending again.
+5. Restart with a small send to members you know want the emails.
+
+## J. The Resend API key or webhook secret may have leaked
+
+1. In Resend, **revoke the API key** and create a new one; set it as `RESEND_API_KEY` in Vercel and redeploy. Sign-in emails stop until the new key is in place.
+2. For the webhook, **roll the signing secret** in Resend and set the new `RESEND_WEBHOOK_SECRET`. A leaked webhook secret lets someone mark members as bounced or opted out (not read anything); check **Admin → Members** for unexpected opt-outs and bounces in the period and restore any that are wrong (only with the person's agreement).
+3. Check Resend's logs for emails you didn't send.
 
 ## After any incident
 
