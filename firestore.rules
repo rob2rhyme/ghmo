@@ -62,6 +62,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Broadcast emails to members: drafted, approved and (later) sent only through /api/admin/broadcasts,
+    // so the second-admin approval and its audit trail cannot be skipped from a browser.
+    match /organizations/{orgSlug}/broadcasts/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Audit entries are written by the server only, so no admin can erase or forge them.
     match /organizations/{orgSlug}/auditLogs/{doc=**} {
       allow read: if isAdmin();

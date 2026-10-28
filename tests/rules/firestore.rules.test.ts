@@ -130,6 +130,19 @@ describe("members and email consent", () => {
   });
 });
 
+describe("broadcasts", () => {
+  it("lets admins read broadcasts but never write them, so approval cannot be skipped from a browser", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/broadcasts/b1`), { subject: "Hello", status: "draft" });
+    });
+    await assertSucceeds(getDoc(doc(admin(), `${ORG}/broadcasts/b1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/broadcasts/b1`), { status: "approved" }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/broadcasts/b2`), { subject: "New", status: "approved" }));
+    await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/broadcasts/b1`)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/broadcasts/b1`)));
+  });
+});
+
 describe("server-only collections", () => {
   it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "admins/active-admin/totp/main", "e2ee/state", "e2ee/state/devices/d1", "e2ee/state/wraps/1_recovery", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
     "denies client access to %s, even for admins",

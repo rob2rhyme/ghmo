@@ -33,6 +33,8 @@ export const EMULATOR_ENV = {
   RESEND_API_KEY: "test-key",
   NOTIFY_FROM_EMAIL: "GHMO <no-reply@example.org>",
   MAIL_API_URL: "http://127.0.0.1:4010/emails",
+  BROADCAST_ORG_NAME: "Test Org",
+  BROADCAST_POSTAL_ADDRESS: "1 Main Street, Springfield",
   RESEND_WEBHOOK_SECRET: "whsec_" + Buffer.from("test-webhook-secret-bytes").toString("base64")
 };
 Object.assign(process.env, EMULATOR_ENV);
