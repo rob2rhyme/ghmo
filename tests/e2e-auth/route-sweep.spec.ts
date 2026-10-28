@@ -45,7 +45,9 @@ const PUBLIC_PREFIXES = [
   "/api/gfmpro/webhook", // signature-checked webhook
   "/api/media/youtube",
   "/api/organizations/ghmo/events",
-  "/api/organizations/ghmo/donations/stats"
+  "/api/organizations/ghmo/donations/stats",
+  "/api/unsubscribe", // signed-link credential, POST only
+  "/api/resend/webhook" // signature-checked webhook
 ];
 const isPublic = (path: string) => PUBLIC_PREFIXES.some(prefix => path.startsWith(prefix));
 

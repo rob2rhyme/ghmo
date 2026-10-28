@@ -207,7 +207,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **5** | Governance features | Original roadmap items, built on the encrypted base: minutes approval workflow + versioning (with separation of duties: an admin cannot approve minutes they submitted, approval cannot change content in the same request, and approved minutes need an explicit, audited reopen), action-item tracking, template versioning, QR verification (signed hash of the published document; finalize must build the certificate PDF server-side from stored inputs and check each signature's role and certificate ID, instead of trusting a client-rendered PNG; store PDFs in Cloud Storage, not inside Firestore documents), attendance exports. | Per-feature acceptance. |
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
-| **8** | Email broadcasts to members | **Proposed, not started** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
+| **8** | Email broadcasts to members | **In progress: 8-A, 8-B, 8-C built (§10.8); 8-D and 8-E not started.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -571,7 +571,7 @@ Email broadcasts to members (no new provider, no number registration) are planne
 
 **Unsubscribe (build first, before any sending):**
 - Every email carries a footer link and `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers (RFC 8058).
-- The link holds a signed token (HMAC of member id + purpose, key derived from the existing server secret by HKDF as the TOTP seeds do). Public route `/unsubscribe`: no login, rate limited, shows a confirmation page, sets `emailOptOutAt`, audited. Re-subscribing needs an admin.
+- The link holds a signed token (HMAC of member id + purpose, key derived from the existing server secret by HKDF as the TOTP seeds do). **Tokens do not expire** (decided in 8-B: an old email must still work, and a token can only opt that one member out). Public route `/unsubscribe`: no login, rate limited, shows a confirmation page, sets `emailOptOutAt`, audited. Re-subscribing needs an admin.
 - Resend bounce and complaint webhook (signature verified) sets `emailBounced` / opt-out automatically.
 
 **Sending engine:**
@@ -591,7 +591,7 @@ Email broadcasts to members (no new provider, no number registration) are planne
 | Step | Scope | Exit criteria |
 |---|---|---|
 | **8-A** | Members page + consent fields + CSV import with attestation; rules for new fields | Add, import, disable and filter members; consent shown; rules tests pass |
-| **8-B** | Unsubscribe route, signed tokens, suppression flags, bounce/complaint webhook, mailer headers and footer | One-click unsubscribe works in an e2e test; a forged or expired token is refused; bounced members are skipped |
+| **8-B** | Unsubscribe route, signed tokens, suppression flags, bounce/complaint webhook, mailer headers and footer | One-click unsubscribe works in an e2e test; a forged token is refused; bounced members are skipped |
 | **8-C** | Broadcast model, composer, test-send, second-admin approval (content-bound) | Sender cannot approve own; editing after approval resets it; audit entries written |
 | **8-D** | Chunked, resumable sender, delivery log, quota stop/resume, cancel | Kill and restart mid-send: no duplicate emails; quota stop resumes next day; unit + emulator tests |
 | **8-E** | Docs, runbook entry (wrong message sent, complaint spike), go-live checklist items, README | `docs/RUNBOOK_INCIDENT.md` and `docs/GO_LIVE_CHECKLIST.md` updated |
@@ -610,4 +610,58 @@ Unit: audience filter (consent, opt-out, bounce, status, role), token sign/verif
 
 ### 10.7 Out of scope for Phase 8
 SMS and voice (§9.1), open and click analytics, HTML templates and drag-and-drop editors, scheduled sends, per-member personalization beyond name, public sign-up forms (a possible 8-F once the owner wants self-service consent).
+
+### 10.8 Progress
+
+**Decisions D7–D11: all recommendations accepted by the owner on 2026-10-27.** Still to supply before the first real send (8-D/8-E): the member count and the verified sending domain (D9), and the legal name and postal address for the footer (D11).
+
+**8-A · Members page, consent fields, CSV import · built 2026-10-27 (local, not yet merged at the time of writing)**
+- **Members page** (`/admin/members`, under Community): list with search and filters (can be emailed / no consent / opted out / disabled), add a member (consent only if the box is ticked), record consent, record an opt-out ("they asked to stop"), "they asked to be added back" (records new consent and clears the opt-out), disable or enable.
+- **Import:** paste a list or CSV (`email` and optional `name` columns, or plain lines); a preview shows the valid addresses and the lines skipped. The admin must tick that these people agreed to receive email; the request is refused without it. Addresses already on the list are left alone, so an import can never re-subscribe someone who opted out. Up to 500 at a time, 5 imports per admin per hour. The audit log records counts only, not addresses.
+- **Data:** `members` gain `emailConsent` {at, source, byUid}, `emailOptOutAt`, and `emailBounced` (set later by the 8-B webhook). `memberEmailState()` in `src/lib/members.ts` is the single rule for who can be emailed: active, consent recorded, no opt-out, no bounce.
+- **Rules:** members are now **server-written only**. Admins can read the list but cannot write it from a browser, so consent can only be recorded through the audited API. (Before this, any admin's browser could write member documents directly; nothing used that.)
+- **Tests:** `tests/unit/members.test.ts` (state rules, CSV parsing); two Firestore rules tests; `tests/e2e-auth/members.spec.ts` (consent only when ticked, consent/opt-out/re-subscribe/disable, import with attestation, no re-subscribe, API refuses without attestation, audit has no addresses). Two `admin-shell` tests were adjusted for the extra "Members" page (the phone menu list now scrolls while the user card and Sign out stay in view; the page-search test parks the mouse first).
+- **Not in 8-A:** no email is sent, and nothing reads `emailConsent` yet except the Members page.
+
+**8-B · Unsubscribe, bounces and complaints, mail headers and footer · built 2026-10-27 (local, not yet merged at the time of writing)**
+- **Unsubscribe page** `/unsubscribe?token=…` (secure layout, no third-party scripts, added to the strict-CSP paths). Opening it changes nothing, because mail scanners open links; the person presses "Unsubscribe me", which calls `POST /api/unsubscribe`. A bad or damaged link shows a plain message and no button.
+- **One-click unsubscribe** `POST /api/unsubscribe?token=…` for mail apps (RFC 8058). POST only (GET answers 405), public, rate limited to 30 per hour per IP, no login; the signed token is the credential. Repeating it keeps the first opt-out time and writes one audit entry.
+- **Tokens** (`src/lib/unsubscribeToken.ts`): `memberId.HMAC`, key derived by HKDF from the server master key with its own purpose label, verified against current and previous keys (so key rotation does not break old emails). No expiry (see §10.3).
+- **Resend webhook** `POST /api/resend/webhook`: Svix signature check (`src/lib/svix.ts`, 5-minute window, constant-time compare) with `RESEND_WEBHOOK_SECRET`; without the secret the route answers 404. `email.bounced` (permanent) sets `emailBounced`; transient bounces are ignored; `email.complained` opts the member out; unknown addresses are ignored; the response never says who was affected. Every change is audited.
+- **Mail pieces** (`src/lib/broadcastMail.ts`): footer (reason for the email, unsubscribe link, organization name and postal address from `BROADCAST_ORG_NAME` / `BROADCAST_POSTAL_ADDRESS`) and the `List-Unsubscribe` / `List-Unsubscribe-Post` headers; `sendMail` now accepts extra headers. Nothing sends broadcasts yet (8-D).
+- **Members page:** a "Bounced" filter.
+- **Tests:** unit (`unsubscribeToken`, `svix`, `broadcastMail`, mailer headers, CSP path); e2e `unsubscribe.spec.ts` (page changes nothing until pressed, forged links, one-click, GET refused, idempotence, webhook bounce/soft bounce/complaint/unknown address/bad signature/stale timestamp, no CSP violations); the route sweep lists the two new public routes. The Playwright config now keeps one server encryption key across test workers so tests can mint valid links.
+- **Owner to do before the first send (also in `docs/GO_LIVE_CHECKLIST.md`):** add the Resend webhook and set `RESEND_WEBHOOK_SECRET`; set the footer name and address; verify the sending domain.
+
+**8-C · Broadcast model, composer, test send, second-admin approval · built 2026-10-28 (local, not yet merged at the time of writing)**
+- **Pages:** `/admin/broadcasts` (new draft, list with status) and `/admin/broadcasts/[id]` (edit, preview exactly as sent with the footer, "Would go to N members", send a test, submit, approve, withdraw, cancel). New "Broadcasts" entry under Community.
+- **Rules of the workflow** (`src/lib/broadcast.ts`, pure and unit-tested): draft → pending_approval → approved, and cancelled from any live status. **Nobody who wrote or submitted a broadcast can approve it** (server refuses with `SEPARATION_OF_DUTIES`; the button is also hidden). **Approval is bound to the text:** the approver's request carries the SHA-256 fingerprint of the subject and body they were shown, and it must match what is stored and what was submitted, otherwise `CONTENT_CHANGED`. **Editing a submitted or approved broadcast returns it to draft** and clears the submission and approval. "Withdraw to edit" does the same on purpose.
+- **Recipients:** the count shown is `selectRecipients()`, which uses the same `memberEmailState()` rule as the Members page (active, consent recorded, no opt-out, no bounce). Audience is "everyone who can be emailed"; roles are not offered because members only have the `member` role.
+- **Test send:** `POST /api/admin/broadcasts/[id]/test` emails only the signed-in admin, subject `[TEST] …`, with a note that it is a test and a dead preview unsubscribe link; limited to 5 per hour per admin; refused until `BROADCAST_ORG_NAME` and `BROADCAST_POSTAL_ADDRESS` are set and mail is configured.
+- **Storage and rules:** `organizations/ghmo/broadcasts/{id}` (subject, body, contentHash, status, creator, submitter, approver, timestamps), server-written only; Firestore rules let admins read and nobody write. Sent content is stored in plain text, as decided in D10.
+- **Audit:** created, updated, edited-returned-to-draft, submitted, approved, withdrawn, cancelled and test-sent. Entries hold status and fingerprint, never the message text.
+- **Tests:** `tests/unit/broadcast.test.ts` (content limits, fingerprint, recipient selection, every transition and refusal); a Firestore rules test; `tests/e2e-auth/broadcasts.spec.ts` (writer cannot approve in the UI or API; a second admin approves; withdraw and edit clears approval; stale-hash approval refused; test email contents and recipient; cancelled broadcasts and bad input refused; audit holds no message text).
+- **Not in 8-C:** nothing is sent to members. An approved broadcast just waits for 8-D.
+
+---
+
+## 11. Installable app (PWA) · built 2026-10-28
+
+The owner asked for the site to be a Progressive Web App. Checked first: it was not one (no manifest, no service worker, no app icons).
+
+**What was added**
+- **Manifest** (`app/manifest.ts`, served at `/manifest.webmanifest`): name "Greater Harrisburg Magar Organization", short name "GHMO", opens full screen (`standalone`) at `/`, theme colour #0f766e, an "Admin" shortcut. Every page links to it.
+- **Icons** (`public/icons/`): 192 and 512 px, a 512 px *maskable* icon with the logo inside the safe zone (Android shapes it), and a 180 px Apple touch icon. Generated from `public/assets/logo-light.png` on white.
+- **iPhone/iPad:** `appleWebApp` metadata (opens full screen, titled "GHMO") and the touch icon; theme colours for light and dark mode.
+- **Service worker** (`public/sw.js`, registered in production only, `Cache-Control: no-cache` so fixes reach installed apps quickly). It is deliberately conservative because this site holds admin and end-to-end encrypted data:
+  - **Pages and API answers are never cached.** Every page load goes to the network, so admin pages, decrypted content and session-dependent pages never sit in a cache on someone's device.
+  - Only content-hashed build files (`/_next/static/…`) and the app icons are cached, for a faster start.
+  - Without a connection, page loads show a static offline page (`public/offline.html`) with a "Try again" link.
+  - Old caches are deleted when the worker is updated (bump `VERSION` in `sw.js` when its caching rules change).
+- **Security notes:** the worker script is first-party and same-origin; third-party scripts on public pages cannot register a different one (service workers must be same-origin files, not blob: URLs). The secure-page CSP already allows `worker-src 'self'` and `manifest-src 'self'`.
+- **Tests:** `tests/e2e-auth/pwa.spec.ts` (manifest fields, icons served as PNG, every page links the manifest and Apple icon, the worker activates, the offline page appears offline and "Try again" recovers, and no `/admin`, `/api` or page HTML is ever in the cache). The other browser tests block service workers so caching cannot affect them.
+
+**How people install it:** on Android/Chrome, the "Install app" prompt or menu → *Install app*; on iPhone/iPad, Safari → Share → *Add to Home Screen*; on a computer, the install icon in Chrome or Edge's address bar.
+
+**Not included (on purpose):** offline reading of pages, background sync and push notifications. Each would mean storing or delivering content on the device, which conflicts with the privacy goals in §4. They can be planned separately if wanted.
 

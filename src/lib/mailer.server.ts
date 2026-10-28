@@ -11,13 +11,13 @@ export function isMailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.NOTIFY_FROM_EMAIL);
 }
 
-export async function sendMail(message: { to: string; subject: string; text: string }, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+export async function sendMail(message: { to: string; subject: string; text: string; headers?: Record<string, string> }, fetchImpl: typeof fetch = fetch): Promise<boolean> {
   if (!isMailConfigured()) return false;
   try {
     const res = await fetchImpl(process.env.MAIL_API_URL || DEFAULT_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: process.env.NOTIFY_FROM_EMAIL, to: [message.to], subject: message.subject, text: message.text }),
+      body: JSON.stringify({ from: process.env.NOTIFY_FROM_EMAIL, to: [message.to], subject: message.subject, text: message.text, ...(message.headers ? { headers: message.headers } : {}) }),
       signal: AbortSignal.timeout(5000)
     });
     return res.ok;

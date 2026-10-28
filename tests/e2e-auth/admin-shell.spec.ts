@@ -47,6 +47,8 @@ test("Ctrl+K opens the page search; typing and Enter jump to a page, arrow keys 
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/admin\/minutes$/);
 
+  // The list highlights whatever the mouse rests on, so park the pointer out of the way first.
+  await page.mouse.move(0, 0);
   await page.keyboard.press("Control+k");
   await expect(search).toBeVisible();
   await expect(page.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
@@ -86,8 +88,13 @@ test("on a phone the menu keeps every page, the user and Sign out in view", asyn
 
   await page.getByRole("button", { name: "Open admin menu" }).click();
   const menu = page.getByRole("dialog");
-  await expect(menu.getByRole("link", { name: "Security", exact: true })).toBeInViewport();
+  // The page list scrolls inside the menu; the user card and Sign out stay pinned in view.
+  await expect(menu.getByText("Alice Rai")).toBeInViewport();
+  await expect(menu.getByRole("button", { name: "Sign out" })).toBeInViewport();
+  await menu.getByRole("link", { name: "Encryption", exact: true }).scrollIntoViewIfNeeded();
   await expect(menu.getByRole("link", { name: "Encryption", exact: true })).toBeInViewport();
+  await menu.getByRole("link", { name: "Security", exact: true }).scrollIntoViewIfNeeded();
+  await expect(menu.getByRole("link", { name: "Security", exact: true })).toBeInViewport();
   await expect(menu.getByText("Alice Rai")).toBeInViewport();
   await expect(menu.getByRole("button", { name: "Sign out" })).toBeInViewport();
 

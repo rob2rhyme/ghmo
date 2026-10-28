@@ -25,12 +25,17 @@ export const EMULATOR_ENV = {
   FEATURE_EMAIL_ADMIN_LOGIN: "true",
   // A fresh throwaway key for every run.
   CERTIFICATE_SIGNING_KEY_BASE64: crypto.randomBytes(32).toString("base64"),
-  // Server data-encryption key (authenticator-app seeds, collected signatures), also fresh every run.
-  DOCGEN_SIGNATURE_ENC_KEY_BASE64: crypto.randomBytes(32).toString("base64"),
+  // Server data-encryption key (authenticator-app seeds, collected signatures), also fresh every run. The
+  // test workers load this file again, so they reuse the value the first load put in the environment;
+  // tests that sign things the server must accept (unsubscribe links) rely on it.
+  DOCGEN_SIGNATURE_ENC_KEY_BASE64: process.env.DOCGEN_SIGNATURE_ENC_KEY_BASE64 || crypto.randomBytes(32).toString("base64"),
   // Notification emails go to a stub server that the notifications test starts on this port.
   RESEND_API_KEY: "test-key",
   NOTIFY_FROM_EMAIL: "GHMO <no-reply@example.org>",
-  MAIL_API_URL: "http://127.0.0.1:4010/emails"
+  MAIL_API_URL: "http://127.0.0.1:4010/emails",
+  BROADCAST_ORG_NAME: "Test Org",
+  BROADCAST_POSTAL_ADDRESS: "1 Main Street, Springfield",
+  RESEND_WEBHOOK_SECRET: "whsec_" + Buffer.from("test-webhook-secret-bytes").toString("base64")
 };
 Object.assign(process.env, EMULATOR_ENV);
 
@@ -41,6 +46,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
+    // The service worker is tested on its own (pwa.spec.ts); elsewhere it would only add caching noise.
+    serviceWorkers: "block",
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : undefined

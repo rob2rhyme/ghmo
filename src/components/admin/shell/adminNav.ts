@@ -7,10 +7,12 @@ import {
   Landmark,
   LayoutDashboard,
   LockKeyhole,
+  Mail,
   MessagesSquare,
   NotebookPen,
   ScrollText,
   ShieldCheck,
+  Users,
   type LucideIcon
 } from "lucide-react";
 
@@ -42,6 +44,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: "Community",
     items: [
       { href: "/admin/events", label: "Events", icon: CalendarDays },
+      { href: "/admin/members", label: "Members", icon: Users },
+      { href: "/admin/broadcasts", label: "Broadcasts", icon: Mail },
       { href: "/admin/gumba-project", label: "GUMBA Project", icon: Landmark }
     ]
   },

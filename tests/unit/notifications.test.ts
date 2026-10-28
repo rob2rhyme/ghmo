@@ -49,4 +49,14 @@ describe("sendMail", () => {
     const boom = vi.fn().mockRejectedValue(new Error("network"));
     expect(await sendMail({ to: "a@x.org", subject: "s", text: "t" }, boom as unknown as typeof fetch)).toBe(false);
   });
+
+  it("passes extra message headers (such as List-Unsubscribe) to the provider, and omits them otherwise", async () => {
+    vi.stubEnv("RESEND_API_KEY", "key");
+    vi.stubEnv("NOTIFY_FROM_EMAIL", "GHMO <no-reply@x.org>");
+    const ok = vi.fn().mockResolvedValue({ ok: true });
+    await sendMail({ to: "a@x.org", subject: "s", text: "t", headers: { "List-Unsubscribe": "<https://x.org/u>" } }, ok as unknown as typeof fetch);
+    expect(JSON.parse(ok.mock.calls[0][1].body).headers).toEqual({ "List-Unsubscribe": "<https://x.org/u>" });
+    await sendMail({ to: "a@x.org", subject: "s", text: "t" }, ok as unknown as typeof fetch);
+    expect(JSON.parse(ok.mock.calls[1][1].body)).not.toHaveProperty("headers");
+  });
 });

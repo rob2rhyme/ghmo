@@ -8,7 +8,7 @@
  * separate root layouts, so public scripts never carry over into secure pages.
  */
 
-const SECURE_PREFIXES = ["/admin", "/login", "/sign", "/c/", "/docs"] as const;
+const SECURE_PREFIXES = ["/admin", "/login", "/sign", "/c/", "/docs", "/unsubscribe"] as const;
 
 export function isSecurePath(pathname: string): boolean {
   return SECURE_PREFIXES.some(prefix => {

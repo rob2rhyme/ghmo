@@ -3,9 +3,10 @@ import "../globals.css";
 import { GoFundMeProInstallSnippet } from "@/src/components/GoFundMeProInstallSnippet";
 import { SiteShell } from "@/src/components/layout/SiteShell";
 import { getCommunity } from "@/src/lib/community";
-import { siteMetadata } from "@/src/lib/siteMetadata";
+import { siteMetadata, siteViewport } from "@/src/lib/siteMetadata";
 
 export const metadata = siteMetadata;
+export const viewport = siteViewport;
 
 // Public root layout. This is the ONLY layout allowed to load third-party scripts.
 export default async function PublicRootLayout({ children }: { children: ReactNode }) {

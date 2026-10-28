@@ -83,6 +83,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
 - Subcollections under `organizations/ghmo`:
   - `members/{memberId}`: `emailLower`, optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
+    Email consent (Phase 8): optional `emailConsent` {`at`, `source` (`admin_on_request` / `signed_up` / `imported`), `byUid`}, `emailOptOutAt`, `emailBounced`. Only members who are active, have a recorded consent and have not opted out or bounced can be emailed. Members are written only by the server (`/api/organizations/ghmo/members`, `/members/[id]`, `/members/import`); Firestore rules let admins read the list but never write it.
   - `content/pages/home`: `{ blocks[] }`.
   - `admin/minutes`: structured meeting minutes tied to published events (admin-only).
   - `docgen/{templateId}` (Document Generator templates) and `docgen/generations/{genId}`.
@@ -170,6 +171,9 @@ Legacy community paths are no longer supported; please migrate any old data into
 ## Public pages & integrations (Phase 6)
 - **Minutes archive:** `/minutes` lists approved minutes (attendance as counts only). Drafts are never shown.
 - **Calendar:** `/api/calendar` is a subscribable `.ics` feed of published events; each event page has "Add to calendar".
+- **Installable app (PWA):** `app/manifest.ts`, icons in `public/icons/`, and a conservative service worker (`public/sw.js`, production only) that caches only hashed build files and icons, never pages or API answers, and shows `public/offline.html` when offline. See plan §11.
+- **Broadcasts (Phase 8-C):** `/admin/broadcasts` drafts an email to all members who agreed to receive it. A second admin must approve the exact text (the writer and submitter cannot); editing resets the approval; admins can send themselves a test. Stored in `organizations/ghmo/broadcasts`, written only by the server. Nothing is sent to members yet.
+- **Member unsubscribe and bounces (Phase 8-B):** broadcast emails carry a signed unsubscribe link (`/unsubscribe`, a page that only acts when the button is pressed) and the one-click `List-Unsubscribe` headers (`POST /api/unsubscribe`). Links do not expire and can only opt that one member out. `POST /api/resend/webhook` marks hard bounces and opts out spam complaints; it is signature-checked with `RESEND_WEBHOOK_SECRET` and does not exist without it. The footer name and address come from `BROADCAST_ORG_NAME` and `BROADCAST_POSTAL_ADDRESS`.
 - **Notification emails:** off unless `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` are set. Admins opt in under Admin → Security. Emails contain no content, only a link.
 - **Draft autosave:** with encryption on and the device unlocked, unsent minutes and new threads are kept encrypted in the browser and offered back after a reload. Signing out wipes them.
 
