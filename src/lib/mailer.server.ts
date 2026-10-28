@@ -27,3 +27,39 @@ export async function sendMail(message: { to: string; subject: string; text: str
     return false;
   }
 }
+
+export type BatchMessage = { to: string; subject: string; text: string; headers?: Record<string, string> };
+export type BatchResult = { ok: true; ids: string[] } | { ok: false; status?: number };
+
+/**
+ * Sends up to 100 messages in one request (Resend's batch endpoint), so a broadcast stays within the
+ * provider's request-rate limit. The idempotency key makes a retried request (for example after a
+ * timeout or a crashed server function) return the first result instead of sending again.
+ */
+export async function sendMailBatch(messages: BatchMessage[], idempotencyKey: string, fetchImpl: typeof fetch = fetch): Promise<BatchResult> {
+  if (!isMailConfigured() || messages.length === 0 || messages.length > 100) return { ok: false };
+  try {
+    const res = await fetchImpl(`${process.env.MAIL_API_URL || DEFAULT_URL}/batch`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(
+        messages.map(message => ({
+          from: process.env.NOTIFY_FROM_EMAIL,
+          to: [message.to],
+          subject: message.subject,
+          text: message.text,
+          ...(message.headers ? { headers: message.headers } : {})
+        }))
+      ),
+      signal: AbortSignal.timeout(15_000)
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    const data = (await res.json().catch(() => null)) as { data?: { id?: string }[] } | null;
+    return { ok: true, ids: (data?.data ?? []).map(item => item.id ?? "") };
+  } catch (error) {
+    // Never log addresses or message text.
+    console.error("Broadcast batch failed", error instanceof Error ? error.name : "unknown");
+    return { ok: false };
+  }
+}
+

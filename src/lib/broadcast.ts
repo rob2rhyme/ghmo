@@ -3,8 +3,8 @@ import { memberEmailState } from "./members";
 
 /**
  * Broadcast emails to members (plan §10). Pure rules: the routes load the stored record and get back
- * the changes to write, or a refusal. Statuses in this step: draft → pending_approval → approved,
- * and cancelled from any of them. (Sending, 8-D, adds sending → sent.)
+ * the changes to write, or a refusal. Statuses: draft → pending_approval → approved → sending → sent,
+ * and cancelled from any status before sent (cancelling while sending stops the remaining chunks).
  *
  *  - A second admin must approve: nobody who wrote or submitted a broadcast can approve it.
  *  - Approval is bound to the exact subject and body (hash): the approver sends the hash they were
@@ -12,7 +12,7 @@ import { memberEmailState } from "./members";
  *  - Editing a submitted or approved broadcast sends it back to draft, so what goes out is always
  *    exactly what was approved.
  */
-export type BroadcastStatus = "draft" | "pending_approval" | "approved" | "cancelled";
+export type BroadcastStatus = "draft" | "pending_approval" | "approved" | "sending" | "sent" | "cancelled";
 
 export const SUBJECT_MAX = 150;
 export const BODY_MAX = 20_000;
@@ -62,6 +62,7 @@ const RESET = { submittedAt: null, submittedByUid: null, submittedHash: null, ap
 export function planContentEdit(before: Stored, content: BroadcastContent, now: Date): BroadcastPlan {
   const status = before.status ?? "draft";
   if (status === "cancelled") return refuse(409, "This broadcast was cancelled.");
+  if (status === "sending" || status === "sent") return refuse(409, "This broadcast is being sent or was sent, so it can't be changed.");
   const updates: Record<string, unknown> = { subject: content.subject, body: content.body, contentHash: hashBroadcast(content), updatedAt: now };
   if (status !== "draft") Object.assign(updates, { status: "draft", ...RESET });
   return { ok: true, updates, audit: status === "draft" ? "broadcast_updated" : "broadcast_edited_returned_to_draft" };
@@ -99,7 +100,22 @@ export function planBroadcastTransition(params: { before: Stored; action: Broadc
     }
     case "cancel": {
       if (status === "cancelled") return refuse(400, "Already cancelled.");
+      if (status === "sent") return refuse(400, "This broadcast was already sent.");
       return { ok: true, audit: "broadcast_cancelled", updates: { status: "cancelled", cancelledAt: now, cancelledByUid: actorUid, updatedAt: now } };
     }
   }
 }
+
+/**
+ * Starting to send: only an approved broadcast whose stored text still matches what was approved.
+ * The caller (the sender) snapshots the recipients and creates one delivery row per member.
+ */
+export function planStartSending(before: Stored & { approvedHash?: string | null }, actorUid: string, now: Date): BroadcastPlan {
+  if ((before.status ?? "draft") !== "approved") return refuse(400, "Only an approved broadcast can be sent.");
+  const normalized = normalizeBroadcastContent(before);
+  if (!normalized.ok || !before.approvedHash || hashBroadcast(normalized.content) !== before.approvedHash) {
+    return refuse(409, "The text no longer matches what was approved. Withdraw it and get it approved again.", "CONTENT_CHANGED");
+  }
+  return { ok: true, audit: "broadcast_sending_started", updates: { status: "sending", startedAt: now, startedByUid: actorUid, updatedAt: now } };
+}
+
