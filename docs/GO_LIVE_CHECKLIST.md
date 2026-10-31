@@ -24,8 +24,8 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 
 ## 3. GitHub
 
-- [ ] Branch protection on `main`, requiring the CI, CodeQL and secret-scan checks.
-- [x] Dependabot alerts page shows no open alerts (rescan from Insights → Dependency graph → Dependabot if it looks stale).
+- [ ] Branch protection on `main`, requiring the CI, CodeQL and secret-scan checks. *Possible now that CI runs again (the repo is public). Require: "Typecheck, lint, unit tests, build", "Rules, auth integration and passkey e2e (emulators)", "Dependency audit", "Secret scan" and "Analyze (javascript-typescript)".*
+- [ ] Dependabot alerts page shows no open alerts (rescan from Insights → Dependency graph → Dependabot if it looks stale). *2026-10-31: one known exception, the `minimatch` alert in dev tools only (ESLint plugins, `firebase-tools`). The only fixed version came out 2026-10-27/28 and those tools can't use it yet; it clears when they update. The live site's dependencies have 0 vulnerabilities. Tick this once that alert closes, or after dismissing it as tolerable risk.*
 
 ## 4. People and keys
 
