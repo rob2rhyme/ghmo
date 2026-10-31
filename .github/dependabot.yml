@@ -10,6 +10,10 @@ updates:
       # Raise this together with the runtime, not on its own.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 (native compiler) is not supported by typescript-eslint (needs < 6.1) and drops
+      # tsconfig "baseUrl". Remove this once typescript-eslint supports it (see PR #63).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       react-next:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "next", "eslint-config-next"]
