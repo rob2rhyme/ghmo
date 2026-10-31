@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Type definitions must match the Node version the site runs on (22, see "engines").
+      # Raise this together with the runtime, not on its own.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       react-next:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "next", "eslint-config-next"]
