@@ -21,14 +21,14 @@ jobs:
       security-events: read
     steps:
       - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           queries: security-extended
       # Results stay in CI (no upload), so this works whether or not GitHub code
       # scanning is enabled for the repository. Turning code scanning on later only
       # adds the Security-tab view; this gate keeps working either way.
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:javascript-typescript"
           upload: never
