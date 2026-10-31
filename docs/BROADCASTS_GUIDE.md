@@ -13,6 +13,14 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 - When someone asks to stop, press **They asked to stop**. If they ask to come back, **They asked to be added back**.
 - The page shows who can be emailed. People who unsubscribed by link, marked an email as spam, or whose address bounced are left out automatically.
 
+## 1b. Phone numbers (Admin → Members)
+
+- Numbers are end-to-end encrypted in your browser before they are saved, so you need **encryption turned on and this device unlocked** to add, see or change them. Without that, the page still works for email.
+- Add a number when you add a member, or press **Add phone** / **Edit contact** on someone in the list (second number, preferred language, household and notes go in the same place).
+- Tick "This person gave their number for community calls" only if they did. Importing a list with a `phone` column asks you to confirm the same thing for everyone on it.
+- Numbers show masked (last four digits) until you press **Show**; **Call** dials from your phone. **They asked not to be called** records a call opt-out.
+- The number never appears in the audit log, in exports or in email.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

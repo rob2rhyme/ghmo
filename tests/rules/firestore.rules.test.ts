@@ -124,6 +124,11 @@ describe("members and email consent", () => {
     await assertFails(setDoc(doc(admin(), `${ORG}/members/m2`), { emailLower: "x@example.org", status: "active" }));
   });
 
+  it("keeps the encrypted contact and its flags server-written too (plan §12)", async () => {
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { hasPhone: true, callOptOutAt: null }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { contact: { v: 1, epoch: 1, dev: "d".repeat(24), iv: "a".repeat(16), ct: "b".repeat(40), sig: "c".repeat(80) } }, { merge: true }));
+  });
+
   it("keeps the member list away from members and visitors", async () => {
     await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/members/m1`)));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/members/m1`)));

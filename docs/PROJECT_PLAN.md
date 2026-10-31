@@ -757,3 +757,13 @@ Unit: split rule (equal counts, household grouping, stability, add and remove ca
 | Numbers typed into a text note | Notes are encrypted; the UI warns not to paste numbers into audit-visible fields (there are none) |
 | Callers stop updating outcomes | Reminder emails; the BOD dashboard shows stale campaigns |
 | Group-chat posts drift from the approved text | The copy button only exists on approved announcements and records the post |
+
+### 12.7 Progress
+
+**9-A · Encrypted member contacts · built 2026-10-31 (local, not yet pushed)**
+- `members/{id}.contact` is one envelope (phone, altPhone, language, household, notes) encrypted in the browser with the workspace key and bound to `members/{id}#contact`; plaintext flags `hasPhone`, `phoneConsent` {at, source, byUid} and `callOptOutAt` sit beside it. The browser chooses the member id before encrypting (as the minutes editor does), and the server creates the document with `create()` so a chosen id can never overwrite someone.
+- The members API accepts `contact` only while encryption is on and only from an active device of the signed-in admin (`envelopeChecker`, one device-list read per request so a 500-row import stays cheap); a plaintext `phone` field is dropped by the schema. Audit entries replace the ciphertext with `[encrypted]`.
+- Members page: phone field and call-consent box on add (disabled until this device is unlocked), masked numbers with Show/Hide and a `tel:` Call button, Edit contact dialog, "They asked not to be called" / "Record call consent", a "With phone" filter, and CSV import with a `phone` column (headered or detected) that encrypts each row before sending and needs a second attestation.
+- Shared rules in `src/lib/members.ts`: `normalizePhone` (US 10/11 digits → +1, else E.164), `formatPhone`, `maskPhone`, `normalizeContact`, `memberCallState`, `memberContactLoc`.
+- Tests: `tests/unit/members.test.ts` (normalizing, masking, contact form, call state, CSV phone column); `tests/rules/firestore.rules.test.ts` (clients cannot write `contact`, `hasPhone` or `callOptOutAt`); `tests/e2e-auth/members-contact.spec.ts` (ciphertext in Firestore and the audit log, masked until tapped, edit keeps the number, import encrypts and records consent, opt-out, a second approved device reads it; with encryption off the number field is disabled, an envelope is refused and a stray plaintext phone is never stored).
+- Guide: `docs/BROADCASTS_GUIDE.md` §1b; README data model updated.

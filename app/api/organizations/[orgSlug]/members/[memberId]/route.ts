@@ -9,14 +9,13 @@ import { normalizeMemberName, sanitizeMemberRoles } from "@/src/lib/members";
 import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
+import { envelopeChecker } from "@/src/lib/e2eeEnvelope.server";
+import { MEMBER_ID_PATTERN, PHONE_CONSENT_INPUT, contactInputSchema, memberAuditView } from "@/src/lib/memberContact.server";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 const MEMBER_PATCH_ROUTE = "/api/organizations/ghmo/members/[memberId]";
-
-/** Firestore doc IDs only: no "/" so a path param cannot reach another collection. */
-const MEMBER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** Admin privileges live in the `admins` collection; member records only carry these roles. */
 const MEMBER_ROLES = ["member"] as const;
@@ -28,7 +27,13 @@ const updateMemberSchema = z.object({
   /** Records consent; this also clears an earlier opt-out, so it is how an admin re-subscribes someone who asked to be added back. */
   emailConsent: z.object({ source: z.enum(["admin_on_request", "signed_up"]) }).optional(),
   /** Records that the member asked to stop receiving email. */
-  emailOptOut: z.literal(true).optional()
+  emailOptOut: z.literal(true).optional(),
+  /** The encrypted contact record (plan §12); null removes it. */
+  contact: contactInputSchema.nullable().optional(),
+  /** Records that the member gave their number for community calls; also clears an earlier call opt-out. */
+  phoneConsent: PHONE_CONSENT_INPUT.optional(),
+  /** Records that the member asked not to be called. */
+  callOptOut: z.literal(true).optional()
 });
 
 function buildAuditMeta(req: NextRequest, route: string) {
@@ -101,6 +106,31 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
       hasChange = true;
     }
 
+    if (body.contact !== undefined) {
+      if (body.contact === null) {
+        updates.contact = null;
+        updates.hasPhone = false;
+      } else {
+        const checker = await envelopeChecker(actor.uid);
+        if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
+        if (!checker.ok(body.contact.enc)) return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        updates.contact = body.contact.enc;
+        updates.hasPhone = body.contact.hasPhone;
+      }
+      hasChange = true;
+    }
+
+    if (body.phoneConsent) {
+      updates.phoneConsent = { at: now, source: body.phoneConsent.source, byUid: actor.uid };
+      updates.callOptOutAt = null;
+      hasChange = true;
+    }
+
+    if (body.callOptOut) {
+      updates.callOptOutAt = now;
+      hasChange = true;
+    }
+
     if (!hasChange) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
@@ -120,8 +150,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
         email: admin.email
       },
       resource: { type: "member", id: memberId, path: memberRef.path },
-      before: toPlain({ id: memberId, ...beforeData }),
-      after: toPlain({ id: memberId, ...afterData }),
+      before: toPlain(memberAuditView({ id: memberId, ...beforeData })),
+      after: toPlain(memberAuditView({ id: memberId, ...afterData })),
       meta
     });
 
