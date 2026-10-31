@@ -147,6 +147,18 @@ describe("calling tree (plan §12)", () => {
   });
 });
 
+describe("call campaigns (plan §12)", () => {
+  it("are server-only: a caller cannot read or rewrite call records from a browser", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/callCampaigns/c1`), { title: "General meeting", status: "open" });
+      await setDoc(doc(ctx.firestore(), `${ORG}/callCampaigns/c1/calls/m1`), { callerUid: "active-admin", outcome: null });
+    });
+    await assertFails(getDoc(doc(admin(), `${ORG}/callCampaigns/c1`)));
+    await assertFails(getDoc(doc(admin(), `${ORG}/callCampaigns/c1/calls/m1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/callCampaigns/c1/calls/m1`), { outcome: "reached" }, { merge: true }));
+  });
+});
+
 describe("broadcasts", () => {
   it("lets admins read broadcasts but never write them, so approval cannot be skipped from a browser", async () => {
     await env.withSecurityRulesDisabled(async ctx => {

@@ -9,6 +9,7 @@ import {
   LockKeyhole,
   Mail,
   MessagesSquare,
+  Megaphone,
   Network,
   PhoneCall,
   NotebookPen,
@@ -49,6 +50,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/members", label: "Members", icon: Users },
       { href: "/admin/broadcasts", label: "Broadcasts", icon: Mail },
       { href: "/admin/calling-tree", label: "Calling Tree", icon: Network },
+      { href: "/admin/call-campaigns", label: "Call Campaigns", icon: Megaphone },
       { href: "/admin/my-calls", label: "My Calls", icon: PhoneCall },
       { href: "/admin/gumba-project", label: "GUMBA Project", icon: Landmark }
     ]

@@ -171,7 +171,7 @@ test("removing a caller moves only that caller's people, and a call opt-out drop
   await page.getByRole("button", { name: "They asked not to be called" }).first().click();
   await expect(shown(page, "Asked not to be called")).toBeVisible();
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "My Calls" }).click();
-  await expect(page.getByText("One person is left out")).toBeVisible();
+  await expect(page.getByText(/1 left out \(asked not to be called, or no number\)/)).toBeVisible();
   await expect(page.getByRole("list", { name: "Your call list" }).getByRole("listitem")).toHaveCount(3);
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling Tree" }).click();
   await page.getByRole("button", { name: "Plan assignments" }).click();

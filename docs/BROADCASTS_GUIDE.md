@@ -27,6 +27,12 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 - To move one person by hand, pick another caller in the dropdown next to their name and save.
 - Each caller opens **My Calls** on their phone: their people, numbers masked until **Show**, and **Call** to dial. Someone who asks not to be called disappears from the list straight away.
 
+## 1d. Calling everyone about an announcement (Admin → Call Campaigns, Admin → My Calls)
+
+- Open a campaign: pick the event (or type a title), a date the calls should be done by, and what to say. The script is encrypted; callers read it on their own devices. Everyone on the calling tree who can be called is copied in with their caller.
+- Each caller opens **My Calls**: the script, their people, **Call** to dial, then **Log call**: what happened (reached, voicemail, no answer, wrong number, call back, declined), whether they are coming, and an encrypted note. Every logged call is in the audit trail with your name, the person and the outcome, never the number or the note.
+- The board opens the campaign page: reached and attempted totals, progress per caller, who is still not reached, the full call log, **Remind callers** (an email to those with people left), **Export CSV** (names and outcomes only) and **Close campaign** when done. A closed campaign takes no more calls.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

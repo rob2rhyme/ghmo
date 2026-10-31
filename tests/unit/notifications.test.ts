@@ -22,6 +22,9 @@ describe("notification emails", () => {
       { uid: "no-email", status: "active", notifyEmail: true }
     ];
     expect(pickRecipients(admins, "actor")).toEqual([{ uid: "yes", email: "y@x.org" }]);
+    // A targeted reminder (call campaigns) goes only to the named people, the actor included, still only if opted in.
+    expect(pickRecipients(admins, "actor", ["yes", "actor", "nobody"])).toEqual(expect.arrayContaining([{ uid: "yes", email: "y@x.org" }]));
+    expect(pickRecipients(admins, "actor", ["nobody"])).toEqual([]);
   });
 });
 

@@ -12,7 +12,7 @@ const THROTTLE_MS = 30 * 60 * 1000;
  * Emails the other opted-in admins that there is activity. Best effort: failures never block the
  * action that caused them. Each person gets at most one email per kind every 30 minutes.
  */
-export async function notifyAdmins(kind: NotificationKind, actorUid: string, origin: string): Promise<number> {
+export async function notifyAdmins(kind: NotificationKind, actorUid: string, origin: string, onlyUids?: string[]): Promise<number> {
   if (!isMailConfigured()) return 0;
   try {
     const snap = await getAdminDb().collection(orgAdminsCollectionPath(COMMUNITY_SLUG)).get();
@@ -22,7 +22,7 @@ export async function notifyAdmins(kind: NotificationKind, actorUid: string, ori
     });
     const message = notificationMessage(kind, origin);
     let sent = 0;
-    for (const recipient of pickRecipients(candidates, actorUid)) {
+    for (const recipient of pickRecipients(candidates, actorUid, onlyUids)) {
       if (!(await checkRateLimit(`notify:${recipient.uid}:${kind}`, 1, THROTTLE_MS)).success) continue;
       if (await sendMail({ to: recipient.email, ...message })) sent += 1;
     }
