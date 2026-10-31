@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -72,6 +72,17 @@ export async function signInWithNewPasskey(page: Page, uid: string, landing = "/
   await page.goto(`/admin/login?next=${encodeURIComponent(landing)}`);
   await page.getByRole("button", { name: "Create passkey" }).click();
   await page.waitForURL(new RegExp(`${landing.replace(/\//g, "\\/")}$`), { timeout: 15_000 });
+  await waitForStreamedContent(page);
+}
+
+/**
+ * Waits until React has moved every streamed page part into place. Parts arrive in hidden holders
+ * (`<div hidden id="S:0">`) and are revealed by a script that can run just after the load event,
+ * so for a moment the same text exists twice (both hidden) and text lookups fail in strict mode.
+ * Seen on GitHub's runners and reproduced locally with a 6x CPU slowdown.
+ */
+export async function waitForStreamedContent(page: Page) {
+  await expect(page.locator('div[hidden][id^="S:"]')).toHaveCount(0, { timeout: 15_000 });
 }
 
 export function collectCspViolations(page: Page) {
