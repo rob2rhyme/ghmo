@@ -79,7 +79,6 @@
     "catharsis": {
       "lodash": "4.18.1"
     },
-    "@google-cloud/storage": "file:stubs/google-cloud-storage",
     "basic-ftp": "6.2.3",
     "@firebase/firestore": {
       "@grpc/grpc-js": "1.14.6"
