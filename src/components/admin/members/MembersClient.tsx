@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Mail, Phone, ShieldOff, Upload, UserPlus, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -14,7 +14,8 @@ import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
 import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
-import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
+import type { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import {
   CONTACT_LIMITS,
   EMAIL_CONSENT_LABELS,
@@ -66,9 +67,6 @@ const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "suc
 
 type Filter = "all" | MemberEmailState | "has_phone";
 
-/** A decrypted contact, or why it could not be read on this device. */
-type ContactView = { ok: true; contact: MemberContact } | { ok: false; error: string };
-
 async function call<T>(url: string, method: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
@@ -79,16 +77,12 @@ async function call<T>(url: string, method: string, body: unknown): Promise<T> {
 const errorText = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
 export default function MembersClient({ initialMembers }: { initialMembers: MemberRow[] }) {
-  const e2ee = useE2ee();
-  const { decrypt, encrypt } = e2ee;
-  /** Phone numbers are only ever handled on an unlocked device while encryption is on (decision D12). */
-  const phonesReady = e2ee.enabled && e2ee.status === "unlocked";
-
   const [members, setMembers] = useState(initialMembers);
+  const { contacts, ready: phonesReady, remember: rememberContact, e2ee } = useMemberContacts(members);
+  const { encrypt } = e2ee;
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [contacts, setContacts] = useState<Map<string, ContactView>>(() => new Map());
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
 
@@ -106,45 +100,11 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   const preview = useMemo(() => (csv.trim() ? parseMemberCsv(csv) : null), [csv]);
   const previewPhones = preview?.rows.filter(row => row.phone).length ?? 0;
 
-  // Decrypt every stored contact once this device can; the result stays in memory only.
-  const decryptContact = useCallback(
-    async (member: MemberRow): Promise<ContactView> => {
-      try {
-        return { ok: true, contact: await decrypt<MemberContact>(member.contact, memberContactLoc(member.id)) };
-      } catch (error) {
-        return { ok: false, error: errorText(error, "Could not decrypt") };
-      }
-    },
-    [decrypt]
-  );
-
-  useEffect(() => {
-    if (!phonesReady) return;
-    const pending = members.filter(member => member.contact && !contacts.has(member.id));
-    if (pending.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const entries = await Promise.all(pending.map(async member => [member.id, await decryptContact(member)] as const));
-      if (cancelled) return;
-      setContacts(current => {
-        const next = new Map(current);
-        for (const [id, view] of entries) next.set(id, view);
-        return next;
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [phonesReady, members, contacts, decryptContact]);
-
-  // Lock or sign-out: forget the plaintext so the page shows nothing until the next unlock.
+  // Lock or sign-out: the hook forgets the plaintext; the revealed set goes with it.
   const [wasReady, setWasReady] = useState(phonesReady);
   if (wasReady !== phonesReady) {
     setWasReady(phonesReady);
-    if (!phonesReady) {
-      setContacts(new Map());
-      setRevealed(new Set());
-    }
+    if (!phonesReady) setRevealed(new Set());
   }
 
   const counts = useMemo(() => {
@@ -167,13 +127,6 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   }, [members, query, filter]);
 
   const replace = (updated: MemberRow) => setMembers(list => list.map(m => (m.id === updated.id ? updated : m)));
-  const rememberContact = (id: string, contact: MemberContact | null) =>
-    setContacts(current => {
-      const next = new Map(current);
-      if (contact) next.set(id, { ok: true, contact });
-      else next.delete(id);
-      return next;
-    });
 
   const refresh = async () => {
     const res = await fetch("/api/organizations/ghmo/members", { cache: "no-store" });

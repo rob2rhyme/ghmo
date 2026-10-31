@@ -135,6 +135,18 @@ describe("members and email consent", () => {
   });
 });
 
+describe("calling tree (plan §12)", () => {
+  it("is server-only: admins can neither read nor write who calls whom", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/callingTree/current`), { callers: ["a"], version: 1 });
+      await setDoc(doc(ctx.firestore(), `${ORG}/callingTree/current/assignments/m1`), { callerUid: "a" });
+    });
+    await assertFails(getDoc(doc(admin(), `${ORG}/callingTree/current`)));
+    await assertFails(getDoc(doc(admin(), `${ORG}/callingTree/current/assignments/m1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/callingTree/current/assignments/m1`), { callerUid: "b" }));
+  });
+});
+
 describe("broadcasts", () => {
   it("lets admins read broadcasts but never write them, so approval cannot be skipped from a browser", async () => {
     await env.withSecurityRulesDisabled(async ctx => {

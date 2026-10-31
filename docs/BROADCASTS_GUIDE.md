@@ -21,6 +21,12 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 - Numbers show masked (last four digits) until you press **Show**; **Call** dials from your phone. **They asked not to be called** records a call opt-out.
 - The number never appears in the audit log, in exports or in email.
 
+## 1c. Who calls whom (Admin → Calling Tree, Admin → My Calls)
+
+- A super admin ticks the board members who make calls and presses **Plan assignments**. Everyone who can be called (number on file, call consent, no opt-out) is split as evenly as possible, people who share a household go to the same caller, and anyone already assigned stays put. The preview lists every change; **Save calling tree** stores it.
+- To move one person by hand, pick another caller in the dropdown next to their name and save.
+- Each caller opens **My Calls** on their phone: their people, numbers masked until **Show**, and **Call** to dial. Someone who asks not to be called disappears from the list straight away.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

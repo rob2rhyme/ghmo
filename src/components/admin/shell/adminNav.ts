@@ -9,6 +9,8 @@ import {
   LockKeyhole,
   Mail,
   MessagesSquare,
+  Network,
+  PhoneCall,
   NotebookPen,
   ScrollText,
   ShieldCheck,
@@ -46,6 +48,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/events", label: "Events", icon: CalendarDays },
       { href: "/admin/members", label: "Members", icon: Users },
       { href: "/admin/broadcasts", label: "Broadcasts", icon: Mail },
+      { href: "/admin/calling-tree", label: "Calling Tree", icon: Network },
+      { href: "/admin/my-calls", label: "My Calls", icon: PhoneCall },
       { href: "/admin/gumba-project", label: "GUMBA Project", icon: Landmark }
     ]
   },

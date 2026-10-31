@@ -54,6 +54,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/chat` (Admin Chat)
   - `/admin/minutes` (Create/Edit + Records tabs)
   - `/admin/events`
+  - `/admin/calling-tree` (who calls whom; super admins plan and save, plan §12) and `/admin/my-calls` (a caller's own people)
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
@@ -90,6 +91,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `docgen/{templateId}` (Document Generator templates) and `docgen/generations/{genId}`.
   - Seed templates by writing documents under `organizations/{orgSlug}/docgen` (e.g., `{ name: "Default Letter", letterhead: {...}, fields: ["Recipient", "Body"] }`) so the admin UI has options.
   - `donations/stats` + `donations/webhookEvents/{eventId}`.
+  - `callingTree/current` (`callers[]`, `version`, `updatedAt`, `updatedBy`) and `callingTree/current/assignments/{memberId}` (`callerUid`, `assignedAt`, `assignedBy`): the calling tree (plan §12), server-only; no client may read or write it.
   - `auditLogs/{logId}`.
 - Communication log collections (all under `organizations/ghmo`):
   - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.
