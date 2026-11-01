@@ -47,7 +47,14 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] Fill in names and phone numbers in `docs/RUNBOOK_INCIDENT.md`, print it, and keep it with the recovery keys.
 - [ ] Calendar reminder: test the recovery key every year (Admin → Encryption → Test).
 
-## 6. After going live
+## 6. UI layout upgrade (Phase 10, code work; see `docs/PROJECT_PLAN.md` §13)
+
+- [ ] **Audit 1** (layout only: beginner friendly, premium and modern look) done and findings reviewed by the owner.
+- [ ] Upgrade 1 fixes merged.
+- [ ] **Audit 2** done and findings reviewed by the owner.
+- [ ] Upgrade 2 fixes merged.
+
+## 7. After going live
 
 - [ ] Open `/admin/login`, `/admin`, `/admin/encryption`, `/minutes` and a public page in a normal browser window with the console open. There should be no red errors.
 - [ ] If the Encryption page shows "The device list failed its integrity check", stop and follow `docs/RUNBOOK_INCIDENT.md` case E.
