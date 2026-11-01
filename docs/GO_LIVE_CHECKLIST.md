@@ -37,6 +37,8 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] Encryption is on and every admin has an approved device; then a super admin runs **Encrypt existing records** once and keeps the page open until it says Done.
 - [ ] Any signatures collected before encryption was turned on were finalized or discarded.
 
+- [ ] **Before the first call campaign (Phase 9):** encryption is on and every caller has an approved device (numbers can't be stored or read otherwise). Add phone numbers with call consent under Admin → Members, tick the callers under Admin → Calling Tree, plan and save. Each caller opens My Calls on their phone once and checks they can see and dial a number. Each caller turns on notification emails under Admin → Security if they want campaign reminders.
+
 ## 5. Assurance (outside this codebase)
 
 - [ ] **External review** of `src/lib/e2ee/` and the key routes by someone qualified in applied cryptography, including the signed device list.

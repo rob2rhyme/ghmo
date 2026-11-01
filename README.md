@@ -54,6 +54,8 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/chat` (Admin Chat)
   - `/admin/minutes` (Create/Edit + Records tabs)
   - `/admin/events`
+  - `/admin/calling-tree` (who calls whom; super admins plan and save, plan §12) and `/admin/my-calls` (a caller's own people)
+  - `/admin/call-campaigns` and `/admin/call-campaigns/[id]` (one campaign per announcement: who was reached, RSVPs, call log, CSV export; plan §12)
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
@@ -84,11 +86,14 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - Subcollections under `organizations/ghmo`:
   - `members/{memberId}`: `emailLower`, optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
     Email consent (Phase 8): optional `emailConsent` {`at`, `source` (`admin_on_request` / `signed_up` / `imported`), `byUid`}, `emailOptOutAt`, `emailBounced`. Only members who are active, have a recorded consent and have not opted out or bounced can be emailed. Members are written only by the server (`/api/organizations/ghmo/members`, `/members/[id]`, `/members/import`); Firestore rules let admins read the list but never write it.
+    Phone and call contact (Phase 9-A, plan §12): `contact` is one end-to-end encrypted envelope (phone, second phone, language, household, notes) made in the admin's browser and bound to the member id, so the server never sees a number; beside it `hasPhone`, `phoneConsent` {`at`, `source`, `byUid`} and `callOptOutAt` are plaintext flags for filtering. Numbers can only be stored once encryption is on and are shown masked until tapped.
   - `content/pages/home`: `{ blocks[] }`.
   - `admin/minutes`: structured meeting minutes tied to published events (admin-only).
   - `docgen/{templateId}` (Document Generator templates) and `docgen/generations/{genId}`.
   - Seed templates by writing documents under `organizations/{orgSlug}/docgen` (e.g., `{ name: "Default Letter", letterhead: {...}, fields: ["Recipient", "Body"] }`) so the admin UI has options.
   - `donations/stats` + `donations/webhookEvents/{eventId}`.
+  - `callingTree/current` (`callers[]`, `version`, `updatedAt`, `updatedBy`) and `callingTree/current/assignments/{memberId}` (`callerUid`, `assignedAt`, `assignedBy`): the calling tree (plan §12), server-only; no client may read or write it.
+  - `callCampaigns/{id}` and `callCampaigns/{id}/calls/{memberId}`: call campaigns (plan §12): title, event, encrypted script, counts; per member the caller, outcome, RSVP and append-only attempts with encrypted notes. Server-only.
   - `auditLogs/{logId}`.
 - Communication log collections (all under `organizations/ghmo`):
   - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.

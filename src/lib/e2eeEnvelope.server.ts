@@ -35,3 +35,17 @@ export async function deviceBelongsTo(
       d.deviceId === envelope.dev && d.uid === uid && d.status === "active",
   );
 }
+
+/**
+ * Same check as `deviceBelongsTo`, for routes that validate many envelopes in one request (the member
+ * import): the device list and state are read once, not once per envelope.
+ */
+export async function envelopeChecker(uid: string): Promise<{ enabled: boolean; ok: (envelope: EnvelopeInput) => boolean }> {
+  const [devices, state] = await Promise.all([listDevices(), getState()]);
+  return {
+    enabled: state.enabled,
+    ok: envelope =>
+      envelope.epoch === state.currentEpoch &&
+      devices.some(d => d.deviceId === envelope.dev && d.uid === uid && d.status === "active"),
+  };
+}

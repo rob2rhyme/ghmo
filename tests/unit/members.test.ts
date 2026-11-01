@@ -70,3 +70,78 @@ describe("parseMemberCsv", () => {
     expect(parseMemberCsv("")).toEqual({ rows: [], problems: [], truncated: false });
   });
 });
+
+describe("phone numbers (plan §12, 9-A)", () => {
+  it("normalizes US numbers and keeps international ones in E.164", async () => {
+    const { normalizePhone } = await import("@/src/lib/members");
+    expect(normalizePhone("(717) 555-0100")).toBe("+17175550100");
+    expect(normalizePhone("1 717 555 0100")).toBe("+17175550100");
+    expect(normalizePhone("+1 717-555-0100")).toBe("+17175550100");
+    expect(normalizePhone("+977 9841 234567")).toBe("+9779841234567");
+    expect(normalizePhone("555-0100")).toBeNull();
+    expect(normalizePhone("+12")).toBeNull();
+    expect(normalizePhone("+1234567890123456")).toBeNull();
+    expect(normalizePhone("")).toBeNull();
+    expect(normalizePhone(undefined)).toBeNull();
+    expect(normalizePhone("call me")).toBeNull();
+  });
+
+  it("formats and masks for display", async () => {
+    const { formatPhone, maskPhone } = await import("@/src/lib/members");
+    expect(formatPhone("+17175550100")).toBe("(717) 555-0100");
+    expect(formatPhone("+9779841234567")).toBe("+9779841234567");
+    expect(maskPhone("+17175550100")).toBe("•••-•••-0100");
+  });
+
+  it("cleans a contact form and reports bad numbers without dropping the rest", async () => {
+    const { normalizeContact } = await import("@/src/lib/members");
+    const ok = normalizeContact({ phone: " 717-555-0100 ", altPhone: "", language: " Nepali ", household: "Thapa family", notes: "Evenings" });
+    expect(ok).toEqual({ contact: { phone: "+17175550100", language: "Nepali", household: "Thapa family", notes: "Evenings" }, hasPhone: true, problems: [] });
+    const bad = normalizeContact({ phone: "nope", altPhone: "717-555-0101" });
+    expect(bad.contact).toEqual({ altPhone: "+17175550101" });
+    expect(bad.hasPhone).toBe(false);
+    expect(bad.problems).toHaveLength(1);
+    expect(normalizeContact({ notes: "x".repeat(2000) }).contact.notes).toHaveLength(1000);
+  });
+
+  it("decides who may be given to a caller", async () => {
+    const { memberCallState } = await import("@/src/lib/members");
+    const ready = { status: "active", hasPhone: true, phoneConsent: { source: "admin_on_request" } };
+    expect(memberCallState(ready)).toBe("ready");
+    expect(memberCallState({ ...ready, callOptOutAt: new Date() })).toBe("opted_out");
+    expect(memberCallState({ ...ready, phoneConsent: null })).toBe("no_consent");
+    expect(memberCallState({ ...ready, hasPhone: false })).toBe("no_phone");
+    expect(memberCallState({ ...ready, status: "disabled", callOptOutAt: new Date() })).toBe("inactive");
+  });
+
+  it("binds the contact envelope to the member id", async () => {
+    const { memberContactLoc } = await import("@/src/lib/members");
+    expect(memberContactLoc("abc")).toEqual({ path: "organizations/ghmo/members", docId: "abc#contact" });
+  });
+});
+
+describe("parseMemberCsv with a phone column", () => {
+  it("reads a phone header in any order and normalizes it", () => {
+    const result = parseMemberCsv("Phone,Email,Name\n(717) 555-0100,sam@example.org,Sam\n,pat@example.org,Pat\n");
+    expect(result.rows).toEqual([
+      { email: "sam@example.org", name: "Sam", phone: "+17175550100" },
+      { email: "pat@example.org", name: "Pat" }
+    ]);
+  });
+
+  it("finds a phone in a headerless line and keeps the name", () => {
+    const result = parseMemberCsv("Sam Lee,sam@example.org,717-555-0100\n717 555 0101,pat@example.org\n");
+    expect(result.rows).toEqual([
+      { email: "sam@example.org", name: "Sam Lee", phone: "+17175550100" },
+      { email: "pat@example.org", phone: "+17175550101" }
+    ]);
+  });
+
+  it("imports the person without the number when it is not recognised, and says so", () => {
+    const result = parseMemberCsv("email,phone\nsam@example.org,555-01\n");
+    expect(result.rows).toEqual([{ email: "sam@example.org" }]);
+    expect(result.problems).toHaveLength(1);
+    expect(result.problems[0]).toContain("Line 2");
+    expect(result.problems[0]).toContain("imported without one");
+  });
+});

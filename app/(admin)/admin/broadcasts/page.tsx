@@ -21,7 +21,7 @@ export default async function BroadcastsPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader title="Broadcasts" description="Write one email to all members who agreed to receive it. A second admin has to approve it before it can go out." />
+      <AdminPageHeader title="Broadcasts" description="Write one announcement, get a second admin to approve it, then email it to members who agreed and copy it into the Messenger group chats." />
       <BroadcastsClient initial={broadcasts ?? []} />
     </div>
   );

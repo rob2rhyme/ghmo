@@ -69,6 +69,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // The calling tree (plan §12) is read and written only through /api/admin/calling-tree, which gives
+    // each caller their own slice; no browser reads the whole member-to-caller map directly.
+    match /organizations/{orgSlug}/callingTree/{doc=**} {
+      allow read, write: if false;
+    }
+
+    // Call campaigns and their per-member call records (plan §12): written only through
+    // /api/admin/call-campaigns, so attempts stay append-only and audited.
+    match /organizations/{orgSlug}/callCampaigns/{doc=**} {
+      allow read, write: if false;
+    }
+
     // Audit entries are written by the server only, so no admin can erase or forge them.
     match /organizations/{orgSlug}/auditLogs/{doc=**} {
       allow read: if isAdmin();

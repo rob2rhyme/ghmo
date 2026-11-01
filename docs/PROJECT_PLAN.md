@@ -208,6 +208,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
 | **8** | Email broadcasts to members | **Built (8-A to 8-E, §10.8). Waiting on the owner's set-up steps before the first real send.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
+| **9** | Member outreach: calling tree and call campaigns | **Built 2026-11-01 (9-A to 9-D, §12.7); not yet pushed or deployed.** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -542,6 +543,8 @@ If the owner wants it, it would be a **new phase**. The owner chose email first;
 
 Email broadcasts to members (no new provider, no number registration) are planned in §10. Text and call are not scheduled.
 
+**Update 2026-10-31:** the owner looked at the alternatives (in-house SMS and voice on a carrier API, a Facebook Messenger Page integration, and merging the separate Rallaria repository) and chose none of them; see §12 for the findings and the chosen scope: BOD members phone the people assigned to them, and bulk announcements continue by hand in the existing Messenger group chats.
+
 ---
 
 ## 10. Phase 8 — Email broadcasts to members (planned 2026-10-27, not started)
@@ -688,3 +691,102 @@ The owner asked for the site to be a Progressive Web App. Checked first: it was 
 
 **Not included (on purpose):** offline reading of pages, background sync and push notifications. Each would mean storing or delivering content on the device, which conflicts with the privacy goals in §4. They can be planned separately if wanted.
 
+---
+
+## 12. Phase 9 — Member outreach: calling tree and call campaigns (planned 2026-10-31, built 2026-11-01)
+
+**Goal.** The community member list is stored in the site so that only the BOD (the admin allowlist) can read it, with phone numbers end-to-end encrypted. Members are split equally across BOD callers once, and kept. For each announcement (for example a General Meeting with its agenda) a campaign tells each caller whom to phone, lets them record the outcome, and gives the whole BOD an audited view of who was reached. Bulk announcements continue by hand in the existing Messenger group chats; the site only prepares the text.
+
+### 12.1 What was checked and ruled out (2026-10-31)
+
+The owner first asked for Text-em-All-style mass text and voice, then for a Facebook Messenger integration, and for merging the separate `rob2rhyme/Rallaria` repository "for community use". Each was researched before deciding; the findings are kept here so they are not re-done.
+
+| Option | Finding | Decision |
+|---|---|---|
+| **In-house mass text and voice** (clone of Text-em-All) | Feasible on top of the Phase 8 broadcast pipeline, but every text or call must still leave through a carrier API (Twilio, Telnyx, Bandwidth…), exactly as email leaves through Resend; "no third party" is not possible at the carrier layer. It also needs 10DLC or toll-free registration (days to weeks), recorded consent per number, STOP handling and quiet hours (TCPA), and phone numbers readable by the server, which breaks the E2EE model for that data. | **Dropped** (D13). |
+| **Messenger Page integration** (Meta Send API) | The API only serves one-to-one Page-to-person chats: it cannot post into the Messenger group chats the community uses, and the Facebook Groups API was removed in April 2024. Each member would have to message the Page first; outside a 24-hour window the event-update message tags were withdrawn in April 2026 and the opt-in "notification messages" product replaced Recurring Notifications in January 2026. Business Verification and App Review are required and Meta changed these rules twice in 2026. | **Dropped** (D14): the policy risk is not worth it. Group chats stay manual. |
+| **Merging the Rallaria repository** | Rallaria is a Phase 0 plan for a consent-first "who's nearby" mobile app: about 3,000 lines of throwaway prototype (React + Vite, fake data, no backend), a Cloudflare waitlist relay and a static site; the rest is brand assets, research and sales material. Different stack, identity model and legal posture; its own rules forbid sending SMS from the app and call the prototype throwaway. | **Not merged** (D16). It stays a separate repository. Two ideas may be rebuilt later as small GHMO features: QR check-in at an event (feeding minutes attendance) and an RSVP on events. |
+
+### 12.2 Decisions (recommendations accepted 2026-10-31 unless noted)
+
+| ID | Decision | Effect |
+|---|---|---|
+| D12 | **Phone numbers and call notes are end-to-end encrypted** in the existing workspace keyring (§4): stored as record envelopes, decrypted only in an admin's browser. The server never sees a number. | Tap-to-dial from the caller's phone; no server-side sending of any kind. CSV import of numbers happens in the browser. |
+| D13 | **No SMS, voice or carrier integration.** | §9.1 stays closed. |
+| D14 | **No Messenger or Meta API integration.** Announcements go to the existing group chats by hand; the site provides a "Copy for Messenger" button on an approved announcement and records the manual post in the audit log. | No Meta app, Page, verification or webhook. |
+| D15 | **Callers are active admins** (the BOD allowlist). The number of callers is a setting, not fixed at six. A persistent calling tree assigns each member to one caller and stays stable across campaigns. | Super admins can swap or reassign by hand. |
+| D16 | **Rallaria is not merged.** | See §12.1. |
+| — | Web push through the installed app (§11) stays out of scope, as decided there. | — |
+
+### 12.3 Design
+
+**Data (all under `organizations/ghmo`):**
+- `members/{id}` gains `contact` (envelope: `phone`, `altPhone`, `language`, `household`, `notes`) and plaintext flags `hasPhone` (bool), `callOptOutAt` (nullable), `phoneConsent` {at, source, byUid}. Name, email and status stay plaintext as today. Members remain server-written through the members API; the envelope is produced in the browser and passed through with the device check already used for minutes (`e2eeEnvelope.server.ts`).
+- `callingTree/current`: `callers[]` (admin uids in a fixed order), `version`, `updatedAt`, `updatedBy`; `callingTree/current/assignments/{memberId}`: `callerUid`, `assignedAt`, `assignedBy` (`auto` or an admin uid). Plaintext: member id and caller id only, never a number.
+- `callCampaigns/{id}`: `title`, `eventId` (optional link to `events`), `script` (envelope; the agenda and talking points), `dueAt`, `status` (open → closed), `createdBy`, `createdAt`, `closedBy`, `closedAt`, counts (`total`, `reached`, `attempted`, `rsvpYes`, `rsvpNo`).
+- `callCampaigns/{id}/calls/{memberId}`: `callerUid`, `outcome` (`reached` | `voicemail` | `no_answer` | `wrong_number` | `callback` | `declined`), `rsvp` (`yes` | `no` | `maybe` | null), `attempts` (append-only: {at, outcome, note envelope}), `updatedAt`.
+- `announcements/{id}` (optional, 9-D): approved text for the group chats, `contentHash`, `approvedBy`, and `manualPosts[]` {at, byUid, channel: "messenger_bod" | "messenger_community"}.
+- Firestore rules: members, calling tree, campaigns and announcements are server-written (clients read only), as for members, broadcasts and minutes today, so every write is audited and the separation of duties cannot be bypassed from a browser.
+
+**Splitting members equally:** sort members by a stable key (household, then name, then id), keep a household with one caller, then round-robin across the callers in their fixed order. Counts differ by at most one. New members go to the caller with the fewest. Removing a caller redistributes only that caller's slice. The split is a pure function with unit tests; the stored result is what callers see, so a later change in the rule never silently moves people.
+
+**Caller page (`/admin/my-calls`, phone-first; the installed app from §11 fits):** the open campaign's script beside the caller's list: name, `tel:` link (number decrypted in the browser), language, last outcome, outcome buttons, RSVP, an encrypted note. Numbers are masked until tapped. Attempts are append-only, written through `/api/admin/call-campaigns/{id}/calls/{memberId}` with the actor, time, member id and outcome going to `auditLogs` (no number, no note text).
+
+**BOD view (`/admin/call-campaigns`):** create a campaign from an event (title, date, agenda becomes the script), progress per caller (reached / attempted / remaining), members not yet reached, RSVP totals, the full attempt log, CSV export without numbers. Closing a campaign is audited. Reminders reuse the content-free notification emails from Phase 6 ("you have calls left, due Friday").
+
+**"Copy for Messenger" (9-D):** on an approved announcement, one button copies the text formatted for a chat, and asks which group it was posted to; the answer is recorded with the actor and time. This is the only bridge to the group chats (D14).
+
+**Safety rails:** callers see only their own slice (API filters by uid; super admins see all); one open campaign per event; a member with `callOptOutAt` is never assigned to a campaign; every create, assign, reassign, attempt, close, export and manual post is audited; numbers never appear in audit entries, exports or notification emails.
+
+### 12.4 Sub-phases (each ends deployable: lint, tests, build green)
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **9-A** | Encrypted `contact` envelope on members, consent and opt-out flags, masked display, browser-side CSV import with a phone column, rules and schema | A number saved from the Members page is ciphertext in Firestore; another admin's device decrypts it; the import never sends a number to the server in plaintext; rules tests pass |
+| **9-B** | Calling tree: callers setting, deterministic split, manual swap and reassign, new-member placement, caller-removed redistribution; `/admin/my-calls` list | Split is equal within one and stable across runs (unit tests); a caller sees only their members (emulator test) |
+| **9-C** | Campaigns: create from an event, script envelope, outcomes, RSVP, append-only attempts, audit, BOD dashboard, close, CSV export, reminder emails | Every attempt is in the audit log without a number; a closed campaign refuses new attempts; dashboard counts match the rows |
+| **9-D** | "Copy for Messenger" on approved announcements with the manual-post record; admin guide and runbook entries | A manual post is recorded with actor, time and group; `docs/BROADCASTS_GUIDE.md` and `docs/RUNBOOK_INCIDENT.md` updated |
+
+### 12.5 Tests
+Unit: split rule (equal counts, household grouping, stability, add and remove callers), outcome and status transitions, masking, CSV phone parsing. Rules: clients cannot write members' contact fields, the tree, campaigns or calls. Emulator: a caller cannot read or write another caller's members; attempts are append-only; audit entries carry no number. Browser (`e2e-auth`): add a member with a number on one device, decrypt on another; run a two-caller campaign end to end; export has no numbers. The route sweep covers the new routes.
+
+### 12.6 Risks
+| Risk | Mitigation |
+|---|---|
+| A caller's unlocked phone exposes their slice | Same limit as all E2EE data (§4.5); numbers masked until tapped; only one caller's slice per device |
+| Numbers typed into a text note | Notes are encrypted; the UI warns not to paste numbers into audit-visible fields (there are none) |
+| Callers stop updating outcomes | Reminder emails; the BOD dashboard shows stale campaigns |
+| Group-chat posts drift from the approved text | The copy button only exists on approved announcements and records the post |
+
+### 12.7 Progress
+
+**9-A · Encrypted member contacts · built 2026-10-31 (local, not yet pushed)**
+- `members/{id}.contact` is one envelope (phone, altPhone, language, household, notes) encrypted in the browser with the workspace key and bound to `members/{id}#contact`; plaintext flags `hasPhone`, `phoneConsent` {at, source, byUid} and `callOptOutAt` sit beside it. The browser chooses the member id before encrypting (as the minutes editor does), and the server creates the document with `create()` so a chosen id can never overwrite someone.
+- The members API accepts `contact` only while encryption is on and only from an active device of the signed-in admin (`envelopeChecker`, one device-list read per request so a 500-row import stays cheap); a plaintext `phone` field is dropped by the schema. Audit entries replace the ciphertext with `[encrypted]`.
+- Members page: phone field and call-consent box on add (disabled until this device is unlocked), masked numbers with Show/Hide and a `tel:` Call button, Edit contact dialog, "They asked not to be called" / "Record call consent", a "With phone" filter, and CSV import with a `phone` column (headered or detected) that encrypts each row before sending and needs a second attestation.
+- Shared rules in `src/lib/members.ts`: `normalizePhone` (US 10/11 digits → +1, else E.164), `formatPhone`, `maskPhone`, `normalizeContact`, `memberCallState`, `memberContactLoc`.
+- Tests: `tests/unit/members.test.ts` (normalizing, masking, contact form, call state, CSV phone column); `tests/rules/firestore.rules.test.ts` (clients cannot write `contact`, `hasPhone` or `callOptOutAt`); `tests/e2e-auth/members-contact.spec.ts` (ciphertext in Firestore and the audit log, masked until tapped, edit keeps the number, import encrypts and records consent, opt-out, a second approved device reads it; with encryption off the number field is disabled, an envelope is refused and a stray plaintext phone is never stored).
+- Guide: `docs/BROADCASTS_GUIDE.md` §1b; README data model updated.
+
+**9-B · Calling tree · built 2026-10-31 (local, not yet pushed)**
+- `src/lib/callingTree.ts` (pure, unit-tested): `planAssignments` keeps every existing assignment, drops members who can no longer be called and assignments to callers who left, joins a newcomer to the caller their household already has, and places the rest one household at a time (largest first, then a stable order) onto the caller with the fewest people. Equal within one without households; the same input plans nothing; removing a caller moves only that caller's people. `moveMember` for hand moves.
+- The split runs in the browser because the household is inside the encrypted contact. `/api/admin/calling-tree` (GET: super admins see all assignments, other admins the callers, counts and their own; PUT, super admin: callers + assignments, checked against active admins and callable members, written in batches, version bumped, audited with counts only) and `/api/admin/calling-tree/mine` (the caller's members with their envelopes, already filtered to those still callable). Storage `callingTree/current` + `assignments/{memberId}` is denied to every client in the rules.
+- Pages: **Calling Tree** (`/admin/calling-tree`, behind the encryption gate): tick callers among active admins, Plan assignments with a preview of every change and its reason, per-caller lists with a Caller select for hand moves (recorded as placed by that admin), Save, Discard. **My Calls** (`/admin/my-calls`): the caller's own people, numbers decrypted on the device, masked until Show, tap-to-dial, language, household and notes.
+- Shared `useMemberContacts` hook decrypts envelopes on an unlocked device and forgets them on lock; the Members page now uses it too.
+- Tests: `tests/unit/callingTree.test.ts` (equal split, determinism and stability, households, caller removal, ineligible members, no callers, duplicate callers); rules test (calling tree unreadable and unwritable from a browser); `tests/e2e-auth/calling-tree.spec.ts` (super admin plans and saves a 3/2 split of five people with the unconsented one left out, audit has counts only, a hand move sticks and is attributed, Bob's My Calls and API show only his slice and his PUT is refused, Carol is not a caller; removing Bob moves only his two, a call opt-out is skipped at once and removed on the next plan).
+
+**9-C · Call campaigns · built 2026-10-31 (local, not yet pushed)**
+- `callCampaigns/{id}` (title, eventId and eventTitle, script envelope bound to `{id}#script`, dueAt, status open → closed, createdBy/At, closedBy/At, treeVersion, counts) and `callCampaigns/{id}/calls/{memberId}` (callerUid, outcome, rsvp, append-only `attempts[]` {id, at, outcome, byUid, note envelope bound to `{id}/{memberId}#{attemptId}`}). Opening a campaign snapshots the calling tree into it (callable members only), so later tree changes do not move people mid-announcement; one open campaign per event. Server-written only; denied to every client in the rules.
+- Pure rules in `src/lib/callCampaigns.ts`: outcomes (reached, voicemail, no answer, wrong number, call back, declined; reached/declined/wrong number count as done), `planAttempt` (open campaign, assigned caller or super admin, RSVP only when reached, counts delta), `computeCounts`, `progressByCaller`, `campaignCsv` (names and outcomes, never a number or a note).
+- API: `/api/admin/call-campaigns` (GET list, `?mine=1` adds the caller's rows and members per open campaign; POST opens one from the tree and emails the callers involved), `/[id]` (GET the BOD view: rows, names, caller names; POST close, remind the callers who still have people to reach, or record an export), `/[id]/calls/[memberId]` (POST one attempt in a transaction: refused when closed, for another caller's person, for someone who can no longer be called, or for a repeated attempt id; counts move by the plan's delta; audited with member id, outcome and RSVP only).
+- Pages: **Call Campaigns** (open from an event with an optional due date and an encrypted script; cards with reached/RSVP counts and a progress bar), campaign **detail** (totals, progress per caller, not yet reached, full call log with decrypted notes, Export CSV, Remind callers, Close), and **My Calls** now shows each open campaign with its script, outcome and RSVP badges and a Log call dialog (outcome, RSVP when reached, encrypted note), above the calling-tree list.
+- Reminder emails reuse the content-free notification kind `calls` ("You have calls to make"), sent only to callers with people left, still at most one per person every 30 minutes.
+- Tests: `tests/unit/callCampaigns.test.ts` (transitions, refusals, counts and deltas, per-caller progress, CSV quoting); rules test (campaigns and call records unreadable and unwritable from a browser); `tests/e2e-auth/call-campaigns.spec.ts` (open from an event with ciphertext script, duplicate refused, Alice logs reached + coming with an encrypted note and the audit holds no number or note, voicemail offers no RSVP, Bob logs his own person on his device and is refused on Alice's, stored counts equal the rows, dashboard totals and log, CSV without numbers is audited, closing refuses further attempts).
+
+**9-D · Copy for Messenger, runbook and checklist · built 2026-11-01 (local, not yet pushed)**
+- The announcement for the group chats is the existing broadcast (Phase 8) rather than a new collection: it already has drafting, second-admin approval bound to the text's fingerprint, and withdraw-to-edit. On an approved, sending or sent broadcast a **Post to the Messenger group chats** card shows `messengerText` (subject, blank line, message, no email footer), a **Copy text** button, and **I posted it in the BOD / Community group chat** buttons. Works without any email set-up.
+- `POST /api/admin/broadcasts/[id]/manual-post` appends {channel, at, byUid, byName} to `manualPosts` in a transaction, only when the stored text still matches the approved fingerprint and the copied fingerprint; audited as `broadcast_posted_manually` with the channel and fingerprint, not the text. `planManualPost` holds the rules (unit-tested).
+- `docs/RUNBOOK_INCIDENT.md` cases **K** (wrong group-chat post), **L** (caller's device lost or caller leaves: revoke, re-plan the tree, open campaigns), **M** (member asks not to be called or to have their number removed). Go-live checklist item before the first campaign; admin guide §5.
+- Tests: `tests/unit/broadcast.test.ts` (formatting; only approved and unchanged text, known chats); `tests/e2e-auth/broadcasts.spec.ts` (no card and a refused API call on a draft; after approval the text is copied to the clipboard without footer, two posts are recorded and listed, nothing is emailed, the audit holds the approved fingerprint and not the text, a stale fingerprint is refused).
+
+**Phase 9 status:** all four steps are built and tested locally. Before the first real campaign the owner completes the Phase 9 item in `docs/GO_LIVE_CHECKLIST.md` §4.

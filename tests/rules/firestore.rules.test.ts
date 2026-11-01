@@ -124,9 +124,38 @@ describe("members and email consent", () => {
     await assertFails(setDoc(doc(admin(), `${ORG}/members/m2`), { emailLower: "x@example.org", status: "active" }));
   });
 
+  it("keeps the encrypted contact and its flags server-written too (plan §12)", async () => {
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { hasPhone: true, callOptOutAt: null }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { contact: { v: 1, epoch: 1, dev: "d".repeat(24), iv: "a".repeat(16), ct: "b".repeat(40), sig: "c".repeat(80) } }, { merge: true }));
+  });
+
   it("keeps the member list away from members and visitors", async () => {
     await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/members/m1`)));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/members/m1`)));
+  });
+});
+
+describe("calling tree (plan §12)", () => {
+  it("is server-only: admins can neither read nor write who calls whom", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/callingTree/current`), { callers: ["a"], version: 1 });
+      await setDoc(doc(ctx.firestore(), `${ORG}/callingTree/current/assignments/m1`), { callerUid: "a" });
+    });
+    await assertFails(getDoc(doc(admin(), `${ORG}/callingTree/current`)));
+    await assertFails(getDoc(doc(admin(), `${ORG}/callingTree/current/assignments/m1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/callingTree/current/assignments/m1`), { callerUid: "b" }));
+  });
+});
+
+describe("call campaigns (plan §12)", () => {
+  it("are server-only: a caller cannot read or rewrite call records from a browser", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/callCampaigns/c1`), { title: "General meeting", status: "open" });
+      await setDoc(doc(ctx.firestore(), `${ORG}/callCampaigns/c1/calls/m1`), { callerUid: "active-admin", outcome: null });
+    });
+    await assertFails(getDoc(doc(admin(), `${ORG}/callCampaigns/c1`)));
+    await assertFails(getDoc(doc(admin(), `${ORG}/callCampaigns/c1/calls/m1`)));
+    await assertFails(setDoc(doc(admin(), `${ORG}/callCampaigns/c1/calls/m1`), { outcome: "reached" }, { merge: true }));
   });
 });
 

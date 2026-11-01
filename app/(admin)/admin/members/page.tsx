@@ -22,7 +22,7 @@ export default async function MembersPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader title="Members" description="Who can be emailed, and who has agreed to it. Nobody gets broadcast email without a recorded consent." />
+      <AdminPageHeader title="Members" description="Who can be emailed or called, and who has agreed to it. Phone numbers are end-to-end encrypted; nobody is contacted without a recorded consent." />
       <MembersClient initialMembers={members ?? []} />
     </div>
   );
