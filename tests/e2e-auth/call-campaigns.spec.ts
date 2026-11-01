@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Timestamp } from "firebase-admin/firestore";
-import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 9-C (plan §12): a campaign is opened from an event, each caller logs outcomes and RSVPs from
@@ -122,6 +122,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   await signInWithNewPasskey(bob, "bob", "/admin/encryption");
   await enrollAndApprove(page, bob, "Bob", "Bob phone");
   await bob.goto("/admin/my-calls");
+  await waitForStreamedContent(bob);
   await bob.getByRole("button", { name: "Unlock with passkey" }).click();
   const bobList = bob.getByRole("list", { name: "Calls for General meeting" });
   await expect(bobList.getByRole("listitem")).toHaveCount(1);
@@ -163,6 +164,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
 
   // --- The BOD dashboard shows it, exports without numbers, and closes ---
   await page.goto(`/admin/call-campaigns/${campaignId}`);
+  await waitForStreamedContent(page);
   // A full page load locks this device's keys again; the campaign page sits behind the encryption gate.
   const unlock = page.getByRole("button", { name: "Unlock with passkey" });
   await expect(unlock.or(page.getByLabel("Reached: 2 / 3"))).toBeVisible();

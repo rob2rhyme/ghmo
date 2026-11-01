@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 9-B (plan §12): a super admin picks the callers and plans an equal split in the browser (the
@@ -96,6 +96,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   await signInWithNewPasskey(bob, "bob", "/admin/encryption");
   await enrollAndApprove(page, bob, "Bob", "Bob phone");
   await bob.goto("/admin/my-calls");
+  await waitForStreamedContent(bob);
   await bob.getByRole("button", { name: "Unlock with passkey" }).click();
   // After the hand move Bob has exactly one person left (the 3/2 split gave him two).
   const bobCount = (await db.collection(`${ORG}/callingTree/current/assignments`).where("callerUid", "==", "bob").get()).size;
@@ -126,6 +127,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   await signInWithNewPasskey(carol, "carol", "/admin/encryption");
   await enrollAndApprove(page, carol, "Carol", "Carol phone");
   await carol.goto("/admin/my-calls");
+  await waitForStreamedContent(carol);
   await carol.getByRole("button", { name: "Unlock with passkey" }).click();
   await expect(carol.getByText("You are not on the caller list")).toBeVisible();
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 9-A (plan §12): a member's phone number is encrypted in the admin's browser, stored as an
@@ -94,6 +94,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
   await signInWithNewPasskey(bob, "bob", "/admin/encryption");
   await enrollAndApprove(page, bob, "Bob", "Bob phone");
   await bob.goto("/admin/members");
+  await waitForStreamedContent(bob);
   await expect(bob.getByText("Phone number on file (unlock to view)").first()).toBeVisible();
   await bob.getByRole("button", { name: "Unlock with passkey" }).click();
   await expect(shown(bob, "•••-•••-0100")).toBeVisible();

@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "./helpers";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent } from "./helpers";
 
 type Mail = { body: { to: string[]; subject: string; text: string } };
 const mails: Mail[] = [];
@@ -186,11 +186,14 @@ test("an approved message can be copied for the Messenger group chats and each h
   await expect(page.getByText("Waiting for approval")).toBeVisible();
   const bob = await second(browser, "bob");
   await bob.goto(`/admin/broadcasts/${id}`);
+  await waitForStreamedContent(bob);
   await bob.getByRole("button", { name: "Approve this message" }).click();
   await expect(bob.locator('[data-slot="badge"]', { hasText: "Approved" })).toBeVisible();
 
   // Alice copies the approved text (no email footer) and records where she pasted it.
   await page.reload();
+  // Wait for React to move streamed parts into place, or the card title briefly exists twice (seen in CI).
+  await waitForStreamedContent(page);
   await expect(page.getByText("Post to the Messenger group chats")).toBeVisible();
   await expect(page.getByLabel("Text for Messenger")).toHaveValue("Annual meeting\n\nJoin us on Saturday at 10am.");
   await page.getByRole("button", { name: "Copy text" }).click();
