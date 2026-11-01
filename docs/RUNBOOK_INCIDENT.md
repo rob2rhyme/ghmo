@@ -84,6 +84,30 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 2. For the webhook, **roll the signing secret** in Resend and set the new `RESEND_WEBHOOK_SECRET`. A leaked webhook secret lets someone mark members as bounced or opted out (not read anything); check **Admin → Members** for unexpected opt-outs and bounces in the period and restore any that are wrong (only with the person's agreement).
 3. Check Resend's logs for emails you didn't send.
 
+## K. Something wrong was posted to a Messenger group chat
+
+*The site does not connect to Messenger (decision D14); posts are pasted by hand and only recorded here.*
+
+1. **Remove it in Messenger:** the person who posted it long-presses the message and chooses **Unsend → Unsend for everyone**. Messenger keeps a note that a message was removed.
+2. Open the broadcast in **Admin → Broadcasts**: the *Posted to group chats* list shows who recorded posting it, where and when, and the audit log has `broadcast_posted_manually` with the text's fingerprint. If the wrong text was pasted (not the approved one), that is a process failure: only the **Copy text** button gives the approved text.
+3. Correct it through the normal path: a new draft, a second admin approves, copy, post, record.
+4. If private information was posted, treat it as a data incident (see *After any incident*).
+
+## L. A caller's phone or laptop is lost, or a caller leaves the board
+
+*Their device can decrypt the contacts of the people assigned to them while it is unlocked (plan §4.5).*
+
+1. Follow case **A** (revoke the device, rotate keys) or **C** (admin leaves). A revoked device cannot read anything new.
+2. A super admin opens **Admin → Calling Tree**, unticks that caller, presses **Plan assignments** and saves: only that caller's people move to the others.
+3. Open campaigns keep the old caller's rows (they were copied in when the campaign opened). Close such a campaign and open a new one for the same event from the updated tree; the closed one keeps its call log.
+4. If the device may be in someone else's hands unlocked, consider telling the people on that caller's list that their number may have been seen.
+
+## M. A member asks for their number to be removed, or not to be called
+
+1. **Not to be called:** **Admin → Members**, press **They asked not to be called**. They disappear from every caller's list at once, are refused in open campaigns, and drop out of the calling tree at the next plan.
+2. **Remove the number entirely:** also press **Edit contact**, clear every field and save. The encrypted contact is deleted from the member record. Older Firestore backups may still hold the ciphertext until they expire.
+3. The audit log records both actions with the admin's name; it never held the number.
+
 ## After any incident
 
 - Write down what happened, what you did and what you'll change. Keep it with this runbook.

@@ -8,7 +8,17 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/u
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
-import { BODY_MAX, SUBJECT_MAX, type BroadcastAction, type BroadcastStatus } from "@/src/lib/broadcast";
+import { Copy, MessageCircle } from "lucide-react";
+import {
+  BODY_MAX,
+  MANUAL_CHANNELS,
+  MANUAL_CHANNEL_LABELS,
+  SUBJECT_MAX,
+  messengerText,
+  type BroadcastAction,
+  type BroadcastStatus,
+  type ManualChannel
+} from "@/src/lib/broadcast";
 import { STATUS_BADGE } from "./BroadcastsClient";
 
 export type SendProgress = {
@@ -31,6 +41,9 @@ export type BroadcastDetail = {
   createdByUid: string;
   createdByName?: string;
   submittedByUid?: string | null;
+  approvedHash?: string | null;
+  /** Hand posts to the Messenger group chats (plan §12, 9-D); dates arrive as epoch milliseconds. */
+  manualPosts?: { channel: ManualChannel; at: number; byUid: string; byName: string }[];
 };
 
 async function send(url: string, method: string, body?: unknown) {
@@ -306,6 +319,84 @@ export default function BroadcastDetailClient({
           ) : null}
         </div>
       </Card>
+
+      {broadcast.status === "approved" || broadcast.status === "sending" || broadcast.status === "sent" ? <MessengerCard broadcast={broadcast} onRecorded={setBroadcast} /> : null}
     </div>
+  );
+}
+
+/**
+ * The approved text for the Messenger group chats (decision D14: no Messenger integration). The admin
+ * copies it, pastes it into the chat themselves, and records where, so the audit trail covers the chats.
+ */
+function MessengerCard({ broadcast, onRecorded }: { broadcast: BroadcastDetail; onRecorded: (b: BroadcastDetail) => void }) {
+  const text = messengerText({ subject: broadcast.subject, body: broadcast.body });
+  const [busy, setBusy] = useState<ManualChannel | null>(null);
+  const posts = [...(broadcast.manualPosts ?? [])].sort((a, b) => b.at - a.at);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied. Paste it into the group chat.");
+    } catch {
+      const area = document.getElementById("b-messenger") as HTMLTextAreaElement | null;
+      area?.focus();
+      area?.select();
+      toast.info("Select all and copy the text below.");
+    }
+  };
+
+  const record = async (channel: ManualChannel) => {
+    setBusy(channel);
+    try {
+      const data = await send(`/api/admin/broadcasts/${broadcast.id}/manual-post`, "POST", { channel, contentHash: broadcast.contentHash });
+      if (data.broadcast) onRecorded(data.broadcast);
+      toast.success(`Recorded: posted to the ${MANUAL_CHANNEL_LABELS[channel]}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not record it");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageCircle aria-hidden="true" className="size-5" /> Post to the Messenger group chats
+        </CardTitle>
+        <CardDescription>
+          The site does not connect to Messenger. Copy the approved text, paste it into the group chat yourself, then record where you posted it. This needs no
+          email set-up.
+        </CardDescription>
+      </CardHeader>
+      <div className="space-y-3">
+        <Label htmlFor="b-messenger" className="sr-only">
+          Text for Messenger
+        </Label>
+        <Textarea id="b-messenger" rows={Math.min(12, text.split("\n").length + 1)} value={text} readOnly />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={copy}>
+            <Copy aria-hidden="true" className="size-4" /> Copy text
+          </Button>
+          {MANUAL_CHANNELS.map(channel => (
+            <Button key={channel} variant="outline" loading={busy === channel} onClick={() => record(channel)}>
+              I posted it in the {MANUAL_CHANNEL_LABELS[channel]}
+            </Button>
+          ))}
+        </div>
+        {posts.length > 0 ? (
+          <ul className="space-y-1 text-sm" aria-label="Posted to group chats">
+            {posts.map(post => (
+              <li key={`${post.channel}-${post.at}-${post.byUid}`}>
+                {post.byName} posted it in the {MANUAL_CHANNEL_LABELS[post.channel]} · {new Date(post.at).toLocaleString()}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">Not recorded in any group chat yet.</p>
+        )}
+      </div>
+    </Card>
   );
 }

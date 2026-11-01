@@ -148,3 +148,29 @@ describe("planBroadcastTransition", () => {
     expect(planBroadcastTransition({ before: { ...draft, status: "cancelled" }, action: "cancel", actorUid: "bob", now })).toMatchObject({ ok: false });
   });
 });
+
+describe("posting by hand to the Messenger group chats (plan §12, 9-D)", () => {
+  it("formats the approved text for a chat: subject, blank line, message, no footer", async () => {
+    const { messengerText } = await import("@/src/lib/broadcast");
+    expect(messengerText({ subject: "General meeting", body: "Saturday 5 pm.\nAgenda: budget." })).toBe("General meeting\n\nSaturday 5 pm.\nAgenda: budget.");
+  });
+
+  it("records a post only for approved, unchanged text, and only to a known chat", async () => {
+    const { planManualPost } = await import("@/src/lib/broadcast");
+    const now = new Date("2026-11-01T12:00:00Z");
+    const approved = { status: "approved" as const, ...content, approvedHash: hash };
+    const ok = planManualPost({ before: approved, channel: "messenger_bod", contentHash: hash, actorUid: "a", actorName: "Alice", now });
+    expect(ok).toEqual({ ok: true, post: { channel: "messenger_bod", at: now, byUid: "a", byName: "Alice" } });
+    for (const status of ["sending", "sent"] as const) {
+      expect(planManualPost({ before: { ...approved, status }, channel: "messenger_community", contentHash: hash, actorUid: "a", actorName: "A", now }).ok).toBe(true);
+    }
+    for (const status of ["draft", "pending_approval", "cancelled"] as const) {
+      expect(planManualPost({ before: { ...approved, status }, channel: "messenger_bod", contentHash: hash, actorUid: "a", actorName: "A", now })).toMatchObject({ ok: false, status: 400 });
+    }
+    expect(planManualPost({ before: approved, channel: "whatsapp" as never, contentHash: hash, actorUid: "a", actorName: "A", now })).toMatchObject({ ok: false, status: 400 });
+    // The copied text is stale, or the stored text no longer matches what was approved.
+    expect(planManualPost({ before: approved, channel: "messenger_bod", contentHash: "0".repeat(64), actorUid: "a", actorName: "A", now })).toMatchObject({ ok: false, status: 409, code: "CONTENT_CHANGED" });
+    expect(planManualPost({ before: { ...approved, body: "Changed" }, channel: "messenger_bod", contentHash: hash, actorUid: "a", actorName: "A", now })).toMatchObject({ ok: false, status: 409 });
+    expect(planManualPost({ before: { ...approved, approvedHash: null }, channel: "messenger_bod", contentHash: hash, actorUid: "a", actorName: "A", now })).toMatchObject({ ok: false, status: 409 });
+  });
+});

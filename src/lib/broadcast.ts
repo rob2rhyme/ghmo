@@ -119,3 +119,45 @@ export function planStartSending(before: Stored & { approvedHash?: string | null
   return { ok: true, audit: "broadcast_sending_started", updates: { status: "sending", startedAt: now, startedByUid: actorUid, updatedAt: now } };
 }
 
+
+// ---- Posting an approved broadcast by hand to the Messenger group chats (plan §12, 9-D, decision D14) ----
+//
+// There is no Messenger integration: an admin copies the approved text and pastes it into the group
+// chat themselves. The site only formats the text and records who said they posted it, where and when,
+// so the audit trail covers the group chats too. Only approved text can be copied and recorded.
+
+export const MANUAL_CHANNELS = ["messenger_bod", "messenger_community"] as const;
+export type ManualChannel = (typeof MANUAL_CHANNELS)[number];
+export const MANUAL_CHANNEL_LABELS: Record<ManualChannel, string> = {
+  messenger_bod: "BOD group chat",
+  messenger_community: "Community group chat"
+};
+
+/** The text to paste into a chat: the subject as its own first line, a blank line, then the message. No email footer. */
+export function messengerText(content: BroadcastContent): string {
+  return `${content.subject}\n\n${content.body}`;
+}
+
+export type ManualPost = { channel: ManualChannel; at: Date; byUid: string; byName: string };
+
+/** Statuses whose text a second admin approved and that nobody changed since. */
+const POSTABLE: BroadcastStatus[] = ["approved", "sending", "sent"];
+
+export function planManualPost(params: {
+  before: Stored & { approvedHash?: string | null };
+  channel: ManualChannel;
+  contentHash: string;
+  actorUid: string;
+  actorName: string;
+  now: Date;
+}): { ok: true; post: ManualPost } | { ok: false; status: number; error: string; code?: string } {
+  const { before } = params;
+  if (!POSTABLE.includes(before.status ?? "draft")) return { ok: false, status: 400, error: "Only an approved message can be posted to the group chats." };
+  if (!(MANUAL_CHANNELS as readonly string[]).includes(params.channel)) return { ok: false, status: 400, error: "Pick a group chat." };
+  const normalized = normalizeBroadcastContent(before);
+  const current = normalized.ok ? hashBroadcast(normalized.content) : undefined;
+  if (!current || current !== before.approvedHash || params.contentHash !== current) {
+    return { ok: false, status: 409, error: "The text changed since you copied it. Reload and copy it again.", code: "CONTENT_CHANGED" };
+  }
+  return { ok: true, post: { channel: params.channel, at: params.now, byUid: params.actorUid, byName: params.actorName } };
+}

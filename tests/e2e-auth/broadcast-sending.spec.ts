@@ -52,7 +52,8 @@ test.beforeEach(async () => {
 
 test("an approved broadcast is sent in chunks to each consenting member once, with a working personal unsubscribe link", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/broadcasts/b1");
-  await expect(page.getByText("Ready to send to 5 members.")).toBeVisible();
+  // Scoped to the main area: a streamed copy of the page part can briefly sit outside it (seen as a flake).
+  await expect(page.locator("#admin-main").getByText("Ready to send to 5 members.")).toBeVisible();
 
   await page.getByRole("button", { name: "Send to 5 members" }).click();
   await page.getByRole("button", { name: "Yes, send it now" }).click();

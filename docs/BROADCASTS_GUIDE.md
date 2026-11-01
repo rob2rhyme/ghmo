@@ -53,6 +53,12 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 - **Pause** stops after the current batch. **Cancel broadcast** stops it for good.
 - If some deliveries failed, press **Retry N failed**.
 
+## 5. Post it to the Messenger group chats
+
+- The site does not connect to Messenger. On an approved message (it does not need to be emailed first, and no email set-up is needed), the **Post to the Messenger group chats** box shows the text without the email footer.
+- Press **Copy text**, paste it into the BOD or community group chat in the Messenger app, then press **I posted it in the BOD group chat** or **I posted it in the Community group chat**. The page lists who posted it where and when, and the audit log records it.
+- Only approved text can be copied and recorded. If someone withdraws and edits the message, it needs approval again before it can be posted.
+
 ## If something goes wrong
 
-Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J.
+Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M.
