@@ -39,10 +39,13 @@ function Brand() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname() ?? "/admin";
   return (
-    <nav aria-label="Admin" className="flex flex-col gap-3 lg:gap-2.5">
+    <nav aria-label="Admin" className="flex flex-col gap-3 lg:gap-2">
       {ADMIN_NAV.map(group => (
         <div key={group.label} className="flex flex-col gap-px">
-          <p className="px-3 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+          {/* "Overview" holds only the Dashboard, so its heading is left out to save room. */}
+          {group.label === "Overview" ? null : (
+            <p className="px-3 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+          )}
           {group.items.map(item => {
             const active = isActiveNavItem(pathname, item.href);
             const Icon = item.icon;
@@ -54,7 +57,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 aria-current={active ? "page" : undefined}
                 onClick={onNavigate}
                 className={cn(
-                  "group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-[34px]",
+                  "group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-8",
                   active
                     ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground before:absolute before:inset-y-2 before:-left-1 before:w-1 before:rounded-full before:bg-primary"
                     : "text-foreground/75 hover:bg-accent hover:text-accent-foreground"

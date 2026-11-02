@@ -11,6 +11,9 @@ const WIDTHS = [
   { name: "desktop", width: 1280, height: 800 }
 ];
 const THEMES = ["light", "dark"] as const;
+// Optional: UI_AUDIT_ONLY=home,admin-dashboard captures just those pages.
+const ONLY = new Set((process.env.UI_AUDIT_ONLY ?? "").split(",").map(s => s.trim()).filter(Boolean));
+const wanted = (name: string) => ONLY.size === 0 || ONLY.has(name);
 
 const PUBLIC_PAGES = [
   ["home", "/"],
@@ -158,10 +161,10 @@ test.beforeAll(async () => {
 
 test("public, member and sign-in pages", async ({ page }) => {
   await page.goto("/");
-  for (const [name, url] of PUBLIC_PAGES) await shoot(page, name, url);
+  for (const [name, url] of PUBLIC_PAGES) if (wanted(name)) await shoot(page, name, url);
 });
 
 test("admin pages", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin");
-  for (const [name, url] of ADMIN_PAGES) await shoot(page, name, url);
+  for (const [name, url] of ADMIN_PAGES) if (wanted(name)) await shoot(page, name, url);
 });
