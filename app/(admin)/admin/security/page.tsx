@@ -22,7 +22,7 @@ export default async function AdminSecurityPage() {
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Security"
-        description="How you sign in to the admin area, passkeys from other admins waiting for your approval, and the emails you get."
+        description="How you sign in to the admin area, and which emails you get."
       />
       <section aria-labelledby="security-sign-in" className="flex flex-col gap-4">
         <h2 id="security-sign-in" className="text-lg font-semibold">

@@ -32,7 +32,7 @@ export const EXPLAIN = {
   fingerprint:
     "The workspace fingerprint identifies GHMO's encryption setup and never changes. A new admin who sees the same fingerprint knows they are joining the real one.",
   rotation:
-    "Rotating makes a fresh set of encryption keys (a new key generation). Removed devices don't get the new keys, so they can't read anything written after that.",
+    "Making new keys replaces the encryption keys with a fresh set. Removed devices don't get the new keys, so they can't read anything written after that.",
   deviceList:
     "This is every computer and phone that holds encryption keys. Your browser checks it against a signed history each time, so a device added behind your back gets noticed."
 } as const;

@@ -1,12 +1,12 @@
 "use client";
 
-import { Mail } from "lucide-react";
+import { Mail, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Skeleton } from "@/src/components/ui/skeleton";
 
 type Prefs = { email: boolean; configured: boolean; address: string | null };
@@ -15,6 +15,7 @@ export default function NotificationsPanel() {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,13 +32,28 @@ export default function NotificationsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   if (!prefs) {
     if (loadFailed) {
       return (
         <Alert variant="destructive">
-          <AlertDescription>Could not load your email settings. Reload the page to try again.</AlertDescription>
+          <AlertTitle>Couldn&apos;t load your email settings</AlertTitle>
+          <AlertDescription>
+            <p>Check your internet connection and try again.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLoadFailed(false);
+                  setAttempt(n => n + 1);
+                }}
+              >
+                <RefreshCw aria-hidden="true" />
+                Try again
+              </Button>
+            </div>
+          </AlertDescription>
         </Alert>
       );
     }
@@ -69,18 +85,23 @@ export default function NotificationsPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          <Mail aria-hidden="true" className="size-5 shrink-0 text-primary" /> Email notifications
+    <AdminSectionCard
+      as="h3"
+      icon={<Mail aria-hidden="true" />}
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          Email notifications
           {prefs.email ? <Badge variant="success">On</Badge> : <Badge variant="secondary">Off</Badge>}
-        </CardTitle>
-        <CardDescription>
-          Get an email when there is new activity in Admin Chat or Plans & Issues, or minutes need approval. The email never contains
-          any content, only a link, and you get at most one of each kind every 30 minutes.
+        </span>
+      }
+      description={
+        <>
+          Get an email when there is new activity in Admin Chat or Plans & Issues, or minutes need approval. The email never contains any
+          content, only a link, and you get at most one of each kind every 30 minutes.
           {prefs.address ? ` Sent to ${prefs.address}.` : ""}
-        </CardDescription>
-      </CardHeader>
+        </>
+      }
+    >
       <div className="flex flex-col gap-3">
         {!prefs.configured ? <p className="text-sm text-muted-foreground">Email sending isn&apos;t set up on this site yet, so nothing will be sent.</p> : null}
         <div className="flex flex-wrap gap-2">
@@ -89,6 +110,6 @@ export default function NotificationsPanel() {
           </Button>
         </div>
       </div>
-    </Card>
+    </AdminSectionCard>
   );
 }

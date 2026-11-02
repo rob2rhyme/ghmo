@@ -1,8 +1,10 @@
 //app/(admin)/admin/document-gallery/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FilePlus2, FileText } from "lucide-react";
+import type { Route } from "next";
+import { Download, FilePlus2, FileText, Image as ImageIcon } from "lucide-react";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
@@ -29,7 +31,7 @@ export default async function DocumentGalleryPage() {
   const documents = await listDocuments();
 
   const makeButton = (
-    <Button asChild size="lg">
+    <Button asChild>
       <Link href="/admin/document-generator">
         <FilePlus2 aria-hidden="true" />
         Make a document
@@ -42,7 +44,7 @@ export default async function DocumentGalleryPage() {
       <AdminPageHeader
         title="Document gallery"
         description="Letters and certificates you saved. Open one to edit, print or download."
-        actions={makeButton}
+        actions={documents.length > 0 ? makeButton : undefined}
       />
       {documents.length === 0 ? (
         <EmptyState
@@ -52,36 +54,42 @@ export default async function DocumentGalleryPage() {
           action={makeButton}
         />
       ) : (
-        <ul className="flex flex-col gap-3">
+        <AdminList label="Documents">
           {documents.map(doc => {
             const savedAt = doc.updatedAt ?? doc.createdAt;
+            const openHref = `/admin/document-generator?docId=${doc.id}`;
             return (
-              <li key={doc.id} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-xs md:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <h2 className="text-base font-semibold text-foreground">{doc.templateTitle || "Untitled document"}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}
-                      {savedAt ? ` · ${formatDateTime(savedAt, { timeZone: DEFAULT_TIMEZONE })}` : ""}
-                    </p>
-                  </div>
-                  <Badge variant="secondary">{doc.category || "General"}</Badge>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild variant="outline" className="h-11 sm:h-10">
-                    <Link href={`/admin/document-generator?docId=${doc.id}`}>Open</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="h-11 sm:h-10">
-                    <Link href={`/admin/document-generator?docId=${doc.id}&focus=export&format=pdf`}>Export PDF</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="h-11 sm:h-10">
-                    <Link href={`/admin/document-generator?docId=${doc.id}&focus=export&format=jpeg`}>Export JPEG</Link>
-                  </Button>
-                </div>
-              </li>
+              <AdminListRow
+                key={doc.id}
+                href={openHref as Route}
+                title={doc.templateTitle || "Untitled document"}
+                badges={<Badge variant="secondary">{doc.category || "General"}</Badge>}
+                meta={
+                  <>
+                    Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}
+                    {savedAt ? ` · ${formatDateTime(savedAt, { timeZone: DEFAULT_TIMEZONE })}` : ""}
+                  </>
+                }
+                actions={
+                  <>
+                    <Button asChild variant="outline" size="row">
+                      <Link href={`${openHref}&focus=export&format=pdf` as Route}>
+                        <Download aria-hidden="true" />
+                        Download PDF
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="row">
+                      <Link href={`${openHref}&focus=export&format=jpeg` as Route}>
+                        <ImageIcon aria-hidden="true" />
+                        Download image (JPEG)
+                      </Link>
+                    </Button>
+                  </>
+                }
+              />
             );
           })}
-        </ul>
+        </AdminList>
       )}
     </div>
   );

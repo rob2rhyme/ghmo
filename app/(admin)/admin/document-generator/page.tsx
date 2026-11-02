@@ -20,8 +20,13 @@ export const revalidate = 0;
 type DocumentGeneratorPageProps = {
   searchParams?: Promise<{
     docId?: string;
+    focus?: string;
+    format?: string;
   }>;
 };
+
+const savedExportFormat = (focus?: string, format?: string) =>
+  focus === "export" && (format === "pdf" || format === "jpeg") ? format : undefined;
 
 export default async function DocumentGeneratorPage({
   searchParams,
@@ -35,7 +40,9 @@ export default async function DocumentGeneratorPage({
     throw error;
   }
 
-  const { docId } = (await searchParams) ?? {};
+  const { docId, focus, format } = (await searchParams) ?? {};
+  // Gallery "Download PDF / image (JPEG)" links open the saved document ready to download.
+  const initialExport = savedExportFormat(focus, format);
   const savedDocument = docId ? await getDocument(docId) : null;
   const docMissing = Boolean(docId && !savedDocument);
   const templateId = savedDocument?.templateId ?? TEMPLATE_META[0]?.id;
@@ -51,7 +58,7 @@ export default async function DocumentGeneratorPage({
           <Button asChild variant="outline">
             <Link href="/admin/document-gallery">
               <FolderOpen aria-hidden="true" />
-              Saved documents
+              Document gallery
             </Link>
           </Button>
         }
@@ -72,7 +79,7 @@ export default async function DocumentGeneratorPage({
               <FileText />
               <AlertTitle>Editing: {savedDocument.templateTitle || "saved document"}</AlertTitle>
               <AlertDescription>
-                {savedOn ? `Saved ${savedOn}. ` : ""}Saving again updates this copy in the gallery.
+                {savedOn ? `Saved ${savedOn}. ` : ""}Saving again updates this copy in the document gallery.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -83,6 +90,7 @@ export default async function DocumentGeneratorPage({
             initialDocId={savedDocument?.id}
             initialTemplateVersion={savedDocument?.templateVersion}
             enc={savedDocument?.enc}
+            initialExport={savedDocument ? initialExport : undefined}
           />
         </div>
       </EncryptionGate>

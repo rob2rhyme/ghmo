@@ -16,15 +16,16 @@ import { MINUTES_PATH } from "./minutesRecords";
 export const MIGRATION_AREAS = ["chat", "threads", "conclusions", "comments", "votes", "minutes", "documents", "actionStatus"] as const;
 export type MigrationArea = (typeof MIGRATION_AREAS)[number];
 
+/** How each area reads on the Encryption page (display only). */
 export const AREA_LABELS: Record<MigrationArea, string> = {
   chat: "Admin Chat messages",
-  threads: "Plans & Issues threads",
-  conclusions: "Thread conclusions",
-  comments: "Thread comments",
-  votes: "Conclusion votes",
+  threads: "Plans & Issues topics",
+  conclusions: "Topic conclusions",
+  comments: "Topic comments",
+  votes: "Votes on conclusions",
   minutes: "Draft and submitted minutes",
-  documents: "Saved documents",
-  actionStatus: "Action item tracking"
+  documents: "Document gallery",
+  actionStatus: "Action item progress"
 };
 
 export type MigrationItem = {

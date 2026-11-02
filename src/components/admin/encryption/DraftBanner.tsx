@@ -11,8 +11,10 @@ export function DraftBanner({ savedAt, onRestore, onDiscard }: { savedAt: number
         You have an unsaved draft from {formatDateTime(savedAt)}. It is stored encrypted on this device only.
       </span>
       <span className="flex flex-wrap gap-2">
-        <Button onClick={onRestore}>Restore draft</Button>
-        <Button variant="outline" onClick={onDiscard}>
+        <Button size="row" onClick={onRestore}>
+          Restore draft
+        </Button>
+        <Button variant="outline" size="row" onClick={onDiscard}>
           Discard
         </Button>
       </span>

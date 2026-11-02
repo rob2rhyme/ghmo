@@ -9,7 +9,7 @@ export default function AdminEncryptionPage() {
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Encryption"
-        description="Keeps admin chat, plans, phone numbers and other private records readable only on board members' approved devices."
+        description="Keeps admin chat, plans, phone numbers and other private records readable only on admins' approved devices."
       />
       <EncryptionPanel />
     </div>

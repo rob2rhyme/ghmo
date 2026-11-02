@@ -1,13 +1,14 @@
 "use client";
 
-import { Check, CheckCircle2, Copy, ShieldCheck, Smartphone, X } from "lucide-react";
+import { Check, CheckCircle2, Copy, RefreshCw, ShieldCheck, Smartphone, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { AuthenticatorSetup } from "@/app/(auth)/admin/login/AuthenticatorSteps";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { PASSKEYS_CHANGED_EVENT } from "./PasskeysPanel";
@@ -114,7 +115,22 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
   if (loadError) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{loadError}</AlertDescription>
+        <AlertTitle>Couldn&apos;t load your sign-in methods</AlertTitle>
+        <AlertDescription>
+          <p>{loadError}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLoadError(null);
+                void load();
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   }
@@ -132,17 +148,16 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
   const anyMethod = active || status.hasActivePasskey;
   return (
     <>
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ShieldCheck aria-hidden="true" className="size-5 shrink-0 text-primary" /> Your sign-in at a glance
-        </CardTitle>
-        <CardDescription>
-          {anyMethod
-            ? "Most admins use the email link plus the authenticator app. A passkey is a quicker extra way in on devices that support it."
-            : "Set up the authenticator app below so you can sign in next time. A passkey is a quicker extra way in."}
-        </CardDescription>
-      </CardHeader>
+    <AdminSectionCard
+      as="h3"
+      icon={<ShieldCheck aria-hidden="true" />}
+      title="Your sign-in at a glance"
+      description={
+        anyMethod
+          ? "Most admins use the email link plus the authenticator app. A passkey is a quicker extra way in on devices that support it."
+          : "Set up the authenticator app below so you can sign in next time. A passkey is a quicker extra way in."
+      }
+    >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-sm font-medium">You can sign in with:</span>
         <ul className="flex flex-wrap gap-2">
@@ -150,11 +165,13 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
           <MethodStatus label="Passkey" on={status.hasActivePasskey} />
         </ul>
       </div>
-    </Card>
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          <Smartphone aria-hidden="true" className="size-5 shrink-0 text-primary" /> Authenticator app
+    </AdminSectionCard>
+    <AdminSectionCard
+      as="h3"
+      icon={<Smartphone aria-hidden="true" />}
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          Authenticator app
           {active ? (
             <Badge variant="success">
               <CheckCircle2 aria-hidden="true" /> On
@@ -162,13 +179,11 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
           ) : (
             <Badge variant="warning">Not set up</Badge>
           )}
-        </CardTitle>
-        <CardDescription>
-          Authenticator app: a 6-digit code from an app on your phone, used after the email link. Apps like Google Authenticator or Authy
-          work.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+        </span>
+      }
+      description="A 6-digit code from an app on your phone, used after the email link. Apps like Google Authenticator or Authy work."
+    >
+      <div className="flex flex-col gap-4">
         {newCodes ? (
           <div className="flex flex-col gap-3">
             <Alert variant="warning">
@@ -181,7 +196,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void navigator.clipboard?.writeText(newCodes.join("\n"))}>
+              <Button variant="outline" onClick={() => void navigator.clipboard?.writeText(newCodes.join("\n")).then(() => toast.success("Codes copied"))}>
                 <Copy aria-hidden="true" /> Copy codes
               </Button>
               <Button variant="ghost" onClick={() => setNewCodes(null)}>
@@ -195,7 +210,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span>Recovery codes left: {status.totp.recoveryCodesLeft}</span>
-              <Button variant="outline" onClick={() => setConfirmCodes(true)} loading={busy === "codes"} disabled={busy !== null}>
+              <Button variant="outline" size="row" onClick={() => setConfirmCodes(true)} loading={busy === "codes"} disabled={busy !== null}>
                 Make new recovery codes
               </Button>
             </div>
@@ -239,19 +254,27 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
             <p className="text-sm text-muted-foreground">
               For an admin who lost their phone and recovery codes. Check it really is them first (a call is best).
             </p>
-            <ul className="flex flex-col gap-2">
+            <AdminList label="Other admins">
               {others.map(a => (
-                <li key={a.uid} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm">
-                  <span className="min-w-0 break-words">
-                    {a.name}
-                    {a.email ? <span className="text-muted-foreground"> · {a.email}</span> : null}
-                  </span>
-                  <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setResetTarget(a)} loading={busy === a.uid} disabled={busy !== null}>
-                    Reset
-                  </Button>
-                </li>
+                <AdminListRow
+                  key={a.uid}
+                  title={a.name}
+                  meta={a.email ? <span className="break-words">{a.email}</span> : undefined}
+                  actions={
+                    <Button
+                      variant="ghost"
+                      size="row"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setResetTarget(a)}
+                      loading={busy === a.uid}
+                      disabled={busy !== null}
+                    >
+                      Reset
+                    </Button>
+                  }
+                />
               ))}
-            </ul>
+            </AdminList>
             <ConfirmDialog
               open={resetTarget !== null}
               onOpenChange={open => (open ? undefined : setResetTarget(null))}
@@ -263,8 +286,8 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
             />
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </AdminSectionCard>
     </>
   );
 }

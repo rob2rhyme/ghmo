@@ -39,9 +39,9 @@ test("existing plaintext records are encrypted, verified and readable afterwards
 
   // --- Run the migration ---
   await page.getByRole("button", { name: "Encrypt existing records" }).click();
-  await expect(page.getByText(/^Done\./)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("All records are encrypted")).toBeVisible({ timeout: 60_000 });
   for (const area of ["chat", "threads", "conclusions", "comments", "votes", "minutes", "documents"]) {
-    await expect(page.getByTestId(`migrate-${area}`)).not.toHaveText("—");
+    await expect(page.getByTestId(`migrate-${area}`)).not.toHaveText("Not started");
   }
 
   // --- Nothing readable is left (except what is public by design) ---
@@ -69,7 +69,7 @@ test("existing plaintext records are encrypted, verified and readable afterwards
   // --- A second run has nothing left to do ---
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Encryption" }).click();
   await page.getByRole("button", { name: "Encrypt existing records" }).click();
-  await expect(page.getByTestId("migrate-chat")).toHaveText("nothing to do");
+  await expect(page.getByTestId("migrate-chat")).toHaveText("Nothing to do");
 
   expect(violations).toEqual([]);
 });

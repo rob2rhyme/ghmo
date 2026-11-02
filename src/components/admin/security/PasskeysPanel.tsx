@@ -1,12 +1,14 @@
 "use client";
 
 import { startRegistration } from "@simplewebauthn/browser";
-import { CheckCircle2, Clock, KeyRound, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
@@ -141,7 +143,20 @@ export default function PasskeysPanel() {
   };
 
   if (loadError) {
-    return <EmptyState icon={<ShieldAlert />} title="Could not load your passkeys" description={loadError} action={<Button onClick={load}>Try again</Button>} />;
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Couldn&apos;t load your passkeys</AlertTitle>
+        <AlertDescription>
+          <p>{loadError}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" onClick={load}>
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   if (!data) {
@@ -157,44 +172,36 @@ export default function PasskeysPanel() {
   return (
     <div className="flex flex-col gap-6">
       {data.pendingApprovals.length > 0 ? (
-        <Card className="border-warning/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock aria-hidden="true" className="size-5 shrink-0 text-warning" /> Waiting for your approval
-            </CardTitle>
-            <CardDescription>
-              Another admin added a passkey using an email link. Only approve it if you have confirmed with them (in person or
-              by phone) that they added it.
-            </CardDescription>
-          </CardHeader>
-          <ul className="flex flex-col divide-y divide-border">
+        <AdminSectionCard
+          as="h3"
+          className="border-warning/50"
+          icon={<Clock aria-hidden="true" />}
+          title="Waiting for your approval"
+          description="Another admin added a passkey using an email link. Only approve it if you have confirmed with them (in person or by phone) that they added it."
+        >
+          <AdminList bare label="Passkeys waiting for your approval">
             {data.pendingApprovals.map(p => (
-              <li key={p.credentialId} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    {p.ownerName} · {p.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Added {formatDate(p.createdAt)}</p>
-                </div>
-                <Button onClick={() => approve(p)} loading={busyId === p.credentialId}>
-                  Approve
-                </Button>
-              </li>
+              <AdminListRow
+                key={p.credentialId}
+                title={`${p.ownerName} · ${p.name}`}
+                meta={`Added ${formatDate(p.createdAt)}`}
+                actions={
+                  <Button variant="outline" size="row" onClick={() => approve(p)} loading={busyId === p.credentialId}>
+                    Approve
+                  </Button>
+                }
+              />
             ))}
-          </ul>
-        </Card>
+          </AdminList>
+        </AdminSectionCard>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound aria-hidden="true" className="size-5 shrink-0 text-primary" /> Passkeys
-          </CardTitle>
-          <CardDescription>
-            Passkey: sign in with your fingerprint, face or phone screen lock. Add one on each device you use, so losing one device never
-            locks you out.
-          </CardDescription>
-        </CardHeader>
+      <AdminSectionCard
+        as="h3"
+        icon={<KeyRound aria-hidden="true" />}
+        title="Passkeys"
+        description="Sign in with your fingerprint, face or phone screen lock. Add one on each device you use, so losing one device never locks you out."
+      >
         {data.mine.length === 0 ? (
           <EmptyState
             icon={<KeyRound />}
@@ -202,35 +209,37 @@ export default function PasskeysPanel() {
             description="Optional. Name this device below, then choose “Add passkey” and follow your device's prompt."
           />
         ) : (
-          <ul className="flex flex-col divide-y divide-border">
+          <AdminList bare label="Your passkeys">
             {data.mine.map(p => (
-              <li key={p.credentialId} className="flex flex-wrap items-start justify-between gap-3 py-3">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium break-words">{p.name}</p>
+              <AdminListRow
+                key={p.credentialId}
+                title={<span className="break-words">{p.name}</span>}
+                badges={
+                  <>
                     <StatusBadge passkey={p} />
                     {p.backedUp ? <Badge variant="secondary">Saved to your password manager</Badge> : null}
                     {p.prfEnabled ? <Badge variant="outline">Can unlock encryption</Badge> : null}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Added {formatDate(p.createdAt)} · Last used {formatDate(p.lastUsedAt)}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => setRemoveTarget({ ownerUid: data.uid, passkey: p })}
-                  loading={busyId === p.credentialId}
-                  aria-label={`Remove passkey ${p.name}`}
-                >
-                  <Trash2 aria-hidden="true" />
-                  Remove
-                </Button>
-              </li>
+                  </>
+                }
+                meta={`Added ${formatDate(p.createdAt)} · Last used ${formatDate(p.lastUsedAt)}`}
+                actions={
+                  <Button
+                    variant="ghost"
+                    size="row"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setRemoveTarget({ ownerUid: data.uid, passkey: p })}
+                    loading={busyId === p.credentialId}
+                    aria-label={`Remove passkey ${p.name}`}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    Remove
+                  </Button>
+                }
+              />
             ))}
-          </ul>
+          </AdminList>
         )}
-        <div className="flex flex-col gap-3 border-t border-border pt-4">
+        <div className="flex flex-col gap-3">
           <Field
             label="New passkey name"
             description="So you can tell your devices apart, e.g. “Work laptop” or “Sita’s phone”."
@@ -254,7 +263,7 @@ export default function PasskeysPanel() {
           destructive
           onConfirm={() => (removeTarget ? remove(removeTarget.ownerUid, removeTarget.passkey) : undefined)}
         />
-      </Card>
+      </AdminSectionCard>
     </div>
   );
 }

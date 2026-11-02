@@ -15,6 +15,7 @@ type SavedDocBuilderProps = {
   initialInputs?: Record<string, string>;
   initialDocId?: string;
   initialTemplateVersion?: number;
+  initialExport?: "pdf" | "jpeg";
   /** Encrypted inputs of the saved document, if it was saved with encryption on. */
   enc?: Record<string, unknown>;
 };
@@ -32,7 +33,7 @@ export default function SavedDocBuilder({ enc, ...props }: SavedDocBuilderProps)
         if (!cancelled) setResult({ inputs: data.inputs ?? {} });
       })
       .catch(error => {
-        if (!cancelled) setResult({ error: error instanceof Error ? error.message : "Could not decrypt" });
+        if (!cancelled) setResult({ error: error instanceof Error ? error.message : "Could not unlock it" });
       });
     return () => {
       cancelled = true;
@@ -43,7 +44,7 @@ export default function SavedDocBuilder({ enc, ...props }: SavedDocBuilderProps)
   if (!result) {
     return (
       <div role="status" className="flex flex-col gap-3">
-        <span className="sr-only">Decrypting document…</span>
+        <span className="sr-only">Unlocking document…</span>
         <Skeleton className="h-40 rounded-xl" />
         <Skeleton className="h-96 rounded-xl" />
       </div>
