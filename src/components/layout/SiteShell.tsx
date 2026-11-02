@@ -6,6 +6,8 @@ import { ScrollToTopButton } from "@/src/components/ScrollToTopButton";
 import { ServiceWorkerRegistration } from "@/src/components/ServiceWorkerRegistration";
 import { SiteFooter } from "@/src/components/public/SiteFooter";
 import { getCommunity } from "@/src/lib/community";
+import { getContactEmail } from "@/src/lib/contact";
+import { getDonateUrl } from "@/src/lib/donateLink";
 import { cn } from "@/src/lib/utils";
 
 type SiteShellProps = {
@@ -48,11 +50,11 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
               >
                 Skip to content
               </a>
-              <CommunityHeader name={community.name} />
+              <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} />
               <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10">
                 {children}
               </main>
-              <SiteFooter name={community.name} />
+              <SiteFooter name={community.name} contactEmail={getContactEmail()} />
             </>
           ) : (
             children

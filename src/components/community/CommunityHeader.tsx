@@ -16,9 +16,13 @@ import { cn } from "@/src/lib/utils";
 
 type CommunityHeaderProps = {
   name?: string;
+  /** True once getDonateUrl() returns a GoFundMe link; until then the button invites support instead of "Donate". */
+  donateOpen?: boolean;
 };
 
-export function CommunityHeader({ name }: CommunityHeaderProps) {
+const DONATE_HREF = "/donate" as Route;
+
+export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderProps) {
   const label = name || "Greater Harrisburg Magar Organization";
   const pathname = usePathname() ?? "/";
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,6 +31,10 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
   const isAuthenticated = !loading && !!session?.authenticated;
 
   const links = [...PUBLIC_NAV, ...(isAdmin ? [{ href: "/admin" as Route, label: "Admin" }] : [])];
+  const donateLabel = donateOpen ? "Donate" : "Support the Gumba";
+  const donateCurrent = isActivePath(pathname, DONATE_HREF);
+  // Signed out, the four links fit in the bar from tablet width; signed in (Admin link, Sign out) from desktop.
+  const inlineFrom = isAuthenticated ? "lg" : "md";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm">
@@ -39,8 +47,8 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
           </span>
         </Link>
 
-        {/* Desktop: links in the bar. The current page is bold with an underline bar, not colour alone. */}
-        <nav aria-label="Main" className="hidden shrink-0 items-center gap-1 lg:flex">
+        {/* Links in the bar. The current page is bold with an underline bar, not colour alone. */}
+        <nav aria-label="Main" className={cn("hidden shrink-0 items-center gap-1", inlineFrom === "md" ? "md:flex" : "lg:flex")}>
           {links.map(link => {
             const active = isActivePath(pathname, link.href);
             return (
@@ -60,29 +68,23 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
             );
           })}
           <div className="ml-2 flex items-center gap-2">
-            <Button asChild size="lg" className="px-4">
-              <Link href="/donate">
-                <HandHeart aria-hidden="true" />
-                Donate
-              </Link>
-            </Button>
+            <DonateButton label={donateLabel} current={donateCurrent} />
             <ThemeToggle />
             {isAuthenticated ? <SignOutButton /> : null}
           </div>
         </nav>
 
-        {/* Phones and tablets: Donate stays in the bar; everything else is in the menu. */}
-        <div className="flex shrink-0 items-center gap-2 lg:hidden">
-          <Button asChild size="lg" className="px-4">
-            <Link href="/donate">
-              <HandHeart className="hidden sm:block" aria-hidden="true" />
-              Donate
-            </Link>
-          </Button>
-          <ThemeToggle />
+        {/* Smaller screens: the Gumba button stays in the bar; everything else is in the menu. */}
+        <div className={cn("flex shrink-0 items-center gap-2", inlineFrom === "md" ? "md:hidden" : "lg:hidden")}>
+          <DonateButton label={donateLabel} current={donateCurrent} iconFrom="sm" />
+          {/* On phones the theme switch moves into the menu so the bar fits at 375 px. */}
+          <span className="hidden sm:contents">
+            <ThemeToggle />
+          </span>
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-            <Button variant="outline" size="icon" className="size-11" aria-label="Open menu" onClick={() => setMenuOpen(true)}>
+            <Button variant="outline" className="h-11 min-w-11 gap-2 px-3 sm:h-10" aria-label="Open menu" onClick={() => setMenuOpen(true)}>
               <Menu aria-hidden="true" />
+              <span className="hidden sm:inline">Menu</span>
             </Button>
             <SheetContent side="right" className="flex flex-col gap-4 p-4">
               <SheetHeader className="p-0 pr-10">
@@ -112,11 +114,15 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
                 })}
               </nav>
               <Button asChild size="lg" className="w-full">
-                <Link href="/donate" onClick={() => setMenuOpen(false)}>
+                <Link href={DONATE_HREF} aria-current={donateCurrent ? "page" : undefined} onClick={() => setMenuOpen(false)}>
                   <HandHeart aria-hidden="true" />
-                  Donate
+                  {donateLabel}
                 </Link>
               </Button>
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-4 sm:hidden">
+                <span className="text-sm text-muted-foreground">Light or dark</span>
+                <ThemeToggle />
+              </div>
               {isAuthenticated ? (
                 <div className="border-t border-border pt-4">
                   <SignOutButton />
@@ -127,5 +133,24 @@ export function CommunityHeader({ name }: CommunityHeaderProps) {
         </div>
       </div>
     </header>
+  );
+}
+
+/** The header's one call to action. On /donate it is marked as the current page (underline bar, like the links). */
+function DonateButton({ label, current, iconFrom }: { label: string; current: boolean; iconFrom?: "sm" }) {
+  return (
+    <Button
+      asChild
+      size="lg"
+      className={cn(
+        "relative px-4",
+        current && "after:absolute after:inset-x-3 after:-bottom-2 after:h-0.5 after:rounded-full after:bg-primary"
+      )}
+    >
+      <Link href={DONATE_HREF} aria-current={current ? "page" : undefined}>
+        <HandHeart className={iconFrom === "sm" ? "hidden sm:block" : undefined} aria-hidden="true" />
+        {label}
+      </Link>
+    </Button>
   );
 }

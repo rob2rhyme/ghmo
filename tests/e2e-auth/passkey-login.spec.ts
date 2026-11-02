@@ -25,7 +25,7 @@ test("magic link -> create passkey -> admin area, then passkey-only sign-in", as
   // Fresh browser state: only the passkey is needed now.
   await context.clearCookies();
   await page.goto("/admin/login");
-  await expect(page.getByRole("heading", { name: "Admin sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Board member sign in" })).toBeVisible();
   await page.getByRole("button", { name: "Sign in with passkey" }).click();
   await expect(page).toHaveURL(/\/admin$/, { timeout: 15_000 });
 

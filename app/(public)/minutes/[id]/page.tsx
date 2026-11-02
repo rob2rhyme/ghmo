@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/src/components/ui/button";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { formatDate, formatShortDate } from "@/src/lib/format";
 import { getArchiveEntry } from "@/src/lib/minutesArchive.server";
 
@@ -17,7 +15,7 @@ function List({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null;
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      <PublicSectionTitle>{title}</PublicSectionTitle>
       <ul className="list-disc space-y-1 pl-6 text-base text-foreground/90">
         {items.map((item, index) => (
           <li key={index}>{item}</li>
@@ -33,23 +31,15 @@ export default async function MinutesDetailPage({ params }: { params: Promise<{ 
   const date = entry.eventDate ? formatDate(entry.eventDate) : null;
 
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Button asChild variant="ghost" className="-ml-3 h-11 self-start px-3">
-        <Link href="/minutes">
-          <ArrowLeft aria-hidden="true" />
-          All minutes
-        </Link>
-      </Button>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight break-words text-foreground md:text-3xl">{entry.eventTitle}</h1>
-        <p className="text-sm text-muted-foreground">
-          {entry.meetingType}
-          {date ? ` · ${date}` : ""}
-        </p>
-      </header>
+    <PublicPage width="reading" className="gap-6">
+      <PublicPageHeader
+        back={{ href: "/minutes", label: "All minutes" }}
+        title={<span className="break-words">{entry.eventTitle}</span>}
+        description={`${entry.meetingType}${date ? ` · ${date}` : ""}`}
+      />
       {entry.discussionSummary ? (
         <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Discussion</h2>
+          <PublicSectionTitle>Discussion</PublicSectionTitle>
           <p className="whitespace-pre-line text-base text-foreground/90">{entry.discussionSummary}</p>
         </section>
       ) : null}
@@ -78,6 +68,6 @@ export default async function MinutesDetailPage({ params }: { params: Promise<{ 
           {entry.approvedAt ? <p className="text-sm text-muted-foreground">Approved {formatShortDate(entry.approvedAt)}.</p> : null}
         </footer>
       ) : null}
-    </article>
+    </PublicPage>
   );
 }

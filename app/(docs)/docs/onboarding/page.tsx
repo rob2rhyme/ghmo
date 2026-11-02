@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { KeyRound, LifeBuoy, LockKeyhole, LogIn, Smartphone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
 import { Button } from "@/src/components/ui/button";
 
 export const metadata: Metadata = { title: "Board member guide · GHMO" };
@@ -32,7 +33,7 @@ const SECTIONS: Section[] = [
     icon: LockKeyhole,
     title: "Setting up encryption on your device",
     steps: [
-      "Open Encryption in the admin menu and give this device a name you will recognise, such as “Sita’s laptop”.",
+      "Open Encryption in the admin menu and give this device a name you will recognize, such as “Sita’s laptop”.",
       "Another board member approves your device. Before they do, compare the safety code on both screens by phone or in person.",
       "After that, private records (chat, minutes, phone numbers) open on this device. Lock it when you step away."
     ],
@@ -51,43 +52,41 @@ const SECTIONS: Section[] = [
 
 export default function OnboardingDocPage() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 py-6 md:py-10">
-      <header className="flex flex-col gap-3">
-        <p className="text-sm font-semibold tracking-wide text-primary uppercase">For board members</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">Board member guide</h1>
-        <p className="text-lg text-muted-foreground">
-          How to sign in to the GHMO admin console, keep your account safe, and set up encryption on your devices.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Button asChild size="lg">
+    <PublicPage width="reading">
+      <PublicPageHeader
+        eyebrow="For board members"
+        title="Board member guide"
+        description="How to sign in to the GHMO admin console, keep your account safe, and set up encryption on your devices."
+        actions={
+          <Button asChild size="lg" className="w-full sm:w-auto">
             <Link href="/admin/login">
               <KeyRound aria-hidden="true" />
               Board member sign in
             </Link>
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       <ol className="flex flex-col gap-4">
         {SECTIONS.map(({ icon: Icon, title, steps, note }) => (
-          <li key={title} className="rounded-xl border border-border bg-card p-5 shadow-xs md:p-6">
+          <li key={title} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-xs md:p-6">
             <h2 className="flex items-center gap-3 text-lg font-semibold">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               {title}
             </h2>
-            <ol className="mt-4 flex list-decimal flex-col gap-2 pl-6 text-foreground/90 marker:font-semibold marker:text-muted-foreground">
+            <ol className="flex list-decimal flex-col gap-2 pl-6 text-foreground/90 marker:font-semibold marker:text-muted-foreground">
               {steps.map(step => (
                 <li key={step} className="pl-1">
                   {step}
                 </li>
               ))}
             </ol>
-            {note ? <p className="mt-4 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">{note}</p> : null}
+            {note ? <p className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">{note}</p> : null}
           </li>
         ))}
       </ol>
-    </div>
+    </PublicPage>
   );
 }

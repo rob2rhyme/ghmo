@@ -107,7 +107,7 @@ export function EventsCalendar({ events, orgSlug }: { events: EventRecord[]; org
                     key={item.evt.id}
                     href={eventHref(orgSlug, item.evt.id)}
                     title={item.evt.title}
-                    className="truncate rounded-md bg-primary/10 px-1.5 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+                    className="line-clamp-2 rounded-md bg-primary/10 px-1.5 py-1 text-xs font-medium break-words text-primary hover:bg-primary/15"
                   >
                     {item.evt.title}
                   </Link>

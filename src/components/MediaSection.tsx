@@ -68,7 +68,7 @@ export function MediaSection({ feed, headingLevel = "h2", limit }: Props) {
             <SocialIcon source={feed.source} />
           </span>
           <div className="min-w-0">
-            <Heading id={headingId} className="text-lg font-semibold">
+            <Heading id={headingId} className={headingLevel === "h2" ? "text-xl font-semibold tracking-tight md:text-2xl" : "text-lg font-semibold"}>
               {meta.name}
             </Heading>
             <p className="text-sm text-muted-foreground">{meta.latest}</p>
@@ -84,7 +84,7 @@ export function MediaSection({ feed, headingLevel = "h2", limit }: Props) {
           </Button>
         ) : null}
       </div>
-      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map(item => (
           <li key={item.id} className="min-w-0">
             <MediaCard item={item} />

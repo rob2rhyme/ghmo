@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { FileCheck2, FileX2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
 
 /** Hashes a chosen PDF in the browser (it is never uploaded) and compares it with the issued one. */
 export default function VerifyPdf({ expectedSha256 }: { expectedSha256: string }) {
@@ -29,14 +31,18 @@ export default function VerifyPdf({ expectedSha256 }: { expectedSha256: string }
         onChange={event => void check(event.target.files?.[0])}
       />
       {result === "match" ? (
-        <p role="status" className="text-sm font-semibold text-success">
-          This file is exactly the certificate that was issued.
-        </p>
+        <Alert variant="success" role="status">
+          <FileCheck2 />
+          <AlertDescription className="font-semibold text-foreground">This file is exactly the certificate that was issued.</AlertDescription>
+        </Alert>
       ) : null}
       {result === "mismatch" ? (
-        <p role="status" className="text-sm font-semibold text-destructive">
-          This file does not match the issued certificate. It may have been altered, or it is a different copy.
-        </p>
+        <Alert variant="destructive" role="status">
+          <FileX2 />
+          <AlertDescription className="font-semibold text-foreground">
+            This file does not match the issued certificate. It may have been altered, or it is a different copy.
+          </AlertDescription>
+        </Alert>
       ) : null}
     </div>
   );

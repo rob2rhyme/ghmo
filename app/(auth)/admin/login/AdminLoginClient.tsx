@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader } from "@/src/components/ui/card";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Separator } from "@/src/components/ui/separator";
@@ -35,6 +36,9 @@ function passkeyErrorMessage(error: unknown): string {
 }
 
 const noopSubscribe = () => () => {};
+
+// Each stage's title is the page's h1 (the card is the whole page).
+const titleClass = "text-2xl font-semibold leading-tight tracking-tight text-foreground";
 
 async function signInWithPasskey() {
   const { options, challengeId } = await postJson<{ options: Parameters<typeof startAuthentication>[0]["optionsJSON"]; challengeId: string }>(
@@ -182,7 +186,7 @@ export default function AdminLoginClient({
         {stage === "signin" ? (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">Admin sign in</CardTitle>
+              <h1 className={titleClass}>Board member sign in</h1>
               <CardDescription className="text-base">
                 {featureEmailLogin
                   ? "Get a sign-in link by email, then enter the 6-digit code from your authenticator app."
@@ -199,10 +203,7 @@ export default function AdminLoginClient({
 
               {featureEmailLogin ? (
                 <form onSubmit={handleEmail} className="flex flex-col gap-3">
-                  <Field
-                    label="Admin email"
-                    description="We'll email a one-time link. Then you enter the 6-digit code from your authenticator app (or set the app up the first time). Use this too if you are new or lost your device."
-                  >
+                  <Field label="Email" description="New here, or lost your device? Start here too.">
                     <Input
                       type="email"
                       autoComplete="email"
@@ -210,7 +211,7 @@ export default function AdminLoginClient({
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="you@example.org"
+                      placeholder="you@example.com"
                     />
                   </Field>
                   <Button type="submit" size="lg" loading={busy === "email"} disabled={busy !== null}>
@@ -233,9 +234,9 @@ export default function AdminLoginClient({
                 className={featureEmailLogin ? "flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4" : "flex flex-col gap-3"}
               >
                 <div className="flex flex-col gap-1">
-                  <h3 id="passkey-signin-title" className="text-base font-semibold text-foreground">
+                  <h2 id="passkey-signin-title" className="text-base font-semibold text-foreground">
                     Have a passkey? Sign in faster
-                  </h3>
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     A passkey uses your fingerprint, face or phone screen lock instead of a code.
                   </p>
@@ -256,6 +257,13 @@ export default function AdminLoginClient({
                   </p>
                 ) : null}
               </section>
+
+              <p className="text-sm text-muted-foreground">
+                First time?{" "}
+                <Link href="/docs/onboarding" className="font-semibold text-primary underline-offset-4 hover:underline">
+                  Read the board member guide
+                </Link>
+              </p>
             </CardContent>
           </>
         ) : null}
@@ -263,7 +271,7 @@ export default function AdminLoginClient({
         {stage === "totp" ? (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">Enter your code</CardTitle>
+              <h1 className={titleClass}>Enter your code</h1>
               <CardDescription>
                 {adminName ? `Welcome back, ${adminName}. ` : null}
                 Your email link worked. Now enter the 6-digit code from your authenticator app to finish signing in.
@@ -278,7 +286,7 @@ export default function AdminLoginClient({
         {stage === "setup" ? (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">{hasActivePasskey ? "Add a passkey" : "Set up your sign-in"}</CardTitle>
+              <h1 className={titleClass}>{hasActivePasskey ? "Add a passkey" : "Set up your sign-in"}</h1>
               <CardDescription>
                 {adminName ? `Welcome, ${adminName}. ` : null}
                 {hasActivePasskey
@@ -297,7 +305,7 @@ export default function AdminLoginClient({
                   </div>
                 </>
               ) : null}
-              <Field label="Passkey device name" description="So you can recognise it later, e.g. “Sita’s iPhone”.">
+              <Field label="Passkey device name" description="So you can recognize it later, e.g. “Sita’s iPhone”.">
                 <Input value={deviceName} onChange={e => setDeviceName(e.target.value)} maxLength={60} placeholder="My phone" />
               </Field>
               <Button
@@ -325,7 +333,7 @@ export default function AdminLoginClient({
         {stage === "pending" ? (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">Waiting for approval</CardTitle>
+              <h1 className={titleClass}>Waiting for approval</h1>
               <CardDescription>
                 Your new passkey was saved. Because you already had one, another admin must approve it in{" "}
                 <strong>Admin → Security</strong> before it works. This protects you if someone gets into your email.
@@ -369,7 +377,7 @@ export default function AdminLoginClient({
             <Field label="Dev token">
               <Input type="password" value={devToken} onChange={e => setDevToken(e.target.value)} autoComplete="off" />
             </Field>
-            <p className="text-sm text-muted-foreground">Uses the admin email above.</p>
+            <p className="text-sm text-muted-foreground">Uses the email above.</p>
             <Button variant="outline" onClick={handleDevLogin} loading={busy === "dev"} disabled={!devToken || !email.trim()}>
               Start dev session
             </Button>

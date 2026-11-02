@@ -42,7 +42,7 @@ export default function CheckCodeForm() {
           placeholder="ABCD EFGH IJKL MNOP"
         />
       </Field>
-      <Button type="submit" variant="outline" size="lg" className="self-start">
+      <Button type="submit" size="lg" className="w-full sm:w-auto sm:self-start">
         <Search aria-hidden="true" />
         Check code
       </Button>

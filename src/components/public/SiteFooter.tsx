@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { Mail } from "lucide-react";
 import ThemeLogo from "@/src/components/ThemeLogo";
 import { SocialIcon } from "@/src/components/public/SocialIcon";
 import { SOCIAL_META } from "@/src/components/public/socialMeta";
 import { getSocialProfiles } from "@/src/components/public/socialProfiles";
+import { cn } from "@/src/lib/utils";
 
 const EXPLORE_LINKS: { href: Route; label: string }[] = [
   { href: "/c/ghmo/events" as Route, label: "Events" },
@@ -17,18 +19,27 @@ const BOARD_LINKS: { href: Route; label: string }[] = [
   { href: "/docs/onboarding", label: "Board member guide" }
 ];
 
+// 44 px tall on phones (touch), compact rows from tablet width up.
 const linkClass =
-  "inline-flex min-h-11 items-center rounded-md text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline";
+  "inline-flex min-h-11 items-center rounded-md text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline md:min-h-8";
 
-/** Public site footer: who GHMO is, the main links, social profiles that are set up, and a small site credit. */
-export function SiteFooter({ name }: { name: string }) {
+/**
+ * Public site footer: who GHMO is, the main links, social profiles that are set up, a contact address when
+ * one is configured (getContactEmail), and a small site credit.
+ */
+export function SiteFooter({ name, contactEmail = null }: { name: string; contactEmail?: string | null }) {
   const socials = getSocialProfiles();
   const year = new Date().getFullYear();
 
   return (
     <footer className="border-t border-border bg-card text-card-foreground">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] md:px-6">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div
+        className={cn(
+          "mx-auto grid max-w-6xl gap-8 px-4 py-10 md:px-6",
+          contactEmail ? "md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]" : "md:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]"
+        )}
+      >
+        <div className="flex min-w-0 flex-col gap-3">
           <div className="flex items-center gap-3">
             <ThemeLogo alt="" className="size-12" />
             <div className="min-w-0">
@@ -37,7 +48,7 @@ export function SiteFooter({ name }: { name: string }) {
             </div>
           </div>
           {socials.length ? (
-            <ul className="flex flex-wrap gap-2" aria-label="GHMO on social media">
+            <ul className="-ml-2.5 flex flex-wrap items-center gap-1" aria-label="GHMO on social media">
               {socials.map(profile => (
                 <li key={profile.source}>
                   <a
@@ -45,7 +56,7 @@ export function SiteFooter({ name }: { name: string }) {
                     target="_blank"
                     rel="noreferrer"
                     aria-label={`GHMO on ${SOCIAL_META[profile.source].name} (opens in a new tab)`}
-                    className="grid size-11 place-items-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                    className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-primary md:size-10"
                   >
                     <SocialIcon source={profile.source} />
                   </a>
@@ -55,7 +66,7 @@ export function SiteFooter({ name }: { name: string }) {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-6 md:col-span-2 md:grid-cols-2">
+        <div className={cn("grid grid-cols-2 gap-6", contactEmail ? "md:col-span-3 md:grid-cols-3" : "md:col-span-2")}>
           <nav aria-label="Footer" className="flex min-w-0 flex-col gap-1">
             <h2 className="text-sm font-semibold">Explore</h2>
             <ul className="flex flex-col">
@@ -80,6 +91,15 @@ export function SiteFooter({ name }: { name: string }) {
               ))}
             </ul>
           </div>
+          {contactEmail ? (
+            <div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
+              <h2 className="text-sm font-semibold">Contact</h2>
+              <a href={`mailto:${contactEmail}`} className={cn(linkClass, "gap-2 break-all")}>
+                <Mail className="size-4 shrink-0" aria-hidden="true" />
+                {contactEmail}
+              </a>
+            </div>
+          ) : null}
         </div>
       </div>
 

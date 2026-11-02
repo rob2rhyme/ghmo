@@ -22,10 +22,12 @@ type PublicPageHeaderProps = {
   description?: ReactNode;
   actions?: ReactNode;
   back?: { href: Route; label: string };
+  /** id for the h1, so a section can point to it with aria-labelledby. */
+  titleId?: string;
 };
 
 /** One title size and layout for every public page (docs/UI_STYLE.md). */
-export function PublicPageHeader({ eyebrow, title, description, actions, back }: PublicPageHeaderProps) {
+export function PublicPageHeader({ eyebrow, title, description, actions, back, titleId }: PublicPageHeaderProps) {
   return (
     <header className="flex flex-col gap-3">
       {back ? (
@@ -37,7 +39,7 @@ export function PublicPageHeader({ eyebrow, title, description, actions, back }:
         </Button>
       ) : null}
       {eyebrow ? <p className="text-sm font-semibold text-primary">{eyebrow}</p> : null}
-      <h1 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">{title}</h1>
+      <h1 id={titleId} className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">{title}</h1>
       {description ? <p className="max-w-2xl text-lg text-muted-foreground">{description}</p> : null}
       {actions ? <div className="flex flex-wrap gap-3 pt-1">{actions}</div> : null}
     </header>

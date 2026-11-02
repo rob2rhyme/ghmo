@@ -1,8 +1,9 @@
-//app/(public)/donate/page.tsx
 import Image from "next/image";
 import { Info } from "lucide-react";
 import { GoFundMeProDonationEmbed } from "@/src/components/GoFundMeProDonationEmbed";
 import { DonateAction } from "@/src/components/public/DonateAction";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getDonateUrl, getDonationEmbedCampaignId } from "@/src/lib/donateLink";
 import { internalFetch } from "@/src/lib/internalFetch";
@@ -55,109 +56,105 @@ export default async function DonatePage() {
   const percent = hasGoal ? Math.min(100, Math.round((totalRaised / (goal as number)) * 100)) : 0;
   const timeLeftLabel = formatTimeLeft(endAt);
   const showDonors = donorCount != null && donorCount > 0;
+  // Nothing raised and no campaign link yet: say plainly that fundraising hasn't started, with no figures.
+  const notStarted = !donateUrl && totalRaised <= 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 md:gap-12">
-      {/* Hero: picture, title, one-line ask and the main action */}
-      <section aria-labelledby="donate-title" className="flex flex-col gap-6">
-        <div className="relative h-56 overflow-hidden rounded-xl border border-border bg-muted sm:h-72 md:h-96">
+    <PublicPage className="gap-10 md:gap-12">
+      {/* Hero: title, one-line ask and the main action, with the picture beside it from desktop width */}
+      <section aria-labelledby="donate-title" className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
+        <div className="flex min-w-0 flex-col gap-6">
+          <PublicPageHeader
+            eyebrow="Gumba Project"
+            titleId="donate-title"
+            title="A home for our language, culture, and community"
+            description="Help us build a Gumba for the Magar community in Harrisburg. Every contribution, large or small, brings us closer."
+          />
+          <DonateAction donateUrl={donateUrl} />
+        </div>
+        <div className="relative aspect-3/2 min-w-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs">
           <Image
             src="/assets/Ghmo-building.png"
-            alt="GHMO community building"
+            alt="Artwork of the planned GHMO Gumba building, with children in traditional Magar dress outside"
             fill
             priority
-            sizes="(min-width: 960px) 896px, 100vw"
+            sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
             className="object-cover object-center"
           />
-        </div>
-        <div className="flex flex-col items-start gap-4">
-          <p className="text-sm font-semibold text-primary">Gumba Project</p>
-          <h1 id="donate-title" className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-            A home for our language, culture, and community
-          </h1>
-          <p className="max-w-2xl text-lg text-muted-foreground">
-            Help us build a Gumba for the Magar community in Harrisburg. Every contribution, large or small, brings us closer.
-          </p>
-          <DonateAction donateUrl={donateUrl} />
         </div>
       </section>
 
       {/* Campaign and progress */}
       <section aria-labelledby="donate-progress" className="flex flex-col gap-5 rounded-xl border border-primary/20 bg-primary/5 p-5 md:p-6">
-        <div className="flex flex-col gap-1">
-          <h2 id="donate-progress" className="text-lg font-semibold">
-            Building a Gumba for the Magar Community in Harrisburg
-          </h2>
-          <p className="text-base text-muted-foreground">
-            A 6-month community fundraising effort to preserve our language, culture, and traditions for future generations.
-            Your support today helps create a permanent home for unity, learning, and faith.
-          </p>
-        </div>
-
-        {statsWarning ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Info className="size-4 shrink-0" aria-hidden="true" />
-            {statsWarning}
-          </p>
+        {notStarted ? (
+          <div className="flex flex-col gap-1">
+            <h2 id="donate-progress" className="text-lg font-semibold">
+              Fundraising starts soon
+            </h2>
+            <p className="text-base text-muted-foreground">
+              When the campaign opens, every gift goes toward planning and building the Gumba, our community&apos;s permanent
+              home in Harrisburg.
+            </p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {totalRaised > 0 ? (
-              <p className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-3xl font-semibold tracking-tight">{currencyFormatter.format(totalRaised)}</span>
-                <span className="text-base text-muted-foreground">
-                  raised{hasGoal ? ` of ${currencyFormatter.format(goal as number)} goal` : ""}
-                </span>
+          <>
+            <div className="flex flex-col gap-1">
+              <h2 id="donate-progress" className="text-lg font-semibold">
+                Building a Gumba for the Magar community in Harrisburg
+              </h2>
+              <p className="text-base text-muted-foreground">
+                A community fundraising campaign for a permanent home for unity, learning, and faith.
+              </p>
+            </div>
+
+            {statsWarning ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Info className="size-4 shrink-0" aria-hidden="true" />
+                {statsWarning}
               </p>
             ) : (
-              <p className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-2xl font-semibold tracking-tight">Be the first to give</span>
+              <div className="flex flex-col gap-4">
+                {totalRaised > 0 ? (
+                  <p className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-3xl font-semibold tracking-tight">{currencyFormatter.format(totalRaised)}</span>
+                    <span className="text-base text-muted-foreground">
+                      raised{hasGoal ? ` of ${currencyFormatter.format(goal as number)} goal` : ""}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-2xl font-semibold tracking-tight">Be the first to give</span>
+                    {hasGoal ? (
+                      <span className="text-base text-muted-foreground">Goal: {currencyFormatter.format(goal as number)}</span>
+                    ) : null}
+                  </p>
+                )}
+
                 {hasGoal ? (
-                  <span className="text-base text-muted-foreground">Goal: {currencyFormatter.format(goal as number)}</span>
+                  <ProgressBar
+                    value={totalRaised}
+                    max={goal as number}
+                    label={`${currencyFormatter.format(totalRaised)} of ${currencyFormatter.format(goal as number)} raised`}
+                    className="h-3"
+                  />
                 ) : null}
-              </p>
+
+                {hasGoal || showDonors || timeLeftLabel ? (
+                  <StatGrid>
+                    {hasGoal ? <StatTile label="Progress" value={`${percent}%`} hint="of the goal" /> : null}
+                    {showDonors ? <StatTile label="Donors" value={numberFormatter.format(donorCount as number)} /> : null}
+                    {timeLeftLabel ? <StatTile label="Time left" value={timeLeftLabel} /> : null}
+                  </StatGrid>
+                ) : null}
+              </div>
             )}
-
-            {hasGoal ? (
-              <div
-                role="progressbar"
-                aria-label="Raised so far"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={percent}
-                aria-valuetext={`${percent}% of the goal`}
-                className="h-3 w-full overflow-hidden rounded-full bg-muted"
-              >
-                <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
-              </div>
-            ) : null}
-
-            <dl className="flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-4">
-              {hasGoal ? (
-                <div className="flex flex-col">
-                  <dt className="text-sm text-muted-foreground">Progress</dt>
-                  <dd className="text-base font-semibold">{percent}% of goal</dd>
-                </div>
-              ) : null}
-              {showDonors ? (
-                <div className="flex flex-col">
-                  <dt className="text-sm text-muted-foreground">Donors</dt>
-                  <dd className="text-base font-semibold">{numberFormatter.format(donorCount as number)}</dd>
-                </div>
-              ) : null}
-              <div className="flex flex-col">
-                <dt className="text-sm text-muted-foreground">Time left</dt>
-                <dd className="text-base font-semibold">{timeLeftLabel}</dd>
-              </div>
-            </dl>
-          </div>
+          </>
         )}
       </section>
 
       {/* The story, grouped */}
       <section aria-labelledby="donate-why" className="flex max-w-3xl flex-col gap-4">
-        <h2 id="donate-why" className="text-xl font-semibold tracking-tight md:text-2xl">
-          Why the Gumba Project matters
-        </h2>
+        <PublicSectionTitle id="donate-why">Why the Gumba Project matters</PublicSectionTitle>
         <p className="text-base">
           Greater Harrisburg Magar Organization (GHMO) was founded in 2017 to serve the growing Magar community in Harrisburg,
           Pennsylvania. As our population has increased, so has our responsibility to protect, preserve, and uplift our
@@ -178,7 +175,7 @@ export default async function DonatePage() {
 
         <h3 className="pt-4 text-lg font-semibold">Our goal</h3>
         <p className="text-base">
-          GHMO is launching a 6-month fundraising campaign to make the Gumba Project a reality. This is a mass donation effort,
+          GHMO is planning a 6-month fundraising campaign to make the Gumba Project a reality. This is a mass donation effort,
           and every contribution — large or small — brings us closer to our goal. Your gift supports:
         </p>
         <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
@@ -190,9 +187,7 @@ export default async function DonatePage() {
       </section>
 
       <section aria-labelledby="donate-message" className="flex max-w-3xl flex-col gap-4">
-        <h2 id="donate-message" className="text-xl font-semibold tracking-tight md:text-2xl">
-          A message to our donors
-        </h2>
+        <PublicSectionTitle id="donate-message">A message to our donors</PublicSectionTitle>
         <figure className="border-l-4 border-primary py-1 pl-5">
           <blockquote className="text-xl font-medium leading-relaxed text-balance md:text-2xl">
             This project is not just about building a structure. It is about protecting our identity, educating our children,
@@ -207,14 +202,12 @@ export default async function DonatePage() {
         </ul>
       </section>
 
-      {/* How to give, with the action repeated */}
+      {/* How to give, with the action repeated once the campaign link is set */}
       <section
         aria-labelledby="donate-how"
         className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xs md:p-8"
       >
-        <h2 id="donate-how" className="text-xl font-semibold tracking-tight md:text-2xl">
-          How to contribute
-        </h2>
+        <PublicSectionTitle id="donate-how">How to contribute</PublicSectionTitle>
         <p className="max-w-3xl text-base">
           To ensure transparency and security, all donations are collected through GoFundMe.
           {donateUrl
@@ -225,20 +218,20 @@ export default async function DonatePage() {
           Together, we can build a shared home for our language, culture, and community. Thank you for standing with GHMO and
           supporting this important mission.
         </p>
-        <DonateAction donateUrl={donateUrl} />
+        {donateUrl ? <DonateAction donateUrl={donateUrl} /> : null}
         {embedCampaignId ? (
           <div className="pt-2">
             <GoFundMeProDonationEmbed campaignId={embedCampaignId} fallbackUrl={donateUrl} />
           </div>
         ) : null}
       </section>
-    </div>
+    </PublicPage>
   );
 }
 
-/** "12 days left", "5 hours left", "Ended", or "Ongoing" when there is no end date. */
-function formatTimeLeft(value?: number | string | Date | null) {
-  if (!value) return "Ongoing";
+/** "12 days left", "5 hours left", "Ended", or null when there is no end date (then "Time left" is hidden). */
+function formatTimeLeft(value?: number | string | Date | null): string | null {
+  if (!value) return null;
   let timestamp: number | null = null;
   if (value instanceof Date) {
     timestamp = value.getTime();
@@ -248,7 +241,7 @@ function formatTimeLeft(value?: number | string | Date | null) {
   } else if (typeof value === "number") {
     timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
   }
-  if (!timestamp) return "Ongoing";
+  if (!timestamp) return null;
   const diffMs = timestamp - Date.now();
   if (diffMs <= 0) return "Ended";
   const totalMinutes = Math.ceil(diffMs / (1000 * 60));

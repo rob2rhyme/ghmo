@@ -138,8 +138,10 @@ function MemberLoginInner() {
     <div className="flex min-h-[70vh] items-center justify-center py-6">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in</h1>
-          <CardDescription className="text-base">We&apos;ll email you a link to sign in.</CardDescription>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Member sign in</h1>
+          <CardDescription className="text-base">
+            For GHMO members on the board&apos;s member list. We&apos;ll email you a link to sign in.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {mounted && firebaseInitError ? (
@@ -181,9 +183,9 @@ function MemberLoginInner() {
             </form>
           )}
           <p className="text-sm text-muted-foreground">
-            Board admin?{" "}
+            On the board?{" "}
             <Link href="/admin/login" className="font-semibold text-primary underline-offset-4 hover:underline">
-              Use admin login
+              Use board member sign in
             </Link>
           </p>
         </CardContent>

@@ -5,29 +5,25 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CalendarDays, CalendarPlus, CalendarX, Clock, FileText, MapPin } from "lucide-react";
+import type { Route } from "next";
+import { AlertTriangle, CalendarDays, CalendarPlus, CalendarX, Clock, FileText, MapPin } from "lucide-react";
+import { MessagePage } from "@/src/components/public/MessagePage";
+import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { EmptyState } from "@/src/components/ui/empty-state";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { eventFlyerHref, eventsHref as eventsListHref } from "@/src/components/public/events/EventCard";
 import { eventStart, eventWhenLong } from "@/src/components/public/events/eventDates";
 import type { EventRecord } from "@/src/lib/events.shared";
-import { formatDateTime, formatShortDate } from "@/src/lib/format";
-import { MeetingAttendance, MeetingMinutesRecord, MinutesStatus, minutesStatusLabels } from "@/src/lib/minutes";
-import { resolveActorLabel } from "@/src/lib/actor";
+import type { MeetingMinutesRecord, MinutesStatus } from "@/src/lib/minutes";
+import { statusBadge } from "@/src/lib/statusBadges";
 
+// Shown to admins beside the status badge; visitors only ever see approved minutes.
 const adminStatusDescriptions: Record<MinutesStatus, string> = {
   draft: "Draft minutes are visible to admins only.",
-  submitted: "Submitted minutes await approval before publication.",
-  approved: "Approved minutes are the official record."
-};
-
-const statusBadgeVariant: Record<MinutesStatus, "secondary" | "warning" | "success"> = {
-  draft: "secondary",
-  submitted: "warning",
-  approved: "success"
+  submitted: "Submitted minutes wait for approval before they are published.",
+  approved: "Approved minutes are the official record and are in the public archive."
 };
 
 export default function EventDetailPage() {
@@ -128,68 +124,58 @@ export default function EventDetailPage() {
     };
   }, []);
 
-  const backLink = (
-    <Button asChild variant="ghost" className="-ml-3 h-11 self-start px-3">
-      <Link href={eventsHref}>
-        <ArrowLeft aria-hidden="true" />
-        All events
-      </Link>
-    </Button>
-  );
+  const back = { href: eventsHref, label: "All events" };
 
   if (loading) {
     return (
-      <div role="status" aria-live="polite" className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <span className="sr-only">Loading event…</span>
-        <Skeleton className="h-11 w-32" />
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-9 w-3/4" />
-          <Skeleton className="h-5 w-1/2" />
-          <Skeleton className="h-5 w-1/3" />
+      <PublicPage width="reading">
+        <div role="status" aria-live="polite" className="flex flex-col gap-6">
+          <span className="sr-only">Loading event…</span>
+          <Skeleton className="h-11 w-32" />
+          <Skeleton className="h-10 w-3/4" />
+          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-5 w-full" />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-11 w-40" />
+            <Skeleton className="h-11 w-40" />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Skeleton className="h-11 w-40" />
-          <Skeleton className="h-11 w-40" />
-        </div>
-        <Skeleton className="h-40 rounded-xl" />
-      </div>
+      </PublicPage>
     );
   }
 
   if (loadState === "failed") {
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        {backLink}
-        <div role="alert">
-          <EmptyState
-            icon={<AlertTriangle className="text-warning" />}
-            title="We couldn't load this event"
-            description="Check your internet connection and try again."
-            action={
-              <Button size="lg" onClick={() => setAttempt(n => n + 1)}>
-                Try again
-              </Button>
-            }
-          />
-        </div>
-      </div>
+      <MessagePage
+        icon={<AlertTriangle />}
+        title="We couldn't load this event"
+        description="Check your internet connection and try again."
+        actions={
+          <>
+            <Button size="lg" onClick={() => setAttempt(n => n + 1)}>
+              Try again
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href={eventsHref}>See all events</Link>
+            </Button>
+          </>
+        }
+      />
     );
   }
 
   if (!event) {
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <EmptyState
-          icon={<CalendarX />}
-          title="This event isn't available"
-          description="It may have been removed, or it hasn't been announced yet."
-          action={
-            <Button asChild size="lg">
-              <Link href={eventsHref}>See all events</Link>
-            </Button>
-          }
-        />
-      </div>
+      <MessagePage
+        icon={<CalendarX />}
+        title="This event isn't available"
+        description="It may have been removed, or it hasn't been announced yet."
+        actions={
+          <Button asChild size="lg">
+            <Link href={eventsHref}>See all events</Link>
+          </Button>
+        }
+      />
     );
   }
 
@@ -197,209 +183,107 @@ export default function EventDetailPage() {
   const when = eventWhenLong(event);
   const isPastEvent = start ? start.getTime() < loadedAt : false;
   const isAdminMinutesView = adminMinutesAccess && minutesSource === "admin";
-  const normalizedMeetingAttendance = meetingMinutes ? normalizeEventAttendance(meetingMinutes.attendance) : undefined;
+  const minutesBadge = meetingMinutes ? statusBadge("minutes", meetingMinutes.status) : null;
 
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      {backLink}
+    <PublicPage width="reading" className="gap-6">
+      <PublicPageHeader back={back} title={<span className="break-words">{event.title}</span>} />
 
-      <header className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight break-words text-foreground md:text-3xl">{event.title}</h1>
-        <div className="flex flex-col gap-2 text-base text-muted-foreground">
-          {when ? (
-            <>
-              <p className="flex items-start gap-2">
-                <CalendarDays className="mt-1 size-4 shrink-0" aria-hidden="true" />
-                <span className="min-w-0">{when.date}</span>
-              </p>
-              <p className="flex items-start gap-2">
-                <Clock className="mt-1 size-4 shrink-0" aria-hidden="true" />
-                <span className="min-w-0">{when.time}</span>
-              </p>
-            </>
-          ) : (
-            <p className="flex items-start gap-2">
-              <CalendarDays className="mt-1 size-4 shrink-0" aria-hidden="true" />
-              <span>Date to be announced</span>
+      <Card className="gap-3">
+        <h2 className="sr-only">When and where</h2>
+        {when ? (
+          <>
+            <p className="flex items-start gap-3 text-base">
+              <CalendarDays className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0">{when.date}</span>
             </p>
-          )}
-          {event.location ? (
-            <p className="flex items-start gap-2">
-              <MapPin className="mt-1 size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 break-words">{event.location}</span>
+            <p className="flex items-start gap-3 text-base">
+              <Clock className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0">{when.time}</span>
             </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild size="lg">
-            <a href={`/api/calendar/${event.id}`}>
-              <CalendarPlus aria-hidden="true" />
-              Add to calendar
-            </a>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <a href={eventFlyerHref(orgSlug, event.id)}>
-              <FileText aria-hidden="true" />
-              Download flyer (PDF)
-            </a>
-          </Button>
-        </div>
-      </header>
+          </>
+        ) : (
+          <p className="flex items-start gap-3 text-base">
+            <CalendarDays className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span>Date to be announced</span>
+          </p>
+        )}
+        {event.location ? (
+          <p className="flex items-start gap-3 text-base">
+            <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 break-words">{event.location}</span>
+          </p>
+        ) : null}
+      </Card>
 
       {event.summary ? <p className="text-lg text-foreground/90">{event.summary}</p> : null}
 
-      {event.body?.trim() ? (
-        <Card>
-          <p className="whitespace-pre-wrap break-words text-base text-foreground">{event.body}</p>
-        </Card>
-      ) : null}
+      {event.body?.trim() ? <p className="whitespace-pre-wrap break-words text-base text-foreground">{event.body}</p> : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Button asChild size="lg" className="w-full sm:w-auto">
+          <a href={`/api/calendar/${event.id}`}>
+            <CalendarPlus aria-hidden="true" />
+            Add to calendar
+          </a>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+          <a href={eventFlyerHref(orgSlug, event.id)}>
+            <FileText aria-hidden="true" />
+            Download flyer (PDF)
+          </a>
+        </Button>
+      </div>
 
       {isPastEvent ? (
         <Card aria-labelledby="event-minutes-title">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="event-minutes-title" className="text-lg font-semibold text-foreground">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="event-minutes-title" className="text-base font-semibold text-foreground">
               Meeting minutes
             </h2>
-            {!meetingMinutes && !minutesLoading && adminMinutesAccess ? (
-              <Button asChild variant="outline">
-                <Link href={`/admin/minutes?mode=new&eventId=${event.id}`}>Add minutes</Link>
-              </Button>
-            ) : null}
+            {isAdminMinutesView && minutesBadge ? <Badge variant={minutesBadge.variant}>{minutesBadge.label}</Badge> : null}
           </div>
           {minutesLoading ? (
             <div role="status" aria-live="polite" className="flex flex-col gap-2">
               <span className="sr-only">Loading minutes…</span>
-              <Skeleton className="h-5 w-24" />
               <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-11 w-40" />
             </div>
           ) : meetingMinutes ? (
-            <div className="flex flex-col gap-4 text-sm text-foreground/90">
-              <div className="flex flex-col gap-2">
-                <Badge variant={statusBadgeVariant[meetingMinutes.status]}>{minutesStatusLabels[meetingMinutes.status]}</Badge>
-                {isAdminMinutesView ? (
-                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                    <p>{adminStatusDescriptions[meetingMinutes.status]}</p>
-                    {meetingMinutes.encrypted && meetingMinutes.status !== "approved" ? (
-                      <p>The content of unapproved minutes is encrypted. Open Meeting Minutes to read it.</p>
-                    ) : null}
-                    {meetingMinutes.submittedAt ? (
-                      <p>
-                        Submitted by {resolveActorLabel({ roles: ["admin"] })} · {formatTimestamp(meetingMinutes.submittedAt)}
-                      </p>
-                    ) : null}
-                    {meetingMinutes.approvedAt ? (
-                      <p>
-                        Approved by {resolveActorLabel({ roles: ["admin"] })} · {formatTimestamp(meetingMinutes.approvedAt)}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : meetingMinutes.status === "approved" ? (
-                  <p className="text-sm text-muted-foreground">Official minutes for this event.</p>
+            <>
+              <p className="text-sm text-muted-foreground">
+                {isAdminMinutesView
+                  ? adminStatusDescriptions[meetingMinutes.status]
+                  : "The board's approved minutes of this meeting are in the public archive."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {meetingMinutes.status === "approved" && meetingMinutes.id ? (
+                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+                    <Link href={`/minutes/${encodeURIComponent(meetingMinutes.id)}` as Route}>
+                      <FileText aria-hidden="true" />
+                      Read the minutes
+                    </Link>
+                  </Button>
+                ) : null}
+                {isAdminMinutesView && meetingMinutes.id ? (
+                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+                    <Link href={`/admin/minutes?minutesId=${encodeURIComponent(meetingMinutes.id)}` as Route}>Open meeting minutes</Link>
+                  </Button>
                 ) : null}
               </div>
-              {meetingMinutes.agenda.length ? (
-                <MinutesList title="Agenda" items={meetingMinutes.agenda} />
-              ) : null}
-              {meetingMinutes.discussionSummary ? (
-                <section className="flex flex-col gap-1">
-                  <h3 className="text-base font-semibold text-foreground">Discussion summary</h3>
-                  <p className="whitespace-pre-line text-sm text-foreground/90">{meetingMinutes.discussionSummary}</p>
-                </section>
-              ) : null}
-              {meetingMinutes.decisions.length ? <MinutesList title="Decisions" items={meetingMinutes.decisions} /> : null}
-              {meetingMinutes.actionItems.length ? (
-                <MinutesList
-                  title="Action items"
-                  items={meetingMinutes.actionItems.map(
-                    action =>
-                      `${action.task}${action.assignedTo ? ` — ${action.assignedTo}` : ""}${action.dueDate ? ` (due ${formatShortDate(action.dueDate)})` : ""}`
-                  )}
-                />
-              ) : null}
-              {renderAttendanceBlock(normalizedMeetingAttendance)}
-              {meetingMinutes.signatures && (meetingMinutes.signatures.chairName || meetingMinutes.signatures.secretaryName) ? (
-                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                  {meetingMinutes.signatures.chairName ? (
-                    <p>
-                      <span className="font-semibold text-foreground">Chair:</span> {meetingMinutes.signatures.chairName}
-                    </p>
-                  ) : null}
-                  {meetingMinutes.signatures.secretaryName ? (
-                    <p>
-                      <span className="font-semibold text-foreground">Secretary:</span> {meetingMinutes.signatures.secretaryName}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-              {meetingMinutes.approvalNotes ? (
-                <p className="text-sm text-muted-foreground">Approval notes: {meetingMinutes.approvalNotes}</p>
-              ) : null}
-              <p className="text-sm text-muted-foreground">
-                Recorded by {resolveActorLabel(meetingMinutes.recordedBy)} · {formatTimestamp(meetingMinutes.createdAt)}
-              </p>
-            </div>
+            </>
           ) : (
-            <p className="text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
+            <>
+              <p className="text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
+              {adminMinutesAccess ? (
+                <Button asChild variant="outline" size="lg" className="w-full sm:w-auto sm:self-start">
+                  <Link href={`/admin/minutes?mode=new&eventId=${encodeURIComponent(event.id)}` as Route}>Add minutes</Link>
+                </Button>
+              ) : null}
+            </>
           )}
         </Card>
       ) : null}
-    </article>
-  );
-}
-
-function MinutesList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="flex flex-col gap-1">
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      <ul className="list-disc space-y-1 pl-5">
-        {items.map((item, idx) => (
-          <li key={`${title}-${idx}`}>{item}</li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function formatTimestamp(value?: number) {
-  return formatDateTime(value) || "Date unavailable";
-}
-
-function normalizeEventAttendance(value?: MeetingMinutesRecord["attendance"] | string[]): MeetingAttendance | undefined {
-  if (!value) return undefined;
-  if (Array.isArray(value)) {
-    const present = value.map(item => item.trim()).filter(Boolean);
-    return present.length ? { present } : undefined;
-  }
-  const present = (value.present || []).map(item => item.trim()).filter(Boolean);
-  const absent = (value.absent || []).map(item => item.trim()).filter(Boolean);
-  const guests = (value.guests || []).map(item => item.trim()).filter(Boolean);
-  if (!present.length && !absent.length && !guests.length) return undefined;
-  const result: MeetingAttendance = { present };
-  if (absent.length) result.absent = absent;
-  if (guests.length) result.guests = guests;
-  return result;
-}
-
-function renderAttendanceBlock(attendance?: MeetingAttendance) {
-  if (!attendance) return null;
-  return (
-    <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-      {attendance.present && attendance.present.length ? (
-        <p>
-          <span className="font-semibold text-foreground">Present:</span> {attendance.present.join(", ")}
-        </p>
-      ) : null}
-      {attendance.absent && attendance.absent.length ? (
-        <p>
-          <span className="font-semibold text-foreground">Absent:</span> {attendance.absent.join(", ")}
-        </p>
-      ) : null}
-      {attendance.guests && attendance.guests.length ? (
-        <p>
-          <span className="font-semibold text-foreground">Guests:</span> {attendance.guests.join(", ")}
-        </p>
-      ) : null}
-    </div>
+    </PublicPage>
   );
 }

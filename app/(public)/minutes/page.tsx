@@ -1,6 +1,8 @@
 import Link from "next/link";
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { ChevronRight, FileText } from "lucide-react";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { formatShortDate } from "@/src/lib/format";
 import { listArchive } from "@/src/lib/minutesArchive.server";
@@ -20,23 +22,23 @@ export default async function MinutesArchivePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Meeting minutes</h1>
-        <p className="text-base text-muted-foreground">Approved minutes from our board and general meetings.</p>
-      </header>
+    <PublicPage width="reading" className="gap-6">
+      <PublicPageHeader title="Meeting minutes" description="Approved minutes from our board and general meetings." />
       {entries.length === 0 ? (
         <EmptyState
           icon={<FileText />}
-          title="No minutes have been published yet."
-          description="Minutes are added here after the board approves them. Please check back after the next meeting."
+          title="No minutes have been published yet"
+          description="Minutes are added here after the board approves them. Meanwhile, see what's coming up."
+          action={
+            <Button asChild variant="outline" size="lg">
+              <Link href={"/c/ghmo/events" as Route}>See upcoming events</Link>
+            </Button>
+          }
         />
       ) : (
         [...byYear.entries()].map(([year, items]) => (
           <section key={year} aria-labelledby={`year-${year}`} className="flex flex-col gap-3">
-            <h2 id={`year-${year}`} className="text-lg font-semibold text-foreground">
-              {year}
-            </h2>
+            <PublicSectionTitle id={`year-${year}`}>{year}</PublicSectionTitle>
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
               {items.map(entry => (
                 <li key={entry.id}>
@@ -56,6 +58,6 @@ export default async function MinutesArchivePage() {
           </section>
         ))
       )}
-    </div>
+    </PublicPage>
   );
 }

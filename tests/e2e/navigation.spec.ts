@@ -5,7 +5,8 @@ test("public header shows a mobile menu with the main links", async ({ page }, t
   await page.goto("/");
   await page.getByRole("button", { name: "Open menu" }).click();
   const menu = page.getByRole("dialog");
-  await expect(menu.getByRole("link", { name: "Donate" })).toBeVisible();
+  // "Support the Gumba" until a GoFundMe link is set (the e2e build has none), then "Donate".
+  await expect(menu.getByRole("link", { name: /^(Support the Gumba|Donate)$/ })).toBeVisible();
   await expect(menu.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
 });
 
