@@ -32,7 +32,7 @@ export default async function AdminChatPage() {
         description="Quick updates and reminders between admins. Decisions belong in Plans & Issues."
       />
       <FirebaseAdminAuthBootstrap>
-        <EncryptionGate what="Admin Chat">
+        <EncryptionGate what="admin chat" detail="Messages are readable only on approved admin devices.">
           <AdminChatClient actor={toPlain(actorInfo)} />
         </EncryptionGate>
       </FirebaseAdminAuthBootstrap>

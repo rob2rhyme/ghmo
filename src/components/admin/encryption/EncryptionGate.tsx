@@ -9,13 +9,17 @@ import { EmptyState } from "@/src/components/ui/empty-state";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { UnlockCard } from "./UnlockCard";
+import { EXPLAIN, WhatIsThis } from "./WhatIsThis";
 
 /**
  * Wraps pages whose data is end-to-end encrypted. Shows the page once this device can
  * read it; otherwise explains what is missing (unlock, set up this device, wait for approval).
- * While encryption is not turned on yet, the page works as before with a reminder.
+ * While encryption is not turned on yet, the page works as before with a one-line reminder.
+ *
+ * `what` names the page's records in lower case, as they read mid-sentence ("the meeting minutes",
+ * "your call list"); `detail` is one optional plain line for the locked card.
  */
-export function EncryptionGate({ children, what = "This page" }: { children: ReactNode; what?: string }) {
+export function EncryptionGate({ children, what = "this page", detail }: { children: ReactNode; what?: string; detail?: string }) {
   const { status, enabled, overview, error, refresh, integrity } = useE2ee();
 
   if (status === "loading") {
@@ -42,21 +46,26 @@ export function EncryptionGate({ children, what = "This page" }: { children: Rea
   if (!enabled) {
     return (
       <div className="flex flex-col gap-4">
-        <Alert variant="warning">
-          <ShieldOff />
-          <AlertTitle>End-to-end encryption is not on yet</AlertTitle>
-          <AlertDescription>
-            Records on this page are saved without the extra lock for now. Once it is on, only board members&apos; approved
-            devices can read them.{" "}
-            {overview?.me.superAdmin ? (
-              <Link href="/admin/encryption" className="font-semibold text-foreground underline underline-offset-2">
-                Turn on encryption
-              </Link>
-            ) : (
-              "A super admin can turn it on under Encryption."
-            )}
-          </AlertDescription>
-        </Alert>
+        <div
+          role="note"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+        >
+          <ShieldOff className="size-4 shrink-0 text-warning" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="font-medium text-foreground">Encryption is off.</span>{" "}
+            <span className="text-muted-foreground">Records on this page aren&apos;t extra-locked yet.</span>
+          </span>
+          {overview?.me.superAdmin ? (
+            <Link href="/admin/encryption" className="inline-flex min-h-9 items-center font-semibold text-foreground underline underline-offset-2">
+              Turn it on
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">A super admin can turn it on.</span>
+          )}
+          <WhatIsThis question="What's this?" className="w-full">
+            {EXPLAIN.endToEnd}
+          </WhatIsThis>
+        </div>
         {children}
       </div>
     );
@@ -66,7 +75,7 @@ export function EncryptionGate({ children, what = "This page" }: { children: Rea
     return (
       <Alert variant="destructive">
         <ShieldOff />
-        <AlertTitle>{what} is paused: the device list failed its check</AlertTitle>
+        <AlertTitle>Paused: the device list failed its check</AlertTitle>
         <AlertDescription>
           {integrity.status === "failed" ? integrity.reason : "The device list could not be verified."} Don&apos;t approve devices or share anything until an
           admin you trust confirms what changed.{" "}
@@ -81,16 +90,7 @@ export function EncryptionGate({ children, what = "This page" }: { children: Rea
   if (status === "unlocked") return <>{children}</>;
 
   if (status === "locked") {
-    return (
-      <div className="flex flex-col gap-4">
-        <Alert variant="info">
-          <Lock />
-          <AlertTitle>{what} is end-to-end encrypted</AlertTitle>
-          <AlertDescription>Unlock this device to read and write it.</AlertDescription>
-        </Alert>
-        <UnlockCard />
-      </div>
-    );
+    return <UnlockCard what={what} detail={detail} />;
   }
 
   const message =
@@ -103,7 +103,7 @@ export function EncryptionGate({ children, what = "This page" }: { children: Rea
   return (
     <EmptyState
       icon={<Lock />}
-      title={`${what} is end-to-end encrypted`}
+      title={`Set up this device to see ${what}`}
       description={message}
       action={
         <Button asChild>

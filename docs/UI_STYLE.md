@@ -18,6 +18,21 @@ Follow these for every new or changed page.
 | Loading | `Skeleton` / `PageSkeleton`, not "Loading…" text |
 | Are you sure? | `ConfirmDialog`, never `window.confirm` |
 | Dates | `formatDate`, `formatShortDate`, `formatTime`, `formatDateTime` (`src/lib/format.ts`): no seconds |
+| Admin page title | `AdminPageHeader` with `back={{ href, label }}` on detail and form pages (label = the section's name), `badge`, and one primary in `actions` |
+| Admin section box | `AdminSectionCard` (title, description, `actions`, optional muted `icon`); a bare `Card` only for untitled boxes |
+| Rows of things | `AdminList` + `AdminListRow` (title, meta, badges, actions, `href` for whole-row links) |
+| Row actions | `Button variant="outline" size="row"` (44 px on phones, 40 px from sm); one primary per view |
+| Status badges | `statusBadge(kind, status)` from `src/lib/statusBadges.ts`: one label and colour per state |
+| Steps in a process | `Steps` (`src/components/ui/steps.tsx`) |
+| Figures and progress | `StatGrid` + `StatTile`, `ProgressBar` (`src/components/ui/stat.tsx`) |
+| Tabs that are pages | `SegmentedNav` (same look as `Segmented`) |
+| Destructive actions | ghost button with `text-destructive`, set apart from other buttons, opening `ConfirmDialog destructive` |
+| Errors inside a page | `Alert variant="destructive"` with a "Try again" button; whole-page failures use `RouteError` |
+| Feedback | toasts (`sonner`) for finished actions; inline text only for lasting state ("Saved 2 min ago") |
+| Encrypted pages | `EncryptionGate what="the meeting minutes"` (lower case, as it reads mid-sentence) and an optional `detail` |
+| Public page | `PublicPage width="wide|reading"` + `PublicPageHeader`; `PublicSectionTitle` for sections |
+| "Can't help you here" | `MessagePage` (404, broken link, board-only tool, unavailable record) |
+| Contact | `getContactEmail()` (`src/lib/contact.ts`); show contact only when it returns an address |
 
 ## Colour
 
@@ -39,7 +54,7 @@ Follow these for every new or changed page.
 | Smallest | `text-xs`, only for badges, keyboard hints and counts |
 
 - No `text-[11px]`-style sizes, no ALL-CAPS labels (a single short eyebrow above a page title is the exception).
-- Sentence case for labels and buttons ("Save event", not "SAVE EVENT" or "Save Event").
+- Sentence case for labels, buttons, page titles and nav ("Meeting minutes", "Save event"). Proper names keep their capitals: GHMO, GUMBA, Plans & Issues, YouTube.
 
 ## Shape and space
 
@@ -52,7 +67,10 @@ Follow these for every new or changed page.
 ## Words
 
 - Say what a page is for in one plain sentence under the title.
-- Name things the way a board member would: "topics", "phone numbers", "approved devices", not "threads", "envelopes", "epochs".
+- Name things the way a board member would: "topics", "phone numbers", "approved devices", "unlock" and "open", not "threads", "envelopes", "epochs", "decrypt", "plaintext". Write plurals out ("1 device", "2 devices"), never "device(s)".
+- People who use the admin are "admins"; "board members" is for the real-world group.
+- Exports say "Download PDF", "Download image (JPEG)", "Download spreadsheet (CSV)". Links to another admin page say "Open <page>".
+- Page descriptions are one sentence of 20 words or fewer.
   When a technical word must stay (passkey, recovery key, safety code), explain it once in a short line.
 - Buttons say what happens: "Send invite", "Save changes", "Delete event".
 - Errors say what went wrong and what to do, next to the field.

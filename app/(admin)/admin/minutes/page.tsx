@@ -54,7 +54,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
 
       <MinutesTabs mode={mode} />
 
-      <EncryptionGate what="Meeting Minutes">
+      <EncryptionGate what="the meeting minutes">
         {mode === "records" ? (
           <MinutesRecordsClient initialMinutes={minutes} />
         ) : (

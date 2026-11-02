@@ -120,6 +120,21 @@ describe("numbers and dates", () => {
     expect(formatMoney(48250)).toBe("$48,250");
     expect(formatMoney(undefined)).toBe("$0");
     expect(formatShortDate(Date.UTC(2026, 9, 23, 12))).toBe("Oct 23, 2026");
-    expect(formatShortDate(null)).toBe("Date unavailable");
+    expect(formatShortDate(null)).toBe("Date unknown");
   });
 });
+
+describe("encryption activity", () => {
+  const alice = { name: "Alice Rai", role: "super_admin" };
+  it("reads as sentences with the useful detail", () => {
+    expect(
+      activitySentence({ action: "e2ee_enabled", actor: alice, resource: { summary: "End-to-end encryption enabled; recovery key held by Trustee One and Trustee Two" } })
+    ).toEqual({ text: "Alice Rai turned on encryption", detail: "Recovery key held by Trustee One and Trustee Two" });
+    expect(activitySentence({ action: "e2ee_device_registered", actor: alice, resource: { summary: "Alice laptop" } })).toEqual({
+      text: "Alice Rai set up a device for encryption",
+      detail: "Alice laptop"
+    });
+    expect(activitySentence({ action: "e2ee_rotated", actor: alice })).toEqual({ text: "Alice Rai made new encryption keys" });
+  });
+});
+

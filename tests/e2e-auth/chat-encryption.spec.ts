@@ -30,7 +30,7 @@ test("chat is plaintext until encryption is on, then stored as ciphertext and re
   await signInWithNewPasskey(alice, "alice", "/admin/chat");
 
   // --- Before encryption: works as before, with a visible reminder ---
-  await expect(alice.getByText("End-to-end encryption is not on yet")).toBeVisible();
+  await expect(alice.getByText("Records on this page aren't extra-locked yet.")).toBeVisible();
   await send(alice, BEFORE);
 
   // --- Turn encryption on; the earlier message stays readable (legacy plaintext) ---
@@ -61,7 +61,7 @@ test("chat is plaintext until encryption is on, then stored as ciphertext and re
 
   // --- A reload locks the device: the page asks to unlock instead of showing messages ---
   await alice.reload();
-  await expect(alice.getByText("Admin Chat is end-to-end encrypted")).toBeVisible();
+  await expect(alice.getByText("Unlock to see admin chat")).toBeVisible();
   await expect(bubble(alice, SECRET)).toHaveCount(0);
   await alice.getByRole("button", { name: "Unlock with passkey" }).click();
   await expect(bubble(alice, SECRET)).toBeVisible();

@@ -65,7 +65,7 @@ export default async function DocumentGeneratorPage({
           </AlertDescription>
         </Alert>
       ) : null}
-      <EncryptionGate what="Document Generator">
+      <EncryptionGate what="your documents">
         <div className="flex flex-col gap-6">
           {savedDocument ? (
             <Alert variant="info">

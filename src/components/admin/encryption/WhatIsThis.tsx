@@ -17,6 +17,8 @@ export function WhatIsThis({ question, children, className }: { question: string
 
 /** One-line explanations of the encryption words, kept together so they read the same everywhere. */
 export const EXPLAIN = {
+  endToEnd:
+    "End-to-end encryption locks private records (chat, minutes, phone numbers) with keys that only approved admin devices hold. Even the website's own server, and anyone who breaks into it, sees only scrambled text.",
   passkey:
     "A passkey is the fingerprint, face or screen-lock sign-in saved on this device. It can also lock this device's encryption keys, so there is nothing extra to remember.",
   passphrase:

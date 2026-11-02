@@ -1,4 +1,5 @@
 /** Small, pure helpers for how the admin screens present people, times and numbers. */
+import { formatShortDate as formatDate } from "./format";
 
 export function firstName(name?: string | null): string {
   const first = (name ?? "").trim().split(/\s+/)[0];
@@ -111,7 +112,16 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   timeline_entry_updated: { verb: "updated the GUMBA project timeline" },
   home_blocks_updated: { verb: "updated the homepage" },
   doc_generated: { verb: "made a document", detail: true },
-  reconcile: { verb: "synced donations" }
+  reconcile: { verb: "synced donations" },
+  e2ee_enabled: { verb: "turned on encryption", detail: true },
+  e2ee_device_registered: { verb: "set up a device for encryption", detail: true },
+  e2ee_device_approved: { verb: "approved a device", detail: true },
+  e2ee_device_recovered: { verb: "restored a device with the recovery key", detail: true },
+  e2ee_device_withdrawn: { verb: "removed a device", detail: true },
+  e2ee_rotated: { verb: "made new encryption keys" },
+  e2ee_recovery_replaced: { verb: "replaced the recovery key" },
+  e2ee_roster_sealed: { verb: "sealed the device list" },
+  e2ee_record_migrated: { verb: "encrypted existing records", detail: true }
 };
 
 /** Whole sentences for things nobody in particular did. */
@@ -134,6 +144,8 @@ function cleanDetail(summary: string): string {
     .replace(/\s*\([a-z_]+\)$/, "")
     .replace(/^(created|updated|deleted) event:\s*/i, "")
     .replace(/^minutes for\s+/i, "")
+    .replace(/^end-to-end encryption enabled;\s*/i, "")
+    .replace(/^recovery key held by/i, "Recovery key held by")
     .trim();
 }
 
@@ -183,6 +195,7 @@ export function formatMoney(amount: number | undefined): string {
   return `$${(amount ?? 0).toLocaleString("en-US")}`;
 }
 
+/** "Dec 12, 2026", or "Date unknown" (wraps src/lib/format.ts so every page formats dates the same way). */
 export function formatShortDate(ms: number | null | undefined): string {
-  return ms ? new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date unavailable";
+  return (ms && formatDate(ms)) || "Date unknown";
 }

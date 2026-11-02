@@ -57,7 +57,7 @@ const REASON_LABEL: Record<AssignmentChange["reason"], string> = {
 
 export default function CallingTreeClient() {
   return (
-    <EncryptionGate what="The calling tree">
+    <EncryptionGate what="the calling tree">
       <CallingTree />
     </EncryptionGate>
   );

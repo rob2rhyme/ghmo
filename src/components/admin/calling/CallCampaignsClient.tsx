@@ -25,7 +25,7 @@ type TreeLite = { tree: { callers: string[] }; total: number };
 
 export default function CallCampaignsClient() {
   return (
-    <EncryptionGate what="Call campaigns">
+    <EncryptionGate what="the call campaigns">
       <Campaigns />
     </EncryptionGate>
   );

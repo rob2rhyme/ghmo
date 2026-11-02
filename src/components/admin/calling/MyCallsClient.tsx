@@ -29,7 +29,7 @@ type CampaignsResponse = { campaigns: CampaignView[]; mine: Record<string, { cal
  */
 export default function MyCallsClient() {
   return (
-    <EncryptionGate what="Your call list">
+    <EncryptionGate what="your call list" detail="Phone numbers are readable only on approved admin devices.">
       <MyCalls />
     </EncryptionGate>
   );

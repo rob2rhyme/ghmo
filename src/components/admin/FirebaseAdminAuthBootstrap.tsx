@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
+import { WifiOff } from "lucide-react";
 import { firebaseInitError } from "@/src/lib/firebaseClient";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Button } from "@/src/components/ui/button";
+import { Skeleton } from "@/src/components/ui/skeleton";
 
 type FirebaseAdminAuthBootstrapProps = {
   children: React.ReactNode;
@@ -23,7 +27,8 @@ export default function FirebaseAdminAuthBootstrap({ children }: FirebaseAdminAu
   }, []);
 
   useEffect(() => {
-    if (state === "loading" || state === "ready") return;
+    // After an error, wait for "Try again" instead of retrying in a loop.
+    if (state === "loading" || state === "ready" || state === "error") return;
     if (firebaseInitError) {
       setError(firebaseInitError);
       setState("error");
@@ -77,16 +82,28 @@ export default function FirebaseAdminAuthBootstrap({ children }: FirebaseAdminAu
     void runBootstrap();
   }, [auth, state]);
 
+  if (state === "error") {
+    if (process.env.NODE_ENV !== "production" && error) console.warn("Live connection failed:", error);
+    return (
+      <Alert variant="destructive">
+        <WifiOff />
+        <AlertTitle>Couldn&apos;t connect</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-3">
+          <span>This page needs a live connection. Check your internet, then try again.</span>
+          <Button variant="outline" onClick={() => setState("idle")}>
+            Try again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   if (state !== "ready") {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-xs">
-        <div>
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
-          <p className="mt-3 text-sm font-semibold text-foreground/80">Securing admin session…</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {state === "error" ? error || "Unable to connect to Firebase." : "Connecting to Firestore."}
-          </p>
-        </div>
+      <div role="status" className="flex flex-col gap-3">
+        <span className="sr-only">Connecting…</span>
+        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
       </div>
     );
   }

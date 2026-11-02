@@ -19,7 +19,7 @@ type Detail = { me: { uid: string; superAdmin: boolean }; campaign: CampaignView
 
 export default function CampaignDetailClient({ campaignId }: { campaignId: string }) {
   return (
-    <EncryptionGate what="This campaign">
+    <EncryptionGate what="this campaign">
       <CampaignDetail campaignId={campaignId} />
     </EncryptionGate>
   );
