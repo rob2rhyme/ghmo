@@ -16,7 +16,8 @@
     "test:emulators": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"vitest run --config vitest.emulator.config.mts\"",
     "test:e2e:auth": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"npm run build:e2e-auth && playwright test --config playwright.emulator.config.ts\"",
     "test:coverage": "vitest run --coverage",
-    "build:e2e-auth": "NEXT_PUBLIC_FIREBASE_API_KEY=fake-api-key NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=localhost NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-ghmo NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true next build"
+    "build:e2e-auth": "NEXT_PUBLIC_FIREBASE_API_KEY=fake-api-key NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=localhost NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-ghmo NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true next build",
+    "ui:screens": "firebase emulators:exec --only firestore,auth --project demo-ghmo \"npm run build:e2e-auth && playwright test --config playwright.ui-audit.config.ts\""
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",

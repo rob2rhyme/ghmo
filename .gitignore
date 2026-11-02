@@ -46,3 +46,6 @@ lerna-debug.log*
 /test-results
 firestore-debug.log
 *-debug.log
+
+# UI audit screenshots (npm run ui:screens)
+/ui-audit-screens
