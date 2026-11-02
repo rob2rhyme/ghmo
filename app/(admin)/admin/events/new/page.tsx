@@ -1,185 +1,70 @@
-//app/(admin)/admin/events/new/page.tsx
 "use client";
 
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-const defaultForm = {
-  title: "",
-  summary: "",
-  body: "",
-  status: "draft",
-  startsAt: "",
-  endsAt: "",
-  location: "",
-  timezone: "America/New_York",
-  featured: false,
-  announcementDocTemplate: "",
-};
+import { ArrowLeft } from "lucide-react";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { EMPTY_EVENT_FORM, EventForm, validateEventForm, type EventFormValues } from "@/src/components/admin/events/EventForm";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import { Button } from "@/src/components/ui/button";
 
 export default function NewEventPage() {
-  const [form, setForm] = useState(defaultForm);
+  const router = useRouter();
+  const [form, setForm] = useState<EventFormValues>(EMPTY_EVENT_FORM);
+  const [errors, setErrors] = useState<Partial<Record<keyof EventFormValues, string>>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+
+  const update = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) => setForm(prev => ({ ...prev, [key]: value }));
 
   const handleSubmit = async () => {
+    const found = validateEventForm(form);
+    setErrors(found);
+    if (Object.keys(found).length) return;
     setSaving(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/organizations/ghmo/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(form)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create event");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "The event could not be saved.");
       router.replace("/admin/events");
-    } catch (err: any) {
-      setError(err.message || "Failed to save");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The event could not be saved.");
     } finally {
       setSaving(false);
     }
   };
 
-  const update = (key: string, value: any) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
-
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">New Event</h1>
-      </div>
-      <EventForm form={form} update={update} />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <div className="flex gap-3">
-        <button
-          onClick={handleSubmit}
-          disabled={saving}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
-        >
-          {saving ? "Saving..." : "Save Event"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground/80"
-        >
+    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <Button asChild variant="ghost" className="-ml-3 w-fit text-muted-foreground">
+        <Link href="/admin/events">
+          <ArrowLeft aria-hidden="true" />
+          Events
+        </Link>
+      </Button>
+      <AdminPageHeader title="New event" description="Add the details, then publish it when you want it on the public Events page." />
+      <EventForm form={form} update={update} errors={errors} />
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription className="text-foreground">{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={handleSubmit} loading={saving}>
+          {saving ? "Saving…" : "Save event"}
+        </Button>
+        <Button variant="outline" onClick={() => router.back()} disabled={saving}>
           Cancel
-        </button>
+        </Button>
       </div>
-    </div>
-  );
-}
-
-function EventForm({
-  form,
-  update,
-}: {
-  form: typeof defaultForm;
-  update: (key: string, value: any) => void;
-}) {
-  return (
-    <div className="space-y-4 rounded-lg border border-border bg-card p-5 shadow-xs">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Title
-          <input
-            value={form.title}
-            onChange={(e) => update("title", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-            placeholder="Event title"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Status
-          <select
-            value={form.status}
-            onChange={(e) => update("status", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          >
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </label>
-      </div>
-      <label className="space-y-1 text-sm font-semibold text-foreground">
-        Summary
-        <textarea
-          value={form.summary}
-          onChange={(e) => update("summary", e.target.value)}
-          className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          placeholder="Short description"
-        />
-      </label>
-      <label className="space-y-1 text-sm font-semibold text-foreground">
-        Body
-        <textarea
-          value={form.body}
-          onChange={(e) => update("body", e.target.value)}
-          className="h-40 w-full rounded-md border border-border px-3 py-2 text-sm"
-          placeholder="Event details"
-        />
-      </label>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Starts At
-          <input
-            type="datetime-local"
-            value={form.startsAt}
-            onChange={(e) => update("startsAt", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Ends At
-          <input
-            type="datetime-local"
-            value={form.endsAt}
-            onChange={(e) => update("endsAt", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Timezone
-          <input
-            value={form.timezone}
-            onChange={(e) => update("timezone", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-            placeholder="America/New_York"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Location
-          <input
-            value={form.location}
-            onChange={(e) => update("location", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-            placeholder="Venue or link"
-          />
-        </label>
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={form.featured}
-          onChange={(e) => update("featured", e.target.checked)}
-        />
-        <span className="text-sm text-foreground/80">Featured</span>
-      </div>
-      <label className="space-y-1 text-sm font-semibold text-foreground">
-        Announcement Template (optional)
-        <input
-          value={form.announcementDocTemplate}
-          onChange={(e) => update("announcementDocTemplate", e.target.value)}
-          className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          placeholder="event_announcement_v1"
-        />
-      </label>
     </div>
   );
 }

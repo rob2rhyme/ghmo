@@ -46,13 +46,14 @@ export function EncryptionGate({ children, what = "This page" }: { children: Rea
           <ShieldOff />
           <AlertTitle>End-to-end encryption is not on yet</AlertTitle>
           <AlertDescription>
-            {what} is stored unencrypted for now.{" "}
+            Records on this page are saved without the extra lock for now. Once it is on, only board members&apos; approved
+            devices can read them.{" "}
             {overview?.me.superAdmin ? (
-              <Link href="/admin/encryption" className="font-semibold underline">
+              <Link href="/admin/encryption" className="font-semibold text-foreground underline underline-offset-2">
                 Turn on encryption
               </Link>
             ) : (
-              "A super admin can turn it on under Admin → Encryption."
+              "A super admin can turn it on under Encryption."
             )}
           </AlertDescription>
         </Alert>

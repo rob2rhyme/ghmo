@@ -6,6 +6,7 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
+import { toPlain } from "@/src/lib/serialize.server";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,31 @@ function parseOptionalDate(
     };
   }
   return { date: parsed };
+}
+
+/** One event, for the edit form. Dates come back as epoch milliseconds. */
+export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {
+  const params = await context.params;
+  const adminEnvStatus = getAdminEnvStatus();
+  if (!adminEnvStatus.ok) {
+    return NextResponse.json({ error: "Admin env not configured", missing: adminEnvStatus.missing }, { status: 503 });
+  }
+
+  try {
+    if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const guard = await enforceActiveAdmin(req, params.orgSlug);
+    if ("response" in guard) return guard.response;
+    if (!EVENT_ID_PATTERN.test(params.eventId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const snap = await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId).get();
+    if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ ok: true, event: toPlain(normalizeEvent(snap)) });
+  } catch (error) {
+    if (error instanceof AdminEnvError) {
+      return NextResponse.json({ error: "Admin env not configured", missing: error.issues }, { status: 503 });
+    }
+    throw error;
+  }
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {

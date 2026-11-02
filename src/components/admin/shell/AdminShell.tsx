@@ -39,9 +39,9 @@ function Brand() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname() ?? "/admin";
   return (
-    <nav aria-label="Admin" className="flex flex-col gap-3 md:gap-5">
+    <nav aria-label="Admin" className="flex flex-col gap-3 lg:gap-2.5">
       {ADMIN_NAV.map(group => (
-        <div key={group.label} className="flex flex-col gap-0.5">
+        <div key={group.label} className="flex flex-col gap-px">
           <p className="px-3 pb-0.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{group.label}</p>
           {group.items.map(item => {
             const active = isActiveNavItem(pathname, item.href);
@@ -54,7 +54,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 aria-current={active ? "page" : undefined}
                 onClick={onNavigate}
                 className={cn(
-                  "group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9",
+                  "group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-[34px]",
                   active
                     ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground before:absolute before:inset-y-2 before:-left-1 before:w-1 before:rounded-full before:bg-primary"
                     : "text-foreground/75 hover:bg-accent hover:text-accent-foreground"
@@ -88,13 +88,32 @@ function UserCard({ user }: { user: AdminShellUser }) {
   );
 }
 
+/** Desktop sidebar foot: who is signed in, and Sign out. Status and settings live in the top bar. */
+function SidebarFooter({ user }: { user: AdminShellUser }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-sidebar-border pt-3">
+      <span
+        aria-hidden="true"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-xs"
+      >
+        {initialsOf(user.name)}
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-sm font-semibold text-foreground">{user.name}</span>
+        <span className="block truncate text-xs text-muted-foreground">{user.roleLabel}</span>
+      </span>
+      <SignOutButton />
+    </div>
+  );
+}
+
 function ShellFooter({ user }: { user: AdminShellUser }) {
   return (
     <div className="flex flex-col gap-2.5 border-t border-sidebar-border pt-3">
       <UserCard user={user} />
       <EncryptionStatusBadge />
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild variant="ghost" size="sm" className="mr-auto px-2 text-muted-foreground">
+        <Button asChild variant="ghost" className="mr-auto px-2 text-muted-foreground">
           <Link href="/">
             <ExternalLink aria-hidden="true" />
             Public site
@@ -149,7 +168,7 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
 
   return (
     <E2eeProvider>
-      <div className="min-h-screen md:grid md:grid-cols-[17rem_1fr]">
+      <div className="min-h-screen lg:grid lg:grid-cols-[17rem_1fr]">
         <a
           href="#admin-main"
           className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -157,21 +176,21 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
           Skip to content
         </a>
 
-        <aside className="sticky top-0 hidden h-screen flex-col border-r border-sidebar-border bg-sidebar md:flex">
-          <div className="px-5 pt-5 pb-3">
+        <aside className="sticky top-0 hidden h-screen flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+          <div className="px-5 pt-4 pb-3">
             <Brand />
           </div>
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
+          <div className="flex-1 overflow-y-auto px-4 pb-3">
             <NavList />
           </div>
-          <div className="px-4 pb-4">
-            <ShellFooter user={user} />
+          <div className="px-4 pb-3">
+            <SidebarFooter user={user} />
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-col">
           {/* Phones: brand, search and menu. */}
-          <header className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-sm md:hidden">
+          <header className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-sm lg:hidden">
             <Brand />
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" aria-label="Jump to a page" onClick={() => setJumpOpen(true)}>
@@ -199,12 +218,22 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
             </div>
           </header>
 
-          {/* Desktop: a slim bar with the page search. */}
-          <div className="sticky top-0 z-30 hidden items-center gap-3 border-b border-border bg-background/80 px-8 py-3 backdrop-blur-md md:flex">
+          {/* Desktop: page search on the left; encryption status, public site and theme on the right. */}
+          <div className="sticky top-0 z-30 hidden items-center gap-3 border-b border-border bg-background/80 px-8 py-3 backdrop-blur-md lg:flex">
             <JumpButton onClick={() => setJumpOpen(true)} mac={mac} className="w-full max-w-sm" />
+            <div className="ml-auto flex items-center gap-2">
+              <EncryptionStatusBadge />
+              <Button asChild variant="ghost" className="text-muted-foreground">
+                <Link href="/">
+                  <ExternalLink aria-hidden="true" />
+                  Public site
+                </Link>
+              </Button>
+              <ThemeToggle />
+            </div>
           </div>
 
-          <main id="admin-main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8">
+          <main id="admin-main" className="mx-auto w-full max-w-6xl min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {children}
           </main>
         </div>

@@ -1,248 +1,188 @@
-//app/(admin)/admin/events/[eventId]/edit/page.tsx
 "use client";
 
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, CalendarX2, Trash2 } from "lucide-react";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { EMPTY_EVENT_FORM, EventForm, toInputDate, validateEventForm, type EventFormValues } from "@/src/components/admin/events/EventForm";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import { Button } from "@/src/components/ui/button";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { Skeleton } from "@/src/components/ui/skeleton";
 
-const defaultForm = {
-  title: "",
-  summary: "",
-  body: "",
-  status: "draft",
-  startsAt: "",
-  endsAt: "",
-  location: "",
-  timezone: "America/New_York",
-  featured: false,
-  announcementDocTemplate: "",
-};
+type LoadState = { kind: "loading" } | { kind: "ready" } | { kind: "missing" } | { kind: "failed"; message: string };
 
 export default function EditEventPage() {
   const params = useParams();
   const eventId = params?.eventId as string;
   const router = useRouter();
-  const [form, setForm] = useState(defaultForm);
-  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState<EventFormValues>(EMPTY_EVENT_FORM);
+  const [load, setLoad] = useState<LoadState>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  const [errors, setErrors] = useState<Partial<Record<keyof EventFormValues, string>>>({});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    if (!eventId) return;
+    let active = true;
+    (async () => {
+      setLoad({ kind: "loading" });
       try {
-        const res = await fetch(`/api/admin/organizations/ghmo/events`);
-        const data = await res.json();
-        const evt = (data.events || []).find((e: any) => e.id === eventId);
-        if (evt) {
-          setForm({
-            title: evt.title || "",
-            summary: evt.summary || "",
-            body: evt.body || "",
-            status: evt.status || "draft",
-            startsAt: evt.startsAt ? toInputDate(evt.startsAt) : "",
-            endsAt: evt.endsAt ? toInputDate(evt.endsAt) : "",
-            location: evt.location || "",
-            timezone: evt.timezone || "America/New_York",
-            featured: !!evt.featured,
-            announcementDocTemplate: evt.announcementDocTemplate || "",
-          });
+        const res = await fetch(`/api/admin/organizations/ghmo/events/${encodeURIComponent(eventId)}`, { cache: "no-store" });
+        if (res.status === 404) {
+          if (active) setLoad({ kind: "missing" });
+          return;
         }
-      } finally {
-        setLoading(false);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.event) throw new Error(data.error || `The server answered ${res.status}.`);
+        const evt = data.event;
+        if (!active) return;
+        setForm({
+          title: evt.title || "",
+          summary: evt.summary || "",
+          body: evt.body || "",
+          status: evt.status || "draft",
+          startsAt: toInputDate(evt.startsAt),
+          endsAt: toInputDate(evt.endsAt),
+          location: evt.location || "",
+          timezone: evt.timezone || EMPTY_EVENT_FORM.timezone,
+          featured: !!evt.featured,
+          announcementDocTemplate: evt.announcementDocTemplate || ""
+        });
+        setLoad({ kind: "ready" });
+      } catch (err) {
+        if (active) setLoad({ kind: "failed", message: err instanceof Error ? err.message : "Unknown error." });
       }
+    })();
+    return () => {
+      active = false;
     };
-    if (eventId) void load();
-  }, [eventId]);
+  }, [eventId, attempt]);
 
-  const update = (key: string, value: any) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const update = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) => setForm(prev => ({ ...prev, [key]: value }));
 
   const handleSave = async () => {
+    const found = validateEventForm(form);
+    setErrors(found);
+    if (Object.keys(found).length) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/admin/organizations/ghmo/events/${eventId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update");
+      const res = await fetch(`/api/admin/organizations/ghmo/events/${encodeURIComponent(eventId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "The changes could not be saved.");
       router.replace("/admin/events");
-    } catch (err: any) {
-      setError(err.message || "Failed to update");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The changes could not be saved.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    setSaving(true);
+    setDeleting(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/admin/organizations/ghmo/events/${eventId}`,
-        { method: "DELETE" }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      const res = await fetch(`/api/admin/organizations/ghmo/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "The event could not be deleted.");
       router.replace("/admin/events");
-    } catch (err: any) {
-      setError(err.message || "Failed to delete");
+    } catch (err) {
+      setConfirmDelete(false);
+      setError(err instanceof Error ? err.message : "The event could not be deleted.");
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
   };
 
-  if (loading)
-    return <div className="text-sm text-muted-foreground">Loading...</div>;
+  const back = (
+    <Button asChild variant="ghost" className="-ml-3 w-fit text-muted-foreground">
+      <Link href="/admin/events">
+        <ArrowLeft aria-hidden="true" />
+        Events
+      </Link>
+    </Button>
+  );
+
+  if (load.kind === "loading") {
+    return (
+      <div role="status" className="mx-auto flex max-w-3xl flex-col gap-4">
+        <span className="sr-only">Loading the event…</span>
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-40 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (load.kind === "missing" || load.kind === "failed") {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-6">
+        {back}
+        <EmptyState
+          icon={<CalendarX2 />}
+          title={load.kind === "missing" ? "This event doesn't exist" : "This event couldn't be loaded"}
+          description={
+            load.kind === "missing"
+              ? "It may have been deleted. Nothing was changed."
+              : `Nothing was changed. ${load.message} Check your connection and try again.`
+          }
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              {load.kind === "failed" ? <Button onClick={() => setAttempt(n => n + 1)}>Try again</Button> : null}
+              <Button asChild variant="outline">
+                <Link href="/admin/events">Back to events</Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Edit Event</h1>
-        <button
-          onClick={handleDelete}
-          className="text-sm font-semibold text-destructive hover:underline"
-        >
-          Delete
-        </button>
-      </div>
-      <EventForm form={form} update={update} />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <div className="flex gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
-        >
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground/80"
-        >
+    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      {back}
+      <AdminPageHeader title="Edit event" description={form.title || undefined} />
+      <EventForm form={form} update={update} errors={errors} />
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription className="text-foreground">{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={handleSave} loading={saving} disabled={deleting}>
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+        <Button variant="outline" onClick={() => router.back()} disabled={saving || deleting}>
           Cancel
-        </button>
+        </Button>
+        <Button variant="ghost" className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>
+          <Trash2 aria-hidden="true" />
+          Delete event
+        </Button>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this event?"
+        description={`"${form.title || "This event"}" will be removed from the site for everyone. This can't be undone.`}
+        confirmLabel="Delete event"
+        destructive
+        busy={deleting}
+        onConfirm={handleDelete}
+      />
     </div>
   );
-}
-
-function EventForm({
-  form,
-  update,
-}: {
-  form: typeof defaultForm;
-  update: (key: string, value: any) => void;
-}) {
-  return (
-    <div className="space-y-4 rounded-lg border border-border bg-card p-5 shadow-xs">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Title
-          <input
-            value={form.title}
-            onChange={(e) => update("title", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Status
-          <select
-            value={form.status}
-            onChange={(e) => update("status", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          >
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </label>
-      </div>
-      <label className="space-y-1 text-sm font-semibold text-foreground">
-        Summary
-        <textarea
-          value={form.summary}
-          onChange={(e) => update("summary", e.target.value)}
-          className="w-full rounded-md border border-border px-3 py-2 text-sm"
-        />
-      </label>
-      <label className="space-y-1 text-sm font-semibold text-foreground">
-        Body
-        <textarea
-          value={form.body}
-          onChange={(e) => update("body", e.target.value)}
-          className="h-40 w-full rounded-md border border-border px-3 py-2 text-sm"
-        />
-      </label>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Starts At
-          <input
-            type="datetime-local"
-            value={form.startsAt}
-            onChange={(e) => update("startsAt", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Ends At
-          <input
-            type="datetime-local"
-            value={form.endsAt}
-            onChange={(e) => update("endsAt", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Timezone
-          <input
-            value={form.timezone}
-            onChange={(e) => update("timezone", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-semibold text-foreground">
-          Location
-          <input
-            value={form.location}
-            onChange={(e) => update("location", e.target.value)}
-            className="w-full rounded-md border border-border px-3 py-2 text-sm"
-          />
-        </label>
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={form.featured}
-          onChange={(e) => update("featured", e.target.checked)}
-        />
-        <span className="text-sm text-foreground/80">Featured</span>
-      </div>
-      <label className="space-y-1 text-sm font-semibold text-foreground">
-        Announcement Template
-        <input
-          value={form.announcementDocTemplate}
-          onChange={(e) => update("announcementDocTemplate", e.target.value)}
-          className="w-full rounded-md border border-border px-3 py-2 text-sm"
-        />
-      </label>
-    </div>
-  );
-}
-
-function toInputDate(value: any) {
-  const d = new Date(value.toDate?.() || value);
-  const pad = (n: number) => `${n}`.padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
 }

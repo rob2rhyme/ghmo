@@ -44,7 +44,7 @@ const PRIORITY_LABELS: Record<CommsThreadPriority, string> = {
 };
 
 export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
-  const { enabled: encrypted, unpackPrivate, packPrivate } = useE2ee();
+  const { unpackPrivate, packPrivate } = useE2ee();
   const [threads, setThreads] = useState<ThreadView[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -58,7 +58,6 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   const [createStatus, setCreateStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [seedStatus, setSeedStatus] = useState<string | null>(null);
   const draft = useEncryptedDraft({
     uid: actor.uid,
     name: "thread:new",
@@ -171,21 +170,6 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
     }
   };
 
-  const handleSeedThreads = async () => {
-    setSeedStatus(null);
-    try {
-      const res = await fetch("/api/admin/comms/seed", { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Unable to seed threads");
-      }
-      const data = await res.json().catch(() => ({}));
-      setSeedStatus(data.message || "Sample threads created.");
-    } catch (error: any) {
-      setSeedStatus(error.message || "Unable to seed threads.");
-    }
-  };
-
   return (
     <div className="space-y-6">
       {draft.pending ? (
@@ -275,17 +259,6 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
       <AdminSectionCard
         title="Threads"
         description="Track active proposals, discussion, and outcomes across the admin team."
-        actions={
-          threads.length === 0 && !encrypted ? (
-            <button
-              type="button"
-              onClick={handleSeedThreads}
-              className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
-            >
-              Create sample threads
-            </button>
-          ) : null
-        }
       >
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap gap-2">
@@ -312,7 +285,6 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           />
         </div>
 
-        {seedStatus ? <p className="mt-3 text-sm text-muted-foreground">{seedStatus}</p> : null}
 
         {loading ? (
           <div className="mt-6 rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">

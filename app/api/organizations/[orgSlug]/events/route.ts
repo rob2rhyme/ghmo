@@ -5,6 +5,7 @@ import { COMMUNITY_ID } from "@/src/lib/community";
 import { ensureOrgSlug, eventsCollectionPath, normalizeEvent } from "@/src/lib/events";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { toPlain } from "@/src/lib/serialize.server";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
           ? events.filter(evt => (evt.startsAt ? new Date(evt.startsAt.toDate?.() || evt.startsAt).getTime() < now : false))
           : events.filter(evt => (evt.startsAt ? new Date(evt.startsAt.toDate?.() || evt.startsAt).getTime() >= now : true));
 
-    const response = NextResponse.json({ ok: true, events: filtered });
+    // Firestore timestamps become epoch milliseconds; raw Timestamp objects reach the browser as
+    // {_seconds, _nanoseconds}, which `new Date()` cannot read ("Invalid Date", and no upcoming events).
+    const response = NextResponse.json({ ok: true, events: filtered.map(evt => toPlain(evt)) });
     if (process.env.NODE_ENV !== "production") {
       response.headers.set("x-events-auth", authMode);
     }

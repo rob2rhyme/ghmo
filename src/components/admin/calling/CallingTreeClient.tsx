@@ -210,7 +210,11 @@ function CallingTree() {
               </Button>
             ) : null}
             <span className="text-sm text-muted-foreground">
-              {unassigned.length > 0 ? `${unassigned.length} callable ${unassigned.length === 1 ? "person has" : "people have"} no caller yet.` : "Everyone callable has a caller."}
+              {eligibleCount === 0
+                ? "Nobody can be called yet."
+                : unassigned.length > 0
+                  ? `${unassigned.length} callable ${unassigned.length === 1 ? "person has" : "people have"} no caller yet.`
+                  : "Everyone callable has a caller."}
               {spread(counts) > 1 ? ` Lists differ by ${spread(counts)}.` : ""}
             </span>
           </div>
