@@ -38,7 +38,7 @@ export default function SignOutButton() {
   if (signedOut) return null;
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={handleSignOut} loading={loading}>
+    <Button type="button" variant="outline" onClick={handleSignOut} loading={loading}>
       {loading ? "Signing out…" : "Sign out"}
     </Button>
   );

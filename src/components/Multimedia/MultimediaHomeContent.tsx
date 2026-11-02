@@ -1,49 +1,34 @@
 import { MediaSection } from "@/src/components/MediaSection";
-import { internalFetch } from "@/src/lib/internalFetch";
-import { loadFacebookMedia, loadInstagramFeature, loadTikTokFeature, loadYouTubeMedia, MediaFeed } from "@/src/lib/media";
+import { SocialTiles } from "@/src/components/public/SocialTiles";
+import { feedProfiles, loadPublicFeeds } from "@/src/components/public/feeds";
 
-type Feed = Awaited<ReturnType<typeof loadFacebookMedia>>;
-
-async function fetchYouTubeFeed(): Promise<MediaFeed> {
-  try {
-    const res = await internalFetch("/api/media/youtube");
-    if (!res.ok) {
-      return loadYouTubeMedia();
-    }
-    return (await res.json()) as MediaFeed;
-  } catch {
-    return loadYouTubeMedia();
-  }
-}
-
+/** The Media page: sources with posts or videos as sections, the rest as profile tiles. */
 export default async function MultimediaHomeContent() {
-  const channelUrlFallback = "https://www.youtube.com/@greaterharrisburgmagarorga4597";
-  const [facebook, youtube, tiktok, instagram] = await Promise.all([
-    loadFacebookMedia(),
-    fetchYouTubeFeed(),
-    loadTikTokFeature(),
-    loadInstagramFeature()
-  ]);
-  const youtubeFeed = {
-    ...youtube,
-    profileUrl: youtube.profileUrl || channelUrlFallback
-  };
+  const feeds = await loadPublicFeeds();
+  const withItems = feeds.filter(feed => feed.items.length > 0);
+  const profileOnly = feedProfiles(feeds.filter(feed => feed.items.length === 0));
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2 rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-sm uppercase tracking-wide text-primary/80">Multimedia</p>
-        <h1 className="text-3xl font-bold">Stories & Highlights</h1>
-        <p className="text-muted-foreground dark:text-slate-300">
-          Aggregated social content across Facebook, YouTube, TikTok, and Instagram. API-ready when tokens are present; graceful
-          embeds otherwise.
+    <div className="flex flex-col gap-10">
+      <header className="flex max-w-3xl flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Media</h1>
+        <p className="text-base text-muted-foreground">
+          Videos, photos and news from the Greater Harrisburg Magar community, and where to follow us.
         </p>
       </header>
 
-      <MediaSection title="Facebook" feed={facebook as Feed} />
-      <MediaSection title="YouTube" feed={youtubeFeed as Feed} variant="youtube" />
-      <MediaSection title="TikTok" feed={tiktok as Feed} />
-      <MediaSection title="Instagram" feed={instagram as Feed} />
+      {withItems.map(feed => (
+        <MediaSection key={feed.source} feed={feed} headingLevel="h2" />
+      ))}
+
+      {profileOnly.length ? (
+        <section aria-labelledby="media-follow" className="flex flex-col gap-4">
+          <h2 id="media-follow" className="text-lg font-semibold">
+            {withItems.length ? "More places to follow us" : "Follow us"}
+          </h2>
+          <SocialTiles profiles={profileOnly} />
+        </section>
+      ) : null}
     </div>
   );
 }

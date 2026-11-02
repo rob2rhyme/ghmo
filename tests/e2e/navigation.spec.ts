@@ -12,7 +12,7 @@ test("public header shows a mobile menu with the main links", async ({ page }, t
 test("signed-out visitors do not see an Admin link in the header", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("banner").getByRole("link", { name: "Admin", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Admin sign in" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Board member sign in" })).toBeVisible();
 });
 
 test("a placeholder session cookie does not get into the admin area", async ({ page, context }) => {
