@@ -42,7 +42,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label="Admin" className="flex flex-col gap-3 lg:gap-2.5">
       {ADMIN_NAV.map(group => (
         <div key={group.label} className="flex flex-col gap-px">
-          <p className="px-3 pb-0.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{group.label}</p>
+          <p className="px-3 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
           {group.items.map(item => {
             const active = isActiveNavItem(pathname, item.href);
             const Icon = item.icon;
@@ -139,7 +139,7 @@ function JumpButton({ onClick, mac, className }: { onClick: () => void; mac: boo
     >
       <Search className="size-4" aria-hidden="true" />
       <span className="flex-1 text-left">Jump to a page…</span>
-      <kbd className="hidden rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground sm:inline">
+      <kbd className="hidden rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-xs font-medium text-muted-foreground sm:inline">
         {mac ? "⌘ K" : "Ctrl K"}
       </kbd>
     </button>
