@@ -49,7 +49,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 
 ## 6. UI layout upgrade (Phase 10, code work; see `docs/PROJECT_PLAN.md` §13)
 
-- [ ] **Audit 1** (layout only: beginner friendly, premium and modern look) done and findings reviewed by the owner.
+- [ ] **Audit 1** (layout only: beginner friendly, premium and modern look) done and findings reviewed by the owner. *Audit done 2026-11-02 (`docs/UI_AUDIT_1.md`); waiting for the owner's review and the real GoFundMe link.*
 - [ ] Upgrade 1 fixes merged.
 - [ ] **Audit 2** done and findings reviewed by the owner.
 - [ ] Upgrade 2 fixes merged.

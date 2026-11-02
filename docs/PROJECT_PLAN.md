@@ -844,4 +844,9 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 | Taste disagreements | Owner reviews Audit 1 findings and before/after screenshots before Upgrade 2 |
 
 ### 13.6 Progress
-Not started.
+
+**10-A · Audit 1 · done 2026-11-02 (local, not yet pushed)**
+- New screenshot run: `npm run ui:screens` (`playwright.ui-audit.config.ts`, `tests/ui-audit/screenshots.spec.ts`) seeds sample data in the emulators, signs in as a super admin, and saves 33 pages at 375/768/1280 px in light and dark (198 images in the git-ignored `ui-audit-screens/`). A size check flags sideways scrolling.
+- Findings, causes and fixes: **`docs/UI_AUDIT_1.md`**. About 100 problems merged into 8 bugs and 53 layout rows (17 High, 30 Medium, 6 Low).
+- The worst: developer text and placeholder media (including a Rick-roll video and stock photos) on the public home page; a Donate button to a GoFundMe page that doesn't exist; public events show "Invalid Date" / "No events yet"; white-on-teal buttons fail contrast in dark mode; three pages scroll sideways (Meeting Minutes and event detail on phones, Encryption on tablets); the admin Events table breaks on phones; the document generator is unreadable in dark mode; the Calling Tree pages give a new admin no order of steps; admin sign-in leads with passkeys although most admins use the authenticator app.
+- **Waiting on the owner:** review the findings, approve fixing the 8 bugs inside Phase 10 (they change behaviour), and supply the real GoFundMe campaign link. Upgrade 1 then follows the order in `docs/UI_AUDIT_1.md` §7.
