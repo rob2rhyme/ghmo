@@ -13,6 +13,8 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] In Vercel → Domains, make the other addresses (such as `ghmo.vercel.app`) redirect to that one.
 - [x] Firebase Auth → Settings → Authorized domains lists that domain (and only your real domains).
 - [ ] Node version in Vercel is 22 or later (the app requires `>=22.12`).
+- [ ] **Donate button:** set `GOFUNDME_PUBLIC_URL` to the real Gumba Project campaign page (`https://www.gofundme.com/f/…`). Until it is set, the Donate buttons are hidden and the site says "Donations open soon". Optional: `GOFUNDME_PRO_CAMPAIGN_ID` for the embedded donation form.
+- [ ] **Social links (optional):** `FACEBOOK_PAGE_URL`, `INSTAGRAM_PROFILE_URL`, `TIKTOK_PROFILE_URL`, `YOUTUBE_CHANNEL_URL`. Sections without a link are hidden; YouTube defaults to GHMO's channel.
 - [ ] Optional: Resend account, verified sending domain, `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Admin → Security.
 - [ ] **Before the first broadcast to members (Phase 8):** in Resend add a webhook to `https://<your domain>/api/resend/webhook` for `email.bounced` and `email.complained`, and set its signing secret as `RESEND_WEBHOOK_SECRET`; set `BROADCAST_ORG_NAME` and `BROADCAST_POSTAL_ADDRESS` (the footer of every broadcast); verify the sending domain (SPF, DKIM, DMARC). Test one-click unsubscribe from a real mail app. Then set `FEATURE_BROADCASTS=true` (and `BROADCAST_DAILY_LIMIT` to your Resend plan's daily allowance), and send a first broadcast to a small test list of members before the real one.
 
