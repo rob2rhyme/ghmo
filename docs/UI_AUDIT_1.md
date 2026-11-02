@@ -14,6 +14,9 @@ owner's approval because they change behaviour.
 
 ---
 
+> **Status 2026-11-02:** the owner approved the bug fixes; all 8 bugs and the layout rows below were worked through in
+> Upgrade 1 (plan §13.6, 10-B). B2's root cause was events stored in two places (see the plan). Audit 2 re-checks everything.
+
 ## 1. Bugs found on the way (not layout)
 
 | # | Problem | Where |
