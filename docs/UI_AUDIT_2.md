@@ -113,3 +113,34 @@ encryption-on states with an honest status pill; the token dark theme; jump-dial
 
 <!-- ADMIN2 -->
 
+## 4. Consistency across the admin console
+
+Five implementers rebuilt the admin in Upgrade 1. The basics hold everywhere: `AdminPageHeader` on all 22 routes, tokens
+only (no raw colours, hex or `dark:` patches outside paper previews), one locked-state pattern, skeletons instead of
+"Loading…", dates through `format.ts`, `ConfirmDialog` instead of `window.confirm`. What diverges:
+
+**Inventory (measured):** 9 list styles for "rows of things"; 4 back-link styles (one detail page has none); two section
+boxes (`AdminSectionCard` in 6 files, `Card` in 15, 22 hand-built boxes); row buttons `size="sm"` (Members), 40 px
+(Action Items), `h-11 sm:h-10` (Gallery), `max-sm:h-11` (Calling), `lg` everywhere (DocBuilder); 4 step indicators;
+3 stat-tile styles and 3 progress-bar heights; page titles half Title Case, half sentence case; load errors shown three
+ways; success shown as toasts on 14 files and inline text on 4.
+
+| # | Problem | Sev. | One standard | Where |
+|---|---|---|---|---|
+| C1 | 9 list styles (radius, shadow, padding, gap, hover all differ; Plans & Issues nests cards in a card). | High | `AdminList` / `AdminListRow`: one bordered card with dividers, 56 px rows, hover; card grids only for rich items (campaigns). | events, broadcasts, gallery, action items, comms, members, GUMBA, dashboard, campaign detail |
+| C2 | Back links differ in label, colour, height and grouping; Broadcast detail has none. | High | `back={{ href, label }}` on `AdminPageHeader` (ghost, muted, 44 px on phones), labelled with the section name. | new/edit event, topic, campaign and broadcast detail |
+| C3 | The Firebase connection state is the admin's only spinner, says "Connecting to Firestore." / "Unable to connect to Firebase.", and keeps spinning on error with no retry. | High | Skeleton while connecting; `Alert` "Couldn't connect. Check your internet and try again." + Try again. | `FirebaseAdminAuthBootstrap.tsx:80-92` |
+| C4 | Two section-box components with different padding and title size, chosen at random (both on one page). | Medium | `AdminSectionCard` = `Card` + header, one title size. | `AdminSectionCard.tsx`; `card.tsx`; `CallingTreeClient.tsx` |
+| C5 | Page titles and nav labels mix Title Case and sentence case ("Document generator" page vs "Document Generator" nav). | Medium | Sentence case in nav and headers together ("Action items", "Meeting minutes", "Calling tree"…); list any proper names in `UI_STYLE.md`. | `adminNav.ts`; page headers |
+| C6 | The main create action sits in the header, in a section card, or as a form above the list. | Medium | Header `actions` holds the one create button; inline create forms sit above the list. | comms, broadcasts, campaigns |
+| C7 | Row button sizes differ (32/40/44 px; `lg` everywhere in DocBuilder). | Medium | A `row` button size: 40 px desktop, 44 px phone; `lg` only for a flow's Next/Save. | members, action items, gallery, DocBuilder |
+| C8 | Too many primaries: "Mark done" and "Log call" on every row; 3–4 primaries on Minutes. | Medium | Row actions outline; one primary per view; show only the approval step that applies. | `ActionItemsClient.tsx:153`; `MyCallsClient.tsx:216`; `MinutesEditorClient.tsx:796-897` |
+| C9 | Two-admin approval looks different on Broadcasts (stepper + "next step" card) and Minutes (all buttons at once). | Medium | Reuse the broadcast pattern for minutes. | `BroadcastDetailClient.tsx`; `MinutesEditorClient.tsx:803-830` |
+| C10 | Same state, different badge colour or wording ("Done" secondary vs success; call outcomes warning vs secondary; "Submitted" vs "Waiting for approval"); badge maps copied in two places each. | Medium | One `src/lib/statusBadges.ts`. | action items, my calls, campaign detail, minutes, dashboard, comms |
+| C11 | Destructive styles and confirmations differ: Close campaign solid red with no confirm; Disable member no confirm; broadcast send an inline red "Yes, send it now". | Medium | Ghost-red trigger set apart + `ConfirmDialog destructive`; sending a broadcast confirmed with a primary `ConfirmDialog` (same checks). | `CampaignDetailClient.tsx:183`; `MembersClient.tsx:514`; `BroadcastDetailClient.tsx:301` |
+| C12 | Load errors shown three ways (EmptyState + retry, Alert without retry, RouteError). | Medium | In-page: `Alert` + Try again; whole-page: `RouteError`. | comms, authenticator, notifications, encryption, passkeys, calling tree |
+| C13 | Wording: "thread" vs "topic"; "Decrypting…" / "can't be decrypted" beside "Unlock"; "device(s)", "key generation(s)"; env var names (`BROADCAST_ORG_NAME`, `BROADCAST_POSTAL_ADDRESS`) shown to admins. | Medium | "topic"; "Unlocking…" / "Can't be opened on this device"; written-out plurals; "Ask whoever manages the website to add…". | comms, my calls, campaign detail, members, chat, minutes, encryption, `BroadcastDetailClient.tsx:247-250` |
+| C14 | Topic detail has two titles (H1 "Topic", then an off-scale `text-xl` h2 with the real title); Edit event's description is the event title. | Medium | Object name as the H1; one plain sentence. | `comms/[threadId]/page.tsx:45`; `CommsThreadDetailClient.tsx:472`; edit event |
+| C15 | Steps, stat tiles, progress bars, "see all" links, card-title icons, export labels ("Export" vs "Download"), cross-links ("Go to" vs "Open"), "admins" vs "board members", empty-state styles, feedback channel (toast vs inline), full-width phone submits, long header descriptions (24–38 words), a second date helper in `adminView.ts` and server dates without a time zone on GUMBA all vary. | Low | One `Steps`, `StatTile`, `ProgressBar`; ghost "All …" links; no card-title icons (or one rule); "Download PDF / image (JPEG) / spreadsheet (CSV)"; "Open <page>"; "admins" for console users; `EmptyState` compact; toasts for completed actions; one-sentence descriptions (≤ 20 words); one date helper with `DEFAULT_TIMEZONE`. | see the reviewer notes in the plan |
+
+
