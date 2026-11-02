@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test, type Page } from "@playwright/test";
 import { Timestamp } from "firebase-admin/firestore";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "../e2e-auth/helpers";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "../e2e-auth/helpers";
 
 const OUT = process.env.UI_AUDIT_OUT ?? "ui-audit-screens";
 const WIDTHS = [
@@ -130,7 +130,7 @@ async function seed() {
   }
 }
 
-async function shoot(page: Page, name: string, url: string) {
+async function shoot(page: Page, name: string, url: string, { unlock = false } = {}) {
   for (const theme of THEMES) {
     await page.emulateMedia({ colorScheme: theme });
     await page.evaluate(t => {
@@ -141,9 +141,18 @@ async function shoot(page: Page, name: string, url: string) {
     for (const size of WIDTHS) {
       await page.setViewportSize({ width: size.width, height: size.height });
       try {
-        await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
+        await page.goto(url, { waitUntil: "networkidle", timeout: 10_000 });
       } catch {
         // Pages with long-lived connections never go idle; take what has loaded.
+      }
+      if (unlock) {
+        // A full page load forgets this device's keys; unlock the way an admin would.
+        const button = page.getByRole("button", { name: "Unlock with passkey" });
+        if (await button.isVisible().catch(() => false)) {
+          await button.click();
+          await button.waitFor({ state: "hidden", timeout: 15_000 }).catch(() => undefined);
+          await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+        }
       }
       await page.waitForTimeout(600);
       const dir = path.join(OUT, size.name);
@@ -167,4 +176,51 @@ test("public, member and sign-in pages", async ({ page }) => {
 test("admin pages", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin");
   for (const [name, url] of ADMIN_PAGES) if (wanted(name)) await shoot(page, name, url);
+});
+
+/** Pages whose look changes once end-to-end encryption is on (how the site looks after launch). */
+const ENCRYPTED_PAGES = new Set([
+  "admin-encryption",
+  "admin-dashboard",
+  "admin-minutes",
+  "admin-comms",
+  "admin-chat",
+  "admin-action-items",
+  "admin-members",
+  "admin-calling-tree",
+  "admin-call-campaigns",
+  "admin-my-calls",
+  "admin-document-generator"
+]);
+
+test("open menus on a phone", async ({ page }) => {
+  if (ONLY.size && !ONLY.has("menus")) return;
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const theme of THEMES) {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.goto("/", { waitUntil: "load" });
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.waitForTimeout(500);
+    fs.mkdirSync(path.join(OUT, "phone"), { recursive: true });
+    await page.screenshot({ path: path.join(OUT, "phone", `menu-public--${theme}.png`) });
+  }
+  await signInWithNewPasskey(page, "alice", "/admin");
+  for (const theme of THEMES) {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.goto("/admin", { waitUntil: "load" });
+    await page.getByRole("button", { name: "Open admin menu" }).click();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(OUT, "phone", `menu-admin--${theme}.png`) });
+  }
+});
+
+test("admin pages with encryption on", async ({ page }) => {
+  if (ONLY.size && !ONLY.has("encrypted")) return;
+  await signInWithNewPasskey(page, "alice", "/admin/encryption");
+  await turnOnEncryption(page, "Alice laptop");
+  for (const [name, url] of ADMIN_PAGES) {
+    if (!ENCRYPTED_PAGES.has(name)) continue;
+    await shoot(page, `enc-${name}`, url);
+    await shoot(page, `encu-${name}`, url, { unlock: true });
+  }
 });
