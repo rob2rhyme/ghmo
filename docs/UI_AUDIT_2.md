@@ -9,7 +9,54 @@ consistency across the whole admin console. Each verified the Audit 1 rows for t
 Severity as in Audit 1. Finding ids: **P** public, **A** admin governance and shell, **S** admin community and security,
 **C** consistency across the admin.
 
-<!-- SUMMARY -->
+## Summary
+
+**Audit 1, checked:** all 8 bugs are fixed, and no page scrolls sideways at any width (268 screenshots). Most Audit 1
+rows are resolved; the rest are partly resolved, mainly where a fix landed on some pages and not others.
+
+**What Audit 2 found:** 69 findings (5 High, 41 Medium, 23 Low) and 1 new bug. The site is no longer broken or
+developer-facing anywhere; what remains is about *finish*:
+
+1. **One regression:** on phones the admin menu shows only down to "My Calls"; five pages, including Encryption, are
+   reachable only by scrolling inside the menu with no hint (A1).
+2. **Five builders, five dialects:** 9 list styles, 4 back-link styles, 4 step indicators, two section boxes, the same
+   status in different colours, Title Case and sentence case titles side by side (C1–C15).
+3. **Encryption after launch:** the Encryption page puts the most technical card first and the actions last (S1); every
+   locked page shows two boxes saying the same thing (A2); the "encryption is off" banner is long and worded unlike the
+   status pill (A3); several screens still say "device(s)", "key generation", "plaintext", "thread" (S2, S3, C13).
+4. **Day-one dead ends that remain:** Broadcasts gives no warning that nobody can be emailed yet (S10); Call Campaigns
+   shows a disabled form that looks usable (S6); GUMBA's no-goal state has no next step (S15).
+5. **The public site is correct but not yet premium:** the home page reads as a template (P1), the Donate page
+   contradicts itself while donations are closed (P2, P4, P5), Media is nearly empty (P7), page widths and title sizes
+   differ (P8), and there is no way to contact GHMO anywhere (P3).
+
+**One new bug (B9, needs the owner's go-ahead):** event times can shift by hours, because the edit form and the server
+both ignore the event's time zone (§2).
+
+**Needs the owner:** a contact email for the site (P3); community photos for the home page (P1); the go-ahead to fix B9.
+
+## Upgrade 2 plan (10-D), in order
+
+1. **Fix the regression and B9** (with approval): phone admin menu scrolls as one; event times read and saved in the
+   event's own time zone, with a browser test.
+2. **Shared building blocks, then apply them everywhere:** `AdminList`/`AdminListRow`; `back` on `AdminPageHeader`;
+   `AdminSectionCard` = `Card`; one `Steps`; `StatTile` and `ProgressBar`; `src/lib/statusBadges.ts`; a `row` button size;
+   one destructive pattern (ghost red + `ConfirmDialog`); `Segmented` fixes (visible selected state in dark, link
+   variant for the Minutes tabs); `Field`/`Input`/`Sheet` fixes; one load-error pattern; skeleton instead of the
+   Firebase spinner. Public: `PublicPage` + `PublicPageHeader`, one message-page component, `not-found.tsx` per group.
+3. **Encryption after launch:** one locked-state card per page; one-line "encryption is off" strip; Encryption page
+   reordered with plain wording (every step and warning kept); `e2ee_*` activity sentences.
+4. **Day-one guidance:** Broadcasts email warning; Call Campaigns form hidden until the tree is planned; GUMBA next
+   step; Document generator preview without "TBD", no ids, compact on phones; Members list first on phones.
+5. **Public finish:** home hero with an image slot and no repeated logo; honest closed-Donate state; Media as one
+   featured YouTube card until there are posts; shared `EventCard` on home; contact column once the owner gives an
+   address.
+6. **Wording pass:** sentence-case titles with the nav; "topic"; "unlock/open" instead of "decrypt"; no "(s)", ids or
+   env var names; "Download …" labels; "Open <page>" links; one-sentence descriptions.
+7. Re-run `npm run ui:screens` (all states), the full test suite and an accessibility check.
+
+---
+
 
 ---
 
@@ -111,7 +158,51 @@ event fields, sidebar fold on desktop, sidebar at tablet width, dates, skeletons
 meeting first…", "Nothing is public until another admin approves it"); the edit-event load/error/delete flow; calm
 encryption-on states with an honest status pill; the token dark theme; jump-dialog keywords.
 
-<!-- ADMIN2 -->
+## 3. Admin console: community, documents and security pages
+
+### Audit 1 rows
+
+**Resolved:** B8; white-on-teal and dark-mode selection on these pages; Encryption tablet overflow; raw colours; ALL-CAPS;
+one page frame and width; skeletons; dates; Calling Tree day-one dead end (checklist, "Why?", reason under the button);
+My Calls; Document generator dark mode; Document gallery; Security.
+
+| Audit 1 row | Status | What remains |
+|---|---|---|
+| Touch targets | Partly | Member row buttons are 32 px from 640 px up (tablets); "Why?" / "What is…?" summaries shrink on wider screens. |
+| Members | Partly | Disable still in every row (no "More" menu); no downloadable sample; "CSV" unexplained. |
+| Broadcasts | Partly | **Still no warning** that 0 members can be emailed and no email provider is set. |
+| Call Campaigns | Partly | The disabled form still looks active (S6). |
+| Document generator polish | Partly | "Document saved (ID: …)" still shown; the step name appears twice. |
+| GUMBA | Partly | The no-goal state is a dead end ("there is nothing to set on this page"). |
+| Encryption jargon | Partly | Setup (off) is plain now; the encryption-on screens add new jargon (S2–S4). |
+| Encryption reminder wording | Partly | Gate titles read "Call campaigns is…", "Action Items is…" (A2). |
+
+### New findings
+
+| # | Page | Problem | Sev. | Fix | Where |
+|---|---|---|---|---|---|
+| S1 | Encryption (on) | **The most technical card comes first and the actions last.** Order: status → "Device list verified" (signed history, fingerprint) → devices → recovery key → "Encrypt existing records". Locked: "Unlock with passkey" is the last card, below the fold on a phone. Unlocked: the only primary ("Encrypt existing records") is at the very bottom. | High | Next action first (Unlock when locked; "Encrypt existing records" as a to-do near the top while unfinished); integrity as a one-line "Device list checked ✓" with the fingerprint in a disclosure. Every check and text kept. | `EncryptionPanel.tsx:199-228,660-686` |
+| S2 | Encryption (on) | Jargon and grammar: "1 active device(s) · key generation 1", "tamper-evident history (1 entries)", a hard-to-follow fingerprint sentence; the device-list explanation appears twice. | Medium | "1 approved device"; "key generation" only inside "What does rotating keys do?"; "Checked against a signed record of every change (1 change)"; plain fingerprint line; one explanation. | `EncryptionPanel.tsx:213-225,370,666` |
+| S3 | Encrypt existing records | Rows show "—"; labels say "threads", "Thread conclusions"; the card always looks unfinished; "old plaintext"; failures list raw record ids. | Medium | "Not started / Nothing to do / 3 of 5"; topic wording; collapse to "All records are encrypted ✓" when done; "old unencrypted copies"; failures as area + count. Warning kept. | `src/lib/e2eeMigration.ts:18-27`; `MigrationSection.tsx:94-118` |
+| S4 | Encryption devices | A disabled destructive button looks active (pink); it shows even when there's nothing to revoke; this device's icon sits where checkboxes are and reads as an empty box. | Medium | Muted disabled style for `destructive` (as `default` has); hide revoke with "Only your own device is listed"; neutral device icon spaced unlike a checkbox. | `src/components/ui/button.tsx:12`; `EncryptionPanel.tsx:375-416` |
+| S5 | Recovery key; setup | The Test input has no format hint and stays disabled until 55 characters; "Replace recovery key" doesn't say when; the setup step name appears three times. | Low | Help text for both; title "Set up this device" only. | `EncryptionPanel.tsx:131-184,467-497` |
+| S6 | Call Campaigns | With no calling tree the form is disabled but looks enabled; with encryption off the script help still says "Encrypted on this device" and saving fails with "Unlock this device"; three routes to the Calling Tree. | Medium | Hide the form until the tree is planned; "Turn on encryption to add a script" when off; one route. | `CallCampaignsClient.tsx:127-201` |
+| S7 | Shared `Field`, `Input` | Side-by-side fields misalign when one has help text; disabled inputs look enabled (white at 50%). | Low | `content-start` on Field; `disabled:bg-muted` on Input. | `src/components/ui/field.tsx:29`; `input.tsx:9` |
+| S8 | Members, phone | The list starts ~2,000 px down under Add and Import; each row spends a line on a lone red "Disable". | Medium | List first; "Add a member" / "Import a list" behind buttons; Disable in a "More" menu. | `MembersClient.tsx:262-380,512-524` |
+| S9 | Members, tablet | 7-option filter wraps in its track at 768 px; 32 px row buttons; disabled-state copy says numbers "are encrypted" when encryption is off; import textarea label is screen-reader only. | Low | Segmented from `lg`; 44 px below `lg`; state-aware sentence; visible "Paste your list". | `MembersClient.tsx:76,270,335-338,402-412` |
+| S10 | Broadcasts | No warning that 0 of 6 members can be emailed and email sending isn't set up; the empty-state button focuses the form right above it. | Medium | Inline `Alert` above the form with a link to Members; drop or repurpose the empty-state button. | `BroadcastsClient.tsx:53-92` |
+| S11 | Calling Tree | Three loose grey status lines under the buttons repeat the checklist; a 35-word description. | Low | One status line; "Last saved" by the title; one short sentence. | `CallingTreeClient.tsx:264-292` |
+| S12 | Document generator, phone | Six template cards stack ~720 px before the form; the stepper wraps; no preview below `lg` until the last step. | Medium | Compact picker on phones; shorter step labels; a "Preview" button below `lg`. | `DocBuilder.tsx:610-665,804` |
+| S13 | Document generator | The live preview is full of "TBD at TBD location" and "Dear Valued Member,", so it looks broken; Wedding and Memorial share an icon; "Document saved (ID: …)". | Medium | Grey bracketed hints or the example values in the preview; distinct icon; "Saved to Saved documents" with a link. | `DocBuilder.tsx:428,663-665`; `TemplateTabs.tsx` |
+| S14 | Document gallery | Two identical primary buttons when empty; "Export JPEG"; three names for one place ("Document gallery", "Saved documents"). | Low | Hide the header action when empty; "Download image (JPEG)"; one name. | `document-gallery/page.tsx:31-79` |
+| S15 | GUMBA (admin) | Three ways of saying "nothing yet"; the goal empty state has no next step; minutes rows not clickable; mixed separators. | Medium | One line + a link ("See the Donate page"); rows link to the record; one separator. | `gumba-project/page.tsx:98-170` |
+| S16 | My Calls, Security | Descriptions that don't fit the state ("never leave it" with encryption off; "passkeys waiting for your approval" when none are); "Authenticator app:" / "Passkey:" prefixes repeat card titles. | Low | State-aware sentences; drop the prefixes. | `my-calls/page.tsx:19`; `security/page.tsx:25`; panels |
+
+**Strengths to keep:** the Calling Tree setup checklist (the model for day-one guidance); encryption setup when off
+(three visible steps, "What is…?" lines in one place); Security "Your sign-in at a glance"; finished dark mode including
+the Document generator; honest local copy (Dashain placeholder, "Sita Gurung", consent wording on Members).
+
+
 
 ## 4. Consistency across the admin console
 
@@ -141,6 +232,6 @@ ways; success shown as toasts on 14 files and inline text on 4.
 | C12 | Load errors shown three ways (EmptyState + retry, Alert without retry, RouteError). | Medium | In-page: `Alert` + Try again; whole-page: `RouteError`. | comms, authenticator, notifications, encryption, passkeys, calling tree |
 | C13 | Wording: "thread" vs "topic"; "Decrypting…" / "can't be decrypted" beside "Unlock"; "device(s)", "key generation(s)"; env var names (`BROADCAST_ORG_NAME`, `BROADCAST_POSTAL_ADDRESS`) shown to admins. | Medium | "topic"; "Unlocking…" / "Can't be opened on this device"; written-out plurals; "Ask whoever manages the website to add…". | comms, my calls, campaign detail, members, chat, minutes, encryption, `BroadcastDetailClient.tsx:247-250` |
 | C14 | Topic detail has two titles (H1 "Topic", then an off-scale `text-xl` h2 with the real title); Edit event's description is the event title. | Medium | Object name as the H1; one plain sentence. | `comms/[threadId]/page.tsx:45`; `CommsThreadDetailClient.tsx:472`; edit event |
-| C15 | Steps, stat tiles, progress bars, "see all" links, card-title icons, export labels ("Export" vs "Download"), cross-links ("Go to" vs "Open"), "admins" vs "board members", empty-state styles, feedback channel (toast vs inline), full-width phone submits, long header descriptions (24–38 words), a second date helper in `adminView.ts` and server dates without a time zone on GUMBA all vary. | Low | One `Steps`, `StatTile`, `ProgressBar`; ghost "All …" links; no card-title icons (or one rule); "Download PDF / image (JPEG) / spreadsheet (CSV)"; "Open <page>"; "admins" for console users; `EmptyState` compact; toasts for completed actions; one-sentence descriptions (≤ 20 words); one date helper with `DEFAULT_TIMEZONE`. | see the reviewer notes in the plan |
+| C15 | Steps, stat tiles, progress bars, "see all" links, card-title icons, export labels ("Export" vs "Download"), cross-links ("Go to" vs "Open"), "admins" vs "board members", empty-state styles, feedback channel (toast vs inline), full-width phone submits, long header descriptions (24–38 words), a second date helper in `adminView.ts` and server dates without a time zone on GUMBA all vary. | Low | One `Steps`, `StatTile`, `ProgressBar`; ghost "All …" links; no card-title icons (or one rule); "Download PDF / image (JPEG) / spreadsheet (CSV)"; "Open <page>"; "admins" for console users; `EmptyState` compact; toasts for completed actions; one-sentence descriptions (≤ 20 words); one date helper with `DEFAULT_TIMEZONE`. | across the admin |
 
 
