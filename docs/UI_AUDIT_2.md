@@ -61,4 +61,55 @@ All §1 public bugs (B1, B3–B6) **resolved**. §3 and §4 rows **resolved** ex
 filters, whole-card links, date tiles, agenda list on phones); the header and phone menu current-page marker; finished
 light and dark modes; calm, plain copy (Donate story and pull-quote, the board member guide, "This link doesn't work").
 
-<!-- ADMIN -->
+## 2. Admin console: governance pages and shell
+
+### Audit 1 rows
+
+**Resolved:** B2 (edit event: loads, "doesn't exist / couldn't load" states, confirmed delete), B7, white-on-teal, the
+Meeting Minutes overflow and blank space, Minutes duplicate controls and jargon, the Events table on phones, new/edit
+event fields, sidebar fold on desktop, sidebar at tablet width, dates, skeletons.
+
+| Audit 1 row | Status | What remains |
+|---|---|---|
+| One button/chip/card style | Partly | Hand-built Minutes tabs, overdue pill, Lock button, jump button; event form uses `Card` where other forms use `AdminSectionCard` (C rows). |
+| One page frame / width | Partly | New/edit event centred at `max-w-3xl`, so its title starts 88 px right of every other page. |
+| Touch targets | Partly | Preview Fit/100% 32 px, Minutes tabs 40 px, Lock and the status link 36 px. |
+| Encryption worded three ways; banner | Partly | Pill fixed ("Encryption is off"); the banner is still 3–5 lines, worded differently, "end-to-end" unexplained. |
+| Round theme toggle | Not resolved | Still round beside square controls (also P19). |
+| Dashboard activity / two searches / quick actions | Partly | Sign-in entries are sentences; encryption entries are raw; two searches remain; six quick-action tiles push recent lists down on phones. |
+| Plans & Issues wording | Partly | Heading says "topic", button and status still say "thread" (kept for tests). |
+| Admin Chat height | Partly | With encryption off, the composer starts below the fold on phones. |
+| Action Items wording | Partly | Tab still "Done / dropped" beside "Not needed". |
+
+### New findings
+
+| # | Page | Problem | Sev. | Fix | Where |
+|---|---|---|---|---|---|
+| A1 | Phone admin menu | **Regression:** the pinned footer (user card, encryption pill, Public site / theme / Sign out, ~185 px) leaves room only down to "My Calls"; GUMBA, both Documents pages, Security and Encryption are reachable only by scrolling inside the menu, with no hint. | High | Let the whole sheet scroll as one, or shrink the footer to one row (initials + Sign out) and move theme and Public site into the list. | `AdminShell.tsx:113-130,206-218` |
+| A2 | Gated pages, locked | Two boxes say the same thing (an info Alert, then a generic Unlock card that mentions "chat and plans" on every page). | Medium | One card: "{Page} is locked on this device", one plain line, a large "Unlock with passkey" button. | `EncryptionGate.tsx:144-155`; `UnlockCard.tsx:213-231` |
+| A3 | Gated pages, encryption off | The banner is 3–5 lines on every page, worded differently from the pill, and sits in different places (under the tabs on Minutes). | Medium | One line in one slot under the page header: "Encryption is off. Records here aren't extra-locked yet. Turn it on →", with a "What's this?". | `EncryptionGate.tsx:103-124`; `minutes/page.tsx:55-57` |
+| A4 | Dashboard activity | Encryption events show raw ("Alice laptop", "End-to-end encryption enabled; recovery key held by…"). | Medium | Map the `e2ee_*` actions to sentences ("Alice Rai turned on encryption", "Alice Rai set up a device"). | `src/lib/adminView.ts:62-115,154` |
+| A5 | Events list | Column headings sit 48 px left of their values (header row lacks the rows' `gap-4`). | Medium | Share one grid class. | `events/page.tsx:77,93` |
+| A6 | Events | "Featured" means three things: "Homepage" column, "top of the Events page" checkbox, "home page" summary help. | Medium | One meaning, one wording. | `events/page.tsx:82,111`; `EventForm.tsx:71,122-123` |
+| A7 | Plans & Issues | "Start a new topic" heading with a "Create thread" button and "Thread created." status. | Medium | "Start topic" / "Topic started." (update the two tests). | `CommsBoardClient.tsx:180,398-400` |
+| A8 | Admin Chat, phone | Composer and Send below the fold while the banner shows (page 931 px on an 812 px screen). | Medium | Full-height flex column with `flex-1` chat, or the one-line banner (A3). | `AdminChatClient.tsx:126` |
+| A9 | Action Items, phone | Filter wraps to two rows ("All" alone); the Open tab carries two numbers; "dropped" vs "Not needed". | Medium | Overdue as a badge in the list heading; tab "Done / not needed" (update the test); fit one row. | `ActionItemsClient.tsx:93-114` |
+| A10 | Dashboard, phone | Six quick-action tiles and a second search come before the recent lists. | Medium | Hide quick actions below `md` (or three tiles); drop the page filter (update the test). | `AdminDashboardOverview.tsx:243-265` |
+| A11 | Meeting Minutes, phone | The sticky Save bar is ~120 px (hint + left button), covering ~23% of the screen while typing. | Medium | One short line or none on phones, full-width button, ~64 px bar. | `MinutesEditorClient.tsx:789-800` |
+| A12 | Meeting Minutes | Section actions sit in different places ("Add attendance" wraps under its text, "Add signatures" sits right); the "New minutes" card repeats the header; the action-item Task input has no visible label. | Low | Pinned header actions in `AdminSectionCard`; show the card only when editing; `Field label="Task"`. | `AdminSectionCard.tsx:35-40`; `MinutesEditorClient.tsx:559-770` |
+| A13 | Top bar | Three control shapes and heights (pill, ghost link, round toggle); "Lock" is a bare grey word at 36 px. | Low | One 40 px height, `rounded-md`; "Lock now" outline button with an icon. | `ThemeToggle.tsx:19`; `EncryptionStatusBadge.tsx:32-57` |
+| A14 | Dashboard, phone | "View all" floats under the description; "To approve" hint breaks mid-phrase. | Low | Text link aligned to the title; "1 draft". | `AdminDashboardOverview.tsx:238-276` |
+| A15 | Events list | Sorted latest first with no Upcoming/Past split. | Low | Upcoming (soonest first), then Past. | `admin/events/route.ts:25`; `events/page.tsx:85` |
+
+### Bug found on the way (behaviour, owner decision)
+
+| # | Problem | Where |
+|---|---|---|
+| B9 | **Event times can shift by hours.** The edit form shows and sends times in the browser's own time zone, and the server reads the time without a zone (`new Date("2026-12-12T19:00")`, i.e. in the server's zone, UTC on Vercel). The event's own "Time zone" setting is ignored for both. The capture showed the same event at 4:59 PM in the list and 09:59 PM in the form. An admin in Harrisburg entering 7:00 PM could store 7:00 PM UTC (2:00 PM Eastern). | `EventForm.tsx:45-54`; `api/admin/organizations/[orgSlug]/events/route.ts` and `[eventId]/route.ts` (`parseOptionalDate`) |
+
+**Strengths to keep:** every page fits at 375 and 768 px; plain guiding copy on Minutes ("Which meeting?", "Choose a
+meeting first…", "Nothing is public until another admin approves it"); the edit-event load/error/delete flow; calm
+encryption-on states with an honest status pill; the token dark theme; jump-dialog keywords.
+
+<!-- ADMIN2 -->
+
