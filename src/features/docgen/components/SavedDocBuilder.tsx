@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ShieldAlert } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Skeleton } from "@/src/components/ui/skeleton";
 import DocBuilder from "./DocBuilder";
 import type { DocTemplateMeta } from "../types";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
@@ -37,12 +40,24 @@ export default function SavedDocBuilder({ enc, ...props }: SavedDocBuilderProps)
   }, [enc, props.initialDocId, decrypt]);
 
   if (!enc) return <DocBuilder {...props} />;
-  if (!result) return <p className="text-sm text-muted-foreground">Decrypting document…</p>;
+  if (!result) {
+    return (
+      <div role="status" className="flex flex-col gap-3">
+        <span className="sr-only">Decrypting document…</span>
+        <Skeleton className="h-40 rounded-xl" />
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    );
+  }
   if (result.error) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-destructive">
-        This document can&apos;t be decrypted on this device ({result.error}).
-      </div>
+      <Alert variant="destructive">
+        <ShieldAlert />
+        <AlertTitle>This document can&apos;t be opened on this device</AlertTitle>
+        <AlertDescription>
+          It is encrypted and this device couldn&apos;t unlock it ({result.error}). Ask a super admin for help.
+        </AlertDescription>
+      </Alert>
     );
   }
   return <DocBuilder {...props} initialInputs={result.inputs} />;

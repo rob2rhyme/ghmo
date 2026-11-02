@@ -4,6 +4,25 @@ import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import * as htmlToImage from "html-to-image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Copy,
+  Download,
+  FileCheck2,
+  FileText,
+  Image as ImageIcon,
+  Save,
+  TriangleAlert
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { cn } from "@/src/lib/utils";
 import DocForm from "./DocForm";
 import DocPreview from "./DocPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "./LetterheadPage";
@@ -59,7 +78,7 @@ const SIGNATURE_ROLES: Array<{ role: SignatureRole; label: string; inputKey: str
   { role: "witness1", label: "Witness 1", inputKey: "witness1SignatureImage" },
   { role: "witness2", label: "Witness 2", inputKey: "witness2SignatureImage" },
   { role: "officiant", label: "Officiant", inputKey: "officiantSignatureImage" },
-  { role: "issuingAuthority", label: "Issuing Authority", inputKey: "issuingAuthoritySignatureImage" }
+  { role: "issuingAuthority", label: "Issuing authority", inputKey: "issuingAuthoritySignatureImage" }
 ];
 const SIGNATURE_FIELDS: Record<SignatureRole, string> = {
   witness1: "witness1Signature",
@@ -98,12 +117,7 @@ const LOCKED_FIELD_VALUES: Record<string, string> = {
   organizationName: "Greater Harrisburg Magar Organization"
 };
 const LOCKED_FIELD_IDS = new Set([...Object.keys(LOCKED_FIELD_VALUES), "officialSeal"]);
-const FALLBACK_STEP_TITLES = [
-  "Document Details",
-  "Recipient/Parties",
-  "Event/Main Content",
-  "Additional Details"
-];
+const FALLBACK_STEP_TITLES = ["Details", "Recipient", "Event", "More details"];
 
 const slugify = (value: string) =>
   value
@@ -135,7 +149,7 @@ const buildTemplateSteps = (meta?: DocTemplateMeta): DocTemplateStep[] => {
       } else {
         cleaned.push({
           id: "additional-details",
-          title: "Additional Details",
+          title: "More details",
           fieldKeys: missing
         });
       }
@@ -209,7 +223,7 @@ export default function DocBuilder({
   const steps = useMemo(
     () => [
       ...stepDefinitions,
-      { id: "review-print", title: "Review & Print", fieldKeys: [] }
+      { id: "review-print", title: "Review & print", fieldKeys: [] }
     ],
     [stepDefinitions]
   );
@@ -573,118 +587,137 @@ export default function DocBuilder({
       )
     : undefined;
 
+  const showVersionNote = Boolean(
+    initialDocId &&
+      initialTemplateVersion &&
+      selectedTemplateMeta &&
+      selectedTemplateMeta.id === initialTemplateId &&
+      initialTemplateVersion < selectedTemplateMeta.version
+  );
+
   return (
-    <section className="space-y-6">
-      <div className="space-y-2 rounded-2xl border border-border bg-card p-5 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Document generator</p>
-            <h1 className="text-2xl font-semibold text-foreground">Document builder</h1>
-            {initialDocId ? (
-              <p className="text-xs text-slate-400">Editing saved document ({initialDocId})</p>
-            ) : null}
-            {initialDocId && initialTemplateVersion && selectedTemplateMeta && selectedTemplateMeta.id === initialTemplateId && initialTemplateVersion < selectedTemplateMeta.version ? (
-              <p className="text-xs text-warning">
-                Saved with version {initialTemplateVersion} of this template; it now shows version {selectedTemplateMeta.version}, so
-                wording or layout may differ.
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="hidden lg:block">
-          <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
-        </div>
-        <div className="block lg:hidden">
-          <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
-        </div>
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {steps.map((step, index) => {
-              const active = index === activeStepIndex;
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  onClick={() => setActiveStepIndex(index)}
-                  className={`rounded-full border px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-wide transition ${
-                    active
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground/80"
-                  }`}
-                >
-                  {step.title}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p>
+    <section className="flex flex-col gap-6">
+      {showVersionNote ? (
+        <Alert variant="warning">
+          <TriangleAlert />
+          <AlertTitle>This template has changed since you saved</AlertTitle>
+          <AlertDescription>
+            The wording or layout may look a little different from your saved copy. Check the preview before you print.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Choose a template</CardTitle>
+          <CardDescription>Pick what you want to make. You can switch any time; what you typed is kept for each template.</CardDescription>
+        </CardHeader>
+        <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
+      </Card>
+
+      {selectedTemplateMeta ? (
+        <div className={cn("grid gap-6", !isReviewStep && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+          <Card className="min-w-0">
+            <CardHeader>
+              <CardTitle>{selectedTemplateMeta.title}</CardTitle>
+              <CardDescription>{selectedTemplateMeta.description}</CardDescription>
+            </CardHeader>
+
+            <nav aria-label="Steps">
+              <ol className="flex flex-wrap gap-2">
+                {steps.map((step, index) => {
+                  const active = index === activeStepIndex;
+                  const done = index < activeStepIndex;
+                  return (
+                    <li key={step.id}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveStepIndex(index)}
+                        aria-current={active ? "step" : undefined}
+                        className={cn(
+                          "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 pr-3 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : done
+                                ? "border-primary text-primary"
+                                : "border-border bg-card"
+                          )}
+                        >
+                          {done ? <Check className="size-3.5" /> : index + 1}
+                        </span>
+                        <span className="sr-only">Step {index + 1}: </span>
+                        {step.title}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+            <p className="text-sm text-muted-foreground">
               Step {Math.min(activeStepIndex + 1, steps.length)} of {steps.length}
             </p>
-            <p className="uppercase tracking-wide">{activeStep?.title}</p>
-          </div>
-        </div>
-        {selectedTemplateMeta ? (
-          <div className="space-y-4 rounded-2xl border border-border bg-white/70 p-5">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{selectedTemplateMeta.category}</p>
-              <p className="text-sm text-muted-foreground">{selectedTemplateMeta.description}</p>
-            </div>
+
             {!isReviewStep ? (
               <>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">{activeStep?.title}</p>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      {stepFields.length} fields
-                    </p>
-                  </div>
+                <fieldset className="min-w-0">
+                  <legend className="sr-only">{activeStep?.title}</legend>
                   <DocForm fields={stepFields} values={mergedInputs} onChange={handleFieldChange} />
-                </div>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <button
+                </fieldset>
+                <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="lg"
                     onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
                     disabled={activeStepIndex === 0}
-                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-input disabled:cursor-not-allowed disabled:opacity-60"
                   >
+                    <ArrowLeft aria-hidden="true" />
                     Back
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    size="lg"
                     onClick={() => setActiveStepIndex(index => Math.min(steps.length - 1, index + 1))}
-                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800"
                   >
                     Next
-                  </button>
+                    <ArrowRight aria-hidden="true" />
+                  </Button>
                 </div>
               </>
             ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Letter preview</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">Preview</h3>
                   {selectedTemplate ? (
-                    <DocPreview
-                      template={selectedTemplate}
-                      inputs={mergedInputs}
-                      ref={previewRef}
-                      onBackgroundLoad={() => setLetterheadReady(true)}
-                    />
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-border bg-white/70 p-6 text-center text-xs text-slate-400">
-                      Add a template to see a preview here.
+                    <div className="rounded-xl border border-border bg-muted/50">
+                      <DocPreview
+                        template={selectedTemplate}
+                        inputs={mergedInputs}
+                        ref={previewRef}
+                        onBackgroundLoad={() => setLetterheadReady(true)}
+                      />
                     </div>
+                  ) : (
+                    <EmptyState title="No preview yet" description="Choose a template to see a preview here." />
                   )}
-                  <p className="text-xs text-slate-400">
-                    Preview is letter-size (8.5x11) and used for export.
+                  <p className="text-sm text-muted-foreground">
+                    This is how the letter-size (8.5 × 11 in) page will print and download.
                   </p>
                 </div>
+
                 {signatureEnabled ? (
-                  <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Signature requests</p>
-                      <p className="text-[0.65rem] uppercase tracking-wide text-slate-400">
-                        Request links for mobile signing
+                  <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/40 p-4">
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-base font-semibold text-foreground">Signatures</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Send each person a link. They sign on their phone and the signature appears here.
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -692,139 +725,145 @@ export default function DocBuilder({
                         const action = signatureActions?.[SIGNATURE_FIELDS[roleConfig.role]];
                         if (!action) return null;
                         return (
-                          <div
-                            key={roleConfig.role}
-                            className="rounded-xl border border-border bg-background/70 p-3"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-foreground/80">{roleConfig.label}</p>
-                              {action.badge ? (
-                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700">
-                                  {action.badge}
-                                </span>
-                              ) : null}
+                          <div key={roleConfig.role} className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-foreground">{roleConfig.label}</p>
+                              {action.badge ? <Badge variant="success">{action.badge}</Badge> : null}
                             </div>
-                            {action.status ? <p className="text-xs text-slate-400">{action.status}</p> : null}
-                            <button
-                              type="button"
-                              onClick={action.onClick}
-                              disabled={action.disabled}
-                              className="mt-3 w-full rounded-full border border-border px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
-                            >
+                            {action.status ? <p className="text-sm text-muted-foreground">{action.status}</p> : null}
+                            <Button type="button" variant="outline" onClick={action.onClick} disabled={action.disabled} className="w-full">
                               {action.label}
-                            </button>
+                            </Button>
                           </div>
                         );
                       })}
                     </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="lg"
+                          onClick={handleFinalizeSigned}
+                          disabled={!selectedTemplate || isFinalizing || !letterheadReady}
+                          loading={isFinalizing}
+                        >
+                          <FileCheck2 aria-hidden="true" />
+                          Finalize &amp; save signed certificate
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        When everyone has signed, this saves the signed certificate and downloads its PDF. It can&apos;t be changed after.
+                      </p>
+                    </div>
                   </div>
                 ) : null}
-                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-start">
-                  <button
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="lg" onClick={handleSave} disabled={!selectedTemplate || isSaving} loading={isSaving}>
+                    <Save aria-hidden="true" />
+                    Save to gallery
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="lg"
                     onClick={() => handleExport("pdf")}
                     disabled={!selectedTemplate || isExporting || !letterheadReady}
-                    className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
                   >
+                    <Download aria-hidden="true" />
                     Download PDF
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="lg"
                     onClick={() => handleExport("jpeg")}
                     disabled={!selectedTemplate || isExporting || !letterheadReady}
-                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
                   >
+                    <ImageIcon aria-hidden="true" />
                     Download JPEG
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={!selectedTemplate || isSaving}
-                    className="rounded-full border border-emerald-400 bg-emerald-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                  >
-                    Save to Gallery
-                  </button>
-                  {signatureEnabled ? (
-                    <button
-                      type="button"
-                      onClick={handleFinalizeSigned}
-                      disabled={!selectedTemplate || isFinalizing || !letterheadReady}
-                      className="rounded-full border border-border bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                    >
-                      Finalize & Save Signed Certificate
-                    </button>
-                  ) : null}
+                  </Button>
                 </div>
-                {statusMessage ? <p className={`text-xs ${statusColor}`}>{statusMessage}</p> : null}
-                <div className="flex flex-wrap justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
-                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-input"
-                  >
+                {statusMessage ? (
+                  <p role="status" className={cn("text-sm", statusColor)}>
+                    {statusMessage}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+                  <Button type="button" variant="outline" size="lg" onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}>
+                    <ArrowLeft aria-hidden="true" />
                     Back
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No template selected.</p>
-        )}
-      </div>
-      {activeSession ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="w-full max-w-md space-y-4 rounded-2xl bg-card p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Signature link</p>
-                <p className="text-lg font-semibold text-foreground">
-                  {SIGNATURE_ROLES.find(role => role.role === activeSession.role)?.label}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveQrRole(null)}
-                className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground"
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background/60 p-4 text-center">
+          </Card>
+
+          {!isReviewStep && selectedTemplate ? (
+            <aside aria-label="Live preview" className="hidden min-w-0 lg:block">
+              <Card className="sticky top-20">
+                <CardHeader>
+                  <CardTitle>Live preview</CardTitle>
+                  <CardDescription>Updates as you type. Download or save on the last step.</CardDescription>
+                </CardHeader>
+                <div className="rounded-xl border border-border bg-muted/50">
+                  <DocPreview template={selectedTemplate} inputs={mergedInputs} />
+                </div>
+              </Card>
+            </aside>
+          ) : null}
+        </div>
+      ) : (
+        <EmptyState icon={<FileText />} title="No template selected" description="Choose a template above to start." />
+      )}
+
+      <Dialog open={Boolean(activeSession)} onOpenChange={open => (open ? undefined : setActiveQrRole(null))}>
+        {activeSession ? (
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Signature link: {SIGNATURE_ROLES.find(role => role.role === activeSession.role)?.label}</DialogTitle>
+              <DialogDescription>Ask them to scan this code with their phone camera, or send them the link.</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/40 p-4 text-center">
               <LocalQrCode
                 value={activeSession.signUrl}
                 alt="QR code for signing link"
                 className="h-48 w-48 rounded-lg border border-border bg-card p-2"
               />
-              <p className="text-xs text-muted-foreground">Scan on phone to sign</p>
+              <p className="text-sm text-muted-foreground">Scan on a phone to sign</p>
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Direct link</p>
-              <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-sm font-medium text-foreground">Link</p>
+              <div className="rounded-md border border-border bg-muted/40 p-3 text-sm break-all text-muted-foreground">
                 {activeSession.signUrl}
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(activeSession.signUrl);
-                    setStatusMessage("Signing link copied");
-                  } catch (error) {
-                    console.error("Failed to copy link", error);
-                    setStatusMessage("Unable to copy link");
-                  }
-                }}
-                className="rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground/80 transition hover:border-primary"
-              >
-                Copy link
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(activeSession.signUrl);
+                      setStatusMessage("Signing link copied");
+                    } catch (error) {
+                      console.error("Failed to copy link", error);
+                      setStatusMessage("Unable to copy link");
+                    }
+                  }}
+                >
+                  <Copy aria-hidden="true" />
+                  Copy link
+                </Button>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </section>
   );
 }
+
 
 function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");

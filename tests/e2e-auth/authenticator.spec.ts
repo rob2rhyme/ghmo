@@ -124,8 +124,8 @@ test("a super admin can reset another admin's authenticator, which signs that ad
   // Alice (super admin, passkey session) resets Bob.
   await signInWithNewPasskey(page, "alice", "/admin/security");
   await expect(page.getByText("Reset another admin's authenticator")).toBeVisible();
-  page.once("dialog", dialog => void dialog.accept());
   await page.getByRole("button", { name: "Reset" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Reset authenticator" }).click();
   await expect(page.getByText("Authenticator reset for Bob")).toBeVisible();
   expect((await admin().db.doc("organizations/ghmo/admins/bob/totp/main").get()).exists).toBe(false);
 

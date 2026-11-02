@@ -6,22 +6,22 @@ export const eventHostInvitation: DocTemplate = {
   version: 1,
   title: "Community Leader Invitation",
   category: "Events",
-  description: "Invite an external community leader to attend and help share awareness of a GHMO event.",
+  description: "Invite a leader from another community to a GHMO event and ask them to spread the word.",
   fields: [
-    { id: "hostName", label: "Leader Name", type: "text", placeholder: "Priya Sharma", required: true },
-    { id: "leaderCommunity", label: "Leader Organization / Community", type: "text", placeholder: "Regional Circle" },
-    { id: "eventName", label: "Event Name", type: "text", placeholder: "Magar Heritage Celebration", required: true },
-    { id: "eventDate", label: "Event Date", type: "date", required: true },
-    { id: "eventTime", label: "Event Time", type: "text", placeholder: "7:00 PM" },
-    { id: "eventLocation", label: "Event Location", type: "text", placeholder: "City Auditorium" },
+    { id: "hostName", label: "Leader's name", type: "text", placeholder: "Dhan Bahadur Rana", required: true },
+    { id: "leaderCommunity", label: "Their organization or community", type: "text", placeholder: "Nepali Community of Central PA" },
+    { id: "eventName", label: "Event name", type: "text", placeholder: "Magar Heritage Celebration", required: true },
+    { id: "eventDate", label: "Event date", type: "date", required: true },
+    { id: "eventTime", label: "Event time", type: "text", placeholder: "7:00 PM" },
+    { id: "eventLocation", label: "Event place", type: "text", placeholder: "Harrisburg community hall" },
     {
       id: "guestFocus",
-      label: "Purpose / Message to Share",
+      label: "Message to share",
       type: "textarea",
       rows: 5,
       placeholder: "Celebrating members, sharing cultural program, community gratitude."
     },
-    { id: "supportContact", label: "Contact Information (GHMO)", type: "text", placeholder: "executive@ghmo.org" }
+    { id: "supportContact", label: "GHMO contact", type: "text", placeholder: "executive@ghmo.org" }
   ],
   renderHtml(inputs) {
     const organizationName =

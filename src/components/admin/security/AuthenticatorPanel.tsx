@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Copy, Smartphone } from "lucide-react";
+import { Check, CheckCircle2, Copy, ShieldCheck, Smartphone, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AuthenticatorSetup } from "@/app/(auth)/admin/login/AuthenticatorSteps";
@@ -8,7 +8,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { PASSKEYS_CHANGED_EVENT } from "./PasskeysPanel";
 
 type Status = { totp: { state: "none" | "pending" | "active"; recoveryCodesLeft: number }; hasActivePasskey: boolean };
 type OtherAdmin = { uid: string; name: string; email: string | null };
@@ -20,7 +22,23 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
-/** Your authenticator app: set it up, replace recovery codes, and (super admins) reset another admin's. */
+/** One sign-in method in the summary: a tick or a cross, said in words too. */
+function MethodStatus({ label, on }: { label: string; on: boolean }) {
+  return (
+    <li>
+      <Badge variant={on ? "success" : "outline"} className="gap-1.5 px-3 py-1 text-sm font-medium">
+        {on ? <Check aria-hidden="true" className="size-3.5!" /> : <X aria-hidden="true" className="size-3.5! text-muted-foreground" />}
+        {label}
+        <span className="sr-only">{on ? ": set up" : ": not set up"}</span>
+      </Badge>
+    </li>
+  );
+}
+
+/**
+ * Your authenticator app: set it up, replace recovery codes, and (super admins) reset another admin's.
+ * Also shows the sign-in summary at the top of the page, from the same status it already loads.
+ */
 export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [others, setOthers] = useState<OtherAdmin[]>([]);
@@ -29,6 +47,8 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
   const [newCodes, setNewCodes] = useState<string[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [confirmCodes, setConfirmCodes] = useState(false);
+  const [resetTarget, setResetTarget] = useState<OtherAdmin | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -38,6 +58,13 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
       setLoadError(err instanceof Error ? err.message : "Could not load");
     }
   }, [superAdmin]);
+
+  // Adding or removing a passkey below changes the summary, so reload the status then.
+  useEffect(() => {
+    const onChange = () => void load();
+    window.addEventListener(PASSKEYS_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(PASSKEYS_CHANGED_EVENT, onChange);
+  }, [load]);
 
   useEffect(() => {
     let active = true;
@@ -58,7 +85,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
   }, [superAdmin]);
 
   const regenerate = async () => {
-    if (!window.confirm("Make new recovery codes? The old ones will stop working.")) return;
+    setConfirmCodes(false);
     setBusy("codes");
     try {
       setNewCodes((await api<{ recoveryCodes: string[] }>("/api/auth/totp/recovery-codes", { method: "POST", body: "{}" })).recoveryCodes);
@@ -71,7 +98,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
   };
 
   const reset = async (admin: OtherAdmin) => {
-    if (!window.confirm(`Reset the authenticator app for ${admin.name}? They will be signed out and must set up a new app after their next email-link sign-in.`)) return;
+    setResetTarget(null);
     setBusy(admin.uid);
     try {
       await api(`/api/admin/totp/${encodeURIComponent(admin.uid)}`, { method: "DELETE" });
@@ -91,14 +118,43 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
       </Alert>
     );
   }
-  if (!status) return <Skeleton className="h-40 w-full" />;
+  if (!status) {
+    return (
+      <div role="status" className="flex flex-col gap-3">
+        <span className="sr-only">Loading your sign-in methods…</span>
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
 
   const active = status.totp.state === "active";
+  const anyMethod = active || status.hasActivePasskey;
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Smartphone aria-hidden="true" className="size-5" /> Authenticator app
+          <ShieldCheck aria-hidden="true" className="size-5 shrink-0 text-primary" /> Your sign-in at a glance
+        </CardTitle>
+        <CardDescription>
+          {anyMethod
+            ? "Most admins use the email link plus the authenticator app. A passkey is a quicker extra way in on devices that support it."
+            : "Set up the authenticator app below so you can sign in next time. A passkey is a quicker extra way in."}
+        </CardDescription>
+      </CardHeader>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-sm font-medium">You can sign in with:</span>
+        <ul className="flex flex-wrap gap-2">
+          <MethodStatus label="Authenticator app" on={active} />
+          <MethodStatus label="Passkey" on={status.hasActivePasskey} />
+        </ul>
+      </div>
+    </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <Smartphone aria-hidden="true" className="size-5 shrink-0 text-primary" /> Authenticator app
           {active ? (
             <Badge variant="success">
               <CheckCircle2 aria-hidden="true" /> On
@@ -108,7 +164,8 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
           )}
         </CardTitle>
         <CardDescription>
-          After your email link you enter a 6-digit code from an app like Google Authenticator or Authy. Passkeys are optional.
+          Authenticator app: a 6-digit code from an app on your phone, used after the email link. Apps like Google Authenticator or Authy
+          work.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -118,12 +175,12 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
               <AlertTitle>Your new recovery codes</AlertTitle>
               <AlertDescription>Each works once. They are shown only now; save them somewhere safe.</AlertDescription>
             </Alert>
-            <ul aria-label="Recovery codes" className="grid grid-cols-2 gap-2 rounded-md border bg-muted p-3 font-mono text-sm">
+            <ul aria-label="Recovery codes" className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted p-3 font-mono text-sm">
               {newCodes.map(c => (
                 <li key={c}>{c}</li>
               ))}
             </ul>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void navigator.clipboard?.writeText(newCodes.join("\n"))}>
                 <Copy aria-hidden="true" /> Copy codes
               </Button>
@@ -135,11 +192,22 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
         ) : null}
 
         {active ? (
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span>Recovery codes left: {status.totp.recoveryCodesLeft}</span>
-            <Button variant="outline" size="sm" onClick={regenerate} loading={busy === "codes"} disabled={busy !== null}>
-              Make new recovery codes
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span>Recovery codes left: {status.totp.recoveryCodesLeft}</span>
+              <Button variant="outline" onClick={() => setConfirmCodes(true)} loading={busy === "codes"} disabled={busy !== null}>
+                Make new recovery codes
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">Recovery codes let you sign in if you lose your phone. Each one works once.</p>
+            <ConfirmDialog
+              open={confirmCodes}
+              onOpenChange={setConfirmCodes}
+              title="Make new recovery codes?"
+              description="The old ones will stop working."
+              confirmLabel="Make new codes"
+              onConfirm={regenerate}
+            />
           </div>
         ) : setupOpen ? (
           <>
@@ -158,33 +226,45 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
             ) : null}
           </>
         ) : (
-          <div>
-            <Button onClick={() => setSetupOpen(true)}>Set up authenticator app</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="lg" onClick={() => setSetupOpen(true)}>
+              Set up authenticator app
+            </Button>
           </div>
         )}
 
         {superAdmin && others.length > 0 ? (
-          <div className="flex flex-col gap-2 border-t pt-4">
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
             <h3 className="text-sm font-semibold">Reset another admin&apos;s authenticator</h3>
             <p className="text-sm text-muted-foreground">
               For an admin who lost their phone and recovery codes. Check it really is them first (a call is best).
             </p>
             <ul className="flex flex-col gap-2">
               {others.map(a => (
-                <li key={a.uid} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                  <span>
+                <li key={a.uid} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm">
+                  <span className="min-w-0 break-words">
                     {a.name}
                     {a.email ? <span className="text-muted-foreground"> · {a.email}</span> : null}
                   </span>
-                  <Button variant="destructive" size="sm" onClick={() => reset(a)} loading={busy === a.uid} disabled={busy !== null}>
+                  <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setResetTarget(a)} loading={busy === a.uid} disabled={busy !== null}>
                     Reset
                   </Button>
                 </li>
               ))}
             </ul>
+            <ConfirmDialog
+              open={resetTarget !== null}
+              onOpenChange={open => (open ? undefined : setResetTarget(null))}
+              title={`Reset the authenticator app for ${resetTarget?.name ?? ""}?`}
+              description="They will be signed out and must set up a new app after their next email-link sign-in."
+              confirmLabel="Reset authenticator"
+              destructive
+              onConfirm={() => (resetTarget ? reset(resetTarget) : undefined)}
+            />
           </div>
         ) : null}
       </CardContent>
     </Card>
+    </>
   );
 }

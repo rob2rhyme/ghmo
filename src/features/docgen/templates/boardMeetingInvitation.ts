@@ -6,21 +6,21 @@ export const boardMeetingInvitation: DocTemplate = {
   version: 1,
   title: "Board Meeting Invitation",
   category: "Governance",
-  description: "Formal invitation for GHMO board members to attend a board meeting.",
+  description: "Invite a board member to a board meeting, with the date, place and agenda.",
   fields: [
-    { id: "memberName", label: "Board Member Name", type: "text", placeholder: "Board Member Name" },
-    { id: "meetingTitle", label: "Meeting Title", type: "text", placeholder: "Board Meeting", required: true },
-    { id: "meetingDate", label: "Meeting Date", type: "date", required: true },
-    { id: "meetingTime", label: "Meeting Time", type: "text", placeholder: "6:00 PM", required: true },
-    { id: "meetingLocation", label: "Meeting Location", type: "text", placeholder: "GHMO Office / Community Center", required: true },
+    { id: "memberName", label: "Board member's name", type: "text", placeholder: "Ram Bahadur Thapa" },
+    { id: "meetingTitle", label: "Meeting title", type: "text", placeholder: "Board Meeting", required: true },
+    { id: "meetingDate", label: "Meeting date", type: "date", required: true },
+    { id: "meetingTime", label: "Meeting time", type: "text", placeholder: "6:00 PM", required: true },
+    { id: "meetingLocation", label: "Meeting place", type: "text", placeholder: "GHMO Office / Community Center", required: true },
     {
       id: "agenda",
-      label: "Agenda / Key Topics",
+      label: "Agenda",
       type: "textarea",
       rows: 4,
-      placeholder: "Treasury overview, bylaws review, community outreach updates"
+      placeholder: "Treasurer's report, bylaws review, Gumba project update"
     },
-    { id: "rsvpContact", label: "RSVP / Contact Information", type: "text", placeholder: "board@ghmo.org" }
+    { id: "rsvpContact", label: "How to reply", type: "text", placeholder: "board@ghmo.org" }
   ],
   renderHtml(inputs) {
     const organizationName =

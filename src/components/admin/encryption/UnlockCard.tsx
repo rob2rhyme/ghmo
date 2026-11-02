@@ -37,11 +37,13 @@ export function UnlockCard() {
     <Card>
       <CardHeader>
         <CardTitle>Unlock encryption on this device</CardTitle>
-        <CardDescription>Encrypted chat and threads stay unreadable until you unlock. Keys are forgotten when you lock or close the tab.</CardDescription>
+        <CardDescription>
+          Private records such as chat and plans stay unreadable until you unlock. The keys are forgotten again when you lock or close the tab.
+        </CardDescription>
       </CardHeader>
       <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
         {usesPassphrase ? (
-          <Field label="Encryption passphrase" className="flex-1">
+          <Field label="Encryption passphrase" className="min-w-0 flex-1">
             <Input type="password" autoComplete="current-password" value={passphrase} onChange={e => setPassphrase(e.target.value)} />
           </Field>
         ) : null}

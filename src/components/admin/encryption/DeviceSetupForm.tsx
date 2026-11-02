@@ -7,6 +7,7 @@ import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { PrfUnavailableError } from "@/src/lib/e2ee/client/prf";
+import { EXPLAIN, WhatIsThis } from "./WhatIsThis";
 
 /**
  * Creates this browser's encryption keys, locked with a passphrase, or with a passkey when the admin has one.
@@ -79,21 +80,26 @@ export function DeviceSetupForm({ onDone }: { onDone?: () => void }) {
         </div>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-medium text-destructive">
           {error}
         </p>
       ) : null}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button type="submit" loading={busy}>
-          {usePassphrase ? <KeyRound aria-hidden="true" /> : <Fingerprint aria-hidden="true" />}
-          {usePassphrase ? "Create keys with passphrase" : "Create keys with my passkey"}
-        </Button>
+      <div className="flex flex-col items-start gap-1">
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" size="lg" loading={busy}>
+            {usePassphrase ? <KeyRound aria-hidden="true" /> : <Fingerprint aria-hidden="true" />}
+            {usePassphrase ? "Create keys with passphrase" : "Create keys with my passkey"}
+          </Button>
+        </div>
         {!usePassphrase ? (
-          <Button type="button" variant="ghost" onClick={() => setUsePassphrase(true)}>
+          <Button type="button" variant="link" className="h-auto min-h-11 px-0 font-medium sm:min-h-8" onClick={() => setUsePassphrase(true)}>
             Use a passphrase instead
           </Button>
         ) : null}
       </div>
+      <WhatIsThis question={usePassphrase ? "What is a passphrase?" : "What is a passkey?"}>
+        {usePassphrase ? EXPLAIN.passphrase : EXPLAIN.passkey}
+      </WhatIsThis>
     </form>
   );
 }

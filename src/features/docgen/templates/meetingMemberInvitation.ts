@@ -6,14 +6,14 @@ export const meetingMemberInvitation: DocTemplate = {
   version: 1,
   title: "General Meeting Invitation",
   category: "Meeting",
-  description: "Invite attendees to a curated council meeting with the latest agenda and follow-up expectations.",
+  description: "Invite a member to a general meeting, with the date, place and agenda.",
   fields: [
-    { id: "memberName", label: "Member Name", type: "text", placeholder: "Jordan Rivera", required: true },
-    { id: "meetingDate", label: "Meeting Date", type: "date", required: true },
-    { id: "meetingTime", label: "Time (e.g. 6:30 PM)", type: "text", placeholder: "6:30 PM" },
-    { id: "location", label: "Location", type: "text", placeholder: "Community Center Hall" },
-    { id: "agenda", label: "Agenda Notes", type: "textarea", rows: 4, placeholder: "Fundraising wrap-up, governance updates, volunteer planning." },
-    { id: "rsvpLink", label: "RSVP Link or Contact", type: "text", placeholder: "https://..." }
+    { id: "memberName", label: "Member's name", type: "text", placeholder: "Sita Gurung", required: true },
+    { id: "meetingDate", label: "Meeting date", type: "date", required: true },
+    { id: "meetingTime", label: "Time", type: "text", placeholder: "6:30 PM" },
+    { id: "location", label: "Location", type: "text", placeholder: "GHMO community hall, Harrisburg" },
+    { id: "agenda", label: "What the meeting is about", type: "textarea", rows: 4, placeholder: "Gumba project update, Dashain program planning, volunteer sign-up." },
+    { id: "rsvpLink", label: "How to reply (link, phone or email)", type: "text", placeholder: "secretary@ghmo.org or 717-555-0123" }
   ],
   renderHtml(inputs) {
     const organizationName =

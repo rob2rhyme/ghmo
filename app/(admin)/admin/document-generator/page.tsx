@@ -1,5 +1,12 @@
 //app/(admin)/admin/document-generator/page.tsx
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { FileText, FileX, FolderOpen } from "lucide-react";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Button } from "@/src/components/ui/button";
+import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
+import { formatShortDate } from "@/src/lib/format";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
@@ -33,23 +40,51 @@ export default async function DocumentGeneratorPage({
   const docMissing = Boolean(docId && !savedDocument);
   const templateId = savedDocument?.templateId ?? TEMPLATE_META[0]?.id;
 
+  const savedOn = savedDocument ? formatShortDate(savedDocument.updatedAt ?? savedDocument.createdAt, { timeZone: DEFAULT_TIMEZONE }) : "";
+
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        title="Document generator"
+        description="Make invitations, letters and certificates on GHMO letterhead, then print or save as PDF."
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/admin/document-gallery">
+              <FolderOpen aria-hidden="true" />
+              Saved documents
+            </Link>
+          </Button>
+        }
+      />
       {docMissing ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-destructive">
-          Document <span className="font-semibold">{docId}</span> was not found.
-          Showing a fresh builder below.
-        </div>
+        <Alert variant="destructive">
+          <FileX />
+          <AlertTitle>Document not found</AlertTitle>
+          <AlertDescription>
+            That saved document doesn&apos;t exist any more, or the link is wrong. You can start a new one below.
+          </AlertDescription>
+        </Alert>
       ) : null}
       <EncryptionGate what="Document Generator">
-        <SavedDocBuilder
-          templatesMeta={TEMPLATE_META}
-          initialTemplateId={templateId}
-          initialInputs={savedDocument?.inputs}
-          initialDocId={savedDocument?.id}
-          initialTemplateVersion={savedDocument?.templateVersion}
-          enc={savedDocument?.enc}
-        />
+        <div className="flex flex-col gap-6">
+          {savedDocument ? (
+            <Alert variant="info">
+              <FileText />
+              <AlertTitle>Editing: {savedDocument.templateTitle || "saved document"}</AlertTitle>
+              <AlertDescription>
+                {savedOn ? `Saved ${savedOn}. ` : ""}Saving again updates this copy in the gallery.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          <SavedDocBuilder
+            templatesMeta={TEMPLATE_META}
+            initialTemplateId={templateId}
+            initialInputs={savedDocument?.inputs}
+            initialDocId={savedDocument?.id}
+            initialTemplateVersion={savedDocument?.templateVersion}
+            enc={savedDocument?.enc}
+          />
+        </div>
       </EncryptionGate>
     </div>
   );

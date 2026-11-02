@@ -1,23 +1,64 @@
 "use client";
 
-import { CheckCircle2, Clock, Lock, RefreshCw, ShieldAlert, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, Clock, Lock, RefreshCw, ShieldAlert, ShieldCheck, ShieldOff, Smartphone, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useE2ee, type DeviceView, type PreparedRecovery } from "@/src/lib/e2ee/client/E2eeProvider";
+import { formatShortDate } from "@/src/lib/format";
+import { cn } from "@/src/lib/utils";
 import { DeviceSetupForm } from "./DeviceSetupForm";
 import { MigrationSection } from "./MigrationSection";
 import { errorText, UnlockCard } from "./UnlockCard";
 import { RecoveryKeyFlow } from "./RecoveryKeyFlow";
+import { EXPLAIN, WhatIsThis } from "./WhatIsThis";
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const SETUP_STEPS = ["Set up this device", "Make a recovery key", "Give paper copies to 2 trusted people"];
+
+/** The three setup steps, always visible, so the admin knows where they are and what comes next. */
+function SetupSteps({ current }: { current: number }) {
+  return (
+    <ol aria-label="Setup steps" className="grid gap-2 sm:grid-cols-3">
+      {SETUP_STEPS.map((label, index) => {
+        const number = index + 1;
+        const done = number < current;
+        const active = number === current;
+        return (
+          <li
+            key={label}
+            aria-current={active ? "step" : undefined}
+            className={cn(
+              "flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm",
+              active ? "border-primary bg-primary/10 font-semibold text-foreground" : "border-border bg-card text-muted-foreground"
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
+                active ? "border-primary bg-primary text-primary-foreground" : done ? "border-primary text-primary" : "border-border"
+              )}
+            >
+              {done ? <Check className="size-3.5" /> : number}
+            </span>
+            <span className="min-w-0">
+              <span className="sr-only">{done ? "Done: " : active ? "Current step: " : "Next: "}</span>
+              {label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 function SafetyCode({ code, large = false }: { code: string; large?: boolean }) {
   return (
@@ -71,9 +112,11 @@ function RecoverWithKey() {
           <Input type="password" value={passphrase} onChange={e => setPassphrase(e.target.value)} />
         </Field>
       ) : null}
-      <Button type="submit" variant="outline" loading={busy} disabled={value.replace(/[\s-]/g, "").length < 55}>
-        Activate this device with the recovery key
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="outline" loading={busy} disabled={value.replace(/[\s-]/g, "").length < 55}>
+          Activate this device with the recovery key
+        </Button>
+      </div>
     </form>
   );
 }
@@ -86,9 +129,13 @@ function BootstrapWizard() {
   if (!identity) {
     return (
       <Card>
+        <SetupSteps current={1} />
         <CardHeader>
-          <CardTitle>Step 1 of 3 · Create keys on this device</CardTitle>
-          <CardDescription>Your passkey protects this device&apos;s keys. Nothing secret leaves this browser.</CardDescription>
+          <CardTitle>Step 1 of 3 · Set up this device</CardTitle>
+          <CardDescription>
+            This makes the encryption keys for this computer or phone, protected by your passkey (or a passphrase). Nothing secret leaves
+            this browser.
+          </CardDescription>
         </CardHeader>
         <DeviceSetupForm />
       </Card>
@@ -109,24 +156,32 @@ function BootstrapWizard() {
     };
     return (
       <Card>
+        <SetupSteps current={2} />
         <CardHeader>
-          <CardTitle>Step 2 of 3 · Create the recovery key</CardTitle>
+          <CardTitle>Step 2 of 3 · Make a recovery key</CardTitle>
           <CardDescription>
             A recovery key is shown once. Two trustees each keep a paper copy. Without it, losing every admin device means losing
             all encrypted data.
           </CardDescription>
         </CardHeader>
-        <Button onClick={start} loading={busy} className="self-start">
-          Create recovery key
-        </Button>
+        <div className="flex flex-col gap-1">
+          <WhatIsThis question="What is the recovery key?">{EXPLAIN.recoveryKey}</WhatIsThis>
+          <WhatIsThis question="Who are trustees?">{EXPLAIN.trustees}</WhatIsThis>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="lg" onClick={start} loading={busy}>
+            Create recovery key
+          </Button>
+        </div>
       </Card>
     );
   }
 
   return (
     <Card>
+      <SetupSteps current={3} />
       <CardHeader>
-        <CardTitle>Step 3 of 3 · Save the recovery key</CardTitle>
+        <CardTitle>Step 3 of 3 · Save the recovery key and give paper copies to 2 trusted people</CardTitle>
       </CardHeader>
       <RecoveryKeyFlow
         prepared={prepared}
@@ -144,19 +199,31 @@ function BootstrapWizard() {
 function IntegrityCard() {
   const { integrity, overview, sealRoster, status } = useE2ee();
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   if (integrity.status === "none") return null;
 
   if (integrity.status === "verified") {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Device list verified</CardTitle>
-          <CardDescription>
-            Every device and key here is covered by a signed, tamper-evident history ({integrity.entries} entries) that this browser checks against the
-            server each time. Workspace fingerprint: <SafetyCode code={integrity.fingerprint} />. It never changes. When you add a device, the new owner
-            reads it to an admin, so the workspace they see is the real one.
-          </CardDescription>
-        </CardHeader>
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+          <CardHeader className="min-w-0">
+            <CardTitle>Device list verified</CardTitle>
+            <CardDescription>
+              Every device and key here is covered by a signed, tamper-evident history ({integrity.entries} entries) that this browser checks against
+              the server each time.
+            </CardDescription>
+          </CardHeader>
+        </div>
+        <div className="flex flex-col gap-1 rounded-xl border border-border bg-muted/40 p-3">
+          <p className="text-sm text-muted-foreground">Workspace fingerprint (it never changes)</p>
+          <SafetyCode code={integrity.fingerprint} />
+          <p className="text-sm text-muted-foreground">When you add a device, the new owner reads it to an admin, so the workspace they see is the real one.</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <WhatIsThis question="What is the workspace fingerprint?">{EXPLAIN.fingerprint}</WhatIsThis>
+          <WhatIsThis question="What is the device list?">{EXPLAIN.deviceList}</WhatIsThis>
+        </div>
       </Card>
     );
   }
@@ -176,11 +243,19 @@ function IntegrityCard() {
               <p className="mt-2">
                 Check the device list below with each owner (their safety codes must match), then seal it. From then on, every change is signed.
               </p>
-              <Button
-                className="mt-2"
-                loading={busy}
-                onClick={async () => {
-                  if (!window.confirm("Have you checked every device below with its owner? Sealing records exactly this list.")) return;
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button loading={busy} onClick={() => setConfirmOpen(true)}>
+                  Seal the device list
+                </Button>
+              </div>
+              <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={setConfirmOpen}
+                title="Seal the device list?"
+                description="Have you checked every device below with its owner? Sealing records exactly this list."
+                confirmLabel="Yes, seal it"
+                onConfirm={async () => {
+                  setConfirmOpen(false);
                   setBusy(true);
                   try {
                     await sealRoster();
@@ -191,9 +266,7 @@ function IntegrityCard() {
                     setBusy(false);
                   }
                 }}
-              >
-                Seal the device list
-              </Button>
+              />
             </>
           ) : (
             <p className="mt-2">A super admin should unlock this page and seal the list.</p>
@@ -210,6 +283,7 @@ function DevicesSection() {
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [rotateIds, setRotateIds] = useState<string[] | null>(null);
   if (!overview) return null;
 
   const pending = overview.devices.filter(d => d.status === "pending" && d.deviceId !== identity?.deviceId);
@@ -229,10 +303,7 @@ function DevicesSection() {
   };
 
   const revokeAndRotate = async (ids: string[]) => {
-    const message = ids.length
-      ? `Revoke ${ids.length} device(s) and create new keys? Those devices won't be able to read anything new.`
-      : "Create new encryption keys now? Everyone's active devices get them automatically.";
-    if (!window.confirm(message)) return;
+    setRotateIds(null);
     setBusy("rotate");
     try {
       await rotate(ids);
@@ -255,6 +326,7 @@ function DevicesSection() {
               Before approving, call or meet the person and check that the code on their screen matches the code here exactly.
             </CardDescription>
           </CardHeader>
+          <WhatIsThis question="What is a safety code?">{EXPLAIN.safetyCode}</WhatIsThis>
           <ul className="flex flex-col divide-y divide-border">
             {pending.map(d => (
               <li key={d.deviceId} className="flex flex-col gap-3 py-3">
@@ -270,18 +342,20 @@ function DevicesSection() {
                     <SafetyCode code={integrity.fingerprint} />.
                   </p>
                 ) : null}
-                <label className="flex items-start gap-2 text-sm">
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm sm:min-h-0">
                   <input
                     type="checkbox"
-                    className="mt-1 size-4 accent-primary"
+                    className="mt-0.5 size-4 shrink-0 accent-primary"
                     checked={!!confirmed[d.deviceId]}
                     onChange={e => setConfirmed(c => ({ ...c, [d.deviceId]: e.target.checked }))}
                   />
                   I compared this code{integrity.status === "verified" ? " and the workspace fingerprint" : ""} with {d.ownerName} and {integrity.status === "verified" ? "both match" : "it matches"}
                 </label>
-                <Button className="self-start" onClick={() => approve(d)} disabled={!confirmed[d.deviceId]} loading={busy === d.deviceId}>
-                  Approve device
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => approve(d)} disabled={!confirmed[d.deviceId]} loading={busy === d.deviceId}>
+                    Approve device
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -293,22 +367,23 @@ function DevicesSection() {
           <CardTitle>Devices with encryption keys</CardTitle>
           <CardDescription>Revoke a lost device or one belonging to an admin who left. Keys are rotated so it can&apos;t read anything new.</CardDescription>
         </CardHeader>
+        <WhatIsThis question="What is this list?">{EXPLAIN.deviceList}</WhatIsThis>
         <ul className="flex flex-col divide-y divide-border">
           {listed.map(d => (
             <li key={d.deviceId} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 {canRevoke(d) ? (
                   <input
                     type="checkbox"
                     aria-label={`Select ${d.name} to revoke`}
-                    className="mt-1 size-4 accent-destructive"
+                    className="mt-1 size-4 shrink-0 accent-destructive"
                     checked={selected.includes(d.deviceId)}
                     onChange={e => setSelected(s => (e.target.checked ? [...s, d.deviceId] : s.filter(x => x !== d.deviceId)))}
                   />
                 ) : (
-                  <Smartphone className="mt-0.5 size-4 text-muted-foreground" aria-hidden="true" />
+                  <Smartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 )}
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">
                       {d.ownerName} · {d.name}
@@ -317,8 +392,8 @@ function DevicesSection() {
                     {d.deviceId === identity?.deviceId ? <Badge variant="outline">This device</Badge> : null}
                     {!d.ownerActive ? <Badge variant="destructive">Owner no longer active</Badge> : null}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Added {dateFormat.format(new Date(d.createdAt))} · {d.unlock === "prf" ? "Passkey" : "Passphrase"} ·{" "}
+                  <p className="text-sm text-muted-foreground">
+                    Added {formatShortDate(d.createdAt)} · {d.unlock === "prf" ? "Passkey" : "Passphrase"} · Safety code{" "}
                     <SafetyCode code={d.safetyCode} />
                   </p>
                 </div>
@@ -326,16 +401,31 @@ function DevicesSection() {
             </li>
           ))}
         </ul>
-        <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row">
-          <Button variant="destructive" disabled={selected.length === 0} loading={busy === "rotate" && selected.length > 0} onClick={() => revokeAndRotate(selected)}>
-            <Trash2 aria-hidden="true" />
-            Revoke selected and rotate keys
-          </Button>
-          <Button variant="outline" loading={busy === "rotate" && selected.length === 0} onClick={() => revokeAndRotate([])}>
-            <RefreshCw aria-hidden="true" />
-            Rotate keys now
-          </Button>
+        <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="destructive" disabled={selected.length === 0} loading={busy === "rotate" && selected.length > 0} onClick={() => setRotateIds(selected)}>
+              <Trash2 aria-hidden="true" />
+              Revoke selected and rotate keys
+            </Button>
+            <Button variant="outline" loading={busy === "rotate" && selected.length === 0} onClick={() => setRotateIds([])}>
+              <RefreshCw aria-hidden="true" />
+              Rotate keys now
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">Tick the devices to revoke first. You can&apos;t revoke the device you&apos;re using now.</p>
+          <WhatIsThis question="What does rotating keys do?">{EXPLAIN.rotation}</WhatIsThis>
         </div>
+        <ConfirmDialog
+          open={rotateIds !== null}
+          onOpenChange={open => (open ? undefined : setRotateIds(null))}
+          title={rotateIds?.length ? `Revoke ${rotateIds.length} device(s) and create new keys?` : "Create new encryption keys now?"}
+          description={
+            rotateIds?.length ? "Those devices won't be able to read anything new." : "Everyone's active devices get them automatically."
+          }
+          confirmLabel={rotateIds?.length ? "Revoke and rotate keys" : "Rotate keys"}
+          destructive={Boolean(rotateIds?.length)}
+          onConfirm={() => revokeAndRotate(rotateIds ?? [])}
+        />
       </Card>
     </>
   );
@@ -346,6 +436,7 @@ function RecoverySection() {
   const [drill, setDrill] = useState("");
   const [busy, setBusy] = useState(false);
   const [prepared, setPrepared] = useState<PreparedRecovery | null>(null);
+  const [replaceOpen, setReplaceOpen] = useState(false);
   if (!overview) return null;
 
   const runDrill = async (event: React.FormEvent) => {
@@ -368,12 +459,13 @@ function RecoverySection() {
         <CardTitle>Recovery key</CardTitle>
         <CardDescription>
           Held on paper by {overview.state.trustees.map(t => t.name).join(" and ") || "nobody yet"}
-          {overview.state.recoveryRotatedAt ? ` since ${dateFormat.format(new Date(overview.state.recoveryRotatedAt))}` : ""}.
+          {overview.state.recoveryRotatedAt ? ` since ${formatShortDate(overview.state.recoveryRotatedAt)}` : ""}.
           Test it once a year so you know the paper copies still work.
         </CardDescription>
       </CardHeader>
+      <WhatIsThis question="What is the recovery key?">{EXPLAIN.recoveryKey}</WhatIsThis>
       <form onSubmit={runDrill} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <Field label="Test a recovery key (changes nothing)" className="flex-1">
+        <Field label="Test a recovery key (changes nothing)" className="min-w-0 flex-1">
           <Input className="font-mono uppercase" autoComplete="off" value={drill} onChange={e => setDrill(e.target.value)} />
         </Field>
         <Button type="submit" variant="outline" loading={busy} disabled={drill.replace(/[\s-]/g, "").length < 55}>
@@ -393,16 +485,27 @@ function RecoverySection() {
               }}
             />
           ) : (
-            <Button
-              variant="outline"
-              onClick={async () => {
-                if (window.confirm("Create a new recovery key? The old paper copies will stop working.")) {
-                  setPrepared(await prepareRecoveryKey());
-                }
-              }}
-            >
-              Replace recovery key
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setReplaceOpen(true)}>
+                Replace recovery key
+              </Button>
+              <ConfirmDialog
+                open={replaceOpen}
+                onOpenChange={setReplaceOpen}
+                title="Create a new recovery key?"
+                description="The old paper copies will stop working."
+                confirmLabel="Create new recovery key"
+                destructive
+                onConfirm={async () => {
+                  setReplaceOpen(false);
+                  try {
+                    setPrepared(await prepareRecoveryKey());
+                  } catch (err) {
+                    toast.error(errorText(err));
+                  }
+                }}
+              />
+            </>
           )}
         </div>
       ) : null}
@@ -436,12 +539,17 @@ export default function EncryptionPanel() {
         <AlertDescription>
           <p>{integrity.status === "failed" ? integrity.reason : "It could not be verified."}</p>
           <p className="mt-2">
-            Encryption is paused on this device: nothing is unlocked, approved or written. This can mean the database was changed outside the app. Tell the
-            other admins, compare device safety codes with their owners, and follow the incident runbook (docs/RUNBOOK_INCIDENT.md, case E).
+            Encryption is paused on this device: nothing is unlocked, approved or written. This can mean the database was changed outside the app.
           </p>
-          <Button className="mt-2" variant="outline" onClick={refresh}>
-            Check again
-          </Button>
+          <p className="mt-2 font-medium text-foreground">
+            Stop and contact your super admin; they have the incident guide. Tell the other admins, and compare device safety codes with their owners.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" onClick={refresh}>
+              <RefreshCw aria-hidden="true" />
+              Check again
+            </Button>
+          </div>
         </AlertDescription>
       </Alert>
     );
@@ -450,18 +558,18 @@ export default function EncryptionPanel() {
   if (status === "not-setup") {
     return overview.me.superAdmin ? (
       <div className="flex flex-col gap-4">
-        <Alert variant="info">
-          <ShieldCheck />
+        <Alert variant="warning">
+          <ShieldOff />
           <AlertTitle>End-to-end encryption is not on yet</AlertTitle>
           <AlertDescription>
             Once on, admin chat and other private records are encrypted on admins&apos; devices. Not even the server or Google can
-            read them.
+            read them. Setting it up takes about 10 minutes and three steps.
           </AlertDescription>
         </Alert>
         <BootstrapWizard />
       </div>
     ) : (
-      <EmptyState icon={<ShieldCheck />} title="End-to-end encryption is not set up yet" description="A super admin needs to turn it on first." />
+      <EmptyState icon={<ShieldOff />} title="End-to-end encryption is not set up yet" description="A super admin needs to turn it on first." />
     );
   }
 
@@ -470,7 +578,10 @@ export default function EncryptionPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Set up encryption on this device</CardTitle>
-          <CardDescription>Then another admin approves it, or you use the recovery key.</CardDescription>
+          <CardDescription>
+            Encryption is on for GHMO, but this computer or phone has no keys yet. Set it up here, then another admin approves it (or you use
+            the recovery key).
+          </CardDescription>
         </CardHeader>
         <DeviceSetupForm />
       </Card>
@@ -488,7 +599,10 @@ export default function EncryptionPanel() {
               what they see.
             </CardDescription>
           </CardHeader>
-          <SafetyCode code={thisDevice.safetyCode} large />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm text-muted-foreground">Safety code for this device</p>
+            <SafetyCode code={thisDevice.safetyCode} large />
+          </div>
           {integrity.status === "verified" ? (
             <div className="flex flex-col gap-1">
               <p className="text-sm text-muted-foreground">
@@ -497,7 +611,13 @@ export default function EncryptionPanel() {
               <SafetyCode code={integrity.fingerprint} large />
             </div>
           ) : null}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-1">
+            <WhatIsThis question="What is a safety code?">{EXPLAIN.safetyCode}</WhatIsThis>
+            {integrity.status === "verified" ? (
+              <WhatIsThis question="What is the workspace fingerprint?">{EXPLAIN.fingerprint}</WhatIsThis>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={refresh}>
               <RefreshCw aria-hidden="true" />
               Check again
@@ -525,9 +645,11 @@ export default function EncryptionPanel() {
           <CardTitle>This device was revoked</CardTitle>
           <CardDescription>Its keys no longer receive new data. Remove them from this browser and set the device up again if needed.</CardDescription>
         </CardHeader>
-        <Button variant="outline" onClick={forgetThisDevice} className="self-start">
-          Remove keys from this browser
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={forgetThisDevice}>
+            Remove keys from this browser
+          </Button>
+        </div>
       </Card>
     );
   }
@@ -536,12 +658,12 @@ export default function EncryptionPanel() {
     <div className="flex flex-col gap-6">
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="size-8 text-success" aria-hidden="true" />
-            <div>
+          <div className="flex min-w-0 items-center gap-3">
+            <ShieldCheck className="size-8 shrink-0 text-success" aria-hidden="true" />
+            <div className="min-w-0">
               <p className="font-semibold">End-to-end encryption is on</p>
               <p className="text-sm text-muted-foreground">
-                Key generation {overview.state.currentEpoch} · {overview.devices.filter(d => d.status === "active").length} active device(s)
+                {overview.devices.filter(d => d.status === "active").length} active device(s) · key generation {overview.state.currentEpoch}
               </p>
             </div>
           </div>

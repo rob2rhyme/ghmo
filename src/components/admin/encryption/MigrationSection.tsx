@@ -80,21 +80,23 @@ export function MigrationSection() {
       <CardHeader>
         <CardTitle>Encrypt existing records</CardTitle>
         <CardDescription>
-          Records saved before encryption was turned on are still readable by the server. This encrypts them on this device, checks
-          each one, then removes the plaintext. Approved minutes stay public. Keep this page open until it finishes.
+          Records saved before encryption was turned on can still be read by the server. This encrypts them on this device, checks
+          each one, then removes the unencrypted copy. Approved minutes stay public. Keep this page open until it finishes.
         </CardDescription>
       </CardHeader>
       <div className="flex flex-col gap-3">
-        <Button onClick={run} loading={running} className="self-start">
-          {finished ? "Run again" : "Encrypt existing records"}
-        </Button>
-        <ul className="flex flex-col gap-1 text-sm" aria-live="polite">
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={run} loading={running}>
+            {finished ? "Run again" : "Encrypt existing records"}
+          </Button>
+        </div>
+        <ul className="flex flex-col divide-y divide-border rounded-xl border border-border text-sm" aria-live="polite">
           {MIGRATION_AREAS.map(area => {
             const p = progress[area];
             return (
-              <li key={area} className="flex justify-between gap-4">
-                <span>{AREA_LABELS[area]}</span>
-                <span className="text-muted-foreground" data-testid={`migrate-${area}`}>
+              <li key={area} className="flex justify-between gap-4 px-3 py-2">
+                <span className="min-w-0">{AREA_LABELS[area]}</span>
+                <span className="shrink-0 text-muted-foreground tabular-nums" data-testid={`migrate-${area}`}>
                   {p ? (p.total === 0 ? "nothing to do" : `${p.done} of ${p.total}`) : "—"}
                 </span>
               </li>
@@ -107,8 +109,8 @@ export function MigrationSection() {
           </p>
         ) : null}
         {failures > 0 ? (
-          <div className="text-sm text-destructive">
-            <p>{failures} record(s) could not be encrypted and were left as they were:</p>
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-foreground">
+            <p className="font-medium text-destructive">{failures} record(s) could not be encrypted and were left as they were:</p>
             <ul className="list-disc pl-5">
               {Object.values(progress).flatMap(p => p?.failed ?? []).slice(0, 10).map(line => (
                 <li key={line}>{line}</li>

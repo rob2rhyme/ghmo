@@ -1,6 +1,13 @@
 //app/(admin)/admin/document-gallery/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { FilePlus2, FileText } from "lucide-react";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
+import { formatDateTime } from "@/src/lib/format";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listDocuments } from "@/src/features/docgen/firestore/docRepo";
@@ -8,14 +15,6 @@ import { resolveActorLabel } from "@/src/lib/actor";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 export default async function DocumentGalleryPage() {
   try {
@@ -29,86 +28,61 @@ export default async function DocumentGalleryPage() {
 
   const documents = await listDocuments();
 
+  const makeButton = (
+    <Button asChild size="lg">
+      <Link href="/admin/document-generator">
+        <FilePlus2 aria-hidden="true" />
+        Make a document
+      </Link>
+    </Button>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Document gallery
-            </p>
-            <h1 className="text-2xl font-semibold text-foreground">
-              Saved letters & certificates
-            </h1>
-          </div>
-          <Link
-            href="/admin/document-generator"
-            className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground"
-          >
-            Build new document
-          </Link>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Each record stores the template, inputs, and creator so you can
-          reopen, re-export, or iterate.
-        </p>
-      </div>
-      <section className="space-y-3">
-        {documents.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-background/70 p-5 text-sm text-muted-foreground">
-            No documents saved yet. Use the Document Generator to create a new
-            letter or certificate and save it to the gallery.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="rounded-2xl border border-border bg-card p-5 shadow-xs"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold text-foreground">
-                      {doc.templateTitle}
-                    </p>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {doc.category || "General"}{doc.templateVersion ? ` · template v${doc.templateVersion}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        title="Document gallery"
+        description="Letters and certificates you saved. Open one to edit, print or download."
+        actions={makeButton}
+      />
+      {documents.length === 0 ? (
+        <EmptyState
+          icon={<FileText />}
+          title="No saved documents yet"
+          description="When you make a letter or certificate and choose “Save to gallery”, it shows up here so you can open it again later."
+          action={makeButton}
+        />
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {documents.map(doc => {
+            const savedAt = doc.updatedAt ?? doc.createdAt;
+            return (
+              <li key={doc.id} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-xs md:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <h2 className="text-base font-semibold text-foreground">{doc.templateTitle || "Untitled document"}</h2>
+                    <p className="text-sm text-muted-foreground">
                       Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}
+                      {savedAt ? ` · ${formatDateTime(savedAt, { timeZone: DEFAULT_TIMEZONE })}` : ""}
                     </p>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    {doc.createdAt
-                      ? DATE_FORMATTER.format(doc.createdAt)
-                      : "Timestamp unknown"}
-                  </p>
+                  <Badge variant="secondary">{doc.category || "General"}</Badge>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  <Link
-                    href={`/admin/document-generator?docId=${doc.id}`}
-                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
-                  >
-                    Open
-                  </Link>
-                  <Link
-                    href={`/admin/document-generator?docId=${doc.id}&focus=export&format=pdf`}
-                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
-                  >
-                    Export PDF
-                  </Link>
-                  <Link
-                    href={`/admin/document-generator?docId=${doc.id}&focus=export&format=jpeg`}
-                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
-                  >
-                    Export JPEG
-                  </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="outline" className="h-11 sm:h-10">
+                    <Link href={`/admin/document-generator?docId=${doc.id}`}>Open</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="h-11 sm:h-10">
+                    <Link href={`/admin/document-generator?docId=${doc.id}&focus=export&format=pdf`}>Export PDF</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="h-11 sm:h-10">
+                    <Link href={`/admin/document-generator?docId=${doc.id}&focus=export&format=jpeg`}>Export JPEG</Link>
+                  </Button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

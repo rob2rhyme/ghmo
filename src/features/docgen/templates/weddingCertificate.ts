@@ -7,16 +7,16 @@ export const weddingCertificate: DocTemplate = {
   version: 1,
   title: "Wedding Certificate",
   category: "Certificate",
-  description: "Create a Magar Community marriage certificate with bilingual cultural acknowledgements.",
+  description: "A marriage certificate in English and Nepali, signed by witnesses and the officiant, with a code anyone can check.",
   steps: [
     {
       id: "document-details",
-      title: "Document Details",
+      title: "Details",
       fieldKeys: ["certificateNumber", "issueDate", "issuingAuthority", "officialSeal"]
     },
     {
       id: "recipient-parties",
-      title: "Recipient/Parties",
+      title: "Couple",
       fieldKeys: [
         "groomName",
         "brideName",
@@ -30,12 +30,12 @@ export const weddingCertificate: DocTemplate = {
     },
     {
       id: "event-main-content",
-      title: "Event/Main Content",
+      title: "Ceremony",
       fieldKeys: ["marriageDate", "ceremonyPlace", "optionalVowsEnabled", "customBlessing"]
     },
     {
       id: "additional-details",
-      title: "Additional Details",
+      title: "Witnesses",
       fieldKeys: [
         "witness1Name",
         "witness2Name",
@@ -48,11 +48,11 @@ export const weddingCertificate: DocTemplate = {
     }
   ],
   fields: [
-    { id: "groomName", label: "Groom Name / दुलहाको नाम", type: "text", placeholder: "Saurav Rai", required: true },
-    { id: "brideName", label: "Bride Name / दुलहीको नाम", type: "text", placeholder: "Amrita Gurung", required: true },
+    { id: "groomName", label: "Groom's name / दुलहाको नाम", type: "text", placeholder: "Saurav Rai", required: true },
+    { id: "brideName", label: "Bride's name / दुलहीको नाम", type: "text", placeholder: "Amrita Gurung", required: true },
     {
       id: "brideEthnicity",
-      label: "Bride Ethnicity / Bride Community / दुलहीको जात/समुदाय",
+      label: "Bride's community / दुलहीको जात/समुदाय",
       type: "select",
       options: [
         { label: "Gurung / गुरुङ", value: "Gurung|गुरुङ" },
@@ -101,19 +101,19 @@ export const weddingCertificate: DocTemplate = {
     },
     {
       id: "brideEthnicityOther",
-      label: "If Other, specify / अन्य भए लेख्नुहोस्",
+      label: "If other, which one / अन्य भए लेख्नुहोस्",
       type: "text",
       placeholder: "उदाहरण: थकाली / Thakali"
     },
     {
       id: "maitiRepresentativeName",
-      label: "Maiti Representative Name / माईती प्रतिनिधि नाम",
+      label: "Maiti representative's name / माईती प्रतिनिधि नाम",
       type: "text",
-      placeholder: "Elder Name"
+      placeholder: "Elder's name"
     },
     {
       id: "maitiRepresentativeRole",
-      label: "Maiti Role / माईतीको भूमिका",
+      label: "Maiti representative's role / माईतीको भूमिका",
       type: "select",
       options: [
         { label: "President / अध्यक्ष", value: "President|अध्यक्ष" },
@@ -144,45 +144,45 @@ export const weddingCertificate: DocTemplate = {
     },
     {
       id: "maitiRepresentativeRoleOther",
-      label: "If Other Role, specify / अन्य भूमिका भए लेख्नुहोस्",
+      label: "If other role, which one / अन्य भूमिका भए लेख्नुहोस्",
       type: "text",
       placeholder: "उदाहरण: Cultural Advisor / सांस्कृतिक सल्लाहकार"
     },
     {
       id: "maitiWitnessNote",
-      label: "Maiti Acknowledgement (Optional) / माईती स्वीकृति (वैकल्पिक)",
+      label: "Maiti acknowledgement (optional) / माईती स्वीकृति (वैकल्पिक)",
       type: "textarea",
       rows: 3
     },
-    { id: "marriageDate", label: "Marriage Date / विवाह मिति", type: "date", required: true },
-    { id: "ceremonyPlace", label: "Place of Ceremony / विवाह स्थान", type: "text", placeholder: "Glenwood Garden" },
+    { id: "marriageDate", label: "Marriage date / विवाह मिति", type: "date", required: true },
+    { id: "ceremonyPlace", label: "Place of ceremony / विवाह स्थान", type: "text", placeholder: "Glenwood Garden" },
     {
       id: "issuingAuthority",
-      label: "Issuing Authority / जारी गर्ने निकाय",
+      label: "Issued by / जारी गर्ने निकाय",
       type: "text",
       placeholder: "Magar Community Council / Magar Samaj / Association Name",
       defaultValue: "Magar Community Council / Magar Samaj / Association Name"
     },
-    { id: "certificateNumber", label: "Certificate Number / प्रमाणपत्र नं.", type: "text", placeholder: "GHMO-2024-001" },
-    { id: "issueDate", label: "Date of Issue / जारी मिति", type: "date" },
-    { id: "officialSeal", label: "Official Seal / Stamp / आधिकारिक छाप", type: "text", placeholder: "Seal / Stamp" },
-    { id: "witness1Name", label: "Witness 1 Name / साक्षी १ नाम", type: "text", placeholder: "Elder Name" },
-    { id: "witness1Signature", label: "Witness 1 Signature / साक्षी १ हस्ताक्षर", type: "text", placeholder: "Signature" },
-    { id: "witness2Name", label: "Witness 2 Name / साक्षी २ नाम", type: "text", placeholder: "Elder Name" },
-    { id: "witness2Signature", label: "Witness 2 Signature / साक्षी २ हस्ताक्षर", type: "text", placeholder: "Signature" },
-    { id: "officiantName", label: "Officiant Name / संस्कार सम्पन्न गराउने", type: "text", placeholder: "Justice Dipak Thapa" },
-    { id: "officiantTitle", label: "Officiant Title / पद", type: "text", placeholder: "जेष्ठ, अगुवा, पुजारी" },
-    { id: "officiantSignature", label: "Officiant Signature / हस्ताक्षर", type: "text", placeholder: "Signature" },
+    { id: "certificateNumber", label: "Certificate number / प्रमाणपत्र नं.", type: "text", placeholder: "GHMO-2024-001" },
+    { id: "issueDate", label: "Date of issue / जारी मिति", type: "date" },
+    { id: "officialSeal", label: "Official seal or stamp / आधिकारिक छाप", type: "text", placeholder: "Seal / Stamp" },
+    { id: "witness1Name", label: "Witness 1 name / साक्षी १ नाम", type: "text", placeholder: "Elder's name" },
+    { id: "witness1Signature", label: "Witness 1 signature / साक्षी १ हस्ताक्षर", type: "text", placeholder: "Signature" },
+    { id: "witness2Name", label: "Witness 2 name / साक्षी २ नाम", type: "text", placeholder: "Elder's name" },
+    { id: "witness2Signature", label: "Witness 2 signature / साक्षी २ हस्ताक्षर", type: "text", placeholder: "Signature" },
+    { id: "officiantName", label: "Officiant's name / संस्कार सम्पन्न गराउने", type: "text", placeholder: "Justice Dipak Thapa" },
+    { id: "officiantTitle", label: "Officiant's title / पद", type: "text", placeholder: "जेष्ठ, अगुवा, पुजारी" },
+    { id: "officiantSignature", label: "Officiant signature / हस्ताक्षर", type: "text", placeholder: "Signature" },
     {
       id: "optionalVowsEnabled",
-      label: "Include Traditional Vows? / प्रतिज्ञा समावेश?",
+      label: "Include traditional vows? / प्रतिज्ञा समावेश?",
       type: "checkbox",
-      placeholder: "Show Traditional Vows section",
+      placeholder: "Show the traditional vows section",
       defaultValue: "true"
     },
     {
       id: "customBlessing",
-      label: "Custom Blessing (Optional) / वैकल्पिक आशीर्वाद",
+      label: "Custom blessing (optional) / वैकल्पिक आशीर्वाद",
       type: "textarea",
       rows: 4,
       placeholder: "Add a custom blessing (will appear in both English and मगर/नेपाली sections)."
