@@ -183,8 +183,10 @@ export default function AdminLoginClient({
           <>
             <CardHeader>
               <CardTitle className="text-2xl">Admin sign in</CardTitle>
-              <CardDescription>
-                Use your passkey, or get an email link and then enter the code from your authenticator app.
+              <CardDescription className="text-base">
+                {featureEmailLogin
+                  ? "Get a sign-in link by email, then enter the 6-digit code from your authenticator app."
+                  : "Sign in with the passkey on this device."}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -194,42 +196,66 @@ export default function AdminLoginClient({
                   <AlertTitle>Checking your sign-in link…</AlertTitle>
                 </Alert>
               ) : null}
-              <Button size="lg" onClick={handlePasskeySignIn} loading={busy === "passkey"} disabled={!supported || busy !== null}>
-                <KeyRound aria-hidden="true" />
-                Sign in with passkey
-              </Button>
-              {!supported ? (
-                <p className="text-sm text-muted-foreground">
-                  This browser does not support passkeys. Use an up-to-date browser on your phone or computer.
-                </p>
+
+              {featureEmailLogin ? (
+                <form onSubmit={handleEmail} className="flex flex-col gap-3">
+                  <Field
+                    label="Admin email"
+                    description="We'll email a one-time link. Then you enter the 6-digit code from your authenticator app (or set the app up the first time). Use this too if you are new or lost your device."
+                  >
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      required
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="you@example.org"
+                    />
+                  </Field>
+                  <Button type="submit" size="lg" loading={busy === "email"} disabled={busy !== null}>
+                    <Mail aria-hidden="true" />
+                    Email me a sign-in link
+                  </Button>
+                </form>
               ) : null}
 
               {featureEmailLogin ? (
-                <>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <Separator className="flex-1" />
-                    No passkey, first time, or lost your device?
-                    <Separator className="flex-1" />
-                  </div>
-                  <form onSubmit={handleEmail} className="flex flex-col gap-3">
-                    <Field label="Admin email" description="We'll email a one-time link. Then you enter the 6-digit code from your authenticator app (or set the app up the first time).">
-                      <Input
-                        type="email"
-                        autoComplete="email"
-                        inputMode="email"
-                        required
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        placeholder="you@example.org"
-                      />
-                    </Field>
-                    <Button type="submit" variant="outline" loading={busy === "email"} disabled={busy !== null}>
-                      <Mail aria-hidden="true" />
-                      Email me a sign-in link
-                    </Button>
-                  </form>
-                </>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <Separator className="flex-1" />
+                  or
+                  <Separator className="flex-1" />
+                </div>
               ) : null}
+
+              <section
+                aria-labelledby="passkey-signin-title"
+                className={featureEmailLogin ? "flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4" : "flex flex-col gap-3"}
+              >
+                <div className="flex flex-col gap-1">
+                  <h3 id="passkey-signin-title" className="text-base font-semibold text-foreground">
+                    Have a passkey? Sign in faster
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    A passkey uses your fingerprint, face or phone screen lock instead of a code.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  variant={featureEmailLogin ? "outline" : "default"}
+                  onClick={handlePasskeySignIn}
+                  loading={busy === "passkey"}
+                  disabled={!supported || busy !== null}
+                >
+                  <KeyRound aria-hidden="true" />
+                  Sign in with passkey
+                </Button>
+                {!supported ? (
+                  <p className="text-sm text-muted-foreground">
+                    This browser does not support passkeys. Use an up-to-date browser on your phone or computer.
+                  </p>
+                ) : null}
+              </section>
             </CardContent>
           </>
         ) : null}
@@ -264,7 +290,7 @@ export default function AdminLoginClient({
               {!hasActivePasskey ? (
                 <>
                   <AuthenticatorSetup onDone={finishSignIn} onError={setError} />
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <Separator className="flex-1" />
                     or use a passkey instead
                     <Separator className="flex-1" />
@@ -288,7 +314,7 @@ export default function AdminLoginClient({
                 I already have a passkey on this device
               </Button>
               {hasActivePasskey ? null : (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   A passkey stays on your device and works with your fingerprint, face or device PIN. It is optional.
                 </p>
               )}
@@ -338,12 +364,12 @@ export default function AdminLoginClient({
         ) : null}
 
         {devLoginAvailable && stage === "signin" ? (
-          <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 p-4 text-sm">
+          <div className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
             <p className="font-semibold">Dev login (local only)</p>
             <Field label="Dev token">
               <Input type="password" value={devToken} onChange={e => setDevToken(e.target.value)} autoComplete="off" />
             </Field>
-            <p className="text-xs text-muted-foreground">Uses the admin email above.</p>
+            <p className="text-sm text-muted-foreground">Uses the admin email above.</p>
             <Button variant="outline" onClick={handleDevLogin} loading={busy === "dev"} disabled={!devToken || !email.trim()}>
               Start dev session
             </Button>

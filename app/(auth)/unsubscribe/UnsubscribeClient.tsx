@@ -31,7 +31,7 @@ export default function UnsubscribeClient({ token }: { token: string }) {
   return (
     <>
       <p className="text-muted-foreground">Press the button to stop receiving email from us. This takes effect right away.</p>
-      <Button onClick={confirm} loading={state === "busy"} className="self-start">
+      <Button size="lg" onClick={confirm} loading={state === "busy"} className="self-start">
         Unsubscribe me
       </Button>
       {state === "error" ? (

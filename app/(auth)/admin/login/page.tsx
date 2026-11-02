@@ -16,7 +16,7 @@ type AdminLoginPageProps = {
 
 /**
  * Admin sign-in. The stage is decided here from the session:
- * - no session                    -> "signin" (passkey, or email link for setup/recovery)
+ * - no session                    -> "signin" (email link + authenticator code; passkey as the faster option)
  * - magic-link session            -> "totp" (enter the authenticator code), "setup" (set up an
  *                                    authenticator app or a passkey), or "pending" if a new passkey
  *                                    is waiting for another admin's approval

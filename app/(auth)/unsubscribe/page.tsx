@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Link2Off, MailX } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
+import { Card } from "@/src/components/ui/card";
 import UnsubscribeClient from "./UnsubscribeClient";
 import { memberIdFromToken } from "@/src/lib/memberSuppression.server";
 
@@ -16,15 +20,29 @@ export default async function UnsubscribePage({ searchParams }: { searchParams: 
   const valid = Boolean(memberIdFromToken(value));
 
   return (
-    <main className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center gap-4 px-4 py-12">
-      <h1 className="text-2xl font-semibold">Stop these emails</h1>
+    <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center py-6">
       {valid ? (
-        <UnsubscribeClient token={value} />
+        <Card>
+          <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <MailX className="size-6" aria-hidden="true" />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Stop these emails</h1>
+          <UnsubscribeClient token={value} />
+        </Card>
       ) : (
-        <p className="text-muted-foreground">
-          This link is not valid or was copied incompletely. Use the link in the most recent email, or reply to that email and ask to be removed.
-        </p>
+        <Card className="items-center text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Link2Off className="size-6" aria-hidden="true" />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">This link doesn&apos;t work</h1>
+          <p className="text-base text-muted-foreground">
+            This link is not valid or was copied incompletely. Use the link in the most recent email, or reply to that email and ask to be removed.
+          </p>
+          <Button asChild size="lg">
+            <Link href="/">Go to homepage</Link>
+          </Button>
+        </Card>
       )}
-    </main>
+    </div>
   );
 }
