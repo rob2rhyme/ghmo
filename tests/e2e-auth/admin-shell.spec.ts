@@ -84,23 +84,25 @@ test("on a phone the dashboard goes from the figures straight to the recent list
   await context.close();
 });
 
-test("on a phone the menu keeps every page, the user and Sign out in view", async ({ browser }) => {
+test("on a phone the menu shows every page, then the user and Sign out at the end", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   await signInWithNewPasskey(page, "alice", "/admin");
 
   await page.getByRole("button", { name: "Open admin menu" }).click();
   const menu = page.getByRole("dialog");
-  // The page list scrolls inside the menu; the user card and Sign out stay pinned in view.
-  await expect(menu.getByText("Alice Rai")).toBeInViewport();
-  await expect(menu.getByRole("button", { name: "Sign out" })).toBeInViewport();
-  await menu.getByRole("link", { name: "Encryption", exact: true }).scrollIntoViewIfNeeded();
-  await expect(menu.getByRole("link", { name: "Encryption", exact: true })).toBeInViewport();
-  await menu.getByRole("link", { name: "Security", exact: true }).scrollIntoViewIfNeeded();
-  await expect(menu.getByRole("link", { name: "Security", exact: true })).toBeInViewport();
+  // The whole menu scrolls as one: nothing is pinned over the page list, so pages down to
+  // Document gallery are in view at once, and the account area follows the last page.
+  await expect(menu.getByRole("link", { name: "Document gallery", exact: true })).toBeInViewport();
+  for (const name of ["Security", "Encryption"]) {
+    await menu.getByRole("link", { name, exact: true }).scrollIntoViewIfNeeded();
+    await expect(menu.getByRole("link", { name, exact: true })).toBeInViewport();
+  }
+  await menu.getByRole("button", { name: "Sign out" }).scrollIntoViewIfNeeded();
   await expect(menu.getByText("Alice Rai")).toBeInViewport();
   await expect(menu.getByRole("button", { name: "Sign out" })).toBeInViewport();
 
+  await menu.getByRole("link", { name: "Security", exact: true }).scrollIntoViewIfNeeded();
   await menu.getByRole("link", { name: "Security", exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/security$/);
   await context.close();
