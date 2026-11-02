@@ -55,7 +55,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] **Audit 1** (layout only: beginner friendly, premium and modern look) done and findings reviewed by the owner. *Audit done 2026-11-02 (`docs/UI_AUDIT_1.md`); waiting for the owner's review and the real GoFundMe link.*
 - [ ] Upgrade 1 fixes merged. *Built and tested 2026-11-02 on `claude/elegant-hypatia-klg5se`; not pushed yet.*
 - [ ] **Audit 2** done and findings reviewed by the owner. *Audit done 2026-11-02 (`docs/UI_AUDIT_2.md`); waiting for the owner's review, a contact email and the go-ahead for B9 (event time zones).*
-- [ ] Upgrade 2 fixes merged.
+- [ ] Upgrade 2 fixes merged. *Built and tested 2026-11-02 on `claude/elegant-hypatia-klg5se`; not pushed yet.*
 
 ## 7. After going live
 

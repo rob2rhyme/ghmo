@@ -9,6 +9,9 @@ consistency across the whole admin console. Each verified the Audit 1 rows for t
 Severity as in Audit 1. Finding ids: **P** public, **A** admin governance and shell, **S** admin community and security,
 **C** consistency across the admin.
 
+> **Status 2026-11-02:** the owner approved B9 and Upgrade 2; the regression, B9 and the rows below were worked
+> through in Upgrade 2 (plan §13.6, 10-D). Still waiting on the owner: a contact email (P3) and community photos (P1).
+
 ## Summary
 
 **Audit 1, checked:** all 8 bugs are fixed, and no page scrolls sideways at any width (268 screenshots). Most Audit 1
