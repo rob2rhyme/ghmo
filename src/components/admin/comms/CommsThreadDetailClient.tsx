@@ -2,7 +2,7 @@
 
 import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { Check, MessageSquare, Reply, ThumbsUp } from "lucide-react";
 import {
   collection,
   deleteDoc,
@@ -15,6 +15,15 @@ import {
   setDoc
 } from "firebase/firestore";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { Field } from "@/src/components/ui/field";
+import { Skeleton } from "@/src/components/ui/skeleton";
+import { Textarea } from "@/src/components/ui/textarea";
+import { formatDateTime } from "@/src/lib/format";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
@@ -442,137 +451,114 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
   }, [comments, replyToId]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Link href="/admin/comms" className="text-sm font-semibold text-primary">
-          ← Back to Plans & Issues
-        </Link>
-        {isOpen && thread ? (
-          <button
-            type="button"
-            onClick={() => setProposeModalOpen(true)}
-            className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
-          >
-            Propose Conclusion
-          </button>
-        ) : null}
-      </div>
-
+    <div className="flex flex-col gap-6">
       {loading ? (
-        <AdminSectionCard>
-          <p className="text-sm text-muted-foreground">Loading thread...</p>
-        </AdminSectionCard>
+        <div role="status" className="flex flex-col gap-4">
+          <span className="sr-only">Loading the topic…</span>
+          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
       ) : loadError ? (
-        <AdminSectionCard>
-          <p className="text-sm text-destructive">{loadError}</p>
-        </AdminSectionCard>
+        <Alert variant="destructive">
+          <AlertTitle>Couldn&apos;t load this topic</AlertTitle>
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
       ) : thread && threadMeta ? (
         <>
           <AdminSectionCard>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold text-foreground">{thread.title}</h1>
-                  {(threadMeta.pinned || threadMeta.priority) && (
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {threadMeta.pinned ? "Pinned" : null}
-                      {threadMeta.pinned && threadMeta.priority ? " • " : null}
-                      {threadMeta.priority ? PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority : null}
-                    </span>
-                  )}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold tracking-tight break-words text-foreground">{thread.title}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Started {threadMeta.createdAt} by {threadMeta.createdBy}
+                  </p>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{thread.body}</p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Created {threadMeta.createdAt} by {threadMeta.createdBy}
-                </p>
+                {isOpen ? (
+                  <Button type="button" variant="outline" onClick={() => setProposeModalOpen(true)}>
+                    Propose conclusion
+                  </Button>
+                ) : null}
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase">
-                <span
-                  className={`rounded-full border px-2 py-0.5 ${
-                    threadMeta.status === "open"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : threadMeta.status === "closing"
-                        ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-border bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {STATUS_LABELS[threadMeta.status] || threadMeta.status}
-                </span>
-                <span className="rounded-full border border-border bg-card px-2 py-0.5 text-muted-foreground">
-                  {threadMeta.commentCount} comments
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={STATUS_BADGE[threadMeta.status] ?? "secondary"}>{STATUS_LABELS[threadMeta.status] || threadMeta.status}</Badge>
+                {threadMeta.pinned ? <Badge variant="outline">Pinned</Badge> : null}
+                {threadMeta.priority && threadMeta.priority !== "normal" ? (
+                  <Badge variant={threadMeta.priority === "high" ? "warning" : "outline"}>{PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority} priority</Badge>
+                ) : null}
+                <span className="text-sm text-muted-foreground">
+                  {threadMeta.commentCount} {threadMeta.commentCount === 1 ? "comment" : "comments"}
                 </span>
               </div>
+              <p className="text-base break-words whitespace-pre-wrap text-foreground">{thread.body}</p>
+              {isOpen ? (
+                <p className="text-sm text-muted-foreground">When the team has agreed, propose a conclusion. Admins then vote on it before it is closed.</p>
+              ) : null}
             </div>
+
             {(isClosing || isClosed) && thread.conclusion?.text ? (
-              <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3">
+              <div className="mt-5 flex flex-col gap-4 rounded-xl border border-border bg-muted/40 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conclusion</p>
-                    <p className="mt-2 text-sm text-foreground/80">{thread.conclusion.text}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Proposed {formatTimestamp(thread.conclusion.proposedAt)} by{" "}
-                      {resolveActorName(thread.conclusion.proposedBy)}
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-foreground">Conclusion</h3>
+                    <p className="mt-1 text-sm break-words whitespace-pre-wrap text-foreground">{thread.conclusion.text}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Proposed {formatTimestamp(thread.conclusion.proposedAt)} by {resolveActorName(thread.conclusion.proposedBy)}
                     </p>
                   </div>
                   {isClosing ? (
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                        {voteTally.approve} approve
-                      </span>
-                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-destructive">
-                        {voteTally.reject} reject
-                      </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="success">{voteTally.approve} approve</Badge>
+                      <Badge variant="destructive">{voteTally.reject} reject</Badge>
                     </div>
                   ) : null}
                 </div>
 
                 {isClosing ? (
-                  <div className="mt-4 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <button
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Your vote">
+                      <Button
                         type="button"
+                        variant={conclusionVote === "approve" ? "secondary" : "outline"}
+                        aria-pressed={conclusionVote === "approve"}
                         onClick={() => handleConclusionVote("approve")}
                         disabled={isVotingConclusion || conclusionVote === "approve"}
-                        className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-                          conclusionVote === "approve"
-                            ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                        } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
+                        {conclusionVote === "approve" ? <Check aria-hidden="true" /> : null}
                         Approve
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant={conclusionVote === "reject" ? "secondary" : "outline"}
+                        aria-pressed={conclusionVote === "reject"}
                         onClick={() => handleConclusionVote("reject")}
                         disabled={isVotingConclusion || conclusionVote === "reject"}
-                        className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-                          conclusionVote === "reject"
-                            ? "border border-rose-200 bg-rose-50 text-destructive"
-                            : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                        } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
+                        {conclusionVote === "reject" ? <Check aria-hidden="true" /> : null}
                         Reject
-                      </button>
+                      </Button>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleFinalizeClose}
-                        disabled={isFinalizing}
-                        className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isFinalizing ? "Finalizing..." : "Finalize Close"}
-                      </button>
-                      {conclusionVoteStatus ? (
-                        <p className="text-xs text-muted-foreground">{conclusionVoteStatus}</p>
-                      ) : null}
-                      {finalizeStatus ? <p className="text-xs text-destructive">{finalizeStatus}</p> : null}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button type="button" onClick={handleFinalizeClose} loading={isFinalizing}>
+                        {isFinalizing ? "Finalizing…" : "Finalize close"}
+                      </Button>
+                      <p className="text-sm text-muted-foreground">Closes the topic with this conclusion.</p>
                     </div>
+                    {conclusionVoteStatus ? (
+                      <p role="status" className="text-sm text-muted-foreground">
+                        {conclusionVoteStatus}
+                      </p>
+                    ) : null}
+                    {finalizeStatus ? (
+                      <p role="alert" className="text-sm font-medium text-destructive">
+                        {finalizeStatus}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 
                 {isClosed ? (
-                  <p className="mt-3 text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Finalized {formatTimestamp(thread.finalizedAt)} by {resolveActorName(thread.finalizedBy)}
                   </p>
                 ) : null}
@@ -580,193 +566,167 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
             ) : null}
           </AdminSectionCard>
 
-          <div className="grid gap-6">
-            <AdminSectionCard title="Discussion" description="Add context, replies, and lightweight likes.">
-              {topLevelComments.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
-                  <p className="text-sm text-muted-foreground">No comments yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {topLevelComments.map(comment => {
-                    const replies = repliesByParent[comment.id] || [];
-                    const likeCount = likeCounts[comment.id] ?? 0;
-                    const liked = Boolean(likedComments[comment.id]);
-                    return (
-                      <div key={comment.id} className="space-y-2">
-                        <div className="rounded-xl border border-border bg-background px-4 py-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold text-foreground">
-                              {resolveActorName(comment.createdBy)}
-                            </p>
-                            <span className="text-xs text-muted-foreground">
-                              {formatTimestamp(comment.createdAt)}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-foreground/80">{comment.body}</p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleLike(comment.id)}
-                              disabled={!isOpen || isLiking}
-                              className={`rounded-full border px-3 py-1 transition ${
-                                liked
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                              } disabled:cursor-not-allowed disabled:opacity-60`}
-                            >
-                              {liked ? "Liked" : "Like"} · {likeCount}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setReplyToId(comment.id)}
-                              disabled={!isOpen}
-                              className="rounded-full border border-border px-3 py-1 text-muted-foreground transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Reply
-                            </button>
-                          </div>
-                        </div>
-                        {replies.length > 0 ? (
-                          <div className="space-y-2 pl-4">
-                            {replies.map(reply => {
-                              const replyLikeCount = likeCounts[reply.id] ?? 0;
-                              const replyLiked = Boolean(likedComments[reply.id]);
-                              return (
-                                <div key={reply.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <p className="text-sm font-semibold text-foreground">
-                                      {resolveActorName(reply.createdBy)}
-                                    </p>
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatTimestamp(reply.createdAt)}
-                                    </span>
-                                  </div>
-                                  <p className="mt-2 text-sm text-foreground/80">{reply.body}</p>
-                                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleLike(reply.id)}
-                                      disabled={!isOpen || isLiking}
-                                      className={`rounded-full border px-3 py-1 transition ${
-                                        replyLiked
-                                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                          : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                                      } disabled:cursor-not-allowed disabled:opacity-60`}
-                                    >
-                                      {replyLiked ? "Liked" : "Like"} · {replyLikeCount}
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+          <AdminSectionCard title="Discussion" description="Comments and replies from the admin team.">
+            {topLevelComments.length === 0 ? (
+              <EmptyState
+                icon={<MessageSquare aria-hidden="true" />}
+                title="No comments yet"
+                description={isOpen ? "Be the first to share your view below." : "Nobody commented on this topic."}
+                className="py-8"
+              />
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {topLevelComments.map(comment => {
+                  const replies = repliesByParent[comment.id] || [];
+                  return (
+                    <li key={comment.id} className="flex flex-col gap-2">
+                      <CommentCard
+                        comment={comment}
+                        liked={Boolean(likedComments[comment.id])}
+                        likeCount={likeCounts[comment.id] ?? 0}
+                        canAct={isOpen}
+                        likeBusy={isLiking}
+                        onLike={() => handleToggleLike(comment.id)}
+                        onReply={() => {
+                          setReplyToId(comment.id);
+                          commentInputRef.current?.focus();
+                        }}
+                      />
+                      {replies.length > 0 ? (
+                        <ul className="flex flex-col gap-2 border-l-2 border-border pl-3 sm:pl-4">
+                          {replies.map(reply => (
+                            <li key={reply.id}>
+                              <CommentCard
+                                comment={reply}
+                                liked={Boolean(likedComments[reply.id])}
+                                likeCount={likeCounts[reply.id] ?? 0}
+                                canAct={isOpen}
+                                likeBusy={isLiking}
+                                onLike={() => handleToggleLike(reply.id)}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
-              <div className="mt-4 space-y-2">
-                {replyTarget ? (
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>
-                      Replying to {resolveActorName(replyTarget.createdBy)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setReplyToId(null)}
-                      className="text-xs font-semibold text-muted-foreground hover:text-foreground"
-                    >
-                      Cancel reply
-                    </button>
-                  </div>
-                ) : null}
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Add comment
-                  <textarea
-                    ref={commentInputRef}
-                    value={commentBody}
-                    onChange={event => setCommentBody(event.target.value)}
-                    rows={3}
-                    disabled={!isOpen}
-                    className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden disabled:bg-muted"
-                    placeholder={isOpen ? "Share feedback or a decision." : "Thread is not open for comments."}
-                  />
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePostComment}
-                    disabled={!isOpen || isPostingComment}
-                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isPostingComment ? "Posting..." : "Post comment"}
-                  </button>
-                  {commentStatus ? <p className="text-sm text-muted-foreground">{commentStatus}</p> : null}
-                  {likeStatus ? <p className="text-sm text-muted-foreground">{likeStatus}</p> : null}
+            <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
+              {replyTarget ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <span>Replying to {resolveActorName(replyTarget.createdBy)}</span>
+                  <Button type="button" variant="ghost" onClick={() => setReplyToId(null)}>
+                    Cancel reply
+                  </Button>
                 </div>
+              ) : null}
+              <Field label={replyTarget ? "Your reply" : "Add a comment"}>
+                <Textarea
+                  ref={commentInputRef}
+                  value={commentBody}
+                  onChange={event => setCommentBody(event.target.value)}
+                  rows={3}
+                  disabled={!isOpen}
+                  placeholder={isOpen ? "Share feedback or a decision." : "This topic is closed to new comments."}
+                />
+              </Field>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" onClick={handlePostComment} disabled={!isOpen} loading={isPostingComment}>
+                  {isPostingComment ? "Posting…" : "Post comment"}
+                </Button>
+                {commentStatus ? (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {commentStatus}
+                  </p>
+                ) : null}
+                {likeStatus ? (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {likeStatus}
+                  </p>
+                ) : null}
               </div>
-            </AdminSectionCard>
-          </div>
+            </div>
+          </AdminSectionCard>
         </>
       ) : null}
 
-      {proposeModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
-          <div className="w-full max-w-lg rounded-2xl bg-card p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Propose conclusion</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Proposing a conclusion moves the thread into the closing review stage.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setProposeModalOpen(false)}
-                className="text-sm font-semibold text-muted-foreground hover:text-foreground/80"
-              >
-                Close
-              </button>
-            </div>
-            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Conclusion
-              <textarea
-                value={proposedConclusion}
-                onChange={event => setProposedConclusion(event.target.value)}
-                rows={4}
-                className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden"
-                placeholder="Summarize the decision or outcome."
-              />
-            </label>
-            {proposeStatus ? <p className="mt-2 text-sm text-destructive">{proposeStatus}</p> : null}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setProposeModalOpen(false)}
-                className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleProposeConclusion}
-                disabled={isProposing}
-                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isProposing ? "Proposing..." : "Propose conclusion"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Dialog open={proposeModalOpen} onOpenChange={setProposeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Propose conclusion</DialogTitle>
+            <DialogDescription>Write down what was decided. Admins then vote to approve or reject it before the topic is closed.</DialogDescription>
+          </DialogHeader>
+          <Field label="Conclusion" error={proposeStatus ?? undefined}>
+            <Textarea
+              value={proposedConclusion}
+              onChange={event => setProposedConclusion(event.target.value)}
+              rows={4}
+              placeholder="Summarize the decision or outcome."
+            />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setProposeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleProposeConclusion} loading={isProposing}>
+              {isProposing ? "Proposing…" : "Propose conclusion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const STATUS_BADGE: Record<string, "success" | "warning" | "secondary"> = {
+  open: "success",
+  closing: "warning",
+  closed: "secondary"
+};
+
+function CommentCard({
+  comment,
+  liked,
+  likeCount,
+  canAct,
+  likeBusy,
+  onLike,
+  onReply
+}: {
+  comment: CommentView;
+  liked: boolean;
+  likeCount: number;
+  canAct: boolean;
+  likeBusy: boolean;
+  onLike: () => void;
+  onReply?: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="text-sm font-semibold text-foreground">{resolveActorName(comment.createdBy)}</p>
+        <span className="text-sm text-muted-foreground">{formatTimestamp(comment.createdAt)}</span>
+      </div>
+      <p className="mt-1 text-sm break-words whitespace-pre-wrap text-foreground">{comment.body}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <Button type="button" variant="ghost" aria-pressed={liked} onClick={onLike} disabled={!canAct || likeBusy} className="text-muted-foreground">
+          <ThumbsUp aria-hidden="true" className={liked ? "fill-current text-primary" : undefined} />
+          {liked ? "Liked" : "Like"} · {likeCount}
+        </Button>
+        {onReply ? (
+          <Button type="button" variant="ghost" onClick={onReply} disabled={!canAct} className="text-muted-foreground">
+            <Reply aria-hidden="true" />
+            Reply
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
 
 function formatTimestamp(value?: { toDate?: () => Date } | null) {
-  if (!value || typeof value?.toDate !== "function") return "Timestamp unavailable";
-  return value.toDate().toLocaleString();
+  return formatDateTime(value) || "date unknown";
 }

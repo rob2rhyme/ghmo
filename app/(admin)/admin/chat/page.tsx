@@ -26,10 +26,10 @@ export default async function AdminChatPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Admin Chat"
-        description="WhatsApp-style coordination for quick admin updates."
+        description="Quick updates and reminders between admins. Decisions belong in Plans & Issues."
       />
       <FirebaseAdminAuthBootstrap>
         <EncryptionGate what="Admin Chat">

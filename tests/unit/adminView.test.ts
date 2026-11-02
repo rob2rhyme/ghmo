@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityActorName,
+  activitySentence,
   auditTitle,
   firstName,
   formatMoney,
@@ -47,6 +49,44 @@ describe("audit titles", () => {
     expect(auditTitle({ action: "passkey_registered" })).toBe("Passkey registered");
     expect(auditTitle({ type: "event_created" })).toBe("Event created");
     expect(auditTitle({})).toBe("Activity");
+  });
+});
+
+describe("activity sentences", () => {
+  const alice = { name: "Alice Rai", role: "super_admin" };
+
+  it("says how someone signed in, without the raw method", () => {
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Passkey: Passkey" } })).toEqual({ text: "Alice Rai signed in with a passkey" });
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Authenticator app" } }).text).toBe("Alice Rai signed in with the authenticator app");
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Authenticator: recovery code" } }).text).toBe("Alice Rai signed in with a recovery code");
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Email magic link" } }).text).toBe("Alice Rai signed in with an email link");
+  });
+
+  it("keeps a useful detail and drops codes and generic names", () => {
+    expect(activitySentence({ action: "passkey_registered", actor: alice, resource: { summary: "Sita's iPhone (magic_link)" } })).toEqual({
+      text: "Alice Rai added a passkey",
+      detail: "Sita's iPhone"
+    });
+    expect(activitySentence({ action: "passkey_registered", actor: alice, resource: { summary: "Passkey (magic_link)" } })).toEqual({ text: "Alice Rai added a passkey" });
+    expect(activitySentence({ action: "event_created", actor: alice, resource: { summary: "Created event: Spring picnic" } })).toEqual({
+      text: "Alice Rai created an event",
+      detail: "Spring picnic"
+    });
+    expect(activitySentence({ action: "members_imported", actor: alice, resource: { summary: "Imported 6 members (0 skipped, 2 with a phone number)" } }).detail).toBe(
+      "Imported 6 members (0 skipped, 2 with a phone number)"
+    );
+    expect(activitySentence({ action: "minutes_approved", actor: alice, resource: { summary: "Approved minutes" } })).toEqual({ text: "Alice Rai approved minutes" });
+    expect(activitySentence({ action: "totp_enrolled", actor: alice, resource: { summary: "Authenticator app set up" } })).toEqual({ text: "Alice Rai set up an authenticator app" });
+  });
+
+  it("names the role when there is no name, and covers system entries and unknown actions", () => {
+    expect(activityActorName({ role: "super_admin" })).toBe("A super admin");
+    expect(activityActorName({ name: "alice@example.org", roles: ["admin"] })).toBe("An admin");
+    expect(activityActorName(undefined)).toBe("Someone");
+    expect(activityActorName({ actor: { name: "Bob" } })).toBe("Bob");
+    expect(activitySentence({ action: "webhook_received" }).text).toBe("A donation update arrived from GoFundMe");
+    expect(activitySentence({ action: "something_new", actor: alice, resource: { summary: "Did a new thing" } }).text).toBe("Did a new thing");
+    expect(activitySentence({ action: "something_new", actor: alice }).text).toBe("Something new");
   });
 });
 

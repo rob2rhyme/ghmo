@@ -14,7 +14,7 @@ export type ActorLike =
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
-  super_admin: "Super Admin",
+  super_admin: "Super admin",
   developer: "Developer",
   member: "Member",
   system: "System"

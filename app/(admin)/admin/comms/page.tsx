@@ -26,10 +26,10 @@ export default async function AdminCommsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Plans & Issues"
-        description="Governed threads for proposals, plans, and issues that require admin decisions."
+        description="Topics the admin team needs to discuss and decide. Each one closes with an agreed conclusion."
       />
       <FirebaseAdminAuthBootstrap>
         <EncryptionGate what="Plans & Issues">

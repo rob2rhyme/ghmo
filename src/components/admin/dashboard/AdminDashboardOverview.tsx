@@ -1,7 +1,7 @@
 "use client";
 
 import type { Route } from "next";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -25,8 +25,8 @@ import AdminCommandPalette from "@/src/components/admin/dashboard/AdminCommandPa
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { MeetingMinutesRecord, minutesStatusLabels, type MinutesStatus } from "@/src/lib/minutes";
-import { resolveActorLabel } from "@/src/lib/actor";
-import { auditTitle, firstName, formatMoney, formatShortDate, percentOf, relativeTime } from "@/src/lib/adminView";
+import { activitySentence, firstName, formatMoney, formatShortDate, percentOf, relativeTime } from "@/src/lib/adminView";
+import { formatDateTime } from "@/src/lib/format";
 
 type AuditLogView = {
   id: string;
@@ -34,7 +34,7 @@ type AuditLogView = {
   type?: string;
   action?: string;
   resource?: { summary?: string } | null;
-  actor?: Parameters<typeof resolveActorLabel>[0];
+  actor?: { name?: string | null; role?: string | null; roles?: string[] | null } | string | null;
   actorUid?: string;
   role?: string;
   metadata?: { action?: string } | null;
@@ -67,7 +67,7 @@ const QUICK_ACTIONS: { href: Route; title: string; description: string; icon: Lu
   { href: "/admin/gumba-project" as Route, title: "GUMBA Project", description: "Track project updates and tasks.", icon: Landmark }
 ];
 
-function EmptyNote({ children }: { children: React.ReactNode }) {
+function EmptyNote({ children }: { children: ReactNode }) {
   return <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
@@ -132,7 +132,8 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
     const sorted = [...(auditLogs || [])].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
     const filtered = normalizedQuery
       ? sorted.filter(log => {
-          const haystack = [auditTitle(log), log.type, log.action, log.actorUid, log.role, log.metadata?.action, resolveActorLabel(log.actor ?? { role: log.role })]
+          const sentence = activitySentence(log);
+          const haystack = [sentence.text, sentence.detail, log.type, log.action, log.metadata?.action]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
@@ -176,17 +177,19 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
     }
   };
 
+  const donationsLastUpdate = latestWebhookMs ? relativeTime(latestWebhookMs, now) : "never";
+
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="flex flex-col gap-6 md:gap-8">
       <AdminPageHeader
         title="Dashboard"
         description={`Welcome back, ${firstName(adminName)}. ${community.name ? `Here is what is happening at ${community.name}.` : "Here is what is happening."}`}
         actions={
-          <>
+          <div className="flex flex-nowrap gap-2">
             <Button asChild>
               <Link href="/admin/minutes?mode=new">
                 <Plus aria-hidden="true" />
-                Create minutes
+                Write minutes
               </Link>
             </Button>
             <Button asChild variant="outline">
@@ -195,7 +198,7 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
                 New event
               </Link>
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -206,33 +209,58 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
           icon={CircleDollarSign}
           className="col-span-2 md:col-span-1"
           progress={goalPercent}
-          hint={goalPercent === null ? "No fundraising goal set" : `${goalPercent}% of the ${formatMoney(stats.goal)} goal`}
+          hint={
+            goalPercent !== null
+              ? `${goalPercent}% of the ${formatMoney(stats.goal)} goal`
+              : stats.totalRaised
+                ? "No fundraising goal from GoFundMe yet"
+                : "No donations recorded yet"
+          }
+          action={
+            goalPercent === null ? (
+              <a href="#donations" className="font-medium text-primary underline-offset-4 hover:underline">
+                Sync from GoFundMe
+              </a>
+            ) : null
+          }
         />
-        <AdminKpiCard label="Donors" value={(stats.donorCount || 0).toLocaleString("en-US")} icon={UsersRound} hint="Given so far" />
+        <AdminKpiCard
+          label="Donors"
+          value={(stats.donorCount || 0).toLocaleString("en-US")}
+          icon={UsersRound}
+          hint={stats.donorCount ? "Given so far" : "Counted when donations sync"}
+        />
         <AdminKpiCard
           label="To approve"
           value={awaitingApproval}
           icon={NotebookPen}
           href={"/admin/minutes?mode=records" as Route}
-          hint={awaitingApproval === 0 ? "Minutes: nothing waiting" : `Minutes waiting${drafts ? ` · ${drafts} in draft` : ""}`}
+          hint={
+            awaitingApproval
+              ? `Minutes waiting${drafts ? ` · ${drafts} in draft` : ""}`
+              : drafts
+                ? `Nothing waiting · ${drafts} in draft`
+                : "Nothing waiting. Open the records"
+          }
         />
       </div>
 
-      <div className="max-w-md">
-        <AdminCommandPalette value={query} onChange={setQuery} onClear={() => setQuery("")} inputRef={inputRef} />
-      </div>
-
-      <section aria-labelledby="quick-actions-heading" className="space-y-3">
-        <div>
-          <h2 id="quick-actions-heading" className="text-base font-semibold tracking-tight text-foreground md:text-lg">
-            Quick actions
-          </h2>
-          <p className="text-sm text-muted-foreground">Jump into the tools you use most.</p>
+      <section aria-labelledby="quick-actions-heading" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="quick-actions-heading" className="text-lg font-semibold tracking-tight text-foreground">
+              Quick actions
+            </h2>
+            <p className="text-sm text-muted-foreground">Jump into the tools you use most.</p>
+          </div>
+          <div className="w-full sm:w-72">
+            <AdminCommandPalette value={query} onChange={setQuery} onClear={() => setQuery("")} inputRef={inputRef} />
+          </div>
         </div>
         {filteredQuickActions.length === 0 ? (
           <EmptyNote>No quick actions match your filter.</EmptyNote>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3">
             {filteredQuickActions.map(action => (
               <AdminActionCard key={action.href} href={action.href} title={action.title} description={action.description} icon={action.icon} />
             ))}
@@ -240,12 +268,12 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
         )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         <AdminSectionCard
           title="Recent minutes"
           description="Latest records ready for approval or export."
           actions={
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost">
               <Link href="/admin/minutes?mode=records">View all</Link>
             </Button>
           }
@@ -255,7 +283,7 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
               {normalizedQuery ? "No minutes match your filter." : "No minutes recorded yet."}
               {!normalizedQuery ? (
                 <Link href="/admin/minutes?mode=new" className="mt-2 block font-semibold text-primary hover:underline">
-                  Create your first minutes
+                  Write your first minutes
                 </Link>
               ) : null}
             </EmptyNote>
@@ -265,11 +293,11 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
                 <li key={entry.id}>
                   <Link
                     href={"/admin/minutes?mode=records" as Route}
-                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-foreground">{entry.eventTitle}</span>
-                      <span className="block text-xs text-muted-foreground" suppressHydrationWarning>
+                      <span className="block text-sm text-muted-foreground" suppressHydrationWarning>
                         {entry.meetingType} · {formatShortDate(entry.eventDate)}
                       </span>
                     </span>
@@ -281,65 +309,65 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
           )}
         </AdminSectionCard>
 
-        <AdminSectionCard title="Recent activity" description="Latest admin changes and approvals.">
+        <AdminSectionCard title="Recent activity" description="Who did what, most recent first.">
           {recentAuditLogs.length === 0 ? (
             <EmptyNote>{normalizedQuery ? "No activity matches your filter." : "No activity yet."}</EmptyNote>
           ) : (
             <ol className="relative flex flex-col gap-4 before:absolute before:top-2 before:bottom-2 before:left-[5px] before:w-px before:bg-border">
-              {recentAuditLogs.map(log => (
-                <li key={log.id} className="relative flex gap-3 pl-5">
-                  <span aria-hidden="true" className="absolute top-1.5 left-0 size-[11px] rounded-full border-2 border-primary bg-card" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{auditTitle(log)}</p>
-                    <p className="text-xs text-muted-foreground" suppressHydrationWarning title={log.createdAtMs ? new Date(log.createdAtMs).toLocaleString("en-US") : undefined}>
-                      {resolveActorLabel(log.actor ?? { role: log.role })}
-                      {log.createdAtMs ? ` · ${relativeTime(log.createdAtMs, now)}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
+              {recentAuditLogs.map(log => {
+                const sentence = activitySentence(log);
+                return (
+                  <li key={log.id} className="relative flex gap-3 pl-5">
+                    <span aria-hidden="true" className="absolute top-1.5 left-0 size-[11px] rounded-full border-2 border-primary bg-card" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium break-words text-foreground">{sentence.text}</p>
+                      {sentence.detail ? <p className="text-sm break-words text-muted-foreground">{sentence.detail}</p> : null}
+                      {log.createdAtMs ? (
+                        <p className="text-sm text-muted-foreground" suppressHydrationWarning title={formatDateTime(log.createdAtMs)}>
+                          {relativeTime(log.createdAtMs, now)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           )}
         </AdminSectionCard>
       </div>
 
-      <AdminSectionCard
-        title="Integrations and system status"
-        description="Keep donor numbers in step with GoFundMe Pro."
-        actions={
-          <Button variant="outline" size="sm" onClick={triggerReconcile} loading={reconciling}>
-            <RefreshCw aria-hidden="true" />
-            Sync donations
-          </Button>
-        }
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex items-start gap-3 rounded-lg border border-border p-4">
-            <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${webhookEvents?.length ? "bg-success" : "bg-muted-foreground/40"}`} />
-            <div>
-              <p className="text-sm font-semibold text-foreground">Donation webhooks</p>
-              <p className="text-sm text-muted-foreground">{webhookEvents?.length ? `${webhookEvents.length} received recently` : "No recent webhook activity"}</p>
-              {latestWebhookMs ? (
-                <p className="mt-0.5 text-xs text-muted-foreground" suppressHydrationWarning>
-                  Last received {relativeTime(latestWebhookMs, now)}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex items-start gap-3 rounded-lg border border-border p-4">
-            <span aria-hidden="true" className="mt-1.5 size-2.5 shrink-0 rounded-full bg-primary/60" />
-            <div>
-              <p className="text-sm font-semibold text-foreground">Manual donation sync</p>
-              <p className="text-sm text-muted-foreground">Run it if a gift is missing from the totals.</p>
+      <section id="donations" className="scroll-mt-24">
+        <AdminSectionCard
+          title="Donations"
+          description={`Totals come from GoFundMe. Last update: ${donationsLastUpdate}.`}
+          actions={
+            <Button variant="outline" onClick={triggerReconcile} loading={reconciling}>
+              <RefreshCw aria-hidden="true" />
+              Sync donations
+            </Button>
+          }
+        >
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className={`mt-1.5 size-2.5 shrink-0 rounded-full ${webhookEvents?.length ? "bg-success" : "bg-muted-foreground/40"}`}
+            />
+            <div className="min-w-0">
+              <p className="text-sm text-foreground" suppressHydrationWarning>
+                {webhookEvents?.length
+                  ? `${webhookEvents.length} ${webhookEvents.length === 1 ? "update" : "updates"} from GoFundMe recently.`
+                  : "No updates from GoFundMe yet."}
+              </p>
+              <p className="text-sm text-muted-foreground">If a gift is missing from the totals, press Sync donations.</p>
               {reconcileStatus ? (
-                <p role="status" className={`mt-0.5 text-xs ${reconcileStatus.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+                <p role="status" className={`mt-1 text-sm ${reconcileStatus.tone === "error" ? "font-medium text-destructive" : "text-muted-foreground"}`}>
                   {reconcileStatus.text}
                 </p>
               ) : null}
             </div>
           </div>
-        </div>
-      </AdminSectionCard>
+        </AdminSectionCard>
+      </section>
     </div>
   );
 }

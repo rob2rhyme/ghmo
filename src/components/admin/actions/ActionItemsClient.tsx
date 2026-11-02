@@ -2,10 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import Link from "next/link";
+import { ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
+import { Segmented } from "@/src/components/ui/segmented";
+import { formatShortDate } from "@/src/lib/format";
 import { firestore } from "@/src/lib/firebaseClient";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import {
@@ -81,45 +85,80 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
   const openCount = items.filter(item => item.status === "open").length;
   const overdueCount = items.filter(item => item.overdue).length;
 
+  const doneCount = items.length - openCount;
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {(["open", "done", "all"] as Filter[]).map(value => (
-          <Button key={value} size="sm" variant={filter === value ? "default" : "outline"} onClick={() => setFilter(value)}>
-            {value === "open" ? `Open (${openCount})` : value === "done" ? "Done / dropped" : "All"}
-          </Button>
-        ))}
-        {overdueCount ? <Badge variant="destructive">{overdueCount} overdue</Badge> : null}
-      </div>
+    <div className="flex flex-col gap-4">
+      {items.length > 0 ? (
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            {
+              value: "open",
+              label: (
+                <>
+                  Open
+                  {overdueCount ? (
+                    <span className="rounded-full bg-destructive/10 px-1.5 text-xs font-semibold text-destructive">{overdueCount} overdue</span>
+                  ) : null}
+                </>
+              ),
+              count: openCount
+            },
+            // "Done / dropped" is the name the browser tests click.
+            { value: "done", label: "Done / dropped", count: doneCount },
+            { value: "all", label: "All", count: items.length }
+          ]}
+        />
+      ) : null}
       {visible.length === 0 ? (
-        <EmptyState title="Nothing here" description="Action items appear once minutes with tasks are approved." />
+        items.length === 0 ? (
+          <EmptyState
+            icon={<ListChecks aria-hidden="true" />}
+            title="No action items yet"
+            description="Tasks appear here once minutes that list action items are approved."
+            action={
+              <Button asChild variant="outline">
+                <Link href="/admin/minutes">Go to Meeting Minutes</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<ListChecks aria-hidden="true" />}
+            title={filter === "open" ? "Nothing left to do" : "Nothing here yet"}
+            description={filter === "open" ? "Every action item is done or not needed." : "Items you mark done or not needed show up here."}
+          />
+        )
       ) : (
-        <ul className="space-y-2">
+        <ul className="flex flex-col gap-2">
           {visible.map(item => (
-            <li key={item.key} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
-              <div>
-                <p className="font-medium text-foreground">{item.task}</p>
-                <p className="text-xs text-muted-foreground">
+            <li key={item.key} className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-medium break-words text-foreground">{item.task}</p>
+                <p className="text-sm text-muted-foreground">
                   {item.eventTitle}
                   {item.assignedTo ? ` · ${item.assignedTo}` : ""}
-                  {item.dueDate ? ` · due ${new Date(item.dueDate).toLocaleDateString()}` : ""}
+                  {item.dueDate ? ` · due ${formatShortDate(item.dueDate)}` : ""}
                 </p>
-                {item.note ? <p className="mt-1 text-xs text-muted-foreground">{item.note}</p> : null}
+                {item.note ? <p className="mt-1 text-sm text-muted-foreground">{item.note}</p> : null}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {item.overdue ? <Badge variant="destructive">Overdue</Badge> : null}
-                {item.status !== "open" ? <Badge variant="secondary">{item.status === "done" ? "Done" : "Dropped"}</Badge> : null}
+                {item.status !== "open" ? <Badge variant="secondary">{item.status === "done" ? "Done" : "Not needed"}</Badge> : null}
                 {item.status === "open" ? (
                   <>
-                    <Button size="sm" loading={busy === item.key} onClick={() => setStatus(item, "done")}>
+                    <Button loading={busy === item.key} onClick={() => setStatus(item, "done")}>
                       Mark done
                     </Button>
-                    <Button size="sm" variant="outline" disabled={busy === item.key} onClick={() => setStatus(item, "dropped")}>
-                      Drop
+                    <Button variant="outline" disabled={busy === item.key} onClick={() => setStatus(item, "dropped")}>
+                      Not needed
                     </Button>
                   </>
                 ) : (
-                  <Button size="sm" variant="outline" loading={busy === item.key} onClick={() => setStatus(item, "open")}>
+                  <Button variant="outline" loading={busy === item.key} onClick={() => setStatus(item, "open")}>
                     Reopen
                   </Button>
                 )}

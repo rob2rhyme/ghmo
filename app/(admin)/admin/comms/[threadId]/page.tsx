@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
@@ -31,11 +34,16 @@ export default async function AdminCommsThreadPage({ params }: AdminCommsThreadP
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
-      <AdminPageHeader
-        title="Thread Detail"
-        description="Review discussion, propose a conclusion, and finalize when resolved."
-      />
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <Button asChild variant="ghost" className="-ml-3 self-start text-muted-foreground">
+          <Link href="/admin/comms">
+            <ArrowLeft aria-hidden="true" />
+            Back to Plans & Issues
+          </Link>
+        </Button>
+        <AdminPageHeader title="Topic" description="Read the discussion, add your view, and agree a conclusion together." />
+      </div>
       <FirebaseAdminAuthBootstrap>
         <EncryptionGate what="Plans & Issues">
           <CommsThreadDetailClient threadId={threadId} actor={toPlain(actorInfo)} />
