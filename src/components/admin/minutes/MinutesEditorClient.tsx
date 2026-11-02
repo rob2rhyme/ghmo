@@ -6,14 +6,14 @@ import * as htmlToImage from "html-to-image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Download, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   meetingTypes,
   MeetingAttendance,
   MeetingMinutesFormInput,
   MeetingMinutesRecord,
   MeetingSignatures,
-  MinutesStatus,
-  minutesStatusLabels
+  MinutesStatus
 } from "@/src/lib/minutes";
 import MinutesPreview, { MinutesPreviewData } from "@/src/features/minutes/components/MinutesPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
@@ -26,8 +26,10 @@ import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Segmented } from "@/src/components/ui/segmented";
 import { Select } from "@/src/components/ui/select";
+import { Steps, type Step } from "@/src/components/ui/steps";
 import { Textarea } from "@/src/components/ui/textarea";
 import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { cn } from "@/src/lib/utils";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { approvalLoc, minutesLoc, unpackMinutes } from "@/src/lib/minutesRecords";
@@ -67,11 +69,6 @@ type ExportFormat = "pdf" | "jpeg";
 type PreviewZoomMode = "fit" | "100";
 
 const PIXEL_RATIO = 2;
-const statusHelperText: Record<MinutesStatus, string> = {
-  draft: "Draft minutes can be updated before submission.",
-  submitted: "Submitted minutes are awaiting approval.",
-  approved: "Approved minutes are locked until you return them to draft."
-};
 const isNonNull = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
 /** A random Firestore-style document id; chosen here so the ciphertext can be bound to it. */
@@ -133,12 +130,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       setEventsLoading(true);
       try {
         const res = await fetch(`/api/admin/organizations/${COMMUNITY_SLUG}/events?status=all`);
-        if (!res.ok) throw new Error("Failed to load events");
+        if (!res.ok) throw new Error(`The server answered ${res.status}.`);
         const data = await res.json();
         if (!isActive) return;
         setEvents(Array.isArray(data.events) ? data.events : []);
-      } catch (err: any) {
-        if (isActive) setEventsError(err.message || "Unable to load events");
+      } catch (err) {
+        if (isActive) setEventsError(`Couldn't load the meetings. ${(err instanceof Error && err.message) || ""} Reload the page to try again.`.replace("  ", " "));
       } finally {
         if (isActive) setEventsLoading(false);
       }
@@ -281,16 +278,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const handleMinutesSubmit = async () => {
     if (isSavingMinutes) return;
     if (isApproved) {
-      setMinutesSaveStatus("Approved minutes are locked. Return to draft to update.");
+      setMinutesSaveStatus("Error: Approved minutes are locked. Return them to draft to change them.");
       return;
     }
     if (!formState.eventId) {
-      setMinutesSaveStatus("Select an event before saving minutes.");
+      setMinutesSaveStatus("Error: Choose the meeting first.");
       return;
     }
 
     setIsSavingMinutes(true);
-    setMinutesSaveStatus("Saving minutes...");
+    setMinutesSaveStatus(null);
     const trimmedAgenda = formState.agenda.map(item => item.trim()).filter(Boolean);
     const trimmedDecisions = formState.decisions.map(item => item.trim()).filter(Boolean);
     const cleanedActionItems = formState.actionItems
@@ -321,7 +318,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
     }
     const method = editingId ? "PATCH" : "POST";
     try {
-      if (editingEntry?._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device, so they can't be edited here.");
+      if (editingEntry?._e2ee === "failed") throw new Error("These minutes can't be opened on this device, so they can't be edited here.");
       const id = editingId ?? newMinutesId();
       const { eventId, meetingType, ...content } = payload;
       // With encryption on this is {enc}; before that it is the plain fields, as always.
@@ -336,13 +333,13 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       if (!res.ok) throw new Error(data.error || "Failed to save");
       const saved = await unpackMinutes(unpackPrivate, data.minutes);
       setSavedEntries(prev => [saved, ...prev.filter(entry => entry.id !== saved.id)]);
-      setMinutesSaveStatus(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
+      toast.success(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
       draft.clear();
       setFormState(createEmptyForm());
       setBaseline(JSON.stringify(createEmptyForm()));
       setEditingId(null);
-    } catch (err: any) {
-      setMinutesSaveStatus(`Error: ${err.message || "Unable to save minutes"}`);
+    } catch (err) {
+      setMinutesSaveStatus(`Error: ${(err instanceof Error && err.message) || "The minutes couldn't be saved. Try again."}`);
     } finally {
       setIsSavingMinutes(false);
     }
@@ -351,16 +348,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const handleMinutesExport = async (format: ExportFormat) => {
     if (isExportingMinutes) return;
     if (!formState.eventId) {
-      setMinutesExportStatus("Select an event before exporting.");
+      setMinutesExportStatus("Error: Choose a meeting first to download these minutes.");
       return;
     }
     if (!minutesPreviewRef.current || !previewReady) {
-      setMinutesExportStatus("Preview is still loading.");
+      setMinutesExportStatus("Error: The preview is still getting ready. Try again in a moment.");
       return;
     }
 
     setIsExportingMinutes(true);
-    setMinutesExportStatus("Generating export...");
+    setMinutesExportStatus(null);
     const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
     const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
     try {
@@ -379,18 +376,18 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       const baseName = safeTitle || "meeting-minutes";
       if (format === "jpeg") {
         downloadDataUrl(`${baseName}.jpg`, dataUrl);
-        setMinutesExportStatus("JPEG ready to download.");
+        toast.success("Image (JPEG) downloaded.");
       } else {
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.addImage(dataUrl, "PNG", 0, 0, pageWidth, pageHeight);
         doc.save(`${baseName}.pdf`);
-        setMinutesExportStatus("PDF downloaded.");
+        toast.success("PDF downloaded.");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Minutes export failed", err);
-      setMinutesExportStatus(err?.message ? `Error: ${err.message}` : "Failed to export minutes.");
+      setMinutesExportStatus(`Error: ${(err instanceof Error && err.message) || "The download couldn't be made. Try again."}`);
     } finally {
       setIsExportingMinutes(false);
     }
@@ -399,16 +396,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const handleMinutesStatusAction = async (action: "submit" | "approve" | "returnToDraft") => {
     if (isUpdatingStatus) return;
     if (!editingId) {
-      setStatusActionStatus("Save minutes before changing status.");
+      setStatusActionStatus("Error: Save the minutes first.");
       return;
     }
     setIsUpdatingStatus(true);
-    setStatusActionStatus("Updating status...");
+    setStatusActionStatus(null);
     try {
       const notes = action === "approve" ? approvalNotesInput.trim() : "";
       const extra: Record<string, unknown> = {};
       if (action === "approve" && encrypted && editingEntry?.encrypted) {
-        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be opened on this device.");
         // Approving publishes the saved content as a plaintext copy for the public pages.
         const { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures } = editingEntry;
         extra.published = { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures };
@@ -418,7 +415,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       }
       if (action === "submit" && editingEntry?.encrypted) {
         // The approver's copy must hash to exactly this, so the minutes can't change during approval.
-        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be opened on this device.");
         extra.contentHash = await hashContent(editingEntry as unknown as Record<string, unknown>);
       }
       if (action === "returnToDraft" && editingStatus === "approved") extra.reason = reopenReason.trim();
@@ -433,15 +430,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       setSavedEntries(prev => [updated, ...prev.filter(entry => entry.id !== updated.id)]);
       loadMinutesIntoForm(updated);
       setReopenReason("");
-      setStatusActionStatus(
-        action === "approve"
-          ? "Minutes approved."
-          : action === "returnToDraft"
-            ? "Marked as draft."
-            : "Submitted for approval."
-      );
-    } catch (err: any) {
-      setStatusActionStatus(`Error: ${err.message || "Unable to change status."}`);
+      toast.success(action === "approve" ? "Minutes approved." : action === "returnToDraft" ? "Marked as draft." : "Submitted for approval.");
+    } catch (err) {
+      setStatusActionStatus(`Error: ${(err instanceof Error && err.message) || "The status couldn't be changed. Try again."}`);
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -466,9 +457,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const editingEntry = editingId ? minutesEntries.find(entry => entry.id === editingId) ?? null : null;
   const editingStatus: MinutesStatus = (editingEntry?.status as MinutesStatus) ?? "draft";
   const isApproved = editingStatus === "approved";
-  const canSubmitForApproval = Boolean(editingEntry && editingStatus === "draft");
-  const canApproveMinutes = Boolean(editingEntry && editingStatus === "submitted");
-  const canReturnToDraft = Boolean(editingEntry && editingStatus !== "draft");
+  const editingBadge = statusBadge("minutes", editingStatus);
   const displayEventTitle = selectedEvent?.title || editingEntry?.eventTitle;
   const displayEventDateMs = selectedEvent?.startsAtMs ?? editingEntry?.eventDate ?? null;
   const displayEventDate = displayEventDateMs ? formatDateTime(displayEventDateMs) : null;
@@ -541,6 +530,24 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const saveHint = isApproved
     ? "Approved minutes are locked. Return them to draft to change them."
     : "Saved as a draft. Nothing is public until another admin approves it.";
+  const saveError = minutesSaveStatus?.startsWith("Error: ") ? minutesSaveStatus.slice(7) : null;
+  const submittedByMe = editingStatus === "submitted" && editingEntry?.submittedByUid === adminActor.uid;
+  const nextStepText = !editingEntry
+    ? ""
+    : editingStatus === "draft"
+      ? "When the minutes are complete, submit them. Another admin then checks and approves them."
+      : editingStatus === "submitted"
+        ? submittedByMe
+          ? "You submitted these minutes, so another admin must approve them."
+          : "Read the minutes and the preview. Approving publishes them on the public minutes page."
+        : "Approved and published. To change them, return them to draft and say why.";
+  // Write → submit → another admin approves; "current" is the step waiting to be done.
+  const currentStep = !editingEntry ? 0 : editingStatus === "draft" ? 1 : editingStatus === "submitted" ? 2 : 3;
+  const minutesSteps: Step[] = [
+    { title: "Write and save", description: "Fill in what you can. You can finish later." },
+    { title: "Submit for approval", description: "When the minutes are complete." },
+    { title: "Another admin approves", description: "Then they're published." }
+  ].map((step, index) => ({ ...step, state: index < currentStep ? "done" : index === currentStep ? "current" : "todo" }));
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -556,28 +563,25 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
           />
         ) : null}
 
-        <AdminSectionCard>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-foreground">
-                {editingId ? `Editing: ${displayEventTitle || "minutes"}` : displayEventTitle ? `New minutes: ${displayEventTitle}` : "New minutes"}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {editingId ? "Change what you need, then save. Submitting and approving are at the bottom." : "Pick the meeting, fill in what you can, and save. You can come back and finish later."}
-              </p>
-              {editingEntry ? (
-                <Badge variant={STATUS_BADGE[editingStatus]} className="mt-3">
-                  {minutesStatusLabels[editingStatus]}
-                </Badge>
-              ) : null}
-            </div>
-            {editingId ? (
+        <Steps label="How minutes are approved" steps={minutesSteps} className="max-sm:hidden" />
+
+        {editingId ? (
+          <AdminSectionCard
+            title={`Editing: ${displayEventTitle || "minutes"}`}
+            description="Change what you need, then save. The next step is below the form."
+            actions={
               <Button type="button" variant="outline" onClick={cancelMinutesEdit}>
                 Cancel edit
               </Button>
+            }
+          >
+            {editingEntry ? (
+              <Badge variant={editingBadge.variant} className="w-fit">
+                {editingBadge.label}
+              </Badge>
             ) : null}
-          </div>
-        </AdminSectionCard>
+          </AdminSectionCard>
+        ) : null}
 
         <fieldset disabled={isApproved} className="flex min-w-0 flex-col gap-6">
           <AdminSectionCard title="Which meeting?" description="Minutes belong to a meeting that has already happened.">
@@ -591,7 +595,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                     <>
                       Minutes are added after a meeting has happened. No past meetings yet:{" "}
                       <Link href="/admin/events" className="font-medium text-primary underline-offset-4 hover:underline">
-                        see Events
+                        open Events
                       </Link>
                       .
                     </>
@@ -696,14 +700,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
             <div className="flex flex-col gap-3">
               {formState.actionItems.map((item, index) => (
                 <div key={`action-${index}`} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:p-4">
-                  <RemovableRow removeLabel={`Remove action item ${index + 1}`} onRemove={() => removeActionItem(index)}>
-                    <Input
-                      aria-label={`Action item ${index + 1}: task`}
-                      value={item.task}
-                      onChange={e => updateActionItem(index, "task", e.target.value)}
-                      placeholder="Task"
-                    />
-                  </RemovableRow>
+                  <div className="flex min-w-0 items-end gap-2">
+                    <Field label={`Task ${index + 1}`} className="min-w-0 flex-1">
+                      <Input value={item.task} onChange={e => updateActionItem(index, "task", e.target.value)} placeholder="Task" />
+                    </Field>
+                    <RemoveButton label={`Remove action item ${index + 1}`} onRemove={() => removeActionItem(index)} />
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Who will do it (optional)">
                       <Input value={item.assignedTo} onChange={e => updateActionItem(index, "assignedTo", e.target.value)} placeholder="Name" />
@@ -786,84 +788,36 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
             )}
           </AdminSectionCard>
 
-          <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur-sm">
+          {/* Compact on phones (one button, a line only for errors), so it covers little of the form while typing. */}
+          <div className="sticky bottom-0 z-20 flex flex-col gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-lg backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3">
             <p
               role="status"
-              className={cn("min-w-0 flex-1 basis-48 text-sm", minutesSaveStatus?.startsWith("Error") ? "font-medium text-destructive" : "text-muted-foreground")}
+              className={cn(
+                "min-w-0 text-sm sm:flex-1",
+                saveError ? "px-2 font-medium text-destructive sm:px-0" : "text-muted-foreground max-sm:hidden"
+              )}
             >
-              {minutesSaveStatus ?? saveHint}
+              {saveError ?? saveHint}
             </p>
-            <Button type="button" size="lg" onClick={handleMinutesSubmit} loading={isSavingMinutes} disabled={isApproved}>
+            <Button type="button" size="lg" className="max-sm:w-full" onClick={handleMinutesSubmit} loading={isSavingMinutes} disabled={isApproved}>
               {editingId ? "Save changes" : "Save minutes"}
             </Button>
           </div>
         </fieldset>
 
         {editingEntry ? (
-          <AdminSectionCard title="Submit or approve" description="Another admin approves the minutes. Approving publishes them on the public minutes page.">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={canSubmitForApproval ? "default" : "outline"}
-                  onClick={() => handleMinutesStatusAction("submit")}
-                  disabled={!canSubmitForApproval || isUpdatingStatus}
-                >
-                  Submit for approval
-                </Button>
-                <Button
-                  type="button"
-                  variant={canApproveMinutes ? "default" : "outline"}
-                  onClick={() => handleMinutesStatusAction("approve")}
-                  disabled={!canApproveMinutes || isUpdatingStatus}
-                >
-                  Approve
-                </Button>
-                <Button type="button" variant="outline" onClick={() => handleMinutesStatusAction("returnToDraft")} disabled={!canReturnToDraft || isUpdatingStatus}>
-                  Return to draft
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">{statusHelperText[editingStatus]}</p>
-              {editingStatus === "submitted" && editingEntry?.submittedByUid === adminActor.uid ? (
-                <p className="text-sm text-muted-foreground">You submitted these minutes, so another admin must approve them.</p>
-              ) : null}
-              <Field label="Approval notes (optional)">
-                <Textarea
-                  value={approvalNotesInput}
-                  onChange={e => setApprovalNotesInput(e.target.value)}
-                  rows={3}
-                  placeholder="Optional context for approvers"
-                />
-              </Field>
-              {editingStatus === "approved" ? (
-                <Field label="Reason for reopening" description="Reopening takes the minutes off the public page until they are approved again.">
-                  <Textarea
-                    value={reopenReason}
-                    onChange={e => setReopenReason(e.target.value)}
-                    rows={2}
-                    placeholder="Required. Recorded in the audit log; reopening unpublishes the minutes."
-                  />
-                </Field>
-              ) : null}
-              {versions.length ? (
-                <div>
-                  <h3 className="text-sm font-medium text-foreground">Approved versions</h3>
-                  <ul className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground">
-                    {versions.map(v => (
-                      <li key={v.version} className="break-words">
-                        Version {v.version} · {v.approvedAt ? formatDateTime(v.approvedAt) : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {statusActionStatus ? (
-                <p role="status" className={cn("text-sm", statusActionStatus.startsWith("Error") ? "font-medium text-destructive" : "text-muted-foreground")}>
-                  {statusActionStatus}
-                </p>
-              ) : null}
-            </div>
-          </AdminSectionCard>
+          <MinutesNextStep
+            status={editingStatus}
+            description={nextStepText}
+            approvalNotes={approvalNotesInput}
+            onApprovalNotesChange={setApprovalNotesInput}
+            reopenReason={reopenReason}
+            onReopenReasonChange={setReopenReason}
+            busy={isUpdatingStatus}
+            onAction={handleMinutesStatusAction}
+            error={statusActionStatus?.replace(/^Error: /, "") ?? null}
+            versions={versions}
+          />
         ) : null}
       </div>
 
@@ -875,7 +829,6 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
           actions={
             <Segmented
               label="Zoom"
-              size="sm"
               value={previewZoomMode}
               onChange={setPreviewZoomMode}
               options={[
@@ -894,7 +847,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
           />
           <div className="mt-4 flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => handleMinutesExport("pdf")} disabled={Boolean(exportBlockedReason) || isExportingMinutes}>
+              <Button type="button" variant="outline" onClick={() => handleMinutesExport("pdf")} disabled={Boolean(exportBlockedReason)} loading={isExportingMinutes}>
                 <Download aria-hidden="true" />
                 Download PDF
               </Button>
@@ -903,8 +856,8 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
               </Button>
             </div>
             {minutesExportStatus || exportBlockedReason ? (
-              <p role="status" className={cn("text-sm", minutesExportStatus?.startsWith("Error") ? "font-medium text-destructive" : "text-muted-foreground")}>
-                {minutesExportStatus ?? exportBlockedReason}
+              <p role="status" className={cn("text-sm", minutesExportStatus ? "font-medium text-destructive" : "text-muted-foreground")}>
+                {minutesExportStatus?.replace(/^Error: /, "") ?? exportBlockedReason}
               </p>
             ) : null}
           </div>
@@ -914,21 +867,102 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   );
 }
 
-const STATUS_BADGE: Record<MinutesStatus, "secondary" | "warning" | "success"> = {
-  draft: "secondary",
-  submitted: "warning",
-  approved: "success"
-};
+type MinutesVersion = { version: number; approvedAt?: number; contentHash: string };
+
+/** The one approval step that applies now (as on Broadcasts): submit a draft, approve submitted minutes, or reopen approved ones. */
+function MinutesNextStep({
+  status,
+  description,
+  approvalNotes,
+  onApprovalNotesChange,
+  reopenReason,
+  onReopenReasonChange,
+  busy,
+  onAction,
+  error,
+  versions
+}: {
+  status: MinutesStatus;
+  description: string;
+  approvalNotes: string;
+  onApprovalNotesChange: (value: string) => void;
+  reopenReason: string;
+  onReopenReasonChange: (value: string) => void;
+  busy: boolean;
+  onAction: (action: "submit" | "approve" | "returnToDraft") => void;
+  error: string | null;
+  versions: MinutesVersion[];
+}) {
+  return (
+    <AdminSectionCard title="Next step" description={description}>
+      {status === "submitted" ? (
+        <Field label="Approval notes (optional)">
+          <Textarea value={approvalNotes} onChange={e => onApprovalNotesChange(e.target.value)} rows={3} placeholder="Optional context for approvers" />
+        </Field>
+      ) : null}
+      {status === "approved" ? (
+        <Field label="Reason for reopening" description="Reopening takes the minutes off the public page until they are approved again.">
+          <Textarea
+            value={reopenReason}
+            onChange={e => onReopenReasonChange(e.target.value)}
+            rows={2}
+            placeholder="Required. Recorded in the audit log; reopening unpublishes the minutes."
+          />
+        </Field>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {status === "draft" ? (
+          <Button type="button" variant="outline" onClick={() => onAction("submit")} loading={busy}>
+            Submit for approval
+          </Button>
+        ) : null}
+        {status === "submitted" ? (
+          <Button type="button" variant="outline" onClick={() => onAction("approve")} loading={busy}>
+            Approve
+          </Button>
+        ) : null}
+        {status !== "draft" ? (
+          <Button type="button" variant="outline" onClick={() => onAction("returnToDraft")} disabled={busy}>
+            Return to draft
+          </Button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
+      {versions.length ? (
+        <div className="border-t border-border pt-4">
+          <h3 className="text-sm font-medium text-foreground">Approved versions</h3>
+          <ul className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground">
+            {versions.map(v => (
+              <li key={v.version} className="break-words">
+                Version {v.version} · {v.approvedAt ? formatDateTime(v.approvedAt) : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </AdminSectionCard>
+  );
+}
 
 /** A text field with a 44 px labelled remove button beside it. */
 function RemovableRow({ children, removeLabel, onRemove }: { children: ReactNode; removeLabel: string; onRemove: () => void }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <div className="min-w-0 flex-1">{children}</div>
-      <Button type="button" variant="ghost" size="icon" className="size-11 text-muted-foreground hover:text-destructive" aria-label={removeLabel} title={removeLabel} onClick={onRemove}>
-        <X aria-hidden="true" />
-      </Button>
+      <RemoveButton label={removeLabel} onRemove={onRemove} />
     </div>
+  );
+}
+
+function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground hover:text-destructive" aria-label={label} title={label} onClick={onRemove}>
+      <X aria-hidden="true" />
+    </Button>
   );
 }
 

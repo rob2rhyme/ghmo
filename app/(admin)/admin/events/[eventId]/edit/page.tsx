@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarX2, Trash2 } from "lucide-react";
+import { CalendarX2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import { EMPTY_EVENT_FORM, EventForm, toInputDate, validateEventForm, type EventFormValues } from "@/src/components/admin/events/EventForm";
-import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
 import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
@@ -82,6 +83,7 @@ export default function EditEventPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "The changes could not be saved.");
+      toast.success("Changes saved.");
       router.replace("/admin/events");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The changes could not be saved.");
@@ -97,6 +99,7 @@ export default function EditEventPage() {
       const res = await fetch(`/api/admin/organizations/ghmo/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "The event could not be deleted.");
+      toast.success("Event deleted.");
       router.replace("/admin/events");
     } catch (err) {
       setConfirmDelete(false);
@@ -106,18 +109,11 @@ export default function EditEventPage() {
     }
   };
 
-  const back = (
-    <Button asChild variant="ghost" className="-ml-3 w-fit text-muted-foreground">
-      <Link href="/admin/events">
-        <ArrowLeft aria-hidden="true" />
-        Events
-      </Link>
-    </Button>
-  );
+  const back = { href: "/admin/events", label: "Events" } as const;
 
   if (load.kind === "loading") {
     return (
-      <div role="status" className="mx-auto flex max-w-3xl flex-col gap-4">
+      <div role="status" className="flex max-w-3xl flex-col gap-4">
         <span className="sr-only">Loading the event…</span>
         <Skeleton className="h-9 w-48" />
         <Skeleton className="h-64 rounded-xl" />
@@ -126,25 +122,35 @@ export default function EditEventPage() {
     );
   }
 
-  if (load.kind === "missing" || load.kind === "failed") {
+  if (load.kind === "failed") {
     return (
-      <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        {back}
+      <div className="flex max-w-3xl flex-col gap-6">
+        <AdminPageHeader back={back} title="Edit event" />
+        <Alert variant="destructive">
+          <AlertTitle>This event couldn&apos;t be loaded</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-3">
+            <span>Nothing was changed. {load.message} Check your connection and try again.</span>
+            <Button variant="outline" size="row" onClick={() => setAttempt(n => n + 1)}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (load.kind === "missing") {
+    return (
+      <div className="flex max-w-3xl flex-col gap-6">
+        <AdminPageHeader back={back} title="Edit event" />
         <EmptyState
           icon={<CalendarX2 />}
-          title={load.kind === "missing" ? "This event doesn't exist" : "This event couldn't be loaded"}
-          description={
-            load.kind === "missing"
-              ? "It may have been deleted. Nothing was changed."
-              : `Nothing was changed. ${load.message} Check your connection and try again.`
-          }
+          title="This event doesn't exist"
+          description="It may have been deleted. Nothing was changed."
           action={
-            <div className="flex flex-wrap justify-center gap-2">
-              {load.kind === "failed" ? <Button onClick={() => setAttempt(n => n + 1)}>Try again</Button> : null}
-              <Button asChild variant="outline">
-                <Link href="/admin/events">Back to events</Link>
-              </Button>
-            </div>
+            <Button asChild variant="outline">
+              <Link href="/admin/events">Open Events</Link>
+            </Button>
           }
         />
       </div>
@@ -152,9 +158,8 @@ export default function EditEventPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      {back}
-      <AdminPageHeader title="Edit event" description={form.title || undefined} />
+    <div className="flex max-w-3xl flex-col gap-6">
+      <AdminPageHeader back={back} title="Edit event" description="Change the details, then save. Published changes show on the site straight away." />
       <EventForm form={form} update={update} errors={errors} />
       {error ? (
         <Alert variant="destructive">
@@ -162,10 +167,10 @@ export default function EditEventPage() {
         </Alert>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={handleSave} loading={saving} disabled={deleting}>
+        <Button size="lg" className="max-sm:flex-1" onClick={handleSave} loading={saving} disabled={deleting}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
-        <Button variant="outline" onClick={() => router.back()} disabled={saving || deleting}>
+        <Button size="lg" variant="outline" onClick={() => router.back()} disabled={saving || deleting}>
           Cancel
         </Button>
         <Button variant="ghost" className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>

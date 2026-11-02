@@ -2,6 +2,7 @@
 
 import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, MessageSquare, Reply, ThumbsUp } from "lucide-react";
 import {
   collection,
@@ -14,16 +15,21 @@ import {
   serverTimestamp,
   setDoc
 } from "firebase/firestore";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
+import { Card } from "@/src/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { Steps } from "@/src/components/ui/steps";
 import { Textarea } from "@/src/components/ui/textarea";
+import { toast } from "sonner";
 import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
@@ -50,12 +56,6 @@ const PRIORITY_LABELS: Record<string, string> = {
   high: "High"
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  open: "Open",
-  closing: "Closing",
-  closed: "Closed"
-};
-
 export default function CommsThreadDetailClient({ threadId, actor }: CommsThreadDetailClientProps) {
   const { packPrivate, unpackPrivate } = useE2ee();
   const [thread, setThread] = useState<ThreadView | null>(null);
@@ -65,8 +65,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     reject: 0,
     mine: null
   });
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => Boolean(firestore));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
+  const [missing, setMissing] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const [commentBody, setCommentBody] = useState("");
   const [replyToId, setReplyToId] = useState<string | null>(null);
@@ -91,18 +93,14 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    if (!firestore) {
-      setLoadError(firebaseInitError || "Firebase is not configured.");
-      setLoading(false);
-      return;
-    }
+    if (!firestore) return;
     const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
     let cancelled = false;
     const unsubscribe = onSnapshot(
       threadRef,
       snapshot => {
         if (!snapshot.exists()) {
-          setLoadError("Thread not found.");
+          setMissing(true);
           setThread(null);
           setLoading(false);
           return;
@@ -110,12 +108,13 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
         void unpackThread(unpackPrivate, snapshot.id, snapshot.data() as Record<string, unknown>).then(next => {
           if (cancelled) return;
           setThread(next);
+          setMissing(false);
           setLoadError(null);
           setLoading(false);
         });
       },
       error => {
-        setLoadError(error.message || "Unable to load thread");
+        setLoadError(error.message || "The connection failed.");
         setLoading(false);
       }
     );
@@ -123,7 +122,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       cancelled = true;
       unsubscribe();
     };
-  }, [threadId, unpackPrivate]);
+  }, [threadId, unpackPrivate, attempt]);
 
   useEffect(() => {
     if (!firestore) return;
@@ -139,7 +138,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
         });
       },
       error => {
-        setCommentStatus(error.message || "Unable to load comments");
+        toast.error(`Couldn't load the comments. ${error.message || "Reload the page to try again."}`);
       }
     );
     return () => {
@@ -163,7 +162,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           setLikedComments(prev => ({ ...prev, [comment.id]: iLiked }));
         },
         error => {
-          setLikeStatus(error.message || "Unable to load likes");
+          setLikeStatus(`Couldn't load the likes. ${error.message || ""}`.trim());
         }
       );
     });
@@ -195,7 +194,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
         });
       },
       error => {
-        setConclusionVoteStatus(error.message || "Unable to load votes");
+        setConclusionVoteStatus(`Couldn't load the votes. ${error.message || "Reload the page to try again."}`);
       }
     );
     return () => {
@@ -239,8 +238,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           { merge: false }
         );
       }
-    } catch (error: any) {
-      setLikeStatus(error.message || "Unable to update like");
+    } catch (error) {
+      toast.error(`Couldn't update your like. ${errorText(error)}`);
     } finally {
       setIsLiking(false);
     }
@@ -267,8 +266,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           }
         })
       });
-    } catch (error: any) {
-      setConclusionVoteStatus(error.message || "Unable to submit vote");
+    } catch (error) {
+      toast.error(`Couldn't record your vote. ${errorText(error)}`);
     } finally {
       setIsVotingConclusion(false);
     }
@@ -278,7 +277,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     if (!firestore || !thread || !isOpen) return;
     const trimmed = commentBody.trim();
     if (!trimmed) {
-      setCommentStatus("Comment cannot be empty.");
+      setCommentStatus("Write a comment first.");
       return;
     }
     if (isPostingComment) return;
@@ -290,10 +289,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       const privateFields = await packPrivate(commentLoc(threadId, commentRef.id), { body: trimmed });
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
+        if (!threadSnap.exists()) throw new Error("This topic is no longer available.");
         const threadData = threadSnap.data() as { status?: string; commentCount?: number };
         if ((threadData.status || "open") !== "open") {
-          throw new Error("Thread is closed");
+          throw new Error("This topic is closed to new comments.");
         }
         transaction.set(commentRef, {
           ...privateFields,
@@ -321,8 +320,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       setCommentBody("");
       setReplyToId(null);
       commentInputRef.current?.focus();
-    } catch (error: any) {
-      setCommentStatus(error.message || "Unable to post comment");
+    } catch (error) {
+      toast.error(`Couldn't post the comment. ${errorText(error)}`);
     } finally {
       setIsPostingComment(false);
     }
@@ -332,7 +331,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     if (!firestore || !thread || !isOpen) return;
     const trimmed = proposedConclusion.trim();
     if (trimmed.length < 6) {
-      setProposeStatus("Conclusion must be at least 6 characters.");
+      setProposeStatus("Write at least 6 characters.");
       return;
     }
     if (isProposing) return;
@@ -343,10 +342,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       const privateFields = await packPrivate(conclusionLoc(threadId), { text: trimmed });
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
+        if (!threadSnap.exists()) throw new Error("This topic is no longer available.");
         const threadData = threadSnap.data() as { status?: string };
         if ((threadData.status || "open") !== "open") {
-          throw new Error("Thread is not open");
+          throw new Error("A conclusion was already proposed for this topic.");
         }
         transaction.update(threadRef, {
           status: "closing",
@@ -372,8 +371,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       });
       setProposeModalOpen(false);
       setProposedConclusion("");
-    } catch (error: any) {
-      setProposeStatus(error.message || "Unable to propose conclusion");
+    } catch (error) {
+      setProposeStatus(`Couldn't propose the conclusion. ${errorText(error)}`);
     } finally {
       setIsProposing(false);
     }
@@ -388,13 +387,13 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
+        if (!threadSnap.exists()) throw new Error("This topic is no longer available.");
         const threadData = threadSnap.data() as { status?: string; conclusion?: { text?: string; enc?: unknown } };
         if ((threadData.status || "open") !== "closing") {
-          throw new Error("Thread is not in closing");
+          throw new Error("This topic isn't waiting for a conclusion any more.");
         }
         if (!threadData.conclusion?.text?.trim() && !threadData.conclusion?.enc) {
-          throw new Error("Conclusion is required");
+          throw new Error("Propose a conclusion first.");
         }
         transaction.update(threadRef, {
           status: "closed",
@@ -414,8 +413,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           }
         })
       });
-    } catch (error: any) {
-      setFinalizeStatus(error.message || "Unable to finalize close");
+    } catch (error) {
+      setFinalizeStatus(`Couldn't close the topic. ${errorText(error)}`);
     } finally {
       setIsFinalizing(false);
     }
@@ -450,6 +449,9 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     return comments.find(comment => comment.id === replyToId) || null;
   }, [comments, replyToId]);
 
+  const back = { href: "/admin/comms", label: "Plans & Issues" } as const;
+  const badge = threadMeta ? statusBadge("topic", threadMeta.status) : null;
+
   return (
     <div className="flex flex-col gap-6">
       {loading ? (
@@ -458,113 +460,144 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           <Skeleton className="h-40 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />
         </div>
+      ) : missing ? (
+        <EmptyState
+          icon={<MessageSquare aria-hidden="true" />}
+          title="This topic doesn't exist"
+          description="It may have been removed, or the link is wrong."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/admin/comms">Open Plans &amp; Issues</Link>
+            </Button>
+          }
+        />
       ) : loadError ? (
         <Alert variant="destructive">
           <AlertTitle>Couldn&apos;t load this topic</AlertTitle>
-          <AlertDescription>{loadError}</AlertDescription>
+          <AlertDescription className="flex flex-col items-start gap-3">
+            <span>{loadError}</span>
+            {firestore ? (
+              <Button
+                variant="outline"
+                size="row"
+                onClick={() => {
+                  setLoadError(null);
+                  setLoading(true);
+                  setAttempt(n => n + 1);
+                }}
+              >
+                Try again
+              </Button>
+            ) : null}
+          </AlertDescription>
         </Alert>
       ) : thread && threadMeta ? (
         <>
-          <AdminSectionCard>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-semibold tracking-tight break-words text-foreground">{thread.title}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Started {threadMeta.createdAt} by {threadMeta.createdBy}
-                  </p>
-                </div>
-                {isOpen ? (
+          {/* The topic's own title is the page title (data-topic-header hides the page's placeholder header). */}
+          <div data-topic-header>
+            <AdminPageHeader
+              back={back}
+              title={thread.title}
+              badge={badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+              description={`Started ${threadMeta.createdAt} by ${threadMeta.createdBy}.`}
+              actions={
+                isOpen ? (
                   <Button type="button" variant="outline" onClick={() => setProposeModalOpen(true)}>
                     Propose conclusion
                   </Button>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={STATUS_BADGE[threadMeta.status] ?? "secondary"}>{STATUS_LABELS[threadMeta.status] || threadMeta.status}</Badge>
-                {threadMeta.pinned ? <Badge variant="outline">Pinned</Badge> : null}
-                {threadMeta.priority && threadMeta.priority !== "normal" ? (
-                  <Badge variant={threadMeta.priority === "high" ? "warning" : "outline"}>{PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority} priority</Badge>
-                ) : null}
-                <span className="text-sm text-muted-foreground">
-                  {threadMeta.commentCount} {threadMeta.commentCount === 1 ? "comment" : "comments"}
-                </span>
-              </div>
-              <p className="text-base break-words whitespace-pre-wrap text-foreground">{thread.body}</p>
-              {isOpen ? (
-                <p className="text-sm text-muted-foreground">When the team has agreed, propose a conclusion. Admins then vote on it before it is closed.</p>
-              ) : null}
-            </div>
+                ) : null
+              }
+            />
+          </div>
 
-            {(isClosing || isClosed) && thread.conclusion?.text ? (
-              <div className="mt-5 flex flex-col gap-4 rounded-xl border border-border bg-muted/40 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-foreground">Conclusion</h3>
-                    <p className="mt-1 text-sm break-words whitespace-pre-wrap text-foreground">{thread.conclusion.text}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Proposed {formatTimestamp(thread.conclusion.proposedAt)} by {resolveActorName(thread.conclusion.proposedBy)}
-                    </p>
+          <Steps
+            label="How a topic is decided"
+            className="max-sm:hidden"
+            steps={[
+              { title: "Discuss", description: "Admins comment and reply.", state: isOpen ? "current" : "done" },
+              { title: "Agree a conclusion", description: "Someone proposes it; admins vote.", state: isClosing ? "current" : isClosed ? "done" : "todo" },
+              { title: "Closed", description: "The conclusion is final.", state: isClosed ? "done" : "todo" }
+            ]}
+          />
+
+          <Card>
+            <div className="flex flex-wrap items-center gap-2">
+              {threadMeta.pinned ? <Badge variant="outline">Pinned</Badge> : null}
+              {threadMeta.priority && threadMeta.priority !== "normal" ? (
+                <Badge variant={threadMeta.priority === "high" ? "warning" : "outline"}>{PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority} priority</Badge>
+              ) : null}
+              <span className="text-sm text-muted-foreground">
+                {threadMeta.commentCount} {threadMeta.commentCount === 1 ? "comment" : "comments"}
+              </span>
+            </div>
+            <p className="text-base break-words whitespace-pre-wrap text-foreground">{thread.body}</p>
+          </Card>
+
+          {(isClosing || isClosed) && thread.conclusion?.text ? (
+            <AdminSectionCard
+              title="Conclusion"
+              description={`Proposed ${formatTimestamp(thread.conclusion.proposedAt)} by ${resolveActorName(thread.conclusion.proposedBy)}.`}
+              actions={
+                isClosing ? (
+                  <>
+                    <Badge variant="success">{voteTally.approve} approve</Badge>
+                    <Badge variant="destructive">{voteTally.reject} reject</Badge>
+                  </>
+                ) : null
+              }
+            >
+              <p className="text-base break-words whitespace-pre-wrap text-foreground">{thread.conclusion.text}</p>
+
+              {isClosing ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Your vote">
+                    <Button
+                      type="button"
+                      variant={conclusionVote === "approve" ? "secondary" : "outline"}
+                      aria-pressed={conclusionVote === "approve"}
+                      onClick={() => handleConclusionVote("approve")}
+                      disabled={isVotingConclusion || conclusionVote === "approve"}
+                    >
+                      {conclusionVote === "approve" ? <Check aria-hidden="true" /> : null}
+                      Approve
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={conclusionVote === "reject" ? "secondary" : "outline"}
+                      aria-pressed={conclusionVote === "reject"}
+                      onClick={() => handleConclusionVote("reject")}
+                      disabled={isVotingConclusion || conclusionVote === "reject"}
+                    >
+                      {conclusionVote === "reject" ? <Check aria-hidden="true" /> : null}
+                      Reject
+                    </Button>
                   </div>
-                  {isClosing ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="success">{voteTally.approve} approve</Badge>
-                      <Badge variant="destructive">{voteTally.reject} reject</Badge>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="button" onClick={handleFinalizeClose} loading={isFinalizing}>
+                      {isFinalizing ? "Finalizing…" : "Finalize close"}
+                    </Button>
+                    <p className="text-sm text-muted-foreground">Closes the topic with this conclusion.</p>
+                  </div>
+                  {conclusionVoteStatus ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {conclusionVoteStatus}
+                    </p>
+                  ) : null}
+                  {finalizeStatus ? (
+                    <p role="alert" className="text-sm font-medium text-destructive">
+                      {finalizeStatus}
+                    </p>
                   ) : null}
                 </div>
+              ) : null}
 
-                {isClosing ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap gap-2" role="group" aria-label="Your vote">
-                      <Button
-                        type="button"
-                        variant={conclusionVote === "approve" ? "secondary" : "outline"}
-                        aria-pressed={conclusionVote === "approve"}
-                        onClick={() => handleConclusionVote("approve")}
-                        disabled={isVotingConclusion || conclusionVote === "approve"}
-                      >
-                        {conclusionVote === "approve" ? <Check aria-hidden="true" /> : null}
-                        Approve
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={conclusionVote === "reject" ? "secondary" : "outline"}
-                        aria-pressed={conclusionVote === "reject"}
-                        onClick={() => handleConclusionVote("reject")}
-                        disabled={isVotingConclusion || conclusionVote === "reject"}
-                      >
-                        {conclusionVote === "reject" ? <Check aria-hidden="true" /> : null}
-                        Reject
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Button type="button" onClick={handleFinalizeClose} loading={isFinalizing}>
-                        {isFinalizing ? "Finalizing…" : "Finalize close"}
-                      </Button>
-                      <p className="text-sm text-muted-foreground">Closes the topic with this conclusion.</p>
-                    </div>
-                    {conclusionVoteStatus ? (
-                      <p role="status" className="text-sm text-muted-foreground">
-                        {conclusionVoteStatus}
-                      </p>
-                    ) : null}
-                    {finalizeStatus ? (
-                      <p role="alert" className="text-sm font-medium text-destructive">
-                        {finalizeStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {isClosed ? (
-                  <p className="text-sm text-muted-foreground">
-                    Finalized {formatTimestamp(thread.finalizedAt)} by {resolveActorName(thread.finalizedBy)}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </AdminSectionCard>
+              {isClosed ? (
+                <p className="text-sm text-muted-foreground">
+                  Finalized {formatTimestamp(thread.finalizedAt)} by {resolveActorName(thread.finalizedBy)}
+                </p>
+              ) : null}
+            </AdminSectionCard>
+          ) : null}
 
           <AdminSectionCard title="Discussion" description="Comments and replies from the admin team.">
             {topLevelComments.length === 0 ? (
@@ -614,7 +647,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
               </ul>
             )}
 
-            <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
+            <div className="flex flex-col gap-3 border-t border-border pt-5">
               {replyTarget ? (
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <span>Replying to {resolveActorName(replyTarget.createdBy)}</span>
@@ -634,11 +667,11 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                 />
               </Field>
               <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" onClick={handlePostComment} disabled={!isOpen} loading={isPostingComment}>
+                <Button type="button" variant={isOpen ? "default" : "outline"} onClick={handlePostComment} disabled={!isOpen} loading={isPostingComment}>
                   {isPostingComment ? "Posting…" : "Post comment"}
                 </Button>
                 {commentStatus ? (
-                  <p role="status" className="text-sm text-muted-foreground">
+                  <p role="alert" className="text-sm font-medium text-destructive">
                     {commentStatus}
                   </p>
                 ) : null}
@@ -680,12 +713,6 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     </div>
   );
 }
-
-const STATUS_BADGE: Record<string, "success" | "warning" | "secondary"> = {
-  open: "success",
-  closing: "warning",
-  closed: "secondary"
-};
 
 function CommentCard({
   comment,
@@ -729,4 +756,8 @@ function CommentCard({
 
 function formatTimestamp(value?: { toDate?: () => Date } | null) {
   return formatDateTime(value) || "date unknown";
+}
+
+function errorText(error: unknown) {
+  return (error instanceof Error && error.message) || "Check your connection and try again.";
 }

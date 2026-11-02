@@ -96,7 +96,7 @@ export default function NotificationsPanel() {
       }
       description={
         <>
-          Get an email when there is new activity in Admin Chat or Plans & Issues, or minutes need approval. The email never contains any
+          Get an email when there is new activity in Admin chat or Plans & Issues, or minutes need approval. The email never contains any
           content, only a link, and you get at most one of each kind every 30 minutes.
           {prefs.address ? ` Sent to ${prefs.address}.` : ""}
         </>

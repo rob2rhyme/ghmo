@@ -3,12 +3,16 @@ import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import Link from "next/link";
-import { CalendarDays, Pencil, Plus } from "lucide-react";
+import type { Route } from "next";
+import { CalendarDays, Plus } from "lucide-react";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
-import { formatDateTime, type DateInput } from "@/src/lib/format";
+import { formatDateTime, toDate, type DateInput } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -41,11 +45,38 @@ export default async function AdminEventsPage() {
     }[];
   };
 
+  type AdminEvent = (typeof events)[number];
+  const { upcoming, past } = splitByTime(events);
+
+  const row = (evt: AdminEvent) => {
+    const status = statusBadge("event", evt.status);
+    const when = eventDate(evt.startsAt, evt.timezone);
+    return (
+      <AdminListRow
+        key={evt.id}
+        href={`/admin/events/${evt.id}/edit` as Route}
+        title={<span className="break-words">{evt.title || "Untitled event"}</span>}
+        badges={
+          <>
+            <Badge variant={status.variant}>{status.label}</Badge>
+            {evt.featured ? <Badge variant="outline">Featured</Badge> : null}
+          </>
+        }
+        meta={
+          <>
+            <span>{when || "No date set"}</span>
+            {evt.summary ? <span className="mt-0.5 line-clamp-2 block">{evt.summary}</span> : null}
+          </>
+        }
+      />
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Events"
-        description="Meetings and community gatherings. Published events show on the public events page."
+        description="Meetings and community gatherings. Published events show on the public Events page."
         actions={
           <Button asChild>
             <Link href="/admin/events/new">
@@ -71,67 +102,38 @@ export default async function AdminEventsPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-          <div
-            aria-hidden="true"
-            className={`hidden border-b border-border bg-muted/40 px-4 py-2.5 text-sm font-medium text-muted-foreground lg:grid ${ROW_COLUMNS}`}
-          >
-            <span>Event</span>
-            <span>Starts</span>
-            <span>Status</span>
-            <span>Homepage</span>
-            <span className="text-right">Edit</span>
-          </div>
-          <ul className="divide-y divide-border">
-            {events.map(evt => {
-              const status = statusView(evt.status);
-              const when = eventDate(evt.startsAt, evt.timezone);
-              return (
-                <li key={evt.id}>
-                  <Link
-                    href={`/admin/events/${evt.id}/edit`}
-                    className={`group flex flex-col gap-2 px-4 py-4 transition-colors outline-none hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:grid lg:items-center lg:gap-4 lg:py-3 ${ROW_COLUMNS}`}
-                  >
-                    <span className="flex min-w-0 items-start justify-between gap-3">
-                      <span className="min-w-0">
-                        <span className="block font-semibold break-words text-foreground">{evt.title || "Untitled event"}</span>
-                        {evt.summary ? <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">{evt.summary}</span> : null}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary lg:hidden">
-                        <Pencil aria-hidden="true" className="size-4" />
-                        Edit
-                      </span>
-                    </span>
-                    <span className="text-sm text-muted-foreground lg:text-foreground">{when || "No date set"}</span>
-                    <span className="flex flex-wrap items-center gap-2 lg:contents">
-                      <span>
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      </span>
-                      <span className={evt.featured ? "" : "hidden lg:block"}>
-                        {evt.featured ? <Badge variant="outline">Featured</Badge> : <span className="text-sm text-muted-foreground">No</span>}
-                      </span>
-                    </span>
-                    <span className="hidden items-center justify-end gap-1 text-sm font-semibold text-primary group-hover:underline lg:flex">
-                      <Pencil aria-hidden="true" className="size-4" />
-                      Edit
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <>
+          <AdminSectionCard title="Upcoming" description="Soonest first. Select an event to edit it.">
+            {upcoming.length ? (
+              <AdminList bare label="Upcoming events">
+                {upcoming.map(row)}
+              </AdminList>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nothing coming up. Add the next meeting or gathering with New event.</p>
+            )}
+          </AdminSectionCard>
+          {past.length ? (
+            <AdminSectionCard title="Past" description="Most recent first.">
+              <AdminList bare label="Past events">
+                {past.map(row)}
+              </AdminList>
+            </AdminSectionCard>
+          ) : null}
+        </>
       )}
     </div>
   );
 }
 
-const ROW_COLUMNS = "lg:grid-cols-[minmax(0,1fr)_14rem_7rem_7rem_4rem]";
-
-function statusView(status?: string): { label: string; variant: "success" | "secondary" | "outline" } {
-  if (status === "published") return { label: "Published", variant: "success" };
-  if (!status || status === "draft") return { label: "Draft", variant: "secondary" };
-  return { label: status.charAt(0).toUpperCase() + status.slice(1), variant: "outline" };
+/** Upcoming soonest first (events without a date count as upcoming, at the end), then past, latest first. */
+function splitByTime<T extends { startsAt?: DateInput }>(events: T[]): { upcoming: T[]; past: T[] } {
+  const now = Date.now();
+  const startMs = (evt: T) => toDate(evt.startsAt)?.getTime() ?? Infinity;
+  const byStart = (a: T, b: T) => (startMs(a) === startMs(b) ? 0 : startMs(a) - startMs(b));
+  return {
+    upcoming: events.filter(evt => startMs(evt) >= now).sort(byStart),
+    past: events.filter(evt => startMs(evt) < now).sort((a, b) => byStart(b, a))
+  };
 }
 
 /** "Sat, Dec 12, 2026 · 7:00 PM" in the event's own time zone (falls back to the server's if it is unknown). */

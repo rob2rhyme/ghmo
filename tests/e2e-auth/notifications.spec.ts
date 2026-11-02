@@ -45,7 +45,7 @@ test("opted-in admins get one content-free email per half hour; nobody else does
   const { body, authorization } = mails[0];
   expect(authorization).toBe("Bearer test-key");
   expect(body.to).toEqual(["bob@example.org"]);
-  expect(body.subject).toBe("GHMO: New activity in Admin Chat");
+  expect(body.subject).toBe("GHMO: New activity in Admin chat");
   expect(JSON.stringify(body)).not.toMatch(/old hall|Friday|Alice/);
   expect(body.text).toContain("/admin/chat");
 

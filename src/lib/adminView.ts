@@ -106,7 +106,7 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   comms_comment_created: { verb: "commented in Plans & Issues" },
   comms_conclusion_proposed: { verb: "proposed a conclusion in Plans & Issues" },
   comms_conclusion_vote: { verb: "voted on a conclusion in Plans & Issues" },
-  admin_chat_message_sent: { verb: "sent a message in Admin Chat" },
+  admin_chat_message_sent: { verb: "sent a message in Admin chat" },
   timeline_created: { verb: "added to the GUMBA project timeline" },
   timeline_updated: { verb: "updated the GUMBA project timeline" },
   timeline_entry_updated: { verb: "updated the GUMBA project timeline" },

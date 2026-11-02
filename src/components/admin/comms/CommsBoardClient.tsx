@@ -2,7 +2,6 @@
 
 import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   collection,
   doc,
@@ -13,6 +12,9 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import { MessagesSquare, Plus, Search } from "lucide-react";
+import type { Route } from "next";
+import { toast } from "sonner";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
@@ -25,6 +27,7 @@ import { Select } from "@/src/components/ui/select";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
 import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
@@ -43,12 +46,6 @@ type CommsBoardClientProps = {
 
 type StatusFilter = "all" | CommsThreadStatus;
 
-const STATUS_LABELS: Record<CommsThreadStatus, string> = {
-  open: "Open",
-  closing: "Closing",
-  closed: "Closed"
-};
-
 const PRIORITY_LABELS: Record<CommsThreadPriority, string> = {
   low: "Low",
   normal: "Normal",
@@ -58,8 +55,9 @@ const PRIORITY_LABELS: Record<CommsThreadPriority, string> = {
 export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   const { unpackPrivate, packPrivate } = useE2ee();
   const [threads, setThreads] = useState<ThreadView[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => Boolean(firestore));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
+  const [attempt, setAttempt] = useState(0);
   const [queryText, setQueryText] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -80,13 +78,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   });
 
   useEffect(() => {
-    if (!firestore) {
-      setLoadError(firebaseInitError || "Firebase is not configured.");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
+    if (!firestore) return;
     let cancelled = false;
     const threadQuery = query(
       collection(firestore, "organizations", "ghmo", "commsThreads"),
@@ -104,12 +96,12 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           })
           .catch(error => {
             if (cancelled) return;
-            setLoadError(error?.message || "Unable to load threads");
+            setLoadError(error?.message || "The topics couldn't be opened.");
             setLoading(false);
           });
       },
       error => {
-        setLoadError(error.message || "Unable to load threads");
+        setLoadError(error.message || "The connection failed.");
         setLoading(false);
       }
     );
@@ -117,7 +109,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
       cancelled = true;
       unsubscribe();
     };
-  }, [unpackPrivate]);
+  }, [unpackPrivate, attempt]);
 
   const normalizedQuery = queryText.trim().toLowerCase();
 
@@ -140,7 +132,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
     if (!trimmedTitle || !trimmedBody) {
-      setCreateStatus("Title and details are required.");
+      setCreateStatus("Add a title and details.");
       return;
     }
     if (isSubmitting) return;
@@ -177,9 +169,9 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
       setPriority("normal");
       setPinned(false);
       setFormOpen(false);
-      setCreateStatus("Thread created.");
-    } catch (error: any) {
-      setCreateStatus(error.message || "Unable to create thread.");
+      toast.success("Topic started.");
+    } catch (error) {
+      setCreateStatus(`Couldn't start the topic. ${(error instanceof Error && error.message) || "Check your connection and try again."}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -204,6 +196,12 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
     });
   };
 
+  const retry = () => {
+    setLoadError(null);
+    setLoading(true);
+    setAttempt(n => n + 1);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {draft.pending ? (
@@ -221,128 +219,10 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
         />
       ) : null}
 
-      <AdminSectionCard
-        title="Topics"
-        description="Newest activity first. Open a topic to read and reply."
-        actions={
-          !showForm && !loading ? (
-            <Button type="button" onClick={openForm}>
-              <Plus aria-hidden="true" />
-              Start a new topic
-            </Button>
-          ) : null
-        }
-      >
-        <div className="flex flex-col gap-4">
-          {createStatus && !showForm ? (
-            <p role="status" className="text-sm font-medium text-success">
-              {createStatus}
-            </p>
-          ) : null}
-
-          {!loading && !loadError && threads.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Segmented
-                label="Show"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={(["all", "open", "closing", "closed"] as StatusFilter[]).map(status => ({
-                  value: status,
-                  label: status === "all" ? "All" : STATUS_LABELS[status],
-                  count: statusCounts[status]
-                }))}
-              />
-              <div className="relative min-w-0 flex-1 basis-56">
-                <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  aria-label="Search topics"
-                  value={queryText}
-                  onChange={event => setQueryText(event.target.value)}
-                  className="pl-9"
-                  placeholder="Search title or details"
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {loading ? (
-            <div role="status" className="flex flex-col gap-3">
-              <span className="sr-only">Loading topics…</span>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-24 rounded-xl" />
-              ))}
-            </div>
-          ) : loadError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Couldn&apos;t load topics</AlertTitle>
-              <AlertDescription>{loadError}</AlertDescription>
-            </Alert>
-          ) : threads.length === 0 ? (
-            <EmptyState
-              icon={<MessagesSquare aria-hidden="true" />}
-              title="No topics yet"
-              description="Start the first one with the form below: a plan to agree, a proposal, or an issue to sort out."
-            />
-          ) : filteredThreads.length === 0 ? (
-            <EmptyState
-              title="No topics match"
-              description="Try another word, or show all topics."
-              action={
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setQueryText("");
-                    setStatusFilter("all");
-                  }}
-                >
-                  Show all topics
-                </Button>
-              }
-            />
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {filteredThreads.map(thread => {
-                const status = thread.status || "open";
-                return (
-                  <li key={thread.id}>
-                    <Link
-                      href={`/admin/comms/${thread.id}`}
-                      className="block rounded-xl border border-border bg-card px-4 py-4 transition outline-none hover:border-primary/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-                        <div className="min-w-0">
-                          <h3 className="text-base font-semibold break-words text-foreground">{thread.title}</h3>
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {formatTimestamp(thread.createdAt)} · {resolveActorName(thread.createdBy)}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={STATUS_BADGE[status]}>{STATUS_LABELS[status]}</Badge>
-                          {thread.pinned ? <Badge variant="outline">Pinned</Badge> : null}
-                          {thread.priority && thread.priority !== "normal" ? (
-                            <Badge variant={thread.priority === "high" ? "warning" : "outline"}>{PRIORITY_LABELS[thread.priority]} priority</Badge>
-                          ) : null}
-                        </div>
-                      </div>
-                      <p className="mt-2 line-clamp-2 text-sm break-words text-muted-foreground">{thread.body}</p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {thread.commentCount ?? 0} {(thread.commentCount ?? 0) === 1 ? "comment" : "comments"}
-                      </p>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </AdminSectionCard>
-
       {showForm ? (
         <AdminSectionCard
           title="Start a new topic"
-          description="Say what needs deciding. Other admins can comment, and the topic closes with an agreed conclusion."
+          description="Say what needs deciding. Other admins comment, and the topic closes with an agreed conclusion."
           actions={
             canHideForm ? (
               <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>
@@ -375,11 +255,10 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
                 Pin to the top of the list
               </label>
               <Button type="button" size="lg" onClick={handleCreateThread} loading={isSubmitting}>
-                {/* "Create thread" is the name the browser tests click. */}
-                {isSubmitting ? "Creating…" : "Create thread"}
+                {isSubmitting ? "Starting…" : "Start topic"}
               </Button>
               {createStatus ? (
-                <p role="status" className="text-sm text-muted-foreground">
+                <p role="alert" className="text-sm font-medium text-destructive">
                   {createStatus}
                 </p>
               ) : null}
@@ -387,15 +266,118 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           </div>
         </AdminSectionCard>
       ) : null}
+
+      <AdminSectionCard
+        title="Topics"
+        description="Newest activity first. Open a topic to read and reply."
+        actions={
+          !showForm && !loading && !loadError ? (
+            <Button type="button" onClick={openForm}>
+              <Plus aria-hidden="true" />
+              New topic
+            </Button>
+          ) : null
+        }
+      >
+        {!loading && !loadError && threads.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Segmented
+              label="Show"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={(["all", "open", "closing", "closed"] as StatusFilter[]).map(status => ({
+                value: status,
+                label: status === "all" ? "All" : statusBadge("topic", status).label,
+                count: statusCounts[status]
+              }))}
+            />
+            <div className="relative min-w-0 flex-1 basis-56">
+              <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                aria-label="Search topics"
+                value={queryText}
+                onChange={event => setQueryText(event.target.value)}
+                className="pl-9"
+                placeholder="Search title or details"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {loading ? (
+          <div role="status" className="flex flex-col gap-3">
+            <span className="sr-only">Loading topics…</span>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))}
+          </div>
+        ) : loadError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Couldn&apos;t load topics</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <span>{loadError}</span>
+              {firestore ? (
+                <Button variant="outline" size="row" onClick={retry}>
+                  Try again
+                </Button>
+              ) : null}
+            </AlertDescription>
+          </Alert>
+        ) : threads.length === 0 ? (
+          <EmptyState
+            icon={<MessagesSquare aria-hidden="true" />}
+            title="No topics yet"
+            description="Start the first one with the form above: a plan to agree, a proposal, or an issue to sort out."
+          />
+        ) : filteredThreads.length === 0 ? (
+          <EmptyState
+            title="No topics match"
+            description="Try another word, or show all topics."
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setQueryText("");
+                  setStatusFilter("all");
+                }}
+              >
+                Show all topics
+              </Button>
+            }
+          />
+        ) : (
+          <AdminList bare label="Topics">
+            {filteredThreads.map(thread => {
+              const badge = statusBadge("topic", thread.status || "open");
+              const comments = thread.commentCount ?? 0;
+              return (
+                <AdminListRow
+                  key={thread.id}
+                  href={`/admin/comms/${thread.id}` as Route}
+                  title={<span className="break-words">{thread.title}</span>}
+                  badges={
+                    <>
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      {thread.pinned ? <Badge variant="outline">Pinned</Badge> : null}
+                      {thread.priority && thread.priority !== "normal" ? (
+                        <Badge variant={thread.priority === "high" ? "warning" : "outline"}>{PRIORITY_LABELS[thread.priority]} priority</Badge>
+                      ) : null}
+                    </>
+                  }
+                  meta={`${formatTimestamp(thread.createdAt)} · ${resolveActorName(thread.createdBy)} · ${comments} ${comments === 1 ? "comment" : "comments"}`}
+                >
+                  {thread.body ? <p className="mt-1 line-clamp-2 text-sm break-words text-muted-foreground">{thread.body}</p> : null}
+                </AdminListRow>
+              );
+            })}
+          </AdminList>
+        )}
+      </AdminSectionCard>
     </div>
   );
 }
-
-const STATUS_BADGE: Record<CommsThreadStatus, "success" | "warning" | "secondary"> = {
-  open: "success",
-  closing: "warning",
-  closed: "secondary"
-};
 
 function formatTimestamp(value?: { toDate?: () => Date } | null) {
   return formatDateTime(value) || "Date unknown";

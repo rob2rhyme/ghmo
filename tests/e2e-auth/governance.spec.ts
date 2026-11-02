@@ -31,7 +31,7 @@ test("action items from approved minutes are tracked privately, and attendance e
   const violations = collectCspViolations(page);
   await signInWithNewPasskey(page, "alice", "/admin/encryption");
   await turnOnEncryption(page, "Alice laptop");
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Action Items" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Action items" }).click();
 
   // --- Overdue item first; mark it done ---
   await expect(page.getByText("2 overdue").or(page.getByText("1 overdue"))).toBeVisible();
@@ -39,7 +39,7 @@ test("action items from approved minutes are tracked privately, and attendance e
   await expect(first.getByText("Overdue")).toBeVisible();
   await first.getByRole("button", { name: "Mark done" }).click();
   await expect(page.getByText("Call the bank")).toHaveCount(0); // moves out of the Open filter
-  await page.getByRole("button", { name: "Done / dropped" }).click();
+  await page.getByRole("button", { name: "Done / not needed" }).click();
   await expect(page.getByText("Call the bank")).toBeVisible();
 
   // --- At rest the status is ciphertext ---
@@ -52,14 +52,14 @@ test("action items from approved minutes are tracked privately, and attendance e
   // --- It survives a reload (after unlocking) ---
   await page.reload();
   await page.getByRole("button", { name: "Unlock with passkey" }).click();
-  await page.getByRole("button", { name: "Done / dropped" }).click();
+  await page.getByRole("button", { name: "Done / not needed" }).click();
   await expect(page.getByText("Call the bank")).toBeVisible();
 
   // --- Attendance export: one row per person, spreadsheet formulas defused ---
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Meeting Minutes" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Meeting minutes" }).click();
   await page.getByRole("link", { name: "Records", exact: true }).click();
   await expect(page.getByText("1 result")).toBeVisible();
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export attendance (CSV)" }).click()]);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download attendance (CSV)" }).click()]);
   const csv = await (await import("node:fs/promises")).readFile((await download.path())!, "utf8");
   const rows = csv.trim().split("\r\n");
   expect(rows[0]).toBe("Date,Event,Meeting type,Minutes status,Name,Attendance");

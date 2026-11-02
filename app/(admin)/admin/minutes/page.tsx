@@ -5,12 +5,11 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { toPlain } from "@/src/lib/serialize.server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import MinutesEditorClient from "@/src/components/admin/minutes/MinutesEditorClient";
 import MinutesRecordsClient from "@/src/components/admin/minutes/MinutesRecordsClient";
-import { cn } from "@/src/lib/utils";
+import { SegmentedNav } from "@/src/components/ui/segmented";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -47,12 +46,21 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
 
   return (
     <div className="flex flex-col gap-6">
+      {/* The tabs sit in the header, so any encryption notice comes straight under it, as on every other page. */}
       <AdminPageHeader
-        title="Meeting Minutes"
+        title="Meeting minutes"
         description="Write up each meeting, have another admin approve it, then download or publish it."
+        actions={
+          <SegmentedNav
+            label="Minutes views"
+            links={[
+              { href: "/admin/minutes?mode=new", label: "Write minutes", active: mode === "new" },
+              // "Records" is the name the browser tests click; keep it in step with tests/e2e-auth.
+              { href: "/admin/minutes?mode=records", label: "Records", active: mode === "records" }
+            ]}
+          />
+        }
       />
-
-      <MinutesTabs mode={mode} />
 
       <EncryptionGate what="the meeting minutes">
         {mode === "records" ? (
@@ -62,37 +70,5 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
         )}
       </EncryptionGate>
     </div>
-  );
-}
-
-const TABS = [
-  { mode: "new", label: "Write minutes", href: "/admin/minutes?mode=new" },
-  // "Records" is the name the browser tests click; keep it in step with tests/e2e-auth.
-  { mode: "records", label: "Records", href: "/admin/minutes?mode=records" }
-] as const;
-
-/** One tab bar for the two views. Links (not buttons) so each view has its own address. */
-function MinutesTabs({ mode }: { mode: "new" | "records" }) {
-  return (
-    <nav aria-label="Minutes views" className="flex min-w-0">
-      <div className="inline-flex max-w-full flex-wrap gap-1 rounded-lg border border-border bg-muted/60 p-1">
-        {TABS.map(tab => {
-          const selected = tab.mode === mode;
-          return (
-            <Link
-              key={tab.mode}
-              href={tab.href}
-              aria-current={selected ? "page" : undefined}
-              className={cn(
-                "inline-flex h-10 items-center rounded-md px-4 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                selected ? "bg-card text-foreground shadow-xs ring-1 ring-border" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
-              )}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
   );
 }

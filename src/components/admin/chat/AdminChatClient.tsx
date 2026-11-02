@@ -31,14 +31,15 @@ const CHAT_PATH = "organizations/ghmo/adminChatMessages";
 
 export default function AdminChatClient({ actor }: AdminChatClientProps) {
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => Boolean(firestore));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
   const [body, setBody] = useState("");
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const endRef = useRef<HTMLDivElement | null>(null);
   const { packPrivate, unpackPrivate, status } = useE2ee();
-  // Messages are decrypted as snapshots arrive; unlocking later re-reads them.
+  // Messages are unlocked as snapshots arrive; unlocking later re-reads them.
   const canRead = status === "unlocked" || status === "not-setup";
   const latestDocs = useRef<{ id: string; data: Record<string, unknown> }[]>([]);
 
@@ -57,11 +58,7 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
   }, [canRead, decryptAll]);
 
   useEffect(() => {
-    if (!firestore) {
-      setLoadError(firebaseInitError || "Firebase is not configured.");
-      setLoading(false);
-      return;
-    }
+    if (!firestore) return;
     const chatQuery = query(
       collection(firestore, "organizations", "ghmo", "adminChatMessages"),
       orderBy("createdAt", "asc")
@@ -73,12 +70,12 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
         void decryptAll();
       },
       error => {
-        setLoadError(error.message || "Unable to load chat");
+        setLoadError(error.message || "The connection failed.");
         setLoading(false);
       }
     );
     return () => unsubscribe();
-  }, [decryptAll]);
+  }, [decryptAll, attempt]);
 
   const lastMessageCount = useMemo(() => messages.length, [messages]);
 
@@ -91,7 +88,7 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
     if (!firestore) return;
     const trimmed = body.trim();
     if (!trimmed) {
-      setSendStatus("Message cannot be empty.");
+      setSendStatus("Write a message first.");
       return;
     }
     if (isSending) return;
@@ -113,18 +110,16 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
         body: JSON.stringify({ action: "admin_chat_message_sent", resource: { type: "admin_chat", id: messageRef.id } })
       });
       setBody("");
-    } catch (error: any) {
-      setSendStatus(error.message || "Unable to send message");
+    } catch (error) {
+      setSendStatus(`Couldn't send the message. ${(error instanceof Error && error.message) || "Check your connection and try again."}`);
     } finally {
       setIsSending(false);
     }
   };
 
   return (
-    <section
-      aria-label="Chat messages"
-      className="flex h-[calc(100dvh-15rem)] min-h-80 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs lg:h-[calc(100dvh-17rem)]"
-    >
+    // Fills the rest of the page's full-height column (see app/(admin)/admin/chat/page.tsx), whatever sits above it.
+    <section aria-label="Chat messages" data-fill className="flex min-h-64 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto bg-muted/30 px-3 py-4 sm:px-4">
         {loading ? (
           <div role="status" className="flex flex-col gap-3">
@@ -136,7 +131,22 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
         ) : loadError ? (
           <Alert variant="destructive">
             <AlertTitle>Couldn&apos;t load the chat</AlertTitle>
-            <AlertDescription>{loadError}</AlertDescription>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <span>{loadError}</span>
+              {firestore ? (
+                <Button
+                  variant="outline"
+                  size="row"
+                  onClick={() => {
+                    setLoadError(null);
+                    setLoading(true);
+                    setAttempt(n => n + 1);
+                  }}
+                >
+                  Try again
+                </Button>
+              ) : null}
+            </AlertDescription>
           </Alert>
         ) : messages.length === 0 ? (
           <EmptyState
@@ -160,7 +170,7 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
                   <span className="font-semibold">{mine ? "You" : resolveActorName(message.createdBy)}</span> · {formatTimestamp(message.createdAt)}
                 </p>
                 {message._e2ee === "failed" ? (
-                  <p className="mt-1 italic opacity-80">Can&apos;t decrypt this message on this device.</p>
+                  <p className="mt-1 italic opacity-80">This message can&apos;t be opened on this device.</p>
                 ) : (
                   <p className="mt-1 break-words whitespace-pre-wrap">{message.body}</p>
                 )}

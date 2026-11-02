@@ -18,7 +18,7 @@ export type MigrationArea = (typeof MIGRATION_AREAS)[number];
 
 /** How each area reads on the Encryption page (display only). */
 export const AREA_LABELS: Record<MigrationArea, string> = {
-  chat: "Admin Chat messages",
+  chat: "Admin chat messages",
   threads: "Plans & Issues topics",
   conclusions: "Topic conclusions",
   comments: "Topic comments",

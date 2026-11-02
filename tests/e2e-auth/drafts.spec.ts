@@ -36,7 +36,7 @@ test("unsent drafts are kept encrypted on this device, offered after a reload, a
   await turnOnEncryption(page, "Alice laptop");
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Plans & Issues" }).click();
 
-  // --- A new thread draft ---
+  // --- A new topic draft ---
   await page.getByPlaceholder("e.g., Approve community outreach plan").fill(TITLE);
   await page.getByPlaceholder("Summarize the plan, proposal, or issue.").fill(BODY);
   await expect.poll(() => draftKeys(page)).toHaveLength(1);
@@ -51,13 +51,13 @@ test("unsent drafts are kept encrypted on this device, offered after a reload, a
   await expect(page.getByPlaceholder("e.g., Approve community outreach plan")).toHaveValue(TITLE);
   await expect(page.getByPlaceholder("Summarize the plan, proposal, or issue.")).toHaveValue(BODY);
 
-  // Sending the thread clears the draft.
-  await page.getByRole("button", { name: "Create thread" }).click();
-  await expect(page.getByText("Thread created.")).toBeVisible();
+  // Starting the topic clears the draft.
+  await page.getByRole("button", { name: "Start topic" }).click();
+  await expect(page.getByText("Topic started.")).toBeVisible();
   await expect.poll(() => draftKeys(page)).toEqual([]);
 
   // --- A minutes draft; discarding removes it ---
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Meeting Minutes" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Meeting minutes" }).click();
   await page.getByPlaceholder("Summarize the discussion").fill("Discussed the diocese offer");
   await expect.poll(() => draftKeys(page)).toHaveLength(1);
   expect(await draftDump(page)).not.toContain("diocese");

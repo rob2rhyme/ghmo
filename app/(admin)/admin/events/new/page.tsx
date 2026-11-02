@@ -3,9 +3,8 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import { EMPTY_EVENT_FORM, EventForm, validateEventForm, type EventFormValues } from "@/src/components/admin/events/EventForm";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
@@ -34,6 +33,7 @@ export default function NewEventPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "The event could not be saved.");
+      toast.success("Event saved.");
       router.replace("/admin/events");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The event could not be saved.");
@@ -43,14 +43,12 @@ export default function NewEventPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <Button asChild variant="ghost" className="-ml-3 w-fit text-muted-foreground">
-        <Link href="/admin/events">
-          <ArrowLeft aria-hidden="true" />
-          Events
-        </Link>
-      </Button>
-      <AdminPageHeader title="New event" description="Add the details, then publish it when you want it on the public Events page." />
+    <div className="flex max-w-3xl flex-col gap-6">
+      <AdminPageHeader
+        back={{ href: "/admin/events", label: "Events" }}
+        title="New event"
+        description="Add the details, then publish it when you want it on the public Events page."
+      />
       <EventForm form={form} update={update} errors={errors} />
       {error ? (
         <Alert variant="destructive">
@@ -58,10 +56,10 @@ export default function NewEventPage() {
         </Alert>
       ) : null}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={handleSubmit} loading={saving}>
+        <Button size="lg" className="max-sm:flex-1" onClick={handleSubmit} loading={saving}>
           {saving ? "Saving…" : "Save event"}
         </Button>
-        <Button variant="outline" onClick={() => router.back()} disabled={saving}>
+        <Button size="lg" variant="outline" onClick={() => router.back()} disabled={saving}>
           Cancel
         </Button>
       </div>

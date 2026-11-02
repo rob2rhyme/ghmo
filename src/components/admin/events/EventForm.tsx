@@ -1,10 +1,10 @@
 "use client";
 
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Select } from "@/src/components/ui/select";
 import { Textarea } from "@/src/components/ui/textarea";
-import { Card } from "@/src/components/ui/card";
 import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
 import { toDate, type DateInput } from "@/src/lib/format";
 import { dateToWallTime, isValidTimeZone } from "@/src/lib/zonedTime";
@@ -64,8 +64,7 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
   const timezoneKnown = TIMEZONES.some(tz => tz.value === form.timezone);
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <h2 className="text-base font-semibold">What is happening</h2>
+      <AdminSectionCard title="What is happening">
         <Field label="Event name" error={errors.title}>
           <Input value={form.title} onChange={e => update("title", e.target.value)} placeholder="e.g. Dashain celebration" maxLength={120} required />
         </Field>
@@ -75,10 +74,9 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
         <Field label="Full details" description="Shown on the event page: programme, what to bring, who to contact." error={errors.body}>
           <Textarea value={form.body} onChange={e => update("body", e.target.value)} className="min-h-40" required />
         </Field>
-      </Card>
+      </AdminSectionCard>
 
-      <Card>
-        <h2 className="text-base font-semibold">When and where</h2>
+      <AdminSectionCard title="When and where">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Starts" description="In the time zone chosen below." error={errors.startsAt}>
             <Input type="datetime-local" value={form.startsAt} onChange={e => update("startsAt", e.target.value)} />
@@ -102,11 +100,10 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
             <Input value={form.location} onChange={e => update("location", e.target.value)} placeholder="e.g. Community hall, 100 Main St" maxLength={200} />
           </Field>
         </div>
-      </Card>
+      </AdminSectionCard>
 
-      <Card>
-        <h2 className="text-base font-semibold">Who can see it</h2>
-        <Field label="Status" description="Draft events are only visible to board members. Published events appear on the public Events page.">
+      <AdminSectionCard title="Who can see it">
+        <Field label="Status" description="Drafts are visible to admins only. Published events appear on the public Events page.">
           <Select value={form.status} onChange={e => update("status", e.target.value)}>
             <option value="draft">Draft</option>
             <option value="published">Published</option>
@@ -120,8 +117,8 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
             onChange={e => update("featured", e.target.checked)}
           />
           <span>
-            <span className="font-medium">Feature this event</span>
-            <span className="block text-muted-foreground">Highlight it at the top of the Events page.</span>
+            <span className="font-medium">Feature on the Events page</span>
+            <span className="block text-muted-foreground">Adds a Featured badge to the event on the public Events and home pages.</span>
           </span>
         </label>
         <details className="rounded-lg border border-border p-3 text-sm">
@@ -132,7 +129,7 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
             </Field>
           </div>
         </details>
-      </Card>
+      </AdminSectionCard>
     </div>
   );
 }

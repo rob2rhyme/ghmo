@@ -36,7 +36,7 @@ test("chat is plaintext until encryption is on, then stored as ciphertext and re
   // --- Turn encryption on; the earlier message stays readable (legacy plaintext) ---
   await turnOnEncryption(alice, "Alice laptop");
   // In-app navigation keeps the keys unlocked (a full page load would lock the device).
-  await alice.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Admin Chat" }).click();
+  await alice.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Admin chat" }).click();
   await expect(bubble(alice, BEFORE)).toBeVisible();
 
   // --- New messages are encrypted ---

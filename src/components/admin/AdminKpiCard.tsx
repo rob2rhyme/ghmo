@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { ProgressBar } from "@/src/components/ui/stat";
 import { cn } from "@/src/lib/utils";
 
 type AdminKpiCardProps = {
@@ -30,18 +31,7 @@ export default function AdminKpiCard({ label, value, hint, icon: Icon, progress,
         ) : null}
       </div>
       <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground tabular-nums md:mt-3 md:text-3xl">{value}</p>
-      {typeof progress === "number" ? (
-        <div
-          role="progressbar"
-          aria-label={`${label} progress`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={progress}
-          className="mt-3 h-2 overflow-hidden rounded-full bg-muted"
-        >
-          <div className="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${progress}%` }} />
-        </div>
-      ) : null}
+      {typeof progress === "number" ? <ProgressBar value={progress} max={100} label={`${label} progress`} className="mt-3" /> : null}
       {hint ? <p className="mt-2 text-sm text-muted-foreground">{hint}</p> : null}
       {action && !href ? <p className="mt-1 text-sm">{action}</p> : null}
     </>

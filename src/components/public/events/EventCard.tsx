@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { ArrowRight, Clock, FileText, MapPin } from "lucide-react";
+import { ArrowRight, Clock, FileText, MapPin, Star } from "lucide-react";
+import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import type { EventRecord } from "@/src/lib/events.shared";
@@ -40,13 +41,19 @@ export function EventCard({ evt, orgSlug, compact = false, flyer = true, heading
   const Heading = headingLevel;
 
   return (
-    <article className="relative flex h-full min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs transition-colors hover:border-primary/50 hover:bg-muted/30 md:p-6">
+    <article className={cn("relative flex h-full min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground shadow-xs transition-colors hover:border-primary/50 hover:bg-muted/30 md:p-6", evt.featured ? "border-primary/40" : "border-border")}>
       <div className="flex min-w-0 gap-4">
         <div aria-hidden="true" className="flex size-14 shrink-0 flex-col items-center justify-center rounded-md bg-primary/10 text-primary">
           <span className="text-sm font-medium leading-none">{tile?.month ?? "Date"}</span>
           <span className="text-xl font-semibold leading-tight">{tile?.day ?? "TBA"}</span>
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {evt.featured ? (
+            <Badge className="mb-1">
+              <Star aria-hidden="true" />
+              Featured
+            </Badge>
+          ) : null}
           <Heading className="text-base font-semibold text-foreground md:text-lg">
             <Link href={eventHref(orgSlug, evt.id)} className="break-words after:absolute after:inset-0 after:rounded-xl">
               {evt.title}

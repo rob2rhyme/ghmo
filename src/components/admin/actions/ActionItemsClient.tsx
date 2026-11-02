@@ -5,6 +5,8 @@ import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/f
 import Link from "next/link";
 import { ListChecks } from "lucide-react";
 import { toast } from "sonner";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
@@ -12,6 +14,7 @@ import { Segmented } from "@/src/components/ui/segmented";
 import { formatShortDate } from "@/src/lib/format";
 import { firestore } from "@/src/lib/firebaseClient";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { statusBadge } from "@/src/lib/statusBadges";
 import {
   ACTION_STATUS_PATH,
   actionStatusLoc,
@@ -30,6 +33,8 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
   const [items, setItems] = useState<TrackedItem[]>([]);
   const [filter, setFilter] = useState<Filter>("open");
   const [busy, setBusy] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!firestore) return;
@@ -44,18 +49,19 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
           })
         ).then(entries => {
           if (cancelled) return;
+          setLoadError(null);
           const next = new Map<string, StatusRecord>();
           for (const [key, value] of entries) if (value) next.set(key, value);
           setStatuses(next);
         });
       },
-      error => toast.error(error.message || "Could not load action item statuses")
+      error => setLoadError(error.message || "The connection failed.")
     );
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, [unpackPrivate]);
+  }, [unpackPrivate, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +82,7 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
       const fields = await packPrivate(actionStatusLoc(item.key), { status, ...(item.note ? { note: item.note } : {}) });
       await setDoc(doc(firestore, ACTION_STATUS_PATH, item.key), { ...fields, updatedAt: serverTimestamp(), updatedBy: uid });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update");
+      toast.error(`Couldn't update the action item. ${error instanceof Error ? error.message : "Try again."}`);
     } finally {
       setBusy(null);
     }
@@ -89,29 +95,31 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
 
   return (
     <div className="flex flex-col gap-4">
+      {loadError ? (
+        <Alert variant="destructive">
+          <AlertTitle>Couldn&apos;t load which items are done</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-3">
+            <span>Every item shows as open until this works. {loadError}</span>
+            <Button variant="outline" size="row" onClick={() => setAttempt(n => n + 1)}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {items.length > 0 ? (
-        <Segmented
-          label="Show"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            {
-              value: "open",
-              label: (
-                <>
-                  Open
-                  {overdueCount ? (
-                    <span className="rounded-full bg-destructive/10 px-1.5 text-xs font-semibold text-destructive">{overdueCount} overdue</span>
-                  ) : null}
-                </>
-              ),
-              count: openCount
-            },
-            // "Done / dropped" is the name the browser tests click.
-            { value: "done", label: "Done / dropped", count: doneCount },
-            { value: "all", label: "All", count: items.length }
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Segmented
+            label="Show"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "open", label: "Open", count: openCount },
+              { value: "done", label: "Done / not needed", count: doneCount },
+              { value: "all", label: "All" }
+            ]}
+          />
+          {overdueCount && filter !== "done" ? <Badge variant="destructive">{overdueCount} overdue</Badge> : null}
+        </div>
       ) : null}
       {visible.length === 0 ? (
         items.length === 0 ? (
@@ -121,7 +129,7 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
             description="Tasks appear here once minutes that list action items are approved."
             action={
               <Button asChild variant="outline">
-                <Link href="/admin/minutes">Go to Meeting Minutes</Link>
+                <Link href="/admin/minutes">Open meeting minutes</Link>
               </Button>
             }
           />
@@ -133,39 +141,43 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
           />
         )
       ) : (
-        <ul className="flex flex-col gap-2">
-          {visible.map(item => (
-            <li key={item.key} className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-medium break-words text-foreground">{item.task}</p>
-                <p className="text-sm text-muted-foreground">
-                  {item.eventTitle}
-                  {item.assignedTo ? ` · ${item.assignedTo}` : ""}
-                  {item.dueDate ? ` · due ${formatShortDate(item.dueDate)}` : ""}
-                </p>
-                {item.note ? <p className="mt-1 text-sm text-muted-foreground">{item.note}</p> : null}
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {item.overdue ? <Badge variant="destructive">Overdue</Badge> : null}
-                {item.status !== "open" ? <Badge variant="secondary">{item.status === "done" ? "Done" : "Not needed"}</Badge> : null}
-                {item.status === "open" ? (
+        <AdminList label="Action items">
+          {visible.map(item => {
+            const badge = item.overdue || item.status !== "open" ? statusBadge("actionItem", item.overdue ? "overdue" : item.status) : null;
+            return (
+              <AdminListRow
+                key={item.key}
+                title={<span className="break-words">{item.task}</span>}
+                badges={badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+                meta={
                   <>
-                    <Button loading={busy === item.key} onClick={() => setStatus(item, "done")}>
-                      Mark done
-                    </Button>
-                    <Button variant="outline" disabled={busy === item.key} onClick={() => setStatus(item, "dropped")}>
-                      Not needed
-                    </Button>
+                    {item.eventTitle}
+                    {item.assignedTo ? ` · ${item.assignedTo}` : ""}
+                    {item.dueDate ? ` · due ${formatShortDate(item.dueDate)}` : ""}
                   </>
-                ) : (
-                  <Button variant="outline" loading={busy === item.key} onClick={() => setStatus(item, "open")}>
-                    Reopen
-                  </Button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+                }
+                actions={
+                  item.status === "open" ? (
+                    <>
+                      <Button variant="outline" size="row" loading={busy === item.key} onClick={() => setStatus(item, "done")}>
+                        Mark done
+                      </Button>
+                      <Button variant="outline" size="row" disabled={busy === item.key} onClick={() => setStatus(item, "dropped")}>
+                        Not needed
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" size="row" loading={busy === item.key} onClick={() => setStatus(item, "open")}>
+                      Reopen
+                    </Button>
+                  )
+                }
+              >
+                {item.note ? <p className="mt-1 text-sm text-muted-foreground">{item.note}</p> : null}
+              </AdminListRow>
+            );
+          })}
+        </AdminList>
       )}
     </div>
   );

@@ -1,7 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/src/components/ui/button";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
@@ -34,15 +31,14 @@ export default async function AdminCommsThreadPage({ params }: AdminCommsThreadP
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <Button asChild variant="ghost" className="-ml-3 self-start text-muted-foreground">
-          <Link href="/admin/comms">
-            <ArrowLeft aria-hidden="true" />
-            Back to Plans & Issues
-          </Link>
-        </Button>
-        <AdminPageHeader title="Topic" description="Read the discussion, add your view, and agree a conclusion together." />
+    <div className="group/topic flex flex-col gap-6">
+      {/* Shown while the topic loads or is locked; once it opens, its own title becomes the page title. */}
+      <div className="group-has-data-topic-header/topic:hidden">
+        <AdminPageHeader
+          back={{ href: "/admin/comms", label: "Plans & Issues" }}
+          title="Topic"
+          description="Read the discussion, add your view, and agree a conclusion together."
+        />
       </div>
       <FirebaseAdminAuthBootstrap>
         <EncryptionGate what="Plans & Issues">

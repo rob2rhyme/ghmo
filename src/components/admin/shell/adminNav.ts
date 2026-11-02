@@ -40,9 +40,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: "Governance",
     items: [
       { href: "/admin/comms", label: "Plans & Issues", icon: ScrollText, keywords: "topics, threads, proposals, discussion, vote" },
-      { href: "/admin/chat", label: "Admin Chat", icon: MessagesSquare, keywords: "messages, talk, board chat" },
-      { href: "/admin/minutes", label: "Meeting Minutes", icon: NotebookPen, keywords: "notes, decisions, attendance, records" },
-      { href: "/admin/action-items", label: "Action Items", icon: ListChecks, keywords: "tasks, to do, follow up, overdue" }
+      { href: "/admin/chat", label: "Admin chat", icon: MessagesSquare, keywords: "messages, talk, board chat" },
+      { href: "/admin/minutes", label: "Meeting minutes", icon: NotebookPen, keywords: "notes, decisions, attendance, records" },
+      { href: "/admin/action-items", label: "Action items", icon: ListChecks, keywords: "tasks, to do, follow up, overdue" }
     ]
   },
   {
@@ -51,17 +51,17 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/events", label: "Events", icon: CalendarDays, keywords: "new event, calendar, programs, schedule" },
       { href: "/admin/members", label: "Members", icon: Users, keywords: "people, contacts, phone numbers, consent, import, email list" },
       { href: "/admin/broadcasts", label: "Broadcasts", icon: Mail, keywords: "announcement, newsletter, send email, messenger" },
-      { href: "/admin/calling-tree", label: "Calling Tree", icon: Network, keywords: "callers, phone tree, assignments" },
-      { href: "/admin/call-campaigns", label: "Call Campaigns", icon: Megaphone, keywords: "phone round, rsvp, script, call progress" },
-      { href: "/admin/my-calls", label: "My Calls", icon: PhoneCall, keywords: "my people, log a call, call list" },
-      { href: "/admin/gumba-project", label: "GUMBA Project", icon: Landmark, keywords: "donations, fundraising, gofundme, goal, temple" }
+      { href: "/admin/calling-tree", label: "Calling tree", icon: Network, keywords: "callers, phone tree, assignments" },
+      { href: "/admin/call-campaigns", label: "Call campaigns", icon: Megaphone, keywords: "phone round, rsvp, script, call progress" },
+      { href: "/admin/my-calls", label: "My calls", icon: PhoneCall, keywords: "my people, log a call, call list" },
+      { href: "/admin/gumba-project", label: "GUMBA project", icon: Landmark, keywords: "donations, fundraising, gofundme, goal, temple" }
     ]
   },
   {
     label: "Documents",
     items: [
-      { href: "/admin/document-generator", label: "Document Generator", icon: FileSignature, noPrefetch: true, keywords: "letter, certificate, invitation, make a document, print" },
-      { href: "/admin/document-gallery", label: "Document Gallery", icon: FolderOpen, noPrefetch: true, keywords: "saved documents, letters, certificates, signatures" }
+      { href: "/admin/document-generator", label: "Document generator", icon: FileSignature, noPrefetch: true, keywords: "letter, certificate, invitation, make a document, print" },
+      { href: "/admin/document-gallery", label: "Document gallery", icon: FolderOpen, noPrefetch: true, keywords: "saved documents, letters, certificates, signatures" }
     ]
   },
   {

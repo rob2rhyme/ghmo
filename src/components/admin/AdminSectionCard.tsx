@@ -23,8 +23,8 @@ export default function AdminSectionCard({ title, description, actions, icon, ch
   return (
     <section id={id} className={cn("flex flex-col gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs md:p-6", className)}>
       {title || description || actions ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 basis-56">
             {title ? (
               <Heading className="flex items-center gap-2 text-base font-semibold leading-tight text-foreground">
                 {icon ? <span className="text-muted-foreground [&_svg]:size-5">{icon}</span> : null}

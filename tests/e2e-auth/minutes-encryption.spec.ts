@@ -29,7 +29,7 @@ test("minutes are ciphertext while draft, approved by a different admin with the
   const violations = collectCspViolations(page);
   await signInWithNewPasskey(page, "alice", "/admin/encryption");
   await turnOnEncryption(page, "Alice laptop");
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Meeting Minutes" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Meeting minutes" }).click();
 
   // --- Write and save a draft ---
   await page.locator("select").first().selectOption("ev1");

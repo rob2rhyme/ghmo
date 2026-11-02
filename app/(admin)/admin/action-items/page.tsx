@@ -29,7 +29,7 @@ export default async function ActionItemsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader title="Action Items" description="Tasks agreed in approved meeting minutes. Mark each one done when it's finished." />
+      <AdminPageHeader title="Action items" description="Tasks agreed in approved meeting minutes. Mark each one done when it's finished." />
       <FirebaseAdminAuthBootstrap>
         <EncryptionGate what="the action items">
           <ActionItemsClient minutes={approved} uid={uid} />
