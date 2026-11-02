@@ -149,93 +149,123 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
     .flatMap(call => call.attempts.map(attempt => ({ ...attempt, memberId: call.memberId, callerUid: call.callerUid })))
     .sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 
+  const pct = live.total ? Math.round((live.reached / live.total) * 100) : 0;
+  const summary = [
+    campaign.eventTitle ? `For ${campaign.eventTitle}.` : "",
+    campaign.createdAt ? `Opened ${formatDay(campaign.createdAt)}.` : "",
+    campaign.dueAt ? `Calls to be done by ${formatDay(campaign.dueAt)}.` : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="space-y-6">
-      <AdminPageHeader
-        title={campaign.title}
-        description={`${campaign.status === "open" ? "Open" : "Closed"}${campaign.eventTitle ? ` · ${campaign.eventTitle}` : ""}${campaign.dueAt ? ` · calls by ${formatDay(campaign.dueAt)}` : ""} · opened ${formatWhen(campaign.createdAt)} · calling tree v${campaign.treeVersion}`}
-      />
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="ghost" size="sm">
+    <div className="flex flex-col gap-6">
+      <div>
+        <Button asChild variant="ghost" className="-ml-3 max-sm:h-11">
           <Link href="/admin/call-campaigns">
             <ArrowLeft aria-hidden="true" className="size-4" /> All campaigns
           </Link>
         </Button>
-        <Button size="sm" variant="outline" loading={busy === "export"} onClick={() => act("export")}>
-          <Download aria-hidden="true" className="size-4" /> Export CSV
-        </Button>
-        {campaign.status === "open" ? (
+      </div>
+      <AdminPageHeader
+        title={campaign.title}
+        description={summary || "Who has been reached so far, per caller, with every call logged."}
+        actions={
           <>
-            <Button size="sm" variant="outline" loading={busy === "remind"} onClick={() => act("remind")}>
-              Remind callers
+            <Button variant="outline" loading={busy === "export"} onClick={() => act("export")} className="max-sm:h-11">
+              <Download aria-hidden="true" className="size-4" /> Export CSV
             </Button>
-            <Button size="sm" variant="destructive" loading={busy === "close"} onClick={() => act("close")}>
-              Close campaign
-            </Button>
+            {campaign.status === "open" ? (
+              <>
+                <Button variant="outline" loading={busy === "remind"} onClick={() => act("remind")} className="max-sm:h-11">
+                  Remind callers
+                </Button>
+                <Button variant="destructive" loading={busy === "close"} onClick={() => act("close")} className="max-sm:h-11">
+                  Close campaign
+                </Button>
+              </>
+            ) : null}
           </>
-        ) : null}
-      </div>
+        }
+      />
 
-      <div className="grid gap-3 sm:grid-cols-4" aria-label="Campaign totals">
-        <Stat label="Reached" value={`${live.reached} / ${live.total}`} />
-        <Stat label="Attempted" value={`${live.attempted} / ${live.total}`} />
-        <Stat label="Coming" value={String(live.rsvpYes)} />
-        <Stat label="Not coming / maybe" value={`${live.rsvpNo} / ${live.rsvpMaybe}`} />
-      </div>
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-lg font-semibold text-foreground tabular-nums">
+              {live.reached} of {live.total}
+            </strong>{" "}
+            people reached ({pct}%)
+          </p>
+          <Badge variant={campaign.status === "open" ? "success" : "secondary"}>{campaign.status === "open" ? "Open" : "Closed"}</Badge>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`${pct}% reached`}>
+          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Campaign totals">
+          <Stat label="Reached" value={`${live.reached} / ${live.total}`} />
+          <Stat label="Attempted" value={`${live.attempted} / ${live.total}`} />
+          <Stat label="Coming" value={String(live.rsvpYes)} />
+          <Stat label="Not coming / maybe" value={`${live.rsvpNo} / ${live.rsvpMaybe}`} />
+        </div>
+      </Card>
 
       {campaign.script ? (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2">
               <Lock aria-hidden="true" className="size-4" /> Script
             </CardTitle>
+            <CardDescription>What callers say. Only callers and board devices can read it.</CardDescription>
           </CardHeader>
-          <p className="whitespace-pre-wrap text-sm">{script ?? "Decrypting…"}</p>
+          <p className="text-sm whitespace-pre-wrap">{script ?? "Decrypting…"}</p>
         </Card>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Progress per caller</CardTitle>
+          <CardTitle>Progress per caller</CardTitle>
         </CardHeader>
-        <table className="w-full text-sm" aria-label="Progress per caller">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-1 pr-2 font-medium">Caller</th>
-              <th className="py-1 pr-2 font-medium">Reached</th>
-              <th className="py-1 pr-2 font-medium">Attempted</th>
-              <th className="py-1 pr-2 font-medium">Left</th>
-              <th className="py-1 font-medium">Coming</th>
-            </tr>
-          </thead>
-          <tbody>
-            {byCaller.map(row => (
-              <tr key={row.callerUid} className="border-t border-border">
-                <td className="py-1 pr-2">{callerNames[row.callerUid] ?? row.callerUid}</td>
-                <td className="py-1 pr-2">
-                  {row.reached} / {row.total}
-                </td>
-                <td className="py-1 pr-2">{row.attempted}</td>
-                <td className="py-1 pr-2">{row.total - row.done}</td>
-                <td className="py-1">{row.rsvpYes}</td>
+        <div className="-mx-1 overflow-x-auto px-1">
+          <table className="w-full min-w-[28rem] text-sm" aria-label="Progress per caller">
+            <thead>
+              <tr className="text-left text-muted-foreground">
+                <th className="py-2 pr-3 font-medium">Caller</th>
+                <th className="py-2 pr-3 font-medium">Reached</th>
+                <th className="py-2 pr-3 font-medium">Attempted</th>
+                <th className="py-2 pr-3 font-medium">Left</th>
+                <th className="py-2 font-medium">Coming</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {byCaller.map(row => (
+                <tr key={row.callerUid} className="border-t border-border">
+                  <td className="py-2 pr-3 font-medium">{callerNames[row.callerUid] ?? row.callerUid}</td>
+                  <td className="py-2 pr-3 tabular-nums">
+                    {row.reached} / {row.total}
+                  </td>
+                  <td className="py-2 pr-3 tabular-nums">{row.attempted}</td>
+                  <td className="py-2 pr-3 tabular-nums">{row.total - row.done}</td>
+                  <td className="py-2 tabular-nums">{row.rsvpYes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Not yet reached ({notReached.length})</CardTitle>
-          <CardDescription>People whose caller has not reached them, had the call declined, or found a wrong number.</CardDescription>
+          <CardTitle>Not yet reached ({notReached.length})</CardTitle>
+          <CardDescription>People still to try: not called yet, no answer, a voicemail left, or asked to be called back.</CardDescription>
         </CardHeader>
         {notReached.length === 0 ? (
           <p className="text-sm text-muted-foreground">Everyone has been reached.</p>
         ) : (
           <ul className="divide-y divide-border text-sm" aria-label="Not yet reached">
             {notReached.map(call => (
-              <li key={call.memberId} className="flex items-center justify-between gap-2 py-1.5">
-                <span>{memberLabel(memberById.get(call.memberId), call.memberId)}</span>
+              <li key={call.memberId} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                <span className="min-w-0 truncate font-medium">{memberLabel(memberById.get(call.memberId), call.memberId)}</span>
                 <span className="text-muted-foreground">
                   {callerNames[call.callerUid] ?? call.callerUid}
                   {call.outcome ? ` · ${OUTCOME_LABELS[call.outcome]} (${call.attemptCount})` : " · not tried"}
@@ -248,22 +278,22 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Call log ({log.length})</CardTitle>
+          <CardTitle>Call log ({log.length})</CardTitle>
           <CardDescription>Every attempt, newest first. Notes are decrypted on this device.</CardDescription>
         </CardHeader>
         {log.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No calls logged yet.</p>
+          <p className="text-sm text-muted-foreground">No calls logged yet. Callers log them from My Calls.</p>
         ) : (
           <ul className="divide-y divide-border text-sm" aria-label="Call log">
             {log.map(entry => (
-              <li key={entry.id} className="py-1.5">
-                <span className="font-medium">{memberLabel(memberById.get(entry.memberId), entry.memberId)}</span>
-                {" · "}
-                <Badge variant={entry.outcome === "reached" ? "success" : "secondary"}>{OUTCOME_LABELS[entry.outcome]}</Badge>
-                <span className="text-muted-foreground">
-                  {" "}
-                  by {callerNames[entry.byUid] ?? entry.byUid} · {formatWhen(entry.at)}
-                </span>
+              <li key={entry.id} className="flex flex-col gap-1 py-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-medium">{memberLabel(memberById.get(entry.memberId), entry.memberId)}</span>
+                  <Badge variant={entry.outcome === "reached" ? "success" : "secondary"}>{OUTCOME_LABELS[entry.outcome]}</Badge>
+                  <span className="text-muted-foreground">
+                    by {callerNames[entry.byUid] ?? entry.byUid} · {formatWhen(entry.at)}
+                  </span>
+                </div>
                 {notes.get(entry.id) ? <p className="text-muted-foreground">{notes.get(entry.id)}</p> : null}
               </li>
             ))}
@@ -272,7 +302,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
       </Card>
 
       {calls.some(call => call.rsvp) ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           RSVPs: {calls.filter(c => c.rsvp === "yes").length} {RSVP_LABELS.yes.toLowerCase()}, {calls.filter(c => c.rsvp === "no").length} {RSVP_LABELS.no.toLowerCase()},{" "}
           {calls.filter(c => c.rsvp === "maybe").length} {RSVP_LABELS.maybe.toLowerCase()}.
         </p>
@@ -283,11 +313,11 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="py-3">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold" aria-label={`${label}: ${value}`}>
+    <div className="rounded-md border border-border bg-background px-3 py-2">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-xl font-semibold tabular-nums" aria-label={`${label}: ${value}`}>
         {value}
       </p>
-    </Card>
+    </div>
   );
 }

@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, Lock, Mail, Phone, ShieldOff, Upload, UserPlus, Users } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Phone, SearchX, ShieldOff, Upload, UserPlus, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
+import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
+import { Segmented } from "@/src/components/ui/segmented";
+import { Select } from "@/src/components/ui/select";
 import { Textarea } from "@/src/components/ui/textarea";
 import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
@@ -33,6 +36,7 @@ import {
   type MemberContact,
   type MemberEmailState
 } from "@/src/lib/members";
+import { cn } from "@/src/lib/utils";
 
 export type MemberRow = {
   id: string;
@@ -53,19 +57,23 @@ export type MemberRow = {
 
 const STATE_LABEL: Record<MemberEmailState, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
   ready: { label: "Can be emailed", variant: "success" },
-  no_consent: { label: "No consent recorded", variant: "warning" },
+  // Neutral, not a warning: on day one nobody has been asked yet, and that is normal.
+  no_consent: { label: "No consent recorded", variant: "secondary" },
   opted_out: { label: "Opted out", variant: "destructive" },
   bounced: { label: "Address bounced", variant: "destructive" },
   inactive: { label: "Disabled", variant: "secondary" }
 };
 
-const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "success" | "warning" | "destructive" }>> = {
+const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "success" | "secondary" | "destructive" }>> = {
   ready: { label: "Can be called", variant: "success" },
-  no_consent: { label: "No call consent", variant: "warning" },
+  no_consent: { label: "No call consent", variant: "secondary" },
   opted_out: { label: "Asked not to be called", variant: "destructive" }
 };
 
 type Filter = "all" | MemberEmailState | "has_phone";
+
+/** Row buttons: compact on wide screens, full 44 px tap targets on phones. */
+const ROW_BUTTON = "max-sm:h-11 max-sm:px-4 max-sm:text-sm";
 
 async function call<T>(url: string, method: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -250,28 +258,28 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   const importBlocked = previewPhones > 0 && !phonesReady;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <PhoneAccessNotice status={e2ee.status} enabled={e2ee.enabled} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus aria-hidden="true" className="size-5" /> Add a member
             </CardTitle>
             <CardDescription>Only tick a box if this person told you so. Phone numbers are encrypted in this browser before they are saved.</CardDescription>
           </CardHeader>
-          <form onSubmit={addMember} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="member-email">Email</Label>
-              <Input id="member-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="member-name">Name (optional)</Label>
+          <form onSubmit={addMember} className="flex flex-col gap-4">
+            <Field label="Email">
+              <Input id="member-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" placeholder="name@example.org" />
+            </Field>
+            <Field label="Name (optional)">
               <Input id="member-name" value={name} onChange={e => setName(e.target.value)} maxLength={120} autoComplete="off" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="member-phone">Phone (optional)</Label>
+            </Field>
+            <Field
+              label="Phone (optional)"
+              description={<PhoneFieldHint status={e2ee.status} enabled={e2ee.enabled} ready={phonesReady} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />}
+            >
               <Input
                 id="member-phone"
                 type="tel"
@@ -280,35 +288,50 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 maxLength={32}
                 autoComplete="off"
                 disabled={!phonesReady}
-                placeholder={phonesReady ? "(717) 555-0100" : "Unlock this device to add a number"}
+                placeholder={phonesReady ? "(717) 555-0100" : undefined}
               />
+            </Field>
+            <div className="flex flex-col gap-1">
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
+                <span>This person asked to receive email from us.</span>
+              </label>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                  checked={callAgreed}
+                  disabled={!phonesReady || !phone.trim()}
+                  onChange={e => setCallAgreed(e.target.checked)}
+                />
+                <span>This person gave their number for community calls.</span>
+              </label>
             </div>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
-              <span>This person asked to receive email from us.</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={callAgreed} disabled={!phonesReady || !phone.trim()} onChange={e => setCallAgreed(e.target.checked)} />
-              <span>This person gave their number for community calls.</span>
-            </label>
-            <Button type="submit" loading={adding}>
-              Add member
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={adding} className="max-sm:h-11 max-sm:w-full">
+                Add member
+              </Button>
+            </div>
           </form>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload aria-hidden="true" className="size-5" /> Import a list
             </CardTitle>
-            <CardDescription>
-              Paste a list with one email per line, or a CSV with an <code>email</code> column and optional <code>name</code> and <code>phone</code> columns (up to{" "}
-              {MAX_IMPORT_ROWS} at a time). People already on the list are left alone, so an import never re-subscribes someone who opted out. Numbers are
-              encrypted here before anything is sent.
-            </CardDescription>
+            <CardDescription>Add many people at once from a spreadsheet or an email list.</CardDescription>
           </CardHeader>
-          <div className="space-y-3">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+            <li>Paste one email per line, or a CSV with columns email, name and phone (name and phone are optional). Up to {MAX_IMPORT_ROWS} at a time.</li>
+            <li>People already on the list are left alone, so an import never signs up again someone who opted out.</li>
+            <li>Phone numbers are encrypted on this device before anything is sent.</li>
+          </ul>
+          <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+            <p className="text-muted-foreground">Sample file (first line is the column names):</p>
+            <pre className="mt-1 overflow-x-auto font-mono text-xs text-foreground">{"email,name,phone\nsam@example.org,Sam Lee,717-555-0100\npat@example.org,Pat Rai,"}</pre>
+          </div>
+          <div className="flex flex-col gap-3">
             <Label htmlFor="member-csv" className="sr-only">
               Member list
             </Label>
@@ -331,23 +354,35 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 ) : null}
               </div>
             ) : null}
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={attested} onChange={e => setAttested(e.target.checked)} />
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+              <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={attested} onChange={e => setAttested(e.target.checked)} />
               <span>These people agreed to receive email from us. (This is recorded with your name.)</span>
             </label>
             {previewPhones > 0 ? (
-              <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" className="mt-1" checked={phoneAttested} onChange={e => setPhoneAttested(e.target.checked)} />
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={phoneAttested} onChange={e => setPhoneAttested(e.target.checked)} />
                 <span>These people gave their number for community calls. (Also recorded with your name.)</span>
               </label>
             ) : null}
-            <Button
-              onClick={runImport}
-              loading={importing}
-              disabled={!attested || !preview || preview.rows.length === 0 || importBlocked || (previewPhones > 0 && !phoneAttested)}
-            >
-              Import {preview?.rows.length ? `${preview.rows.length} ` : ""}members
-            </Button>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={runImport}
+                  loading={importing}
+                  disabled={!attested || !preview || preview.rows.length === 0 || importBlocked || (previewPhones > 0 && !phoneAttested)}
+                  className="max-sm:h-11 max-sm:w-full"
+                >
+                  Import {preview?.rows.length ? `${preview.rows.length} ` : ""}members
+                </Button>
+              </div>
+              {!preview || preview.rows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Paste a list above to see how many people will be added.</p>
+              ) : !attested ? (
+                <p className="text-sm text-muted-foreground">Tick the box above to confirm these people agreed.</p>
+              ) : previewPhones > 0 && !phoneAttested && !importBlocked ? (
+                <p className="text-sm text-muted-foreground">Tick the call box too, or remove the phone column.</p>
+              ) : null}
+            </div>
           </div>
         </Card>
       </div>
@@ -362,25 +397,51 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
           </CardDescription>
         </CardHeader>
         <div className="space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} className="sm:max-w-xs" />
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter members">
-              {filters.map(item => (
-                <Button key={item.key} size="sm" variant={filter === item.key ? "default" : "outline"} onClick={() => setFilter(item.key)} aria-pressed={filter === item.key}>
-                  {item.label} ({item.count})
-                </Button>
-              ))}
+          <div className="flex flex-col gap-3">
+            <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} className="md:max-w-xs" />
+            <div className="md:hidden">
+              <Select aria-label="Filter members" value={filter} onChange={e => setFilter(e.target.value as Filter)} className="max-sm:h-11">
+                {filters.map(item => (
+                  <option key={item.key} value={item.key}>
+                    {item.label} ({item.count})
+                  </option>
+                ))}
+              </Select>
             </div>
+            <Segmented
+              className="hidden md:flex"
+              label="Filter members"
+              value={filter}
+              onChange={setFilter}
+              options={filters.map(item => ({ value: item.key, label: item.label, count: item.count }))}
+            />
           </div>
 
           {visible.length === 0 ? (
             <EmptyState
-              icon={<Mail aria-hidden="true" />}
+              icon={members.length === 0 ? <Mail aria-hidden="true" /> : <SearchX aria-hidden="true" />}
               title={members.length === 0 ? "No members yet" : "No one matches"}
-              description={members.length === 0 ? "Add someone above or import a list." : "Try another search or filter."}
+              description={
+                members.length === 0
+                  ? "Add someone with the form above, or paste a list under Import a list. Only tick consent if the person told you so."
+                  : "Try another search, or show everyone."
+              }
+              action={
+                members.length > 0 ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setQuery("");
+                      setFilter("all");
+                    }}
+                  >
+                    Show everyone
+                  </Button>
+                ) : null
+              }
             />
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border">
+            <ul className="divide-y divide-border rounded-md border border-border">
               {visible.map(member => {
                 const state = memberEmailState(member);
                 const meta = STATE_LABEL[state];
@@ -391,13 +452,13 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 const view = contacts.get(member.id);
                 const displayName = member.name || member.emailLower;
                 return (
-                  <li key={member.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <li key={member.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{displayName}</p>
                       {member.name ? <p className="truncate text-sm text-muted-foreground">{member.emailLower}</p> : null}
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <Badge variant={meta.variant}>{meta.label}</Badge>
-                        {isEmailConsentSource(source) ? <span className="text-xs text-muted-foreground">{EMAIL_CONSENT_LABELS[source]}</span> : null}
+                        {isEmailConsentSource(source) ? <span className="text-sm text-muted-foreground">{EMAIL_CONSENT_LABELS[source]}</span> : null}
                         {member.hasPhone && callMeta ? <Badge variant={callMeta.variant}>{callMeta.label}</Badge> : null}
                       </div>
                       {member.hasPhone ? (
@@ -410,11 +471,12 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                         />
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       {state === "no_consent" || state === "opted_out" ? (
                         <Button
                           size="sm"
                           variant="outline"
+                          className={ROW_BUTTON}
                           loading={busy}
                           onClick={() => update(member, { emailConsent: { source: "admin_on_request" } }, "Consent recorded")}
                         >
@@ -422,7 +484,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                         </Button>
                       ) : null}
                       {state === "ready" ? (
-                        <Button size="sm" variant="outline" loading={busy} onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
+                        <Button size="sm" variant="outline" className={ROW_BUTTON} loading={busy} onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
                           They asked to stop
                         </Button>
                       ) : null}
@@ -430,6 +492,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                         <Button
                           size="sm"
                           variant="outline"
+                          className={ROW_BUTTON}
                           loading={busy}
                           onClick={() => update(member, { phoneConsent: { source: "admin_on_request" } }, "Call consent recorded")}
                         >
@@ -437,23 +500,28 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                         </Button>
                       ) : null}
                       {callState === "ready" ? (
-                        <Button size="sm" variant="outline" loading={busy} onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
+                        <Button size="sm" variant="outline" className={ROW_BUTTON} loading={busy} onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
                           They asked not to be called
                         </Button>
                       ) : null}
                       {phonesReady ? (
-                        <Button size="sm" variant="outline" loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`}>
+                        <Button size="sm" variant="outline" className={ROW_BUTTON} loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`}>
                           {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
                         </Button>
                       ) : null}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        loading={busy}
-                        onClick={() => update(member, { status: member.status === "active" ? "disabled" : "active" }, member.status === "active" ? "Member disabled" : "Member enabled")}
-                      >
-                        {member.status === "active" ? "Disable" : "Enable"}
-                      </Button>
+                      {/* Set apart from the consent buttons: a divider on wide screens, its own line on phones, and destructive colouring for Disable. */}
+                      <span aria-hidden="true" className="hidden h-6 w-px bg-border sm:block" />
+                      <div className="flex w-full justify-end border-t border-border pt-2 sm:w-auto sm:border-0 sm:pt-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={cn(ROW_BUTTON, member.status === "active" && "text-destructive hover:bg-destructive/10 hover:text-destructive")}
+                          loading={busy}
+                          onClick={() => update(member, { status: member.status === "active" ? "disabled" : "active" }, member.status === "active" ? "Member disabled" : "Member enabled")}
+                        >
+                          {member.status === "active" ? "Disable" : "Enable"}
+                        </Button>
+                      </div>
                     </div>
                   </li>
                 );
@@ -526,6 +594,33 @@ function PhoneAccessNotice({ status, enabled, superAdmin }: { status: ReturnType
   );
 }
 
+/** Help under the Phone field: why it is greyed out right now, and what to do about it. */
+function PhoneFieldHint({ status, enabled, ready, superAdmin }: { status: ReturnType<typeof useE2ee>["status"]; enabled: boolean; ready: boolean; superAdmin: boolean }) {
+  if (ready) return <>Encrypted on this device before it is saved. Tick the call box below only if they agreed.</>;
+  if (status === "loading") return <>Checking encryption…</>;
+  if (!enabled) {
+    return (
+      <>
+        Phone numbers can be added after a super admin turns on encryption.{" "}
+        {superAdmin ? (
+          <Link href="/admin/encryption" className="font-medium text-primary underline underline-offset-2">
+            Turn it on
+          </Link>
+        ) : null}
+      </>
+    );
+  }
+  if (status === "locked") return <>Unlock this device to add a number.</>;
+  return (
+    <>
+      This device can&apos;t add numbers yet.{" "}
+      <Link href="/admin/encryption" className="font-medium text-primary underline underline-offset-2">
+        Open Encryption
+      </Link>
+    </>
+  );
+}
+
 function PhoneLine({ name, ready, view, revealed, onToggle }: { name: string; ready: boolean; view: ContactView | undefined; revealed: boolean; onToggle: () => void }) {
   if (!ready) {
     return (
@@ -544,11 +639,11 @@ function PhoneLine({ name, ready, view, revealed, onToggle }: { name: string; re
         <Phone aria-hidden="true" className="size-3.5" />
         {revealed ? formatPhone(phone) : maskPhone(phone)}
       </span>
-      <Button size="sm" variant="ghost" onClick={onToggle} aria-label={revealed ? `Hide ${name}'s number` : `Show ${name}'s number`}>
+      <Button size="sm" variant="ghost" className={ROW_BUTTON} onClick={onToggle} aria-label={revealed ? `Hide ${name}'s number` : `Show ${name}'s number`}>
         {revealed ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
         {revealed ? "Hide" : "Show"}
       </Button>
-      <Button asChild size="sm" variant="outline">
+      <Button asChild size="sm" variant="outline" className={ROW_BUTTON}>
         <a href={`tel:${phone}`} aria-label={`Call ${name}`}>
           Call
         </a>

@@ -1,14 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
-import { Copy, MessageCircle } from "lucide-react";
+import { Copy, MailWarning, MessageCircle } from "lucide-react";
 import {
   BODY_MAX,
   MANUAL_CHANNELS,
@@ -19,7 +22,12 @@ import {
   type BroadcastStatus,
   type ManualChannel
 } from "@/src/lib/broadcast";
+import { formatDateTime } from "@/src/lib/format";
+import { BroadcastSteps } from "./BroadcastSteps";
 import { STATUS_BADGE } from "./BroadcastsClient";
+
+/** Where the broadcast is in Write → Approve → Send (3 = all done). */
+const STEP_OF: Partial<Record<BroadcastStatus, 0 | 1 | 2 | 3>> = { draft: 0, pending_approval: 1, approved: 2, sending: 2, sent: 3 };
 
 export type SendProgress = {
   status: string;
@@ -171,13 +179,31 @@ export default function BroadcastDetailClient({
 
   const percent = progress && progress.total > 0 ? Math.round(((progress.total - progress.remaining) / progress.total) * 100) : 0;
 
+  const step = STEP_OF[broadcast.status];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={badge.variant}>{badge.label}</Badge>
-        <span className="text-sm text-muted-foreground" aria-live="polite">
-          Would go to {count} {count === 1 ? "member" : "members"} (active, agreed to email, not unsubscribed).
-        </span>
+    <div className="flex flex-col gap-6">
+      {step !== undefined ? <BroadcastSteps current={step} /> : null}
+
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={badge.variant}>{badge.label}</Badge>
+          <span className="text-sm text-muted-foreground" aria-live="polite">
+            Would go to {count} {count === 1 ? "member" : "members"} (active, agreed to email, not unsubscribed).
+          </span>
+        </div>
+        {count === 0 && broadcast.status !== "sent" && broadcast.status !== "cancelled" ? (
+          <p className="flex items-start gap-2 text-sm text-foreground">
+            <MailWarning aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
+            <span>
+              0 members can get email yet —{" "}
+              <Link href="/admin/members" className="font-medium text-primary underline underline-offset-2">
+                record consent on Members
+              </Link>
+              .
+            </span>
+          </p>
+        ) : null}
       </div>
 
       <Card>
@@ -189,19 +215,19 @@ export default function BroadcastDetailClient({
               : "To change this message, withdraw it first. It goes back to draft and needs approval again."}
           </CardDescription>
         </CardHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="b-subject">Subject</Label>
-            <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="b-body">Message</Label>
+        <div className="flex flex-col gap-4">
+          <Field label="Subject">
+            <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} placeholder="Dashain celebration on 12 October" />
+          </Field>
+          <Field label="Message">
             <Textarea id="b-body" rows={10} value={body} onChange={e => setBody(e.target.value)} maxLength={BODY_MAX} readOnly={!editable} />
-          </div>
+          </Field>
           {editable ? (
-            <Button onClick={save} loading={busy === "save"} disabled={!dirty}>
-              Save draft
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={save} loading={busy === "save"} disabled={!dirty} className="max-sm:h-11">
+                Save draft
+              </Button>
+            </div>
           ) : null}
         </div>
       </Card>
@@ -211,7 +237,7 @@ export default function BroadcastDetailClient({
           <CardTitle>How it will look</CardTitle>
           <CardDescription>Every email ends with this footer, with a personal unsubscribe link.</CardDescription>
         </CardHeader>
-        <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
           <p className="font-semibold">{broadcast.subject}</p>
           <p className="whitespace-pre-wrap">{broadcast.body}</p>
           <hr className="border-border" />
@@ -220,9 +246,14 @@ export default function BroadcastDetailClient({
               {`You get this email because you asked to hear from ${footer.orgName}.\nTo stop these emails, open: (a personal unsubscribe link)\n\n${footer.orgName}\n${footer.postalAddress}`}
             </p>
           ) : (
-            <p className="text-warning" role="alert">
-              The footer is not set up. Set BROADCAST_ORG_NAME and BROADCAST_POSTAL_ADDRESS before testing or sending.
-            </p>
+            <Alert variant="warning">
+              <MailWarning />
+              <AlertTitle>The email footer is not set up yet</AlertTitle>
+              <AlertDescription>
+                Every email must end with the organisation&apos;s name and postal address, so tests and sending are off until it is set. Whoever manages the
+                site settings sets BROADCAST_ORG_NAME and BROADCAST_POSTAL_ADDRESS.
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       </Card>
@@ -242,7 +273,7 @@ export default function BroadcastDetailClient({
           </CardDescription>
         </CardHeader>
         {progress && (broadcast.status === "sending" || broadcast.status === "sent") ? (
-          <div className="mb-4 space-y-2" aria-live="polite">
+          <div className="flex flex-col gap-2" aria-live="polite">
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Sending progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
               <div className="h-full bg-primary transition-all" style={{ width: `${percent}%` }} />
             </div>
@@ -251,7 +282,7 @@ export default function BroadcastDetailClient({
             </p>
             {progress.paused ? (
               <p className="text-sm text-warning" role="status">
-                Today&apos;s sending limit is used up. Continue after {new Date(progress.paused.resumesAt).toLocaleString()}.
+                Today&apos;s sending limit is used up. Continue after {formatDateTime(progress.paused.resumesAt)}.
               </p>
             ) : null}
             {sendError ? (
@@ -370,7 +401,7 @@ function MessengerCard({ broadcast, onRecorded }: { broadcast: BroadcastDetail; 
           email set-up.
         </CardDescription>
       </CardHeader>
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         <Label htmlFor="b-messenger" className="sr-only">
           Text for Messenger
         </Label>
@@ -389,7 +420,7 @@ function MessengerCard({ broadcast, onRecorded }: { broadcast: BroadcastDetail; 
           <ul className="space-y-1 text-sm" aria-label="Posted to group chats">
             {posts.map(post => (
               <li key={`${post.channel}-${post.at}-${post.byUid}`}>
-                {post.byName} posted it in the {MANUAL_CHANNEL_LABELS[post.channel]} · {new Date(post.at).toLocaleString()}
+                {post.byName} posted it in the {MANUAL_CHANNEL_LABELS[post.channel]} · {formatDateTime(post.at)}
               </li>
             ))}
           </ul>

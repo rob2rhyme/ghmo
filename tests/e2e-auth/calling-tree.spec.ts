@@ -54,7 +54,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
 
   // --- Plan the tree with Alice and Bob as callers ---
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling Tree" }).click();
-  await expect(page.locator("#admin-main").getByText(/5 of 6 members can be called .* Version 0\./)).toBeVisible();
+  await expect(page.locator("#admin-main").getByText(/5 of 6 members can be called\./)).toBeVisible();
   const callers = page.getByRole("list", { name: "Callers" });
   await callers.getByLabel("Alice").check();
   await callers.getByLabel("Bob").check();

@@ -15,7 +15,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     throw error;
   }
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="flex flex-col gap-6">
       <CampaignDetailClient campaignId={campaignId} />
     </div>
   );

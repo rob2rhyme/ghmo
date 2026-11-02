@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Phone, PhoneCall } from "lucide-react";
@@ -50,6 +51,7 @@ function MyCalls() {
   }, [mine, campaigns]);
   const { contacts, e2ee } = useMemberContacts(everyone);
   const { decrypt, encrypt, status } = e2ee;
+  const superAdmin = Boolean(e2ee.overview?.me.superAdmin);
   const [scripts, setScripts] = useState<Map<string, string>>(() => new Map());
 
   const fetchAll = () => Promise.all([api<MineResponse>("/api/admin/calling-tree/mine"), api<CampaignsResponse>("/api/admin/call-campaigns?mine=1")]);
@@ -143,13 +145,26 @@ function MyCalls() {
   const openCampaigns = campaigns.campaigns.filter(c => c.status === "open" && campaigns.mine[c.id]);
 
   if (!mine.isCaller && openCampaigns.length === 0) {
-    return <EmptyState icon={<PhoneCall aria-hidden="true" />} title="You are not on the caller list" description="A super admin adds callers under Calling Tree." />;
+    return superAdmin ? (
+      <EmptyState
+        icon={<PhoneCall aria-hidden="true" />}
+        title="You are not on the caller list"
+        description="Add yourself as a caller: tick your name under Calling Tree, plan assignments and save. Your people then show up here."
+        action={
+          <Button asChild className="max-sm:h-11">
+            <Link href="/admin/calling-tree">Open Calling Tree</Link>
+          </Button>
+        }
+      />
+    ) : (
+      <EmptyState icon={<PhoneCall aria-hidden="true" />} title="You are not on the caller list" description="Ask a super admin to add you under Calling Tree." />
+    );
   }
 
   const sortedPeople = [...mine.members].sort((a, b) => memberLabel(a, a.id).localeCompare(memberLabel(b, b.id)));
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {openCampaigns.map(campaign => {
         const slice = campaigns.mine[campaign.id];
         const memberById = new Map(slice.members.map(m => [m.id, m]));
@@ -167,8 +182,8 @@ function MyCalls() {
               </CardDescription>
             </CardHeader>
             {campaign.script ? (
-              <details className="mb-3 rounded-md border border-border p-3 text-sm" open={left > 0}>
-                <summary className="flex cursor-pointer items-center gap-1 font-medium">
+              <details className="rounded-md border border-border bg-muted/40 p-3 text-sm" open={left > 0}>
+                <summary className="flex min-h-11 cursor-pointer items-center gap-1.5 font-medium sm:min-h-0">
                   <Lock aria-hidden="true" className="size-3.5" /> What to say
                 </summary>
                 <p className="mt-2 whitespace-pre-wrap">{scripts.get(campaign.id) ?? "Decrypting…"}</p>
@@ -194,9 +209,9 @@ function MyCalls() {
                       </p>
                       <PhoneLine view={view} revealed={revealed.has(call.memberId)} />
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-1.5">
+                    <div className="flex shrink-0 flex-wrap gap-2">
                       <RevealAndCall label={label} view={view} revealed={revealed.has(call.memberId)} onToggle={() => toggle(call.memberId)} />
-                      <Button size="sm" variant={done ? "outline" : "default"} onClick={() => setLogging({ campaign, call, member })} aria-label={`Log call to ${label}`}>
+                      <Button variant={done ? "outline" : "default"} className="max-sm:h-11" onClick={() => setLogging({ campaign, call, member })} aria-label={`Log call to ${label}`}>
                         Log call
                       </Button>
                     </div>
@@ -211,7 +226,7 @@ function MyCalls() {
       {mine.isCaller ? (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2">
               <Phone aria-hidden="true" className="size-4" /> Your people
             </CardTitle>
             <CardDescription>
@@ -220,7 +235,7 @@ function MyCalls() {
             </CardDescription>
           </CardHeader>
           {sortedPeople.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nobody assigned to you yet.</p>
+            <p className="text-sm text-muted-foreground">Nobody assigned to you yet. People are shared out when a super admin plans assignments under Calling Tree.</p>
           ) : (
             <ul className="divide-y divide-border" aria-label="Your call list">
               {sortedPeople.map(member => {
@@ -284,12 +299,12 @@ function PhoneLine({ view, revealed }: { view: ContactView | undefined; revealed
 function RevealAndCall({ label, view, revealed, onToggle }: { label: string; view: ContactView | undefined; revealed: boolean; onToggle: () => void }) {
   if (!view?.ok || !view.contact.phone) return null;
   return (
-    <div className="flex shrink-0 gap-1.5">
-      <Button size="sm" variant="ghost" onClick={onToggle} aria-label={revealed ? `Hide ${label}'s number` : `Show ${label}'s number`}>
+    <div className="flex shrink-0 flex-wrap gap-2">
+      <Button variant="ghost" className="max-sm:h-11" onClick={onToggle} aria-label={revealed ? `Hide ${label}'s number` : `Show ${label}'s number`}>
         {revealed ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
         {revealed ? "Hide" : "Show"}
       </Button>
-      <Button asChild size="sm" variant="outline">
+      <Button asChild variant="outline" className="max-sm:h-11">
         <a href={`tel:${view.contact.phone}`} aria-label={`Call ${label}`}>
           <Phone aria-hidden="true" className="size-4" /> Call
         </a>
@@ -339,7 +354,7 @@ function LogCallDialog({
             <legend className="text-sm font-medium">What happened?</legend>
             <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Outcome">
               {OUTCOMES.map(value => (
-                <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${outcome === value ? "border-primary bg-primary/5" : "border-border"}`}>
+                <label key={value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${outcome === value ? "border-primary bg-primary/5" : "border-border"}`}>
                   <input type="radio" name="outcome" value={value} checked={outcome === value} onChange={() => setOutcome(value)} />
                   {OUTCOME_LABELS[value]}
                 </label>
@@ -351,12 +366,12 @@ function LogCallDialog({
               <legend className="text-sm font-medium">Are they coming?</legend>
               <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="RSVP">
                 {RSVPS.map(value => (
-                  <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${rsvp === value ? "border-primary bg-primary/5" : "border-border"}`}>
+                  <label key={value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${rsvp === value ? "border-primary bg-primary/5" : "border-border"}`}>
                     <input type="radio" name="rsvp" value={value} checked={rsvp === value} onChange={() => setRsvp(value)} />
                     {RSVP_LABELS[value]}
                   </label>
                 ))}
-                <label className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${rsvp === null ? "border-primary bg-primary/5" : "border-border"}`}>
+                <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${rsvp === null ? "border-primary bg-primary/5" : "border-border"}`}>
                   <input type="radio" name="rsvp" value="" checked={rsvp === null} onChange={() => setRsvp(null)} />
                   Didn&apos;t say
                 </label>

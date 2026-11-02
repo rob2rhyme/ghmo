@@ -20,8 +20,8 @@ export default async function BroadcastsPage() {
   const { broadcasts } = (await res.json()) as { broadcasts?: BroadcastSummary[] };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader title="Broadcasts" description="Write one announcement, get a second admin to approve it, then email it to members who agreed and copy it into the Messenger group chats." />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="Broadcasts" description="Announcements by email to members who agreed, and by copy-and-paste to the Messenger group chats. Two admins check every one before it goes out." />
       <BroadcastsClient initial={broadcasts ?? []} />
     </div>
   );

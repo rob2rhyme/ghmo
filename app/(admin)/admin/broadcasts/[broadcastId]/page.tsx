@@ -30,8 +30,8 @@ export default async function BroadcastPage({ params }: { params: Promise<{ broa
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <AdminPageHeader title={broadcast.subject || "Broadcast"} description="Draft, test, get a second admin's approval, then email it and post it to the group chats." />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title={broadcast.subject || "Broadcast"} description="Check the message, get a second admin's approval, then email it and post it to the group chats." />
       <BroadcastDetailClient
         initial={broadcast}
         recipientCount={recipientCount}
