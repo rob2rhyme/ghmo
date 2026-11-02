@@ -6,6 +6,8 @@ import { Select } from "@/src/components/ui/select";
 import { Textarea } from "@/src/components/ui/textarea";
 import { Card } from "@/src/components/ui/card";
 import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
+import { toDate, type DateInput } from "@/src/lib/format";
+import { dateToWallTime, isValidTimeZone } from "@/src/lib/zonedTime";
 
 export type EventFormValues = {
   title: string;
@@ -41,16 +43,15 @@ const TIMEZONES: { value: string; label: string }[] = [
   { value: "Asia/Kathmandu", label: "Nepal time" }
 ];
 
-/** A Firestore date (millis, ISO string or Timestamp-like) as a value for <input type="datetime-local">. */
-export function toInputDate(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "";
-  const raw = typeof value === "object" && value && "toDate" in value && typeof (value as { toDate: unknown }).toDate === "function"
-    ? (value as { toDate: () => Date }).toDate()
-    : (value as string | number);
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => `${n}`.padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/**
+ * A stored date (millis, ISO string or Timestamp-like) as the wall-clock value for <input type="datetime-local">,
+ * read in the event's own time zone, so the form shows 7:00 PM for a 7 PM Harrisburg event wherever the admin is.
+ * The server reads the value back in the same zone (src/lib/zonedTime.ts).
+ */
+export function toInputDate(value: unknown, timeZone: string = DEFAULT_TIMEZONE): string {
+  const d = toDate(value as DateInput);
+  if (!d) return "";
+  return dateToWallTime(d, isValidTimeZone(timeZone) ? timeZone : DEFAULT_TIMEZONE);
 }
 
 type EventFormProps = {
@@ -79,7 +80,7 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
       <Card>
         <h2 className="text-base font-semibold">When and where</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Starts" error={errors.startsAt}>
+          <Field label="Starts" description="In the time zone chosen below." error={errors.startsAt}>
             <Input type="datetime-local" value={form.startsAt} onChange={e => update("startsAt", e.target.value)} />
           </Field>
           <Field label="Ends (optional)" error={errors.endsAt}>

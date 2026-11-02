@@ -203,17 +203,16 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
                 <Button variant="outline" size="icon" aria-label="Open admin menu" onClick={() => setMenuOpen(true)}>
                   <Menu aria-hidden="true" />
                 </Button>
-                <SheetContent side="left" className="flex flex-col gap-2 overflow-hidden bg-sidebar p-3">
+                <SheetContent side="left" className="flex flex-col gap-2 overflow-y-auto overscroll-contain bg-sidebar p-3">
                   <SheetHeader className="p-0 pr-8">
                     <SheetTitle>
                       <Brand />
                     </SheetTitle>
                     <SheetDescription className="sr-only">Admin navigation</SheetDescription>
                   </SheetHeader>
-                  <div className="min-h-0 flex-1 overflow-y-auto">
-                    <NavList onNavigate={() => setMenuOpen(false)} />
-                  </div>
-                  <div className="shrink-0">
+                  {/* The whole menu scrolls as one, so every page stays reachable on short screens. */}
+                  <NavList onNavigate={() => setMenuOpen(false)} />
+                  <div className="mt-2">
                     <ShellFooter user={user} />
                   </div>
                 </SheetContent>

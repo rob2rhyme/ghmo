@@ -5,6 +5,7 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { z } from "zod";
 import { toPlain } from "@/src/lib/serialize.server";
+import { isValidTimeZone, parseEventDate } from "@/src/lib/zonedTime";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
 
@@ -33,15 +34,15 @@ const createEventSchema = z.object({
     .optional()
 });
 
+/** Reads a form date in the event's own time zone (zone-less "2026-12-12T19:00" means 7 PM there). */
 function parseOptionalDate(
   value: string | null | undefined,
-  label: "startsAt" | "endsAt"
+  label: "startsAt" | "endsAt",
+  timeZone: string
 ): { date: Date | null } | { response: NextResponse } {
-  if (value === undefined || value === null || value === "") {
-    return { date: null };
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  if (value === undefined || value === null || value === "") return { date: null };
+  const parsed = parseEventDate(value, timeZone);
+  if (!parsed) {
     return {
       response: NextResponse.json({ ok: false, error: "INVALID_DATE", field: label }, { status: 400 })
     };
@@ -105,10 +106,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const parsed = await parseJsonBody(req, createEventSchema);
     if (!parsed.ok) return parsed.response;
 
+    if (parsed.data.timezone && !isValidTimeZone(parsed.data.timezone)) {
+      return NextResponse.json({ ok: false, error: "INVALID_TIMEZONE" }, { status: 400 });
+    }
+    const timeZone = parsed.data.timezone || DEFAULT_TIMEZONE;
+
     // Dates require explicit parsing to avoid storing Invalid Date values.
-    const startsAtResult = parseOptionalDate(parsed.data.startsAt, "startsAt");
+    const startsAtResult = parseOptionalDate(parsed.data.startsAt, "startsAt", timeZone);
     if ("response" in startsAtResult) return startsAtResult.response;
-    const endsAtResult = parseOptionalDate(parsed.data.endsAt, "endsAt");
+    const endsAtResult = parseOptionalDate(parsed.data.endsAt, "endsAt", timeZone);
     if ("response" in endsAtResult) return endsAtResult.response;
     if (startsAtResult.date && endsAtResult.date && endsAtResult.date < startsAtResult.date) {
       return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });

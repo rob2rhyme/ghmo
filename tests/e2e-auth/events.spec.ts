@@ -84,3 +84,27 @@ test("public pages never show placeholder media or a fake donate link", async ({
   await page.goto("/gumba-project");
   await expect(page).toHaveURL(/\/donate$/);
 });
+
+test.describe("event times follow the event's time zone, not the admin's computer", () => {
+  // An admin travelling in Japan still means 7:00 PM in Harrisburg.
+  test.use({ timezoneId: "Asia/Tokyo" });
+
+  test("7:00 PM Eastern is saved and shown as 7:00 PM Eastern", async ({ page }) => {
+    await signInWithNewPasskey(page, "alice", "/admin");
+    await page.goto("/admin/events/ev1/edit");
+    await expect(page.getByLabel("Event name")).toHaveValue("Dashain celebration");
+    await expect(page.getByLabel("Time zone")).toHaveValue("America/New_York");
+    await page.getByLabel("Starts").fill("2026-12-12T19:00");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await page.waitForURL(/\/admin\/events$/);
+
+    const saved = (await admin().db.doc("organizations/ghmo/events/ev1").get()).get("startsAt") as Timestamp;
+    expect(saved.toDate().toISOString()).toBe("2026-12-13T00:00:00.000Z");
+
+    // Reopening shows the same wall time, and the public page says 7:00 PM.
+    await page.goto("/admin/events/ev1/edit");
+    await expect(page.getByLabel("Starts")).toHaveValue("2026-12-12T19:00");
+    await page.goto("/c/ghmo/events/ev1");
+    await expect(page.getByText(/7:00\s?PM/).first()).toBeVisible();
+  });
+});

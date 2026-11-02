@@ -6,6 +6,7 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
 import { toPlain } from "@/src/lib/serialize.server";
+import { isValidTimeZone, parseEventDate } from "@/src/lib/zonedTime";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +36,15 @@ const updateEventSchema = z.object({
     .optional()
 });
 
+/** Reads a form date in the event's own time zone (zone-less "2026-12-12T19:00" means 7 PM there). */
 function parseOptionalDate(
-  value: string | null,
-  label: "startsAt" | "endsAt"
+  value: string | null | undefined,
+  label: "startsAt" | "endsAt",
+  timeZone: string
 ): { date: Date | null } | { response: NextResponse } {
-  if (value === null || value === "") return { date: null };
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  if (value === undefined || value === null || value === "") return { date: null };
+  const parsed = parseEventDate(value, timeZone);
+  if (!parsed) {
     return {
       response: NextResponse.json({ ok: false, error: "INVALID_DATE", field: label }, { status: 400 })
     };
@@ -112,23 +115,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     for (const key of passThroughFields) {
       if (body[key] !== undefined) updates[key] = body[key];
     }
-    if (body.timezone !== undefined) updates.timezone = body.timezone || DEFAULT_TIMEZONE;
-
-    // Dates require explicit parsing to avoid storing Invalid Date values.
-    let startsAt: Date | null | undefined;
-    let endsAt: Date | null | undefined;
-    if (body.startsAt !== undefined) {
-      const result = parseOptionalDate(body.startsAt, "startsAt");
-      if ("response" in result) return result.response;
-      startsAt = updates.startsAt = result.date;
-    }
-    if (body.endsAt !== undefined) {
-      const result = parseOptionalDate(body.endsAt, "endsAt");
-      if ("response" in result) return result.response;
-      endsAt = updates.endsAt = result.date;
-    }
-    if (startsAt && endsAt && endsAt < startsAt) {
-      return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });
+    if (body.timezone !== undefined) {
+      if (body.timezone && !isValidTimeZone(body.timezone)) {
+        return NextResponse.json({ ok: false, error: "INVALID_TIMEZONE" }, { status: 400 });
+      }
+      updates.timezone = body.timezone || DEFAULT_TIMEZONE;
     }
 
     const db = getAdminDb();
@@ -137,6 +128,26 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     if (!existing) {
       return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
     }
+    const storedZone = existing.get("timezone");
+    const timeZone = (updates.timezone as string | undefined) ?? (isValidTimeZone(storedZone) ? storedZone : DEFAULT_TIMEZONE);
+
+    // Dates require explicit parsing to avoid storing Invalid Date values.
+    let startsAt: Date | null | undefined;
+    let endsAt: Date | null | undefined;
+    if (body.startsAt !== undefined) {
+      const result = parseOptionalDate(body.startsAt, "startsAt", timeZone);
+      if ("response" in result) return result.response;
+      startsAt = updates.startsAt = result.date;
+    }
+    if (body.endsAt !== undefined) {
+      const result = parseOptionalDate(body.endsAt, "endsAt", timeZone);
+      if ("response" in result) return result.response;
+      endsAt = updates.endsAt = result.date;
+    }
+    if (startsAt && endsAt && endsAt < startsAt) {
+      return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });
+    }
+
     const ref = existing.ref;
     await ref.set(updates, { merge: true });
     const doc = await ref.get();
