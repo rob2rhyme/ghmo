@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { eventsCollectionPath, normalizeEvent } from "@/src/lib/events";
+import { normalizeEvent, queryAllEvents } from "@/src/lib/events";
 import { toPlainJson } from "@/src/lib/json";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
@@ -22,12 +22,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     if (params.orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const guard = await enforceActiveAdmin(req, params.orgSlug);
     if ("response" in guard) return guard.response;
-    const snap = await getAdminDb()
-      .collection(eventsCollectionPath(params.orgSlug))
-      .orderBy("startsAt", "desc")
-      .limit(200)
-      .get();
-    const events = snap.docs.map(normalizeEvent);
+    const docs = await queryAllEvents(getAdminDb(), q => q.orderBy("startsAt", "desc").limit(200));
+    const events = docs.map(normalizeEvent);
 
     return NextResponse.json(toPlainJson({ ok: true, events }));
   } catch (error) {

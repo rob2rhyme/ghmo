@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID } from "@/src/lib/community";
-import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
+import { findEventDoc, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
 import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
@@ -64,8 +63,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     if ("response" in guard) return guard.response;
     if (!EVENT_ID_PATTERN.test(params.eventId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const snap = await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId).get();
-    if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const snap = await findEventDoc(getAdminDb(), params.eventId);
+    if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ ok: true, event: toPlain(normalizeEvent(snap)) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -133,11 +132,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     }
 
     const db = getAdminDb();
-    const ref = db.collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId);
-    // PATCH edits existing events only; a merge-set would otherwise create a partial event.
-    if (!(await ref.get()).exists) {
+    // PATCH edits existing events only (wherever they are stored); a merge-set would otherwise create a partial event.
+    const existing = await findEventDoc(db, params.eventId);
+    if (!existing) {
       return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
     }
+    const ref = existing.ref;
     await ref.set(updates, { merge: true });
     const doc = await ref.get();
     await logAuditEvent({
@@ -187,7 +187,9 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
     const { actor } = guard;
     if (!EVENT_ID_PATTERN.test(params.eventId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).doc(params.eventId).delete();
+    const existing = await findEventDoc(getAdminDb(), params.eventId);
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    await existing.ref.delete();
     await logAuditEvent({
       orgSlug: params.orgSlug,
       action: "event_deleted",

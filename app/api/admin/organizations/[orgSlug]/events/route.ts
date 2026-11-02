@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID } from "@/src/lib/community";
-import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
+import { normalizeEvent, primaryEventsPath, queryAllEvents, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
 import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { z } from "zod";
@@ -69,13 +68,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     const status = searchParams.get("status");
 
     const db = getAdminDb();
-    let query: FirebaseFirestore.Query = db.collection(eventsCollectionPath(COMMUNITY_ID));
-    if (status === "published" || status === "draft") {
-      query = query.where("status", "==", status);
-    }
-    query = query.orderBy("startsAt", "desc");
-    const snap = await query.limit(200).get();
-    const events = snap.docs.map(doc => toPlain(normalizeEvent(doc)));
+    const docs = await queryAllEvents(db, query => {
+      let q = query;
+      if (status === "published" || status === "draft") q = q.where("status", "==", status);
+      return q.orderBy("startsAt", "desc").limit(200);
+    });
+    const events = docs.map(doc => toPlain(normalizeEvent(doc)));
     return NextResponse.json({ ok: true, events });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -134,7 +132,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       createdByUid: actor.uid
     };
 
-    const ref = await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).add(payload);
+    const ref = await getAdminDb().collection(primaryEventsPath()).add(payload);
     const doc = await ref.get();
     await logAuditEvent({
       orgSlug: params.orgSlug,
