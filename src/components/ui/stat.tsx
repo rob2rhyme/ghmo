@@ -13,8 +13,12 @@ function StatTile({ label, value, hint, className }: { label: React.ReactNode; v
 }
 
 /** A row of StatTiles. */
-function StatGrid({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <dl className={cn("grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3", className)}>{children}</dl>;
+function StatGrid({ children, className, ...props }: React.ComponentProps<"dl">) {
+  return (
+    <dl className={cn("grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3", className)} {...props}>
+      {children}
+    </dl>
+  );
 }
 
 /** Progress toward a goal, with its own accessible label ("$1,200 of $50,000 raised"). */

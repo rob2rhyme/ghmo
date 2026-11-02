@@ -5,6 +5,7 @@ import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { footerFromEnv } from "@/src/lib/broadcastMail";
+import { emailSetupProblem } from "@/src/components/admin/broadcasts/sendingSetup.server";
 import type { SendProgress } from "@/src/lib/broadcastSender.server";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +32,19 @@ export default async function BroadcastPage({ params }: { params: Promise<{ broa
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader title={broadcast.subject || "Broadcast"} description="Check the message, get a second admin's approval, then email it and post it to the group chats." />
+      <AdminPageHeader
+        title={broadcast.subject || "Broadcast"}
+        back={{ href: "/admin/broadcasts", label: "Broadcasts" }}
+        description="Check the message, get a second admin's approval, then email it and post it to the group chats."
+      />
       <BroadcastDetailClient
         initial={broadcast}
         recipientCount={recipientCount}
         uid={uid}
         footer={footerFromEnv()}
         initialProgress={progress}
-        sendingBlocker={sendingBlocker}
+        // Same check as the API, worded without setting names.
+        sendingBlocker={sendingBlocker ? (emailSetupProblem() ?? sendingBlocker) : null}
       />
     </div>
   );

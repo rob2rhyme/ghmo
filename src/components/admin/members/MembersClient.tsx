@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, Lock, Mail, Phone, SearchX, ShieldOff, Upload, UserPlus, Users } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Phone, SearchX, ShieldOff, Upload, UserPlus } from "lucide-react";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
-import { Label } from "@/src/components/ui/label";
 import { Segmented } from "@/src/components/ui/segmented";
 import { Select } from "@/src/components/ui/select";
 import { Textarea } from "@/src/components/ui/textarea";
@@ -72,8 +73,7 @@ const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "suc
 
 type Filter = "all" | MemberEmailState | "has_phone";
 
-/** Row buttons: compact on wide screens, full 44 px tap targets on phones. */
-const ROW_BUTTON = "max-sm:h-11 max-sm:px-4 max-sm:text-sm";
+const SAMPLE_CSV = "email,name,phone\nsam@example.org,Sam Lee,717-555-0100\npat@example.org,Pat Rai,";
 
 async function call<T>(url: string, method: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -93,6 +93,9 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   const [busyId, setBusyId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
+  const [disabling, setDisabling] = useState<MemberRow | null>(null);
+  /** Phones and tablets only: which form is open (both are always shown from lg). */
+  const [panel, setPanel] = useState<"add" | "import" | null>(null);
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -256,227 +259,240 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   ];
 
   const importBlocked = previewPhones > 0 && !phonesReady;
+  const togglePanel = (which: "add" | "import") => setPanel(current => (current === which ? null : which));
+  const phoneSentence = phonesReady
+    ? "Phone numbers are encrypted in this browser before they are saved."
+    : !e2ee.enabled
+      ? "Phone numbers can be added once encryption is on."
+      : "Unlock this device to add a phone number.";
 
   return (
     <div className="flex flex-col gap-6">
       <PhoneAccessNotice status={e2ee.status} enabled={e2ee.enabled} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus aria-hidden="true" className="size-5" /> Add a member
-            </CardTitle>
-            <CardDescription>Only tick a box if this person told you so. Phone numbers are encrypted in this browser before they are saved.</CardDescription>
-          </CardHeader>
-          <form onSubmit={addMember} className="flex flex-col gap-4">
-            <Field label="Email">
-              <Input id="member-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" placeholder="name@example.org" />
-            </Field>
-            <Field label="Name (optional)">
-              <Input id="member-name" value={name} onChange={e => setName(e.target.value)} maxLength={120} autoComplete="off" />
-            </Field>
-            <Field
-              label="Phone (optional)"
-              description={<PhoneFieldHint status={e2ee.status} enabled={e2ee.enabled} ready={phonesReady} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />}
-            >
-              <Input
-                id="member-phone"
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                maxLength={32}
-                autoComplete="off"
-                disabled={!phonesReady}
-                placeholder={phonesReady ? "(717) 555-0100" : undefined}
-              />
-            </Field>
-            <div className="flex flex-col gap-1">
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
-                <span>This person asked to receive email from us.</span>
-              </label>
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:text-muted-foreground">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 shrink-0 accent-primary"
-                  checked={callAgreed}
-                  disabled={!phonesReady || !phone.trim()}
-                  onChange={e => setCallAgreed(e.target.checked)}
-                />
-                <span>This person gave their number for community calls.</span>
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" loading={adding} className="max-sm:h-11 max-sm:w-full">
-                Add member
-              </Button>
-            </div>
-          </form>
-        </Card>
-
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload aria-hidden="true" className="size-5" /> Import a list
-            </CardTitle>
-            <CardDescription>Add many people at once from a spreadsheet or an email list.</CardDescription>
-          </CardHeader>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Paste one email per line, or a CSV with columns email, name and phone (name and phone are optional). Up to {MAX_IMPORT_ROWS} at a time.</li>
-            <li>People already on the list are left alone, so an import never signs up again someone who opted out.</li>
-            <li>Phone numbers are encrypted on this device before anything is sent.</li>
-          </ul>
-          <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-            <p className="text-muted-foreground">Sample file (first line is the column names):</p>
-            <pre className="mt-1 overflow-x-auto font-mono text-xs text-foreground">{"email,name,phone\nsam@example.org,Sam Lee,717-555-0100\npat@example.org,Pat Rai,"}</pre>
-          </div>
-          <div className="flex flex-col gap-3">
-            <Label htmlFor="member-csv" className="sr-only">
-              Member list
-            </Label>
-            <Textarea id="member-csv" rows={6} value={csv} onChange={e => setCsv(e.target.value)} placeholder={"email,name,phone\nsam@example.org,Sam Lee,717-555-0100"} />
-            {preview ? (
-              <div className="rounded-md border border-border bg-muted/40 p-3 text-sm" aria-live="polite">
-                <p className="font-medium">
-                  {preview.rows.length} valid {preview.rows.length === 1 ? "address" : "addresses"} found.
-                  {previewPhones > 0 ? ` ${previewPhones} with a phone number.` : ""}
-                </p>
-                {preview.truncated ? <p className="text-warning">Only the first {MAX_IMPORT_ROWS} will be imported.</p> : null}
-                {importBlocked ? <p className="text-warning">Unlock this device to import the phone numbers, or remove the phone column.</p> : null}
-                {preview.problems.length > 0 ? (
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
-                    {preview.problems.slice(0, 5).map(problem => (
-                      <li key={problem}>{problem}</li>
-                    ))}
-                    {preview.problems.length > 5 ? <li>…and {preview.problems.length - 5} more.</li> : null}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
-            <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-              <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={attested} onChange={e => setAttested(e.target.checked)} />
-              <span>These people agreed to receive email from us. (This is recorded with your name.)</span>
-            </label>
-            {previewPhones > 0 ? (
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={phoneAttested} onChange={e => setPhoneAttested(e.target.checked)} />
-                <span>These people gave their number for community calls. (Also recorded with your name.)</span>
-              </label>
-            ) : null}
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={runImport}
-                  loading={importing}
-                  disabled={!attested || !preview || preview.rows.length === 0 || importBlocked || (previewPhones > 0 && !phoneAttested)}
-                  className="max-sm:h-11 max-sm:w-full"
-                >
-                  Import {preview?.rows.length ? `${preview.rows.length} ` : ""}members
-                </Button>
-              </div>
-              {!preview || preview.rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Paste a list above to see how many people will be added.</p>
-              ) : !attested ? (
-                <p className="text-sm text-muted-foreground">Tick the box above to confirm these people agreed.</p>
-              ) : previewPhones > 0 && !phoneAttested && !importBlocked ? (
-                <p className="text-sm text-muted-foreground">Tick the call box too, or remove the phone column.</p>
-              ) : null}
-            </div>
-          </div>
-        </Card>
+      {/* Phones and tablets: the list comes first; adding and importing open from these two buttons. */}
+      <div className="flex flex-wrap gap-2 lg:hidden">
+        <Button variant={panel === "add" ? "secondary" : "outline"} size="row" aria-expanded={panel === "add"} aria-controls="member-add-panel" onClick={() => togglePanel("add")}>
+          <UserPlus aria-hidden="true" /> Add a member
+        </Button>
+        <Button
+          variant={panel === "import" ? "secondary" : "outline"}
+          size="row"
+          aria-expanded={panel === "import"}
+          aria-controls="member-import-panel"
+          onClick={() => togglePanel("import")}
+        >
+          <Upload aria-hidden="true" /> Import a list
+        </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users aria-hidden="true" className="size-5" /> Member list
-          </CardTitle>
-          <CardDescription>
-            {counts.ready} of {members.length} can be emailed. {counts.has_phone} {counts.has_phone === 1 ? "has" : "have"} a phone number.
-          </CardDescription>
-        </CardHeader>
-        <div className="space-y-3">
-          <div className="flex flex-col gap-3">
-            <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} className="md:max-w-xs" />
-            <div className="md:hidden">
-              <Select aria-label="Filter members" value={filter} onChange={e => setFilter(e.target.value as Filter)} className="max-sm:h-11">
-                {filters.map(item => (
-                  <option key={item.key} value={item.key}>
-                    {item.label} ({item.count})
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <Segmented
-              className="hidden md:flex"
-              label="Filter members"
-              value={filter}
-              onChange={setFilter}
-              options={filters.map(item => ({ value: item.key, label: item.label, count: item.count }))}
-            />
-          </div>
+      <div className={cn("grid gap-6 lg:grid-cols-2", panel === null && "max-lg:hidden")}>
+        <div id="member-add-panel" className={cn("min-w-0", panel !== "add" && "max-lg:hidden")}>
+          <AdminSectionCard title="Add a member" description={`Only tick a box if this person told you so. ${phoneSentence}`} className="h-full">
+            <form onSubmit={addMember} className="flex flex-col gap-4">
+              <Field label="Email">
+                <Input id="member-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" placeholder="name@example.org" />
+              </Field>
+              <Field label="Name (optional)">
+                <Input id="member-name" value={name} onChange={e => setName(e.target.value)} maxLength={120} autoComplete="off" />
+              </Field>
+              <Field
+                label="Phone (optional)"
+                description={<PhoneFieldHint status={e2ee.status} enabled={e2ee.enabled} ready={phonesReady} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />}
+              >
+                <Input
+                  id="member-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  maxLength={32}
+                  autoComplete="off"
+                  disabled={!phonesReady}
+                  placeholder={phonesReady ? "(717) 555-0100" : undefined}
+                />
+              </Field>
+              <div className="flex flex-col gap-1">
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
+                  <span>This person asked to receive email from us.</span>
+                </label>
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-primary"
+                    checked={callAgreed}
+                    disabled={!phonesReady || !phone.trim()}
+                    onChange={e => setCallAgreed(e.target.checked)}
+                  />
+                  <span>This person gave their number for community calls.</span>
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" loading={adding} className="max-sm:h-11">
+                  Add member
+                </Button>
+              </div>
+            </form>
+          </AdminSectionCard>
+        </div>
 
-          {visible.length === 0 ? (
-            <EmptyState
-              icon={members.length === 0 ? <Mail aria-hidden="true" /> : <SearchX aria-hidden="true" />}
-              title={members.length === 0 ? "No members yet" : "No one matches"}
-              description={
-                members.length === 0
-                  ? "Add someone with the form above, or paste a list under Import a list. Only tick consent if the person told you so."
-                  : "Try another search, or show everyone."
-              }
-              action={
-                members.length > 0 ? (
+        <div id="member-import-panel" className={cn("min-w-0", panel !== "import" && "max-lg:hidden")}>
+          <AdminSectionCard title="Import a list" description="Add many people at once from a spreadsheet or an email list." className="h-full">
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              <li>
+                Paste one email per line, or comma-separated rows (CSV) with the columns email, name and phone. Name and phone are optional. Up to {MAX_IMPORT_ROWS} at a
+                time.
+              </li>
+              <li>People already on the list are left alone, so an import never signs up again someone who opted out.</li>
+              <li>{phonesReady ? "Phone numbers are encrypted on this device before anything is sent." : !e2ee.enabled ? "Phone numbers can be imported once encryption is on." : "Unlock this device to import phone numbers."}</li>
+            </ul>
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+              <p className="text-muted-foreground">Example (the first line names the columns):</p>
+              <pre className="overflow-x-auto font-mono text-xs text-foreground">{SAMPLE_CSV}</pre>
+              <a
+                href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV + "\n")}`}
+                download="members-example.csv"
+                className="inline-flex min-h-11 w-fit items-center font-medium text-foreground underline underline-offset-2 sm:min-h-0"
+              >
+                Download the example spreadsheet (CSV)
+              </a>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Field label="Paste your list">
+                <Textarea id="member-csv" rows={6} value={csv} onChange={e => setCsv(e.target.value)} placeholder={"email,name,phone\nsam@example.org,Sam Lee,717-555-0100"} />
+              </Field>
+              {preview ? (
+                <div className="rounded-md border border-border bg-muted/40 p-3 text-sm" aria-live="polite">
+                  <p className="font-medium">
+                    {preview.rows.length} valid {preview.rows.length === 1 ? "address" : "addresses"} found.
+                    {previewPhones > 0 ? ` ${previewPhones} with a phone number.` : ""}
+                  </p>
+                  {preview.truncated ? <p className="text-warning">Only the first {MAX_IMPORT_ROWS} will be imported.</p> : null}
+                  {importBlocked ? <p className="text-warning">Unlock this device to import the phone numbers, or remove the phone column.</p> : null}
+                  {preview.problems.length > 0 ? (
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+                      {preview.problems.slice(0, 5).map(problem => (
+                        <li key={problem}>{problem}</li>
+                      ))}
+                      {preview.problems.length > 5 ? <li>…and {preview.problems.length - 5} more.</li> : null}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={attested} onChange={e => setAttested(e.target.checked)} />
+                <span>These people agreed to receive email from us. (This is recorded with your name.)</span>
+              </label>
+              {previewPhones > 0 ? (
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={phoneAttested} onChange={e => setPhoneAttested(e.target.checked)} />
+                  <span>These people gave their number for community calls. (Also recorded with your name.)</span>
+                </label>
+              ) : null}
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
-                    variant="outline"
-                    onClick={() => {
-                      setQuery("");
-                      setFilter("all");
-                    }}
+                    onClick={runImport}
+                    loading={importing}
+                    disabled={!attested || !preview || preview.rows.length === 0 || importBlocked || (previewPhones > 0 && !phoneAttested)}
+                    className="max-sm:h-11"
                   >
-                    Show everyone
+                    Import {preview?.rows.length ? `${preview.rows.length} ` : ""}members
                   </Button>
-                ) : null
-              }
-            />
-          ) : (
-            <ul className="divide-y divide-border rounded-md border border-border">
-              {visible.map(member => {
-                const state = memberEmailState(member);
-                const meta = STATE_LABEL[state];
-                const source = member.emailConsent?.source;
-                const busy = busyId === member.id;
-                const callState = memberCallState(member);
-                const callMeta = CALL_LABEL[callState];
-                const view = contacts.get(member.id);
-                const displayName = member.name || member.emailLower;
-                return (
-                  <li key={member.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{displayName}</p>
-                      {member.name ? <p className="truncate text-sm text-muted-foreground">{member.emailLower}</p> : null}
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <Badge variant={meta.variant}>{meta.label}</Badge>
-                        {isEmailConsentSource(source) ? <span className="text-sm text-muted-foreground">{EMAIL_CONSENT_LABELS[source]}</span> : null}
-                        {member.hasPhone && callMeta ? <Badge variant={callMeta.variant}>{callMeta.label}</Badge> : null}
-                      </div>
-                      {member.hasPhone ? (
-                        <PhoneLine
-                          name={displayName}
-                          ready={phonesReady}
-                          view={view}
-                          revealed={revealed.has(member.id)}
-                          onToggle={() => toggleReveal(member.id)}
-                        />
-                      ) : null}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                </div>
+                {!preview || preview.rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Paste a list above to see how many people will be added.</p>
+                ) : !attested ? (
+                  <p className="text-sm text-muted-foreground">Tick the box above to confirm these people agreed.</p>
+                ) : previewPhones > 0 && !phoneAttested && !importBlocked ? (
+                  <p className="text-sm text-muted-foreground">Tick the call box too, or remove the phone column.</p>
+                ) : null}
+              </div>
+            </div>
+          </AdminSectionCard>
+        </div>
+      </div>
+
+      <AdminSectionCard
+        title="Member list"
+        description={`${counts.ready} of ${members.length} can be emailed. ${counts.has_phone} ${counts.has_phone === 1 ? "has" : "have"} a phone number.`}
+      >
+        <div className="flex flex-col gap-3">
+          <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} className="max-lg:h-11 md:max-w-xs" />
+          <div className="lg:hidden">
+            <Select aria-label="Filter members" value={filter} onChange={e => setFilter(e.target.value as Filter)} className="h-11">
+              {filters.map(item => (
+                <option key={item.key} value={item.key}>
+                  {item.label} ({item.count})
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Segmented
+            className="hidden lg:flex"
+            label="Filter members"
+            value={filter}
+            onChange={setFilter}
+            options={filters.map(item => ({ value: item.key, label: item.label, count: item.count }))}
+          />
+        </div>
+
+        {visible.length === 0 ? (
+          <EmptyState
+            icon={members.length === 0 ? <Mail aria-hidden="true" /> : <SearchX aria-hidden="true" />}
+            title={members.length === 0 ? "No members yet" : "No one matches"}
+            description={
+              members.length === 0 ? "Add people one at a time or import a list. Only tick consent if the person told you so." : "Try another search, or show everyone."
+            }
+            action={
+              members.length > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setQuery("");
+                    setFilter("all");
+                  }}
+                >
+                  Show everyone
+                </Button>
+              ) : panel === null ? (
+                <Button variant="outline" size="row" className="lg:hidden" onClick={() => setPanel("add")}>
+                  <UserPlus aria-hidden="true" /> Add the first member
+                </Button>
+              ) : null
+            }
+          />
+        ) : (
+          <AdminList bare label="Members">
+            {visible.map(member => {
+              const state = memberEmailState(member);
+              const meta = STATE_LABEL[state];
+              const source = member.emailConsent?.source;
+              const busy = busyId === member.id;
+              const callState = memberCallState(member);
+              const callMeta = CALL_LABEL[callState];
+              const view = contacts.get(member.id);
+              const displayName = member.name || member.emailLower;
+              return (
+                <AdminListRow
+                  key={member.id}
+                  // Several actions per row: keep them under the details at every width so they wrap instead of pushing sideways.
+                  className="sm:flex-col sm:items-stretch"
+                  title={<span className="break-all">{displayName}</span>}
+                  meta={member.name ? <span className="break-all">{member.emailLower}</span> : undefined}
+                  badges={
+                    <>
+                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                      {isEmailConsentSource(source) ? <span className="text-sm text-muted-foreground">{EMAIL_CONSENT_LABELS[source]}</span> : null}
+                      {member.hasPhone && callMeta ? <Badge variant={callMeta.variant}>{callMeta.label}</Badge> : null}
+                    </>
+                  }
+                  actions={
+                    <>
                       {state === "no_consent" || state === "opted_out" ? (
                         <Button
-                          size="sm"
+                          size="row"
                           variant="outline"
-                          className={ROW_BUTTON}
                           loading={busy}
                           onClick={() => update(member, { emailConsent: { source: "admin_on_request" } }, "Consent recorded")}
                         >
@@ -484,15 +500,14 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                         </Button>
                       ) : null}
                       {state === "ready" ? (
-                        <Button size="sm" variant="outline" className={ROW_BUTTON} loading={busy} onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
+                        <Button size="row" variant="outline" loading={busy} onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
                           They asked to stop
                         </Button>
                       ) : null}
                       {member.hasPhone && (callState === "no_consent" || callState === "opted_out") ? (
                         <Button
-                          size="sm"
+                          size="row"
                           variant="outline"
-                          className={ROW_BUTTON}
                           loading={busy}
                           onClick={() => update(member, { phoneConsent: { source: "admin_on_request" } }, "Call consent recorded")}
                         >
@@ -500,36 +515,44 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                         </Button>
                       ) : null}
                       {callState === "ready" ? (
-                        <Button size="sm" variant="outline" className={ROW_BUTTON} loading={busy} onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
+                        <Button size="row" variant="outline" loading={busy} onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
                           They asked not to be called
                         </Button>
                       ) : null}
                       {phonesReady ? (
-                        <Button size="sm" variant="outline" className={ROW_BUTTON} loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`}>
+                        <Button size="row" variant="outline" loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`}>
                           {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
                         </Button>
                       ) : null}
-                      {/* Set apart from the consent buttons: a divider on wide screens, its own line on phones, and destructive colouring for Disable. */}
+                      {/* Set apart at the row end: a divider before it, ghost red, and a confirmation. */}
                       <span aria-hidden="true" className="hidden h-6 w-px bg-border sm:block" />
-                      <div className="flex w-full justify-end border-t border-border pt-2 sm:w-auto sm:border-0 sm:pt-0">
+                      {member.status === "active" ? (
                         <Button
-                          size="sm"
+                          size="row"
                           variant="ghost"
-                          className={cn(ROW_BUTTON, member.status === "active" && "text-destructive hover:bg-destructive/10 hover:text-destructive")}
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                           loading={busy}
-                          onClick={() => update(member, { status: member.status === "active" ? "disabled" : "active" }, member.status === "active" ? "Member disabled" : "Member enabled")}
+                          onClick={() => setDisabling(member)}
                         >
-                          {member.status === "active" ? "Disable" : "Enable"}
+                          Disable
                         </Button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </Card>
+                      ) : (
+                        <Button size="row" variant="ghost" loading={busy} onClick={() => update(member, { status: "active" }, "Member enabled")}>
+                          Enable
+                        </Button>
+                      )}
+                    </>
+                  }
+                >
+                  {member.hasPhone ? (
+                    <PhoneLine name={displayName} ready={phonesReady} view={view} revealed={revealed.has(member.id)} onToggle={() => toggleReveal(member.id)} />
+                  ) : null}
+                </AdminListRow>
+              );
+            })}
+          </AdminList>
+        )}
+      </AdminSectionCard>
 
       {editing ? (
         <ContactDialog
@@ -542,6 +565,21 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={disabling !== null}
+        onOpenChange={open => (!open ? setDisabling(null) : null)}
+        destructive
+        title={`Disable ${disabling ? disabling.name || disabling.emailLower : "this member"}?`}
+        description="They stay on the list but get no broadcasts and are left out of calls until you enable them again."
+        confirmLabel="Disable member"
+        busy={disabling !== null && busyId === disabling.id}
+        onConfirm={async () => {
+          if (!disabling) return;
+          await update(disabling, { status: "disabled" }, "Member disabled");
+          setDisabling(null);
+        }}
+      />
     </div>
   );
 }
@@ -555,38 +593,28 @@ function PhoneAccessNotice({ status, enabled, superAdmin }: { status: ReturnType
         <ShieldOff />
         <AlertTitle>Phone numbers need end-to-end encryption, which is not on yet</AlertTitle>
         <AlertDescription>
-          Email works as before. Numbers can only be stored once encryption is on, so the server never sees them.{" "}
+          Email works now. Numbers can be stored once encryption is on, so the server never sees them.{" "}
           {superAdmin ? (
-            <Link href="/admin/encryption" className="font-semibold underline">
+            <Link href="/admin/encryption" className="font-semibold text-foreground underline underline-offset-2">
               Turn on encryption
             </Link>
           ) : (
-            "A super admin can turn it on under Admin → Encryption."
+            "A super admin can turn it on."
           )}
         </AlertDescription>
       </Alert>
     );
   }
   if (status === "unlocked") return null;
-  if (status === "locked") {
-    return (
-      <div className="flex flex-col gap-4">
-        <Alert variant="info">
-          <Lock />
-          <AlertTitle>Phone numbers are end-to-end encrypted</AlertTitle>
-          <AlertDescription>Unlock this device to see, add or change them. Everything else on this page works now.</AlertDescription>
-        </Alert>
-        <UnlockCard />
-      </div>
-    );
-  }
+  if (status === "locked") return <UnlockCard what="phone numbers" detail="Everything else on this page works now." />;
   return (
     <Alert variant="info">
       <Lock />
-      <AlertTitle>Phone numbers are end-to-end encrypted</AlertTitle>
+      <AlertTitle>Set up this device to see phone numbers</AlertTitle>
       <AlertDescription>
-        {status === "pending" ? "This device is waiting for another admin to approve it." : "This device has no encryption keys yet."}{" "}
-        <Link href="/admin/encryption" className="font-semibold underline">
+        {status === "pending" ? "This device is waiting for another admin to approve it." : "This device has no encryption keys yet."} Everything else on this page
+        works now.{" "}
+        <Link href="/admin/encryption" className="font-semibold text-foreground underline underline-offset-2">
           Open Encryption
         </Link>
       </AlertDescription>
@@ -629,8 +657,8 @@ function PhoneLine({ name, ready, view, revealed, onToggle }: { name: string; re
       </p>
     );
   }
-  if (!view) return <p className="mt-1 text-sm text-muted-foreground">Decrypting…</p>;
-  if (!view.ok) return <p className="mt-1 text-sm text-destructive">Phone number can&apos;t be read on this device: {view.error}</p>;
+  if (!view) return <p className="mt-1 text-sm text-muted-foreground">Unlocking…</p>;
+  if (!view.ok) return <p className="mt-1 text-sm text-destructive">Phone number can&apos;t be opened on this device.</p>;
   const { phone, altPhone, language, household } = view.contact;
   if (!phone) return null;
   return (
@@ -639,11 +667,11 @@ function PhoneLine({ name, ready, view, revealed, onToggle }: { name: string; re
         <Phone aria-hidden="true" className="size-3.5" />
         {revealed ? formatPhone(phone) : maskPhone(phone)}
       </span>
-      <Button size="sm" variant="ghost" className={ROW_BUTTON} onClick={onToggle} aria-label={revealed ? `Hide ${name}'s number` : `Show ${name}'s number`}>
+      <Button size="row" variant="ghost" onClick={onToggle} aria-label={revealed ? `Hide ${name}'s number` : `Show ${name}'s number`}>
         {revealed ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
         {revealed ? "Hide" : "Show"}
       </Button>
-      <Button asChild size="sm" variant="outline" className={ROW_BUTTON}>
+      <Button asChild size="row" variant="outline">
         <a href={`tel:${phone}`} aria-label={`Call ${name}`}>
           Call
         </a>
@@ -688,42 +716,37 @@ function ContactDialog({
   return (
     <Dialog open onOpenChange={open => (!open ? onClose() : null)}>
       <DialogContent>
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Contact for {member.name || member.emailLower}</DialogTitle>
-            <DialogDescription>Encrypted in this browser. Only BOD devices with encryption keys can read it; the server never can.</DialogDescription>
+            <DialogDescription>Encrypted in this browser. Only approved admin devices can read it; the server never can.</DialogDescription>
           </DialogHeader>
           {unreadable ? (
             <Alert variant="warning">
               <ShieldOff />
-              <AlertTitle>The saved contact can&apos;t be read on this device</AlertTitle>
+              <AlertTitle>The saved contact can&apos;t be opened on this device</AlertTitle>
               <AlertDescription>Saving will replace it with what you enter here.</AlertDescription>
             </Alert>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="contact-phone">Phone</Label>
+          <Field label="Phone">
             <Input id="contact-phone" type="tel" value={form.phone} onChange={set("phone")} maxLength={32} autoComplete="off" placeholder="(717) 555-0100" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="contact-alt">Second phone (optional)</Label>
+          </Field>
+          <Field label="Second phone (optional)">
             <Input id="contact-alt" type="tel" value={form.altPhone} onChange={set("altPhone")} maxLength={32} autoComplete="off" />
-          </div>
+          </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="contact-language">Preferred language (optional)</Label>
+            <Field label="Preferred language (optional)">
               <Input id="contact-language" value={form.language} onChange={set("language")} maxLength={CONTACT_LIMITS.language} autoComplete="off" placeholder="Nepali, English…" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="contact-household">Household (optional)</Label>
+            </Field>
+            <Field label="Household (optional)">
               <Input id="contact-household" value={form.household} onChange={set("household")} maxLength={CONTACT_LIMITS.household} autoComplete="off" placeholder="People who share this phone" />
-            </div>
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="contact-notes">Notes (optional)</Label>
+          <Field label="Notes (optional)">
             <Textarea id="contact-notes" rows={3} value={form.notes} onChange={set("notes")} maxLength={CONTACT_LIMITS.notes} placeholder="Best time to call, who to ask for…" />
-          </div>
+          </Field>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" loading={saving}>

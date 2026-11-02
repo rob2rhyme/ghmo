@@ -12,15 +12,16 @@ type AdminSectionCardProps = {
   className?: string;
   /** Heading level for the title (default h2). */
   as?: "h2" | "h3";
+  id?: string;
 };
 
 /**
  * The one section box in the admin (same padding, radius and title size as Card). Use it for every
  * titled section; use a bare Card only for boxes without a title.
  */
-export default function AdminSectionCard({ title, description, actions, icon, children, className, as: Heading = "h2" }: AdminSectionCardProps) {
+export default function AdminSectionCard({ title, description, actions, icon, children, className, as: Heading = "h2", id }: AdminSectionCardProps) {
   return (
-    <section className={cn("flex flex-col gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs md:p-6", className)}>
+    <section id={id} className={cn("flex flex-col gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs md:p-6", className)}>
       {title || description || actions ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

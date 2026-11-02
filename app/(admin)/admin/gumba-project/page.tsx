@@ -1,18 +1,23 @@
-//app/(admin)/admin/gumba-project/page.tsx
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { NotebookPen, Target } from "lucide-react";
+import type { Route } from "next";
+import { NotebookPen } from "lucide-react";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
+import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { percentOf } from "@/src/lib/adminView";
 import { formatDate, formatDateTime, formatShortDate, toDate, type DateInput } from "@/src/lib/format";
 import { MeetingAttendance } from "@/src/lib/minutes";
 import { resolveActorLabel } from "@/src/lib/actor";
+import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
+import { statusBadge } from "@/src/lib/statusBadges";
 
 type MinutesActionItem = {
   task: string;
@@ -54,59 +59,51 @@ export default async function GumbaProjectPage() {
 
   const totalRaised = stats?.totalRaised ?? 0;
   const goal = stats?.goal ?? 0;
-  const lastUpdated = formatDateTime(stats?.lastUpdatedAt ?? null);
+  const lastUpdated = formatDateTime(stats?.lastUpdatedAt ?? null, { timeZone: DEFAULT_TIMEZONE });
   const percent = percentOf(totalRaised, goal);
   const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const recentMinutes = (Array.isArray(minutes) ? [...minutes] : [])
     .sort((a, b) => (toDate(b.eventDate)?.getTime() ?? 0) - (toDate(a.eventDate)?.getTime() ?? 0))
     .slice(0, 3);
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader
-        title="GUMBA Project"
-        description="Our fundraising campaign to build a Gumba, a shared home for the Magar community's language, culture and gatherings in Harrisburg. Here you see what has been raised against the goal."
+      <AdminPageHeader title="GUMBA project" description="Our fundraising campaign for a Gumba, a shared home for Magar language and culture in Harrisburg." />
+
+      <AdminSectionCard
+        title="Fundraising progress"
+        description={lastUpdated ? `Last update from GoFundMe: ${lastUpdated}` : undefined}
         actions={
-          <Button asChild variant="outline">
-            <Link href="/donate">See the public Donate page</Link>
+          <Button asChild variant="outline" size="row">
+            <Link href="/donate">See the Donate page</Link>
           </Button>
         }
-      />
-
-      <AdminSectionCard title="Fundraising progress" description={lastUpdated ? `Last update from GoFundMe: ${lastUpdated}` : "No update from GoFundMe yet."}>
+      >
         {percent !== null ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              <strong className="text-2xl font-semibold text-foreground tabular-nums">{money(totalRaised)}</strong> of{" "}
-              <span className="font-medium text-foreground tabular-nums">{money(goal)}</span> raised ({percent}%)
+              <strong className="font-semibold text-foreground tabular-nums">{money(totalRaised)}</strong> of {money(goal)} raised ({percent}%)
             </p>
-            <div
-              className="h-3 w-full overflow-hidden rounded-full bg-muted"
-              role="progressbar"
-              aria-label="Raised towards the goal"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-              aria-valuetext={`${money(totalRaised)} of ${money(goal)}`}
-            >
-              <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
-            </div>
-            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Stat label="Raised" value={money(totalRaised)} />
-              <Stat label="Goal" value={money(goal)} />
-              <Stat label="Still to raise" value={money(Math.max(0, goal - totalRaised))} />
-            </dl>
+            <ProgressBar value={totalRaised} max={goal} label={`${money(totalRaised)} of ${money(goal)} raised`} />
+            <StatGrid>
+              <StatTile label="Raised" value={money(totalRaised)} />
+              <StatTile label="Goal" value={money(goal)} />
+              <StatTile label="Still to raise" value={money(Math.max(0, goal - totalRaised))} />
+            </StatGrid>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
+            {totalRaised > 0 ? (
+              <StatGrid>
+                <StatTile label="Raised so far" value={money(totalRaised)} />
+              </StatGrid>
+            ) : null}
+            {/* One "nothing yet" line; the goal can't be set here, so the next step is the Donate page above. */}
             <p className="text-sm text-muted-foreground">
-              Raised so far: <strong className="text-lg font-semibold text-foreground tabular-nums">{money(totalRaised)}</strong>
+              {totalRaised > 0 ? "No goal yet." : "Nothing from GoFundMe yet."} The goal and a progress bar show here once the site receives the campaign&apos;s
+              totals.
             </p>
-            <EmptyState
-              icon={<Target aria-hidden="true" />}
-              title="No fundraising goal yet"
-              description="The goal comes from the GoFundMe campaign. It shows here, with a progress bar, once the site receives the campaign's totals from GoFundMe; there is nothing to set on this page."
-            />
           </div>
         )}
       </AdminSectionCard>
@@ -115,7 +112,7 @@ export default async function GumbaProjectPage() {
         title="Recent meeting minutes"
         description="The last three meetings, for the decisions and tasks behind the project."
         actions={
-          <Button asChild variant="outline">
+          <Button asChild variant="ghost" size="row">
             <Link href="/admin/minutes?mode=records">All minutes</Link>
           </Button>
         }
@@ -124,73 +121,61 @@ export default async function GumbaProjectPage() {
           <EmptyState
             icon={<NotebookPen aria-hidden="true" />}
             title="No meeting minutes yet"
-            description="Minutes are written after a meeting under Meeting Minutes. The latest three show here."
+            description="Minutes are written after a meeting under Meeting minutes. The latest three show here."
             action={
-              <Button asChild>
+              <Button asChild variant="outline" size="row">
                 <Link href="/admin/minutes">Write minutes</Link>
               </Button>
             }
           />
         ) : (
-          <ul className="flex flex-col gap-3">
+          <AdminList bare label="Recent meeting minutes">
             {recentMinutes.map(entry => {
               const attendanceSummary = formatAdminAttendance(entry.attendance);
               const decisions: string[] = Array.isArray(entry.decisions) ? entry.decisions : [];
               const actionItems: MinutesActionItem[] = Array.isArray(entry.actionItems) ? entry.actionItems : [];
-              const when = formatDate(entry.eventDate);
+              const when = formatDate(entry.eventDate, { timeZone: DEFAULT_TIMEZONE });
+              const badge = entry.status ? statusBadge("minutes", entry.status) : null;
               return (
-                <li key={entry.id} className="flex flex-col gap-2 rounded-md border border-border bg-background px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-foreground">{entry.eventTitle}</p>
-                      <p className="text-muted-foreground">
-                        {entry.meetingType} · {when || "Date not recorded"}
-                      </p>
-                    </div>
-                    <p className="text-muted-foreground">
-                      {decisions.length} decision{decisions.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  {decisions.length ? (
-                    <ul className="list-disc space-y-1 pl-5 text-foreground">
-                      {decisions.map((decision, idx) => (
-                        <li key={`${entry.id}-decision-${idx}`}>{decision}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {actionItems.length ? (
-                    <div className="text-foreground">
-                      <p className="font-medium text-muted-foreground">Action items</p>
-                      <ul className="list-disc space-y-1 pl-5">
-                        {actionItems.map((action, idx) => (
-                          <li key={`${entry.id}-action-${idx}`}>
-                            {action.task}
-                            {action.assignedTo ? ` — ${action.assignedTo}` : ""}
-                            {action.dueDate && formatShortDate(action.dueDate) ? ` (due ${formatShortDate(action.dueDate)})` : ""}
-                          </li>
+                <AdminListRow
+                  key={entry.id}
+                  href={`/admin/minutes?minutesId=${encodeURIComponent(entry.id)}` as Route}
+                  title={entry.eventTitle || "Untitled meeting"}
+                  badges={badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+                  meta={[entry.meetingType, when || "Date not recorded", plural(decisions.length, "decision", "decisions")].filter(Boolean).join(" · ")}
+                >
+                  <div className="mt-2 flex flex-col gap-2 text-sm">
+                    {decisions.length ? (
+                      <ul className="list-disc space-y-1 pl-5 text-foreground">
+                        {decisions.map((decision, idx) => (
+                          <li key={`${entry.id}-decision-${idx}`}>{decision}</li>
                         ))}
                       </ul>
-                    </div>
-                  ) : null}
-                  <p className="text-muted-foreground">
-                    Recorded by {resolveActorLabel(entry.recordedBy)}
-                    {attendanceSummary ? ` · ${attendanceSummary}` : ""}
-                  </p>
-                </li>
+                    ) : null}
+                    {actionItems.length ? (
+                      <div className="text-foreground">
+                        <p className="font-medium text-muted-foreground">Action items</p>
+                        <ul className="list-disc space-y-1 pl-5">
+                          {actionItems.map((action, idx) => (
+                            <li key={`${entry.id}-action-${idx}`}>
+                              {[action.task, action.assignedTo, action.dueDate && formatShortDate(action.dueDate) ? `due ${formatShortDate(action.dueDate)}` : ""]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <p className="text-muted-foreground">
+                      {["Recorded by " + resolveActorLabel(entry.recordedBy), attendanceSummary].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                </AdminListRow>
               );
             })}
-          </ul>
+          </AdminList>
         )}
       </AdminSectionCard>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-background px-4 py-3">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-xl font-semibold text-foreground tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -234,5 +219,5 @@ function formatAdminAttendance(
   if (normalized.guests && normalized.guests.length) {
     parts.push(`Guests: ${normalized.guests.join(", ")}`);
   }
-  return parts.length ? parts.join(" • ") : null;
+  return parts.length ? parts.join(" · ") : null;
 }

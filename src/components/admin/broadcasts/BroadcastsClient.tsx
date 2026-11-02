@@ -5,30 +5,34 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Mail } from "lucide-react";
+import { Mail, MailWarning } from "lucide-react";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Textarea } from "@/src/components/ui/textarea";
 import { BODY_MAX, SUBJECT_MAX, type BroadcastStatus } from "@/src/lib/broadcast";
 import { formatShortDate } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { BroadcastSteps } from "./BroadcastSteps";
 
 export type BroadcastSummary = { id: string; subject: string; status: BroadcastStatus; updatedAt?: string; createdByName?: string };
 
-export const STATUS_BADGE: Record<BroadcastStatus, { label: string; variant: "secondary" | "warning" | "success" | "destructive" }> = {
-  draft: { label: "Draft", variant: "secondary" },
-  pending_approval: { label: "Waiting for approval", variant: "warning" },
-  approved: { label: "Approved", variant: "success" },
-  sending: { label: "Sending", variant: "warning" },
-  sent: { label: "Sent", variant: "success" },
-  cancelled: { label: "Cancelled", variant: "destructive" }
-};
-
-export default function BroadcastsClient({ initial }: { initial: BroadcastSummary[] }) {
+export default function BroadcastsClient({
+  initial,
+  recipientCount = null,
+  emailProblem = null
+}: {
+  initial: BroadcastSummary[];
+  /** Members a broadcast would reach now; null when it couldn't be counted. */
+  recipientCount?: number | null;
+  /** Why email can't go out yet (plain words), or null when sending is set up. */
+  emailProblem?: string | null;
+}) {
   const router = useRouter();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -52,11 +56,9 @@ export default function BroadcastsClient({ initial }: { initial: BroadcastSummar
     <div className="flex flex-col gap-6">
       <BroadcastSteps />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>New broadcast</CardTitle>
-          <CardDescription>Plain text. Saving only creates a draft; nothing is sent.</CardDescription>
-        </CardHeader>
+      <EmailReadiness recipientCount={recipientCount} emailProblem={emailProblem} />
+
+      <AdminSectionCard title="New broadcast" description="Plain text. Saving only creates a draft; nothing is sent.">
         <form onSubmit={create} className="flex flex-col gap-4">
           <Field label="Subject">
             <Input id="new-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} required placeholder="Dashain celebration on 12 October" />
@@ -73,43 +75,86 @@ export default function BroadcastsClient({ initial }: { initial: BroadcastSummar
             />
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" loading={busy} className="max-sm:h-11 max-sm:w-full">
+            <Button type="submit" loading={busy} className="max-sm:h-11">
               Save draft
             </Button>
           </div>
         </form>
-      </Card>
+      </AdminSectionCard>
 
       {initial.length === 0 ? (
         <EmptyState
           icon={<Mail aria-hidden="true" />}
           title="No broadcasts yet"
-          description="Write your first announcement above. It stays a draft until another admin approves it, and nothing is emailed before you press Send."
-          action={
-            <Button variant="outline" onClick={() => document.getElementById("new-subject")?.focus()}>
-              Write a broadcast
-            </Button>
-          }
+          description="Your first announcement, written above, shows here. It stays a draft until another admin approves it, and nothing is emailed before you press Send."
         />
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card" aria-label="Broadcasts">
+        <AdminList label="Broadcasts">
           {initial.map(item => {
-            const badge = STATUS_BADGE[item.status] ?? STATUS_BADGE.draft;
+            const badge = statusBadge("broadcast", item.status);
             const meta = [item.createdByName ? `Started by ${item.createdByName}` : "", item.updatedAt ? `updated ${formatShortDate(item.updatedAt)}` : ""].filter(Boolean).join(" · ");
             return (
-              <li key={item.id}>
-                <Link href={`/admin/broadcasts/${item.id}` as Route} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-accent/50">
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{item.subject}</span>
-                    {meta ? <span className="block truncate text-sm text-muted-foreground">{meta}</span> : null}
-                  </span>
-                  <Badge variant={badge.variant}>{badge.label}</Badge>
-                </Link>
-              </li>
+              <AdminListRow
+                key={item.id}
+                href={`/admin/broadcasts/${item.id}` as Route}
+                title={item.subject}
+                meta={meta || undefined}
+                badges={<Badge variant={badge.variant}>{badge.label}</Badge>}
+              />
             );
           })}
-        </ul>
+        </AdminList>
       )}
     </div>
+  );
+}
+
+/**
+ * Day-one guidance (Audit 2, S10): says before anyone writes a draft that nobody can be emailed yet
+ * and/or that email sending isn't set up. Drafts and the group-chat copy still work either way.
+ */
+function EmailReadiness({ recipientCount, emailProblem }: { recipientCount: number | null; emailProblem: string | null }) {
+  const nobody = recipientCount === 0;
+  if (recipientCount === null && !emailProblem) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Before your first broadcast, check that members have agreed to email on{" "}
+        <Link href="/admin/members" className="font-medium text-foreground underline underline-offset-2">
+          Members
+        </Link>
+        .
+      </p>
+    );
+  }
+  if (!nobody && !emailProblem) return null;
+  return (
+    <Alert variant="warning">
+      <MailWarning />
+      <AlertTitle>
+        {nobody && emailProblem ? "Nobody can be emailed yet, and email sending isn't set up" : nobody ? "Nobody can be emailed yet" : "Email sending isn't set up yet"}
+      </AlertTitle>
+      <AlertDescription className="flex flex-col gap-1">
+        {nobody ? (
+          <span>
+            No member has agreed to email yet.{" "}
+            <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+              Open Members
+            </Link>{" "}
+            to record who agreed.
+          </span>
+        ) : null}
+        {emailProblem ? <span>{emailProblem}</span> : null}
+        {recipientCount === null ? (
+          <span>
+            Before your first broadcast, check that members have agreed to email on{" "}
+            <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+              Members
+            </Link>
+            .
+          </span>
+        ) : null}
+        <span>You can still write drafts, get them approved and post them to the group chats.</span>
+      </AlertDescription>
+    </Alert>
   );
 }

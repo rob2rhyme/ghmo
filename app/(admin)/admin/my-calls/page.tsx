@@ -16,7 +16,7 @@ export default async function MyCallsPage() {
   }
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader title="My Calls" description="The people you phone, and what to tell them. Numbers are unlocked on this device only and never leave it." />
+      <AdminPageHeader title="My calls" description="The people you phone, and what to tell them." />
       <MyCallsClient />
     </div>
   );

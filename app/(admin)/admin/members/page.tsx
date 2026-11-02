@@ -22,7 +22,7 @@ export default async function MembersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader title="Members" description="Everyone on the community list, and whether they agreed to email or calls. Nobody is contacted without a recorded yes." />
+      <AdminPageHeader title="Members" description="Everyone on the community list, and whether they agreed to be emailed or called." />
       <MembersClient initialMembers={members ?? []} />
     </div>
   );

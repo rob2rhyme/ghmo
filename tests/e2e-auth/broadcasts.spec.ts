@@ -142,6 +142,7 @@ test("a cancelled broadcast cannot be edited, submitted or tested; the API refus
   await signInWithNewPasskey(page, "alice", "/admin/broadcasts");
   const id = await startDraft(page);
   await page.getByRole("button", { name: "Cancel broadcast" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel broadcast" }).click();
   await expect(page.locator('[data-slot="badge"]', { hasText: "Cancelled" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Submit for approval" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Send a test to me" })).toHaveCount(0);

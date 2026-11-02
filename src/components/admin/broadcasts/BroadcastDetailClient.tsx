@@ -5,12 +5,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
+import { ProgressBar } from "@/src/components/ui/stat";
 import { Textarea } from "@/src/components/ui/textarea";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { Copy, MailWarning, MessageCircle } from "lucide-react";
 import {
   BODY_MAX,
@@ -23,8 +25,8 @@ import {
   type ManualChannel
 } from "@/src/lib/broadcast";
 import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { BroadcastSteps } from "./BroadcastSteps";
-import { STATUS_BADGE } from "./BroadcastsClient";
 
 /** Where the broadcast is in Write → Approve → Send (3 = all done). */
 const STEP_OF: Partial<Record<BroadcastStatus, 0 | 1 | 2 | 3>> = { draft: 0, pending_approval: 1, approved: 2, sending: 2, sent: 3 };
@@ -84,12 +86,13 @@ export default function BroadcastDetailClient({
   const [progress, setProgress] = useState<SendProgress | null>(initialProgress);
   const [running, setRunning] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const stopRef = useRef(false);
 
   const editable = broadcast.status === "draft";
   const dirty = subject !== broadcast.subject || body !== broadcast.body;
-  const badge = STATUS_BADGE[broadcast.status];
+  const badge = statusBadge("broadcast", broadcast.status);
   const wroteIt = broadcast.createdByUid === uid || broadcast.submittedByUid === uid;
 
   const run = async (key: string, task: () => Promise<void>) => {
@@ -177,44 +180,44 @@ export default function BroadcastDetailClient({
       void loop();
     });
 
-  const percent = progress && progress.total > 0 ? Math.round(((progress.total - progress.remaining) / progress.total) * 100) : 0;
-
   const step = STEP_OF[broadcast.status];
+  const members = (n: number) => `${n} ${n === 1 ? "member" : "members"}`;
+  const canCancel = broadcast.status !== "cancelled" && broadcast.status !== "sent" && !running;
 
   return (
     <div className="flex flex-col gap-6">
       {step !== undefined ? <BroadcastSteps current={step} /> : null}
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={badge.variant}>{badge.label}</Badge>
           <span className="text-sm text-muted-foreground" aria-live="polite">
-            Would go to {count} {count === 1 ? "member" : "members"} (active, agreed to email, not unsubscribed).
+            Would go to {members(count)} (active, agreed to email, not unsubscribed).
           </span>
         </div>
         {count === 0 && broadcast.status !== "sent" && broadcast.status !== "cancelled" ? (
-          <p className="flex items-start gap-2 text-sm text-foreground">
-            <MailWarning aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
-            <span>
-              0 members can get email yet —{" "}
-              <Link href="/admin/members" className="font-medium text-primary underline underline-offset-2">
-                record consent on Members
-              </Link>
-              .
-            </span>
-          </p>
+          <Alert variant="warning">
+            <MailWarning />
+            <AlertTitle>Nobody can be emailed yet</AlertTitle>
+            <AlertDescription>
+              No member has agreed to email yet.{" "}
+              <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+                Open Members
+              </Link>{" "}
+              to record who agreed. You can still post it to the group chats once it is approved.
+            </AlertDescription>
+          </Alert>
         ) : null}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Message</CardTitle>
-          <CardDescription>
-            {editable
-              ? "Plain text. Changing a submitted or approved message sends it back to draft, so what goes out is exactly what was approved."
-              : "To change this message, withdraw it first. It goes back to draft and needs approval again."}
-          </CardDescription>
-        </CardHeader>
+      <AdminSectionCard
+        title="Message"
+        description={
+          editable
+            ? "Plain text. Changing a submitted or approved message sends it back to draft, so what goes out is exactly what was approved."
+            : "To change this message, withdraw it first. It goes back to draft and needs approval again."
+        }
+      >
         <div className="flex flex-col gap-4">
           <Field label="Subject">
             <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} placeholder="Dashain celebration on 12 October" />
@@ -224,19 +227,15 @@ export default function BroadcastDetailClient({
           </Field>
           {editable ? (
             <div className="flex flex-wrap gap-2">
-              <Button onClick={save} loading={busy === "save"} disabled={!dirty} className="max-sm:h-11">
+              <Button onClick={save} loading={busy === "save"} disabled={!dirty} variant={dirty ? "default" : "outline"} className="max-sm:h-11">
                 Save draft
               </Button>
             </div>
           ) : null}
         </div>
-      </Card>
+      </AdminSectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>How it will look</CardTitle>
-          <CardDescription>Every email ends with this footer, with a personal unsubscribe link.</CardDescription>
-        </CardHeader>
+      <AdminSectionCard title="How it will look" description="Every email ends with this footer, with a personal unsubscribe link.">
         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
           <p className="font-semibold">{broadcast.subject}</p>
           <p className="whitespace-pre-wrap">{broadcast.body}</p>
@@ -248,40 +247,39 @@ export default function BroadcastDetailClient({
           ) : (
             <Alert variant="warning">
               <MailWarning />
-              <AlertTitle>The email footer is not set up yet</AlertTitle>
+              <AlertTitle>The email footer isn&apos;t set up yet</AlertTitle>
               <AlertDescription>
-                Every email must end with the organisation&apos;s name and postal address, so tests and sending are off until it is set. Whoever manages the
-                site settings sets BROADCAST_ORG_NAME and BROADCAST_POSTAL_ADDRESS.
+                Every email must end with it, so tests and sending are off until then. Ask whoever manages the website to add the organization&apos;s name and postal
+                address.
               </AlertDescription>
             </Alert>
           )}
         </div>
-      </Card>
+      </AdminSectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Next step</CardTitle>
-          <CardDescription>
+      <AdminSectionCard
+        title="Next step"
+        description={
+          <>
             {broadcast.status === "draft" && "Send yourself a test, then submit it so another admin can approve it."}
             {broadcast.status === "pending_approval" &&
               (wroteIt ? "Waiting for another admin. You wrote or submitted this, so you can't approve it." : "Read the message above. Approving means you checked exactly this text.")}
             {broadcast.status === "approved" &&
-              (sendingBlocker ? `Approved by a second admin. It can't be sent yet: ${sendingBlocker}` : `Approved by a second admin. Ready to send to ${count} ${count === 1 ? "member" : "members"}.`)}
+              (sendingBlocker ? `Approved by a second admin. It can't be sent yet. ${sendingBlocker}` : `Approved by a second admin. Ready to send to ${members(count)}.`)}
             {broadcast.status === "sending" && "Sending in small batches. Keep this page open; if you close it, sending pauses and you (or another admin) can resume here."}
             {broadcast.status === "sent" && "Sent. Each member got their own copy with a personal unsubscribe link."}
             {broadcast.status === "cancelled" && "This broadcast was cancelled and can't be used."}
-          </CardDescription>
-        </CardHeader>
+          </>
+        }
+      >
         {progress && (broadcast.status === "sending" || broadcast.status === "sent") ? (
           <div className="flex flex-col gap-2" aria-live="polite">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Sending progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
-              <div className="h-full bg-primary transition-all" style={{ width: `${percent}%` }} />
-            </div>
+            <ProgressBar value={progress.total - progress.remaining} max={progress.total} label="Sending progress" />
             <p className="text-sm" data-testid="send-progress">
               {progress.sent} sent · {progress.skipped} skipped · {progress.failed} failed · {progress.remaining} to go (of {progress.total})
             </p>
             {progress.paused ? (
-              <p className="text-sm text-warning" role="status">
+              <p className="text-sm text-muted-foreground" role="status">
                 Today&apos;s sending limit is used up. Continue after {formatDateTime(progress.paused.resumesAt)}.
               </p>
             ) : null}
@@ -293,20 +291,10 @@ export default function BroadcastDetailClient({
           </div>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          {broadcast.status === "approved" && !confirming ? (
+          {broadcast.status === "approved" ? (
             <Button onClick={() => setConfirming(true)} disabled={Boolean(sendingBlocker) || count === 0}>
-              Send to {count} {count === 1 ? "member" : "members"}
+              Send to {members(count)}
             </Button>
-          ) : null}
-          {broadcast.status === "approved" && confirming ? (
-            <>
-              <Button variant="destructive" onClick={startSending} loading={busy === "start"}>
-                Yes, send it now
-              </Button>
-              <Button variant="outline" onClick={() => setConfirming(false)}>
-                Not yet
-              </Button>
-            </>
           ) : null}
           {broadcast.status === "sending" && !running ? (
             <Button onClick={() => void loop()} disabled={Boolean(sendingBlocker)}>
@@ -316,16 +304,6 @@ export default function BroadcastDetailClient({
           {broadcast.status === "sending" && running ? (
             <Button variant="outline" onClick={() => (stopRef.current = true)}>
               Pause
-            </Button>
-          ) : null}
-          {(broadcast.status === "sending" || broadcast.status === "sent") && progress && progress.failed > 0 && !running ? (
-            <Button variant="outline" onClick={retry} loading={busy === "retry"}>
-              Retry {progress.failed} failed
-            </Button>
-          ) : null}
-          {broadcast.status === "draft" || broadcast.status === "pending_approval" || broadcast.status === "approved" ? (
-            <Button variant="outline" onClick={test} loading={busy === "test"} disabled={dirty || !footer}>
-              Send a test to me
             </Button>
           ) : null}
           {broadcast.status === "draft" ? (
@@ -338,20 +316,57 @@ export default function BroadcastDetailClient({
               Approve this message
             </Button>
           ) : null}
+          {(broadcast.status === "sending" || broadcast.status === "sent") && progress && progress.failed > 0 && !running ? (
+            <Button variant="outline" onClick={retry} loading={busy === "retry"}>
+              Retry {progress.failed} failed
+            </Button>
+          ) : null}
+          {broadcast.status === "draft" || broadcast.status === "pending_approval" || broadcast.status === "approved" ? (
+            <Button variant="outline" onClick={test} loading={busy === "test"} disabled={dirty || !footer}>
+              Send a test to me
+            </Button>
+          ) : null}
           {broadcast.status === "pending_approval" || broadcast.status === "approved" ? (
             <Button variant="outline" onClick={() => act("withdraw", "Withdrawn to draft")} loading={busy === "withdraw"}>
               Withdraw to edit
             </Button>
           ) : null}
-          {broadcast.status !== "cancelled" && broadcast.status !== "sent" && !running ? (
-            <Button variant="ghost" onClick={() => act("cancel", "Cancelled")} loading={busy === "cancel"}>
+        </div>
+        {canCancel ? (
+          <div className="border-t border-border pt-4">
+            <Button variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelling(true)} disabled={busy === "cancel"}>
               Cancel broadcast
             </Button>
-          ) : null}
-        </div>
-      </Card>
+          </div>
+        ) : null}
+      </AdminSectionCard>
 
       {broadcast.status === "approved" || broadcast.status === "sending" || broadcast.status === "sent" ? <MessengerCard broadcast={broadcast} onRecorded={setBroadcast} /> : null}
+
+      <ConfirmDialog
+        open={confirming && broadcast.status === "approved"}
+        onOpenChange={setConfirming}
+        title={`Send to ${members(count)} now?`}
+        description="Each member gets their own email with a personal unsubscribe link. Once sending starts it can be paused, but emails already sent can't be taken back."
+        confirmLabel="Yes, send it now"
+        cancelLabel="Not yet"
+        busy={busy === "start"}
+        onConfirm={startSending}
+      />
+      <ConfirmDialog
+        open={cancelling}
+        onOpenChange={setCancelling}
+        destructive
+        title="Cancel this broadcast?"
+        description="It can't be edited, approved or sent after this. To send the same message later, write a new broadcast."
+        confirmLabel="Cancel broadcast"
+        cancelLabel="Keep it"
+        busy={busy === "cancel"}
+        onConfirm={async () => {
+          await act("cancel", "Cancelled");
+          setCancelling(false);
+        }}
+      />
     </div>
   );
 }
@@ -391,16 +406,11 @@ function MessengerCard({ broadcast, onRecorded }: { broadcast: BroadcastDetail; 
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle aria-hidden="true" className="size-5" /> Post to the Messenger group chats
-        </CardTitle>
-        <CardDescription>
-          The site does not connect to Messenger. Copy the approved text, paste it into the group chat yourself, then record where you posted it. This needs no
-          email set-up.
-        </CardDescription>
-      </CardHeader>
+    <AdminSectionCard
+      title="Post to the Messenger group chats"
+      icon={<MessageCircle aria-hidden="true" />}
+      description="The site doesn't connect to Messenger. Copy the approved text, paste it into the group chat, then record where you posted it."
+    >
       <div className="flex flex-col gap-3">
         <Label htmlFor="b-messenger" className="sr-only">
           Text for Messenger
@@ -428,6 +438,6 @@ function MessengerCard({ broadcast, onRecorded }: { broadcast: BroadcastDetail; 
           <p className="text-sm text-muted-foreground">Not recorded in any group chat yet.</p>
         )}
       </div>
-    </Card>
+    </AdminSectionCard>
   );
 }

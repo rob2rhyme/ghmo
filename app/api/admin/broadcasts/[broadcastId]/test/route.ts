@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ broadc
   if (!isMailConfigured()) return NextResponse.json({ error: "Email sending isn't set up on this site yet." }, { status: 409 });
   const footer = footerFromEnv();
   if (!footer) {
-    return NextResponse.json({ error: "Set BROADCAST_ORG_NAME and BROADCAST_POSTAL_ADDRESS first; every broadcast needs them in its footer." }, { status: 409 });
+    return NextResponse.json({ error: "Every broadcast needs the organization's name and postal address in its footer. Ask whoever manages the website to add them." }, { status: 409 });
   }
 
   const limited = await checkRateLimit(`broadcast-test:${actor.uid}`, 5, 60 * 60 * 1000);

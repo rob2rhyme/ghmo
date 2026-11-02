@@ -57,7 +57,7 @@ export function AdminListRow({ title, meta, badges, leading, actions, href, chil
         {meta ? <div className="mt-0.5 text-sm text-muted-foreground">{meta}</div> : null}
         {children}
       </div>
-      {actions ? <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="relative z-10 flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:justify-end">{actions}</div> : null}
     </li>
   );
 }

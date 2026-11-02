@@ -49,6 +49,7 @@ test("an admin can record consent, an opt-out, and disable a member", async ({ p
   expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeNull();
 
   await page.getByRole("button", { name: "Disable", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Disable member" }).click();
   await expect(shown(page, "Disabled").first()).toBeVisible();
 });
 
@@ -56,7 +57,7 @@ test("importing needs the consent attestation, skips existing people and never r
   await members().doc("old").set({ email: "old@example.org", emailLower: "old@example.org", status: "active", roles: ["member"], emailOptOutAt: new Date() });
   await signInWithNewPasskey(page, "alice", "/admin/members");
 
-  await page.getByLabel("Member list").fill("email,name\nnew@example.org,New Person\nold@example.org,Old Person\nbroken\n");
+  await page.getByLabel("Paste your list").fill("email,name\nnew@example.org,New Person\nold@example.org,Old Person\nbroken\n");
   await expect(shown(page, "2 valid addresses found.")).toBeVisible();
   await expect(page.getByText("is not a valid email address")).toBeVisible();
 

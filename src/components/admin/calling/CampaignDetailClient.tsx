@@ -1,27 +1,38 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Lock, Megaphone } from "lucide-react";
+import { Download, Lock, Megaphone } from "lucide-react";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
-import { EmptyState } from "@/src/components/ui/empty-state";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
-import { OUTCOME_LABELS, RSVP_LABELS, attemptNoteLoc, campaignCsv, campaignScriptLoc, computeCounts, isFinalOutcome, progressByCaller } from "@/src/lib/callCampaigns";
+import { attemptNoteLoc, campaignCsv, campaignScriptLoc, computeCounts, isFinalOutcome, progressByCaller } from "@/src/lib/callCampaigns";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { api, formatDay, formatWhen, memberLabel, type CallView, type CampaignView, type MemberLite } from "./campaignShared";
 
 type Detail = { me: { uid: string; superAdmin: boolean }; campaign: CampaignView; calls: CallView[]; members: MemberLite[]; callerNames: Record<string, string> };
 
+const BACK = { href: "/admin/call-campaigns", label: "Call campaigns" } as const;
+
 export default function CampaignDetailClient({ campaignId }: { campaignId: string }) {
+  const { enabled, status } = useE2ee();
+  // The campaign's own header (its title) loads behind the gate; until then keep the way back visible.
+  const gated = enabled && status !== "unlocked";
   return (
-    <EncryptionGate what="this campaign">
-      <CampaignDetail campaignId={campaignId} />
-    </EncryptionGate>
+    <>
+      {gated ? <AdminPageHeader title="Call campaign" back={BACK} /> : null}
+      <EncryptionGate what="this campaign">
+        <CampaignDetail campaignId={campaignId} />
+      </EncryptionGate>
+    </>
   );
 }
 
@@ -32,6 +43,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
   const [script, setScript] = useState<string | null>(null);
   const [notes, setNotes] = useState<Map<string, string>>(() => new Map());
   const [busy, setBusy] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
 
   const url = `/api/admin/call-campaigns/${campaignId}`;
   const load = () =>
@@ -78,7 +90,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
             const { note } = await decrypt<{ note?: string }>(attempt.note, attemptNoteLoc(data.campaign.id, call.memberId, attempt.id));
             if (note) next.set(attempt.id, note);
           } catch {
-            next.set(attempt.id, "(can't be read on this device)");
+            next.set(attempt.id, "(can't be opened on this device)");
           }
         }
       }
@@ -116,7 +128,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
         a.download = `call-campaign-${data.campaign.id}.csv`;
         a.click();
         URL.revokeObjectURL(href);
-        toast.success("Exported (names and outcomes only, no numbers)");
+        toast.success("Downloaded (names and outcomes only, no numbers)");
       } else if (action === "remind") {
         toast.success(`Reminder sent to ${result.sent ?? 0} of ${result.callers ?? 0} callers with calls left`);
       } else {
@@ -130,7 +142,23 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
     }
   };
 
-  if (error) return <EmptyState icon={<Megaphone aria-hidden="true" />} title="Could not load the campaign" description={error} action={<Button onClick={load}>Try again</Button>} />;
+  if (error) {
+    return (
+      <div className="flex flex-col gap-6">
+        <AdminPageHeader title="Call campaign" back={BACK} />
+        <Alert variant="destructive">
+          <Megaphone />
+          <AlertTitle>Couldn&apos;t load the campaign</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-2">
+            <span>{error}</span>
+            <Button variant="outline" size="row" onClick={load}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
   if (!data) {
     return (
       <div role="status" className="flex flex-col gap-3">
@@ -150,6 +178,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
     .sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 
   const pct = live.total ? Math.round((live.reached / live.total) * 100) : 0;
+  const badge = statusBadge("campaign", campaign.status);
   const summary = [
     campaign.eventTitle ? `For ${campaign.eventTitle}.` : "",
     campaign.createdAt ? `Opened ${formatDay(campaign.createdAt)}.` : "",
@@ -160,27 +189,29 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Button asChild variant="ghost" className="-ml-3 max-sm:h-11">
-          <Link href="/admin/call-campaigns">
-            <ArrowLeft aria-hidden="true" className="size-4" /> All campaigns
-          </Link>
-        </Button>
-      </div>
       <AdminPageHeader
         title={campaign.title}
+        back={BACK}
+        badge={<Badge variant={badge.variant}>{badge.label}</Badge>}
         description={summary || "Who has been reached so far, per caller, with every call logged."}
         actions={
           <>
             <Button variant="outline" loading={busy === "export"} onClick={() => act("export")} className="max-sm:h-11">
-              <Download aria-hidden="true" className="size-4" /> Export CSV
+              <Download aria-hidden="true" className="size-4" /> Download spreadsheet (CSV)
             </Button>
             {campaign.status === "open" ? (
               <>
                 <Button variant="outline" loading={busy === "remind"} onClick={() => act("remind")} className="max-sm:h-11">
                   Remind callers
                 </Button>
-                <Button variant="destructive" loading={busy === "close"} onClick={() => act("close")} className="max-sm:h-11">
+                {/* Set apart from the other actions: a divider, ghost red, and a confirmation. */}
+                <span aria-hidden="true" className="hidden h-6 w-px bg-border sm:block" />
+                <Button
+                  variant="ghost"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive max-sm:h-11"
+                  disabled={busy === "close"}
+                  onClick={() => setClosing(true)}
+                >
                   Close campaign
                 </Button>
               </>
@@ -189,43 +220,23 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
         }
       />
 
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
-            <strong className="text-lg font-semibold text-foreground tabular-nums">
-              {live.reached} of {live.total}
-            </strong>{" "}
-            people reached ({pct}%)
-          </p>
-          <Badge variant={campaign.status === "open" ? "success" : "secondary"}>{campaign.status === "open" ? "Open" : "Closed"}</Badge>
-        </div>
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`${pct}% reached`}>
-          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-        </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Campaign totals">
-          <Stat label="Reached" value={`${live.reached} / ${live.total}`} />
-          <Stat label="Attempted" value={`${live.attempted} / ${live.total}`} />
-          <Stat label="Coming" value={String(live.rsvpYes)} />
-          <Stat label="Not coming / maybe" value={`${live.rsvpNo} / ${live.rsvpMaybe}`} />
-        </div>
-      </Card>
+      <AdminSectionCard title="Progress" description={`${live.reached} of ${live.total} people reached (${pct}%).`}>
+        <ProgressBar value={live.reached} max={live.total} label={`${live.reached} of ${live.total} people reached`} />
+        <StatGrid>
+          <StatTile label="Reached" value={<Figure label="Reached" value={`${live.reached} / ${live.total}`} />} />
+          <StatTile label="Attempted" value={<Figure label="Attempted" value={`${live.attempted} / ${live.total}`} />} />
+          <StatTile label="Coming" value={<Figure label="Coming" value={String(live.rsvpYes)} />} />
+          <StatTile label="Not coming / maybe" value={<Figure label="Not coming / maybe" value={`${live.rsvpNo} / ${live.rsvpMaybe}`} />} />
+        </StatGrid>
+      </AdminSectionCard>
 
       {campaign.script ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock aria-hidden="true" className="size-4" /> Script
-            </CardTitle>
-            <CardDescription>What callers say. Only callers and board devices can read it.</CardDescription>
-          </CardHeader>
-          <p className="text-sm whitespace-pre-wrap">{script ?? "Decrypting…"}</p>
-        </Card>
+        <AdminSectionCard title="Script" icon={<Lock aria-hidden="true" />} description="What callers say. Only callers and approved admin devices can read it.">
+          <p className="text-sm whitespace-pre-wrap">{script ?? "Unlocking…"}</p>
+        </AdminSectionCard>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Progress per caller</CardTitle>
-        </CardHeader>
+      <AdminSectionCard title="Progress per caller">
         <div className="-mx-1 overflow-x-auto px-1">
           <table className="w-full min-w-[28rem] text-sm" aria-label="Progress per caller">
             <thead>
@@ -252,72 +263,71 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
             </tbody>
           </table>
         </div>
-      </Card>
+      </AdminSectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Not yet reached ({notReached.length})</CardTitle>
-          <CardDescription>People still to try: not called yet, no answer, a voicemail left, or asked to be called back.</CardDescription>
-        </CardHeader>
+      <AdminSectionCard
+        title={`Not yet reached (${notReached.length})`}
+        description="People still to try: not called yet, no answer, a voicemail left, or asked to be called back."
+      >
         {notReached.length === 0 ? (
           <p className="text-sm text-muted-foreground">Everyone has been reached.</p>
         ) : (
-          <ul className="divide-y divide-border text-sm" aria-label="Not yet reached">
-            {notReached.map(call => (
-              <li key={call.memberId} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                <span className="min-w-0 truncate font-medium">{memberLabel(memberById.get(call.memberId), call.memberId)}</span>
-                <span className="text-muted-foreground">
-                  {callerNames[call.callerUid] ?? call.callerUid}
-                  {call.outcome ? ` · ${OUTCOME_LABELS[call.outcome]} (${call.attemptCount})` : " · not tried"}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <AdminList bare label="Not yet reached">
+            {notReached.map(call => {
+              const outcome = statusBadge("callOutcome", call.outcome);
+              return (
+                <AdminListRow
+                  key={call.memberId}
+                  title={memberLabel(memberById.get(call.memberId), call.memberId)}
+                  badges={<Badge variant={outcome.variant}>{outcome.label}</Badge>}
+                  meta={`${callerNames[call.callerUid] ?? call.callerUid}${call.attemptCount ? ` · ${call.attemptCount} ${call.attemptCount === 1 ? "attempt" : "attempts"}` : ""}`}
+                />
+              );
+            })}
+          </AdminList>
         )}
-      </Card>
+      </AdminSectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Call log ({log.length})</CardTitle>
-          <CardDescription>Every attempt, newest first. Notes are decrypted on this device.</CardDescription>
-        </CardHeader>
+      <AdminSectionCard title={`Call log (${log.length})`} description="Every attempt, newest first. Notes are unlocked on this device.">
         {log.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No calls logged yet. Callers log them from My Calls.</p>
+          <p className="text-sm text-muted-foreground">No calls logged yet. Callers log them from My calls.</p>
         ) : (
-          <ul className="divide-y divide-border text-sm" aria-label="Call log">
-            {log.map(entry => (
-              <li key={entry.id} className="flex flex-col gap-1 py-2">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="font-medium">{memberLabel(memberById.get(entry.memberId), entry.memberId)}</span>
-                  <Badge variant={entry.outcome === "reached" ? "success" : "secondary"}>{OUTCOME_LABELS[entry.outcome]}</Badge>
-                  <span className="text-muted-foreground">
-                    by {callerNames[entry.byUid] ?? entry.byUid} · {formatWhen(entry.at)}
-                  </span>
-                </div>
-                {notes.get(entry.id) ? <p className="text-muted-foreground">{notes.get(entry.id)}</p> : null}
-              </li>
-            ))}
-          </ul>
+          <AdminList bare label="Call log">
+            {log.map(entry => {
+              const outcome = statusBadge("callOutcome", entry.outcome);
+              return (
+                <AdminListRow
+                  key={entry.id}
+                  title={memberLabel(memberById.get(entry.memberId), entry.memberId)}
+                  badges={<Badge variant={outcome.variant}>{outcome.label}</Badge>}
+                  meta={`by ${callerNames[entry.byUid] ?? entry.byUid} · ${formatWhen(entry.at)}`}
+                >
+                  {notes.get(entry.id) ? <p className="mt-1 text-sm text-foreground">{notes.get(entry.id)}</p> : null}
+                </AdminListRow>
+              );
+            })}
+          </AdminList>
         )}
-      </Card>
+      </AdminSectionCard>
 
-      {calls.some(call => call.rsvp) ? (
-        <p className="text-sm text-muted-foreground">
-          RSVPs: {calls.filter(c => c.rsvp === "yes").length} {RSVP_LABELS.yes.toLowerCase()}, {calls.filter(c => c.rsvp === "no").length} {RSVP_LABELS.no.toLowerCase()},{" "}
-          {calls.filter(c => c.rsvp === "maybe").length} {RSVP_LABELS.maybe.toLowerCase()}.
-        </p>
-      ) : null}
+      <ConfirmDialog
+        open={closing}
+        onOpenChange={setClosing}
+        destructive
+        title="Close this campaign?"
+        description="Callers can't log any more calls for it. The progress and call log stay here, and you can still download them."
+        confirmLabel="Close campaign"
+        busy={busy === "close"}
+        onConfirm={async () => {
+          await act("close");
+          setClosing(false);
+        }}
+      />
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-background px-3 py-2">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-xl font-semibold tabular-nums" aria-label={`${label}: ${value}`}>
-        {value}
-      </p>
-    </div>
-  );
+/** A figure with its own accessible name ("Reached: 2 / 3"), so it reads in one go. */
+function Figure({ label, value }: { label: string; value: string }) {
+  return <span aria-label={`${label}: ${value}`}>{value}</span>;
 }
