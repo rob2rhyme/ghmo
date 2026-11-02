@@ -5,6 +5,8 @@ import { COMMUNITY_ID } from "@/src/lib/community";
 import { eventsCollectionPath, ensureOrgSlug, normalizeEvent, DEFAULT_TIMEZONE } from "@/src/lib/events";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { formatDateTime, type DateInput } from "@/src/lib/format";
+import { isValidTimeZone } from "@/src/lib/zonedTime";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +64,10 @@ async function renderEventPdf(event: any): Promise<Uint8Array> {
     label: { fontWeight: "bold" }
   });
 
-  const starts =
-    event.startsAt && new Date(event.startsAt.toDate?.() || event.startsAt).toLocaleString("en-US", { timeZone: event.timezone || DEFAULT_TIMEZONE });
-  const ends =
-    event.endsAt && new Date(event.endsAt.toDate?.() || event.endsAt).toLocaleString("en-US", { timeZone: event.timezone || DEFAULT_TIMEZONE });
+  // Friendly dates in the event's own zone, without seconds ("Sat, Dec 12, 2026 · 7:00 PM").
+  const timeZone = isValidTimeZone(event.timezone) ? event.timezone : DEFAULT_TIMEZONE;
+  const starts = formatDateTime(event.startsAt as DateInput, { timeZone }) || null;
+  const ends = formatDateTime(event.endsAt as DateInput, { timeZone }) || null;
 
   const doc = (
     <Document>
@@ -79,7 +81,7 @@ async function renderEventPdf(event: any): Promise<Uint8Array> {
         <View style={styles.section}>
           <Text style={styles.label}>Date/Time:</Text>
           <Text>
-            {starts ? starts : "TBD"}
+            {starts ? starts : "Date to be announced"}
             {ends ? ` - ${ends}` : ""}
           </Text>
         </View>
