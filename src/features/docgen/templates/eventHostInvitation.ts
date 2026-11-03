@@ -3,7 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const eventHostInvitation: DocTemplate = {
   id: "event-host-invitation",
-  version: 1,
+  version: 2,
   title: "Community Leader Invitation",
   category: "Events",
   description: "Invite a leader from another community to a GHMO event and ask them to spread the word.",
@@ -21,40 +21,38 @@ export const eventHostInvitation: DocTemplate = {
       rows: 5,
       placeholder: "Celebrating members, sharing cultural program, community gratitude."
     },
-    { id: "supportContact", label: "GHMO contact", type: "text", placeholder: "executive@ghmo.org" }
+    { id: "supportContact", label: "GHMO contact", type: "text", placeholder: "A name and phone number or email address" }
   ],
+  // Empty fields leave their sentence out; the letter never prints "TBD" or a made-up contact.
   renderHtml(inputs) {
     const organizationName =
       escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
-    const hostName = escapeHtml(inputs.hostName) || "Esteemed Community Leader";
+    const hostName = escapeHtml(inputs.hostName);
     const leaderCommunity = escapeHtml(inputs.leaderCommunity);
-    const eventName = escapeHtml(inputs.eventName) || "Upcoming GHMO Event";
-    const eventDate = formatDate(inputs.eventDate) || "TBD";
-    const eventTime = escapeHtml(inputs.eventTime) || "TBD";
-    const eventLocation = escapeHtml(inputs.eventLocation) || "TBD location";
-    const guestFocus = escapeHtml(inputs.guestFocus) || "";
-    const supportContact = escapeHtml(inputs.supportContact) || "executive@ghmo.org";
+    const eventName = escapeHtml(inputs.eventName) || "our upcoming event";
+    const eventDate = formatDate(inputs.eventDate);
+    const eventTime = escapeHtml(inputs.eventTime);
+    const eventLocation = escapeHtml(inputs.eventLocation);
+    const guestFocus = escapeHtml(inputs.guestFocus);
+    const supportContact = escapeHtml(inputs.supportContact);
+
+    const meta = [eventName, eventDate, eventTime, eventLocation].filter(Boolean).join(" · ");
+    const when = [eventDate ? ` on ${eventDate}` : "", eventTime ? ` at ${eventTime}` : "", eventLocation ? ` at ${eventLocation}` : ""].join("");
 
     return `
       <div>
         <p class="ghmo-letter-headline">Community Leader Invitation</p>
-        <p class="ghmo-letter-meta">${eventName} • ${eventDate} • ${eventTime} • ${eventLocation}</p>
+        <p class="ghmo-letter-meta">${meta}</p>
         <div class="ghmo-letter-body">
-          <p>Dear ${hostName}${leaderCommunity ? ` of ${leaderCommunity}` : ""},</p>
+          ${hostName ? `<p>Dear ${hostName},</p>` : ""}
           <p>
-            We are honored to invite you to participate in an upcoming GHMO event. Your leadership and relationship with the community make your presence especially meaningful to us.
-          </p>
-          <p>
-            ${eventName} is scheduled for ${eventDate} at ${eventTime} at ${eventLocation}. 
-            We respectfully request your support in sharing this gathering with your community and encouraging friends and neighbors to join.
+            We would be glad to have you with us at ${eventName}${when}. Your presence means a lot to our community, and we hope you will
+            share this invitation with ${leaderCommunity || "your community"} so friends and neighbors can join us too.
           </p>
           ${guestFocus ? `<p>${guestFocus}</p>` : ""}
-          <p>
-            Your involvement will help strengthen cultural collaboration and awareness across our communities. 
-            Please contact us if you have any questions or coordination requests.
-          </p>
+          <p>Gatherings like this bring our communities closer together. If you have any questions, please get in touch.</p>
           <p class="ghmo-letter-footer">Warm regards,<br/>${organizationName}</p>
-          <p class="ghmo-letter-footer" style="margin-top:0.5rem;">Contact: ${supportContact}</p>
+          ${supportContact ? `<p class="ghmo-letter-footer" style="margin-top:0.5rem;">Contact: ${supportContact}</p>` : ""}
         </div>
       </div>
     `;

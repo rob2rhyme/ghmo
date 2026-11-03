@@ -56,7 +56,7 @@ Follow these for every new or changed page.
 | Smallest | `text-xs`, only for badges, keyboard hints and counts |
 
 - No `text-[11px]`-style sizes, no ALL-CAPS labels (a single short eyebrow above a page title is the exception).
-- Sentence case for labels, buttons, page titles and nav ("Meeting minutes", "Save event"). Proper names keep their capitals: GHMO, GUMBA, Plans & Issues, YouTube.
+- Sentence case for labels, buttons, page titles and nav ("Meeting minutes", "Save event"). Proper names keep their capitals: GHMO, Gumba Project ("Gumba" is a word, not an acronym: never "GUMBA" or "Gumba project"), Plans & Issues, YouTube.
 
 ## Shape and space
 

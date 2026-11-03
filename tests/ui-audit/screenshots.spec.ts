@@ -68,8 +68,8 @@ async function seed() {
     status: "approved",
     approvedAt: Timestamp.fromMillis(now - 25 * day),
     createdAt: Timestamp.fromMillis(now - 30 * day),
-    agenda: ["Welcome and introductions", "Treasurer's report", "Dashain festival planning", "GUMBA project update"],
-    decisions: ["Dashain celebration on 10 October at the community hall", "Raise the GUMBA goal to $50,000"],
+    agenda: ["Welcome and introductions", "Treasurer's report", "Dashain festival planning", "Gumba Project update"],
+    decisions: ["Dashain celebration on 10 October at the community hall", "Raise the Gumba Project goal to $50,000"],
     actionItems: [
       { task: "Book the community hall", assignedTo: "Bikash", dueDate: Timestamp.fromMillis(now - 5 * day) },
       { task: "Send the festival flyer to members", assignedTo: "Sita", dueDate: Timestamp.fromMillis(now + 7 * day) }

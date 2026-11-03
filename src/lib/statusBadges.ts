@@ -19,7 +19,7 @@ const BROADCAST: Record<string, StatusBadge> = {
   approved: { label: "Approved", variant: "success" },
   sending: { label: "Sending", variant: "warning" },
   sent: { label: "Sent", variant: "success" },
-  cancelled: { label: "Cancelled", variant: "destructive" }
+  cancelled: { label: "Canceled", variant: "destructive" }
 };
 
 const TOPIC: Record<string, StatusBadge> = {

@@ -54,7 +54,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/calling-tree", label: "Calling tree", icon: Network, keywords: "callers, phone tree, assignments" },
       { href: "/admin/call-campaigns", label: "Call campaigns", icon: Megaphone, keywords: "phone round, rsvp, script, call progress" },
       { href: "/admin/my-calls", label: "My calls", icon: PhoneCall, keywords: "my people, log a call, call list" },
-      { href: "/admin/gumba-project", label: "GUMBA project", icon: Landmark, keywords: "donations, fundraising, gofundme, goal, temple" }
+      { href: "/admin/gumba-project", label: "Gumba Project", icon: Landmark, keywords: "donations, fundraising, gofundme, goal, temple" }
     ]
   },
   {

@@ -159,7 +159,7 @@ export default function EditEventPage() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <AdminPageHeader back={back} title="Edit event" description="Change the details, then save. Published changes show on the site straight away." />
+      <AdminPageHeader back={back} title="Edit event" description="Change the details, then save. Published changes show on the site right away." />
       <EventForm form={form} update={update} errors={errors} />
       {error ? (
         <Alert variant="destructive">

@@ -134,7 +134,7 @@ export function normalizeContact(input: Partial<Record<keyof MemberContact, stri
     if (raw === undefined || raw === null || !raw.trim()) continue;
     const normalized = normalizePhone(raw);
     if (normalized) contact[key] = normalized;
-    else problems.push(key === "phone" ? "The phone number is not recognised. Use 10 digits for US numbers, or +country code for others." : "The second number is not recognised.");
+    else problems.push(key === "phone" ? "The phone number is not recognized. Use 10 digits for US numbers, or +country code for others." : "The second number is not recognized.");
   }
   for (const key of ["language", "household", "notes"] as const) {
     const raw = input[key];

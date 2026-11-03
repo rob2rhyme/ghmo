@@ -37,7 +37,7 @@ export default async function AdminCommsThreadPage({ params }: AdminCommsThreadP
         <AdminPageHeader
           back={{ href: "/admin/comms", label: "Plans & Issues" }}
           title="Topic"
-          description="Read the discussion, add your view, and agree a conclusion together."
+          description="Read the discussion, add your view, and agree on a conclusion together."
         />
       </div>
       <FirebaseAdminAuthBootstrap>

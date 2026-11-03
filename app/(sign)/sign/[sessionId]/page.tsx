@@ -17,10 +17,12 @@ const ROLE_LABELS: Record<string, string> = {
   witness1: "Witness 1",
   witness2: "Witness 2",
   officiant: "Officiant",
-  issuingAuthority: "Issuing Authority"
+  issuingAuthority: "Issuing authority"
 };
 
 type SealTarget = { epoch: number; publicJwk: PublicJwk };
+
+const SUBMIT_FAILED = "Your signature couldn't be sent. Try again, or ask the person who sent the link for a new one.";
 
 function pngBytes(dataUrl: string) {
   const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -46,7 +48,7 @@ export default function SigningPage() {
       try {
         const response = await fetch(`/api/signing-sessions/${params.sessionId}`);
         if (!response.ok) {
-          setMessage("Session not found.");
+          setMessage("This signing link isn't valid.");
           return;
         }
         const payload = await response.json();
@@ -56,7 +58,7 @@ export default function SigningPage() {
         setSeal(payload.seal ?? null);
       } catch (error) {
         console.error("Failed to load signing session", error);
-        setMessage("Unable to load session.");
+        setMessage("We couldn't open this signing link.");
       }
     };
     fetchStatus();
@@ -157,13 +159,13 @@ export default function SigningPage() {
       });
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(errorPayload?.error ?? `Failed to submit (${response.status})`);
+        throw new Error(errorPayload?.error ?? SUBMIT_FAILED);
       }
       setStatus("signed");
       setMessage("Signature submitted. You can close this page.");
     } catch (error) {
       console.error("Signature submit failed", error);
-      setMessage(error instanceof Error ? error.message : "Failed to submit signature.");
+      setMessage(error instanceof Error ? error.message : SUBMIT_FAILED);
     } finally {
       setIsSubmitting(false);
     }
@@ -232,7 +234,7 @@ export default function SigningPage() {
                 Clear
               </Button>
               <Button type="button" size="lg" onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? "Submitting..." : "Submit signature"}
+                {isSubmitting ? "Submitting…" : "Submit signature"}
               </Button>
             </div>
           </>

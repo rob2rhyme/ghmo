@@ -34,7 +34,7 @@ const SECTIONS: Section[] = [
     title: "Setting up encryption on your device",
     steps: [
       "Open Encryption in the admin menu and give this device a name you will recognize, such as “Sita’s laptop”.",
-      "Another board member approves your device. Before they do, compare the safety code on both screens by phone or in person.",
+      "Another admin approves your device. Before they do, compare the safety code on both screens by phone or in person.",
       "After that, private records (chat, minutes, phone numbers) open on this device. Lock it when you step away."
     ],
     note: "A super admin turns encryption on once, with two trusted people present. Each of them keeps a paper copy of the recovery key."
@@ -44,7 +44,7 @@ const SECTIONS: Section[] = [
     title: "If you lose your phone or leave the board",
     steps: [
       "Lost your phone: sign in with one of your recovery codes, or ask a super admin to reset your authenticator app.",
-      "Lost a device that was set up for encryption: tell a super admin straight away so they can remove it.",
+      "Lost a device that was set up for encryption: tell a super admin right away so they can remove it.",
       "Leaving the board: a super admin turns off your access and removes your devices."
     ]
   }

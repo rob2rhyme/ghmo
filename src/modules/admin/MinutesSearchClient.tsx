@@ -66,7 +66,7 @@ export default function MinutesSearchClient({ initialMinutes: rawMinutes }: Minu
       <AdminSectionCard title="Find minutes" description="Search the text, or narrow by type, status and date.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Field label="Search" className="md:col-span-2">
-            <Input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Event title, agenda, decisions, attendees..." />
+            <Input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Event title, agenda, decisions, attendees…" />
           </Field>
           <Field label="Meeting type">
             <Select value={meetingTypeFilter} onChange={e => setMeetingTypeFilter(e.target.value)}>

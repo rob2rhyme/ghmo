@@ -69,7 +69,7 @@ export default async function GumbaProjectPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader title="GUMBA project" description="Our fundraising campaign for a Gumba, a shared home for Magar language and culture in Harrisburg." />
+      <AdminPageHeader title="Gumba Project" description="Our fundraising campaign for a Gumba, a shared home for Magar language and culture in Harrisburg." />
 
       <AdminSectionCard
         title="Fundraising progress"
