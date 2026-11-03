@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import type { Route } from "next";
 import { AlertTriangle, CalendarDays, CalendarPlus, CalendarX, Clock, FileText, MapPin } from "lucide-react";
 import { MessagePage } from "@/src/components/public/MessagePage";
@@ -30,7 +31,8 @@ async function isAdminViewer(): Promise<boolean> {
   try {
     await requireActiveAdmin(undefined, COMMUNITY_SLUG);
     return true;
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error);
     return false;
   }
 }
@@ -40,7 +42,8 @@ async function loadMinutes(eventId: string, admin: boolean): Promise<MeetingMinu
   if (!admin) return getApprovedMinutesForEvent(eventId);
   try {
     return ((await listAdminMinutes({ eventId }))[0] as MeetingMinutesRecord | undefined) ?? null;
-  } catch {
+  } catch (error) {
+    unstable_rethrow(error);
     return null;
   }
 }

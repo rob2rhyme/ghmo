@@ -1,5 +1,7 @@
 import "server-only";
 
+import { unstable_rethrow } from "next/navigation";
+
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { findEventDoc, normalizeEvent, queryEvents } from "./events";
 import type { EventRecord } from "./events.shared";
@@ -23,6 +25,8 @@ async function orNull<T>(label: string, read: () => Promise<T>): Promise<T | nul
   try {
     return await read();
   } catch (error) {
+    // Next signals "render this page per request" (and redirects, 404s) by throwing; let those through.
+    unstable_rethrow(error);
     console.error(`Public read failed: ${label}`, error instanceof Error ? error.message : String(error));
     return null;
   }
@@ -58,6 +62,7 @@ export async function getPublishedEvent(eventId: string): Promise<EventRecord | 
   try {
     return await cachedPublishedEvent(eventId);
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Public read failed: published event", error instanceof Error ? error.message : String(error));
     return undefined;
   }
