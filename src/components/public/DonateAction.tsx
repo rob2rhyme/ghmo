@@ -2,6 +2,7 @@ import "server-only";
 
 import Link from "next/link";
 import type { Route } from "next";
+import type { ReactNode } from "react";
 import { CalendarDays, Clock, ExternalLink, Mail } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
@@ -16,6 +17,8 @@ type DonateActionProps = {
   label?: string;
   /** While donations are closed, also offer other ways to take part (events, YouTube, email). */
   alternatives?: boolean;
+  /** One more sentence for the "open soon" notice (the Donate page says what gifts will go toward). */
+  detail?: ReactNode;
   className?: string;
 };
 
@@ -23,7 +26,7 @@ type DonateActionProps = {
  * The main "give" action: a GoFundMe button when the campaign link is set. Until then, a calm "open soon"
  * notice and, so the page is not a dead end, other ways to take part.
  */
-export function DonateAction({ donateUrl, label = "Donate via GoFundMe", alternatives = true, className }: DonateActionProps) {
+export function DonateAction({ donateUrl, label = "Donate via GoFundMe", alternatives = true, detail, className }: DonateActionProps) {
   if (donateUrl) {
     return (
       <Button asChild size="lg" className={cn("w-full sm:w-auto", className)}>
@@ -44,7 +47,10 @@ export function DonateAction({ donateUrl, label = "Donate via GoFundMe", alterna
       <Alert variant="info" role="note">
         <Clock />
         <AlertTitle>Donations open soon</AlertTitle>
-        <AlertDescription>Our GoFundMe page is being set up. Please check back here.</AlertDescription>
+        <AlertDescription>
+          Our GoFundMe page is being set up. Please check back here.
+          {detail ? <> {detail}</> : null}
+        </AlertDescription>
       </Alert>
       {alternatives ? (
         <div className="flex flex-wrap gap-2">

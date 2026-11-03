@@ -65,6 +65,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
   expect((edited.contact as { sig: string }).sig).not.toBe((sam.contact as { sig: string }).sig);
 
   // --- Import with a phone column: encrypted in the browser, consent recorded as imported ---
+  await page.getByRole("button", { name: "Import a list" }).click();
   await page.getByLabel("Paste your list").fill("email,name,phone\npat@example.org,Pat,717-555-0101\nkim@example.org,Kim,\n");
   await expect(shown(page, "2 valid addresses found. 1 with a phone number.")).toBeVisible();
   const importButton = page.getByRole("button", { name: /^Import 2 members$/ });
@@ -108,7 +109,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
 
 test("without encryption on, numbers cannot be added and a plaintext phone is never stored", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/members");
-  await expect(page.getByText("Phone numbers need end-to-end encryption, which is not on yet")).toBeVisible();
+  await expect(page.getByText("Encryption is off, so phone numbers can't be added yet")).toBeVisible();
   await expect(page.getByLabel("Phone (optional)")).toBeDisabled();
 
   const results = await page.evaluate(async () => {

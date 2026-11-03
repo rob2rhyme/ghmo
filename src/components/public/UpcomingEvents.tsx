@@ -36,7 +36,7 @@ export async function UpcomingEvents({ limit = 3 }: { limit?: number }) {
 
       {events?.length ? (
         <>
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3">
             {events.map(event => (
               <li key={event.id} className="min-w-0">
                 <EventCard evt={event} orgSlug={COMMUNITY_SLUG} compact flyer={false} headingLevel="h3" />

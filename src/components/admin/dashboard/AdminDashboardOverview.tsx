@@ -58,9 +58,9 @@ const QUICK_ACTIONS: { href: Route; title: string; description: string; icon: Lu
   { href: "/admin/minutes" as Route, title: "Meeting minutes", description: "Draft, approve and export minutes.", icon: NotebookPen },
   { href: "/admin/action-items" as Route, title: "Action items", description: "Follow up on what was agreed.", icon: ListChecks },
   { href: "/admin/events" as Route, title: "Events", description: "Manage upcoming and past events.", icon: CalendarDays },
-  { href: "/admin/document-generator" as Route, title: "Document generator", description: "Create formatted letters quickly.", icon: FileSignature },
-  { href: "/admin/document-gallery" as Route, title: "Document gallery", description: "Browse saved PDF documents.", icon: FolderOpen },
-  { href: "/admin/gumba-project" as Route, title: "GUMBA project", description: "Track project updates and tasks.", icon: Landmark }
+  { href: "/admin/document-generator" as Route, title: "Document generator", description: "Letters, invitations and certificates on GHMO letterhead.", icon: FileSignature },
+  { href: "/admin/document-gallery" as Route, title: "Document gallery", description: "Letters and certificates you saved.", icon: FolderOpen },
+  { href: "/admin/gumba-project" as Route, title: "Gumba Project", description: "Fundraising progress and the minutes behind it.", icon: Landmark }
 ];
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -111,6 +111,7 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
   };
 
   const donationsLastUpdate = latestWebhookMs ? relativeTime(latestWebhookMs, now) : "never";
+  const hasDonations = Boolean(stats.totalRaised || stats.donorCount);
 
   const toApproveHint = awaitingApproval
     ? drafts
@@ -143,39 +144,58 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
         }
       />
 
+      {/* Figures, with the one Donations card beside them. Before the first sync the two zero tiles fold into that card. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        {hasDonations ? (
+          <>
+            <AdminKpiCard
+              label="Raised"
+              value={formatMoney(stats.totalRaised)}
+              icon={CircleDollarSign}
+              className="col-span-2 md:col-span-1"
+              progress={goalPercent}
+              hint={goalPercent !== null ? `${goalPercent}% of the ${formatMoney(stats.goal)} goal` : "No fundraising goal from GoFundMe yet"}
+            />
+            <AdminKpiCard label="Donors" value={(stats.donorCount || 0).toLocaleString("en-US")} icon={UsersRound} hint={stats.donorCount ? "Given so far" : "Counted when donations sync"} />
+          </>
+        ) : null}
         <AdminKpiCard
-          label="Raised"
-          value={formatMoney(stats.totalRaised)}
-          icon={CircleDollarSign}
-          className="col-span-2 md:col-span-1"
-          progress={goalPercent}
-          hint={
-            goalPercent !== null
-              ? `${goalPercent}% of the ${formatMoney(stats.goal)} goal`
-              : stats.totalRaised
-                ? "No fundraising goal from GoFundMe yet"
-                : "No donations recorded yet"
-          }
-          action={
-            goalPercent === null ? (
-              <a href="#donations" className="font-medium text-primary underline-offset-4 hover:underline">
-                Sync from GoFundMe
-              </a>
-            ) : null
-          }
+          label="To approve"
+          value={awaitingApproval}
+          icon={NotebookPen}
+          href={"/admin/minutes?mode=records" as Route}
+          hint={toApproveHint}
+          className={hasDonations ? undefined : "col-span-2 md:col-span-1"}
         />
-        <AdminKpiCard
-          label="Donors"
-          value={(stats.donorCount || 0).toLocaleString("en-US")}
-          icon={UsersRound}
-          hint={stats.donorCount ? "Given so far" : "Counted when donations sync"}
-        />
-        <AdminKpiCard label="To approve" value={awaitingApproval} icon={NotebookPen} href={"/admin/minutes?mode=records" as Route} hint={toApproveHint} />
+        <AdminSectionCard
+          title="Donations"
+          description={hasDonations ? `Totals come from GoFundMe. Last update: ${donationsLastUpdate}.` : undefined}
+          className={hasDonations ? "col-span-2 md:col-span-3" : "col-span-2 md:col-span-2"}
+          actions={
+            <Button variant="outline" onClick={triggerReconcile} loading={reconciling}>
+              <RefreshCw aria-hidden="true" />
+              Sync donations
+            </Button>
+          }
+        >
+          {hasDonations ? (
+            <div className="flex items-start gap-3">
+              <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${webhookEvents?.length ? "bg-success" : "bg-muted-foreground/40"}`} />
+              <div className="min-w-0">
+                <p className="text-sm text-foreground" suppressHydrationWarning>
+                  {webhookEvents?.length ? `${plural(webhookEvents.length, "update")} from GoFundMe recently.` : "No updates from GoFundMe yet."}
+                </p>
+                <p className="text-sm text-muted-foreground">If a gift is missing from the totals, press Sync donations.</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No donations synced yet.</p>
+          )}
+        </AdminSectionCard>
       </div>
 
-      {/* Phones go straight from the figures to the recent lists; the jump dialog (Ctrl/⌘ K, or the menu) covers the rest. */}
-      <section aria-labelledby="quick-actions-heading" className="hidden flex-col gap-3 md:flex">
+      {/* Tablets only: phones go straight from the figures to the recent lists, and from lg the sidebar already lists these pages. */}
+      <section aria-labelledby="quick-actions-heading" className="hidden flex-col gap-3 md:flex lg:hidden">
         <div className="min-w-0">
           <h2 id="quick-actions-heading" className="text-lg font-semibold tracking-tight text-foreground">
             Quick actions
@@ -255,29 +275,6 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
               })}
             </ol>
           )}
-        </AdminSectionCard>
-      </div>
-
-      <div id="donations" className="scroll-mt-24">
-        <AdminSectionCard
-          title="Donations"
-          description={`Totals come from GoFundMe. Last update: ${donationsLastUpdate}.`}
-          actions={
-            <Button variant="outline" onClick={triggerReconcile} loading={reconciling}>
-              <RefreshCw aria-hidden="true" />
-              Sync donations
-            </Button>
-          }
-        >
-          <div className="flex items-start gap-3">
-            <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${webhookEvents?.length ? "bg-success" : "bg-muted-foreground/40"}`} />
-            <div className="min-w-0">
-              <p className="text-sm text-foreground" suppressHydrationWarning>
-                {webhookEvents?.length ? `${plural(webhookEvents.length, "update")} from GoFundMe recently.` : "No updates from GoFundMe yet."}
-              </p>
-              <p className="text-sm text-muted-foreground">If a gift is missing from the totals, press Sync donations.</p>
-            </div>
-          </div>
         </AdminSectionCard>
       </div>
     </div>

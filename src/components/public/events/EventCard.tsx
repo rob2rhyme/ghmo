@@ -6,7 +6,7 @@ import { Button } from "@/src/components/ui/button";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import type { EventRecord } from "@/src/lib/events.shared";
 import { cn } from "@/src/lib/utils";
-import { dateTile, eventStart, eventTimeZone, eventWhenShort } from "./eventDates";
+import { dateTile, eventStart, eventTimeZone, eventWhenParts } from "./eventDates";
 
 export function eventHref(orgSlug: string, id: string) {
   return `/c/${orgSlug}/events/${id}` as Route;
@@ -38,6 +38,7 @@ type EventCardProps = {
 export function EventCard({ evt, orgSlug, compact = false, flyer = true, headingLevel = "h2" }: EventCardProps) {
   const start = eventStart(evt);
   const tile = start ? dateTile(start, eventTimeZone(evt)) : null;
+  const when = eventWhenParts(evt);
   const Heading = headingLevel;
 
   return (
@@ -61,7 +62,15 @@ export function EventCard({ evt, orgSlug, compact = false, flyer = true, heading
           </Heading>
           <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0">{eventWhenShort(evt)}</span>
+            <span className="min-w-0">
+              {when ? (
+                <>
+                  {when.date} · <span className="whitespace-nowrap">{when.time}</span>
+                </>
+              ) : (
+                "Date to be announced"
+              )}
+            </span>
           </p>
           {evt.location ? (
             <p className="flex items-start gap-1.5 text-sm text-muted-foreground">

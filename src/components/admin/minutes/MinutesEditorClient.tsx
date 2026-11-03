@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { jsPDF } from "jspdf";
-import * as htmlToImage from "html-to-image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Download, Plus, X } from "lucide-react";
@@ -361,7 +359,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
     const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
     const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
     try {
-      const dataUrl = await htmlToImage.toPng(minutesPreviewRef.current, {
+      // Loaded on demand: the export libraries are only needed when someone downloads.
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(minutesPreviewRef.current, {
         width: exportWidth,
         height: exportHeight,
         pixelRatio: PIXEL_RATIO,
@@ -378,6 +378,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
         downloadDataUrl(`${baseName}.jpg`, dataUrl);
         toast.success("Image (JPEG) downloaded.");
       } else {
+        const { jsPDF } = await import("jspdf");
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
@@ -657,7 +658,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
           <AdminSectionCard title="Agenda" description="The topics, in the order they came up.">
             <div className="flex flex-col gap-3">
               {formState.agenda.map((item, index) => (
-                <RemovableRow key={`agenda-${index}`} removeLabel={`Remove agenda item ${index + 1}`} onRemove={() => removeTextListEntry("agenda", index)}>
+                <RemovableRow
+                  key={`agenda-${index}`}
+                  removeLabel={`Remove agenda item ${index + 1}`}
+                  removable={formState.agenda.length > 1 || item.trim() !== ""}
+                  onRemove={() => removeTextListEntry("agenda", index)}
+                >
                   <Input
                     aria-label={`Agenda item ${index + 1}`}
                     value={item}
@@ -683,7 +689,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
           <AdminSectionCard title="Decisions made" description="One line per motion or decision.">
             <div className="flex flex-col gap-3">
               {formState.decisions.map((item, index) => (
-                <RemovableRow key={`decision-${index}`} removeLabel={`Remove decision ${index + 1}`} onRemove={() => removeTextListEntry("decisions", index)}>
+                <RemovableRow
+                  key={`decision-${index}`}
+                  removeLabel={`Remove decision ${index + 1}`}
+                  removable={formState.decisions.length > 1 || item.trim() !== ""}
+                  onRemove={() => removeTextListEntry("decisions", index)}
+                >
                   <Input
                     aria-label={`Decision ${index + 1}`}
                     value={item}
@@ -704,7 +715,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                     <Field label={`Task ${index + 1}`} className="min-w-0 flex-1">
                       <Input value={item.task} onChange={e => updateActionItem(index, "task", e.target.value)} placeholder="Task" />
                     </Field>
-                    <RemoveButton label={`Remove action item ${index + 1}`} onRemove={() => removeActionItem(index)} />
+                    {formState.actionItems.length > 1 || item.task.trim() || item.assignedTo?.trim() || item.dueDate ? (
+                      <RemoveButton label={`Remove action item ${index + 1}`} onRemove={() => removeActionItem(index)} />
+                    ) : null}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Who will do it (optional)">
@@ -938,7 +951,7 @@ function MinutesNextStep({
           <ul className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground">
             {versions.map(v => (
               <li key={v.version} className="break-words">
-                Version {v.version} · {v.approvedAt ? formatDateTime(v.approvedAt) : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
+                Version {v.version} · {v.approvedAt ? formatDateTime(v.approvedAt) : "date unknown"}
               </li>
             ))}
           </ul>
@@ -948,12 +961,12 @@ function MinutesNextStep({
   );
 }
 
-/** A text field with a 44 px labelled remove button beside it. */
-function RemovableRow({ children, removeLabel, onRemove }: { children: ReactNode; removeLabel: string; onRemove: () => void }) {
+/** A text field with a 44 px labelled remove button beside it (hidden while the list is one empty row). */
+function RemovableRow({ children, removeLabel, removable = true, onRemove }: { children: ReactNode; removeLabel: string; removable?: boolean; onRemove: () => void }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <div className="min-w-0 flex-1">{children}</div>
-      <RemoveButton label={removeLabel} onRemove={onRemove} />
+      {removable ? <RemoveButton label={removeLabel} onRemove={onRemove} /> : null}
     </div>
   );
 }

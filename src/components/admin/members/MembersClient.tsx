@@ -37,7 +37,6 @@ import {
   type MemberContact,
   type MemberEmailState
 } from "@/src/lib/members";
-import { cn } from "@/src/lib/utils";
 
 export type MemberRow = {
   id: string;
@@ -94,8 +93,8 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
   const [disabling, setDisabling] = useState<MemberRow | null>(null);
-  /** Phones and tablets only: which form is open (both are always shown from lg). */
-  const [panel, setPanel] = useState<"add" | "import" | null>(null);
+  /** Which form is open above the list, at every width. An empty list starts with the Add form open. */
+  const [panel, setPanel] = useState<"add" | "import" | null>(initialMembers.length === 0 ? "add" : null);
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -270,8 +269,8 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
     <div className="flex flex-col gap-6">
       <PhoneAccessNotice status={e2ee.status} enabled={e2ee.enabled} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />
 
-      {/* Phones and tablets: the list comes first; adding and importing open from these two buttons. */}
-      <div className="flex flex-wrap gap-2 lg:hidden">
+      {/* The list comes first at every width; adding and importing open from these two buttons. */}
+      <div className="flex flex-wrap gap-2">
         <Button variant={panel === "add" ? "secondary" : "outline"} size="row" aria-expanded={panel === "add"} aria-controls="member-add-panel" onClick={() => togglePanel("add")}>
           <UserPlus aria-hidden="true" /> Add a member
         </Button>
@@ -286,9 +285,9 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
         </Button>
       </div>
 
-      <div className={cn("grid gap-6 lg:grid-cols-2", panel === null && "max-lg:hidden")}>
-        <div id="member-add-panel" className={cn("min-w-0", panel !== "add" && "max-lg:hidden")}>
-          <AdminSectionCard title="Add a member" description={`Only tick a box if this person told you so. ${phoneSentence}`} className="h-full">
+      {panel === "add" ? (
+        <div id="member-add-panel" className="min-w-0">
+          <AdminSectionCard title="Add a member" description={`Only check a box if this person told you so. ${phoneSentence}`}>
             <form onSubmit={addMember} className="flex flex-col gap-4">
               <Field label="Email">
                 <Input id="member-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" placeholder="name@example.org" />
@@ -335,9 +334,11 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
             </form>
           </AdminSectionCard>
         </div>
+      ) : null}
 
-        <div id="member-import-panel" className={cn("min-w-0", panel !== "import" && "max-lg:hidden")}>
-          <AdminSectionCard title="Import a list" description="Add many people at once from a spreadsheet or an email list." className="h-full">
+      {panel === "import" ? (
+        <div id="member-import-panel" className="min-w-0">
+          <AdminSectionCard title="Import a list" description="Add many people at once from a spreadsheet or an email list.">
             <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               <li>
                 Paste one email per line, or comma-separated rows (CSV) with the columns email, name and phone. Name and phone are optional. Up to {MAX_IMPORT_ROWS} at a
@@ -403,15 +404,15 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 {!preview || preview.rows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Paste a list above to see how many people will be added.</p>
                 ) : !attested ? (
-                  <p className="text-sm text-muted-foreground">Tick the box above to confirm these people agreed.</p>
+                  <p className="text-sm text-muted-foreground">Check the box above to confirm these people agreed.</p>
                 ) : previewPhones > 0 && !phoneAttested && !importBlocked ? (
-                  <p className="text-sm text-muted-foreground">Tick the call box too, or remove the phone column.</p>
+                  <p className="text-sm text-muted-foreground">Check the call box too, or remove the phone column.</p>
                 ) : null}
               </div>
             </div>
           </AdminSectionCard>
         </div>
-      </div>
+      ) : null}
 
       <AdminSectionCard
         title="Member list"
@@ -442,7 +443,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
             icon={members.length === 0 ? <Mail aria-hidden="true" /> : <SearchX aria-hidden="true" />}
             title={members.length === 0 ? "No members yet" : "No one matches"}
             description={
-              members.length === 0 ? "Add people one at a time or import a list. Only tick consent if the person told you so." : "Try another search, or show everyone."
+              members.length === 0 ? "Add people one at a time or import a list. Only check consent if the person told you so." : "Try another search, or show everyone."
             }
             action={
               members.length > 0 ? (
@@ -456,7 +457,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                   Show everyone
                 </Button>
               ) : panel === null ? (
-                <Button variant="outline" size="row" className="lg:hidden" onClick={() => setPanel("add")}>
+                <Button variant="outline" size="row" onClick={() => setPanel("add")}>
                   <UserPlus aria-hidden="true" /> Add the first member
                 </Button>
               ) : null
@@ -476,8 +477,6 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
               return (
                 <AdminListRow
                   key={member.id}
-                  // Several actions per row: keep them under the details at every width so they wrap instead of pushing sideways.
-                  className="sm:flex-col sm:items-stretch"
                   title={<span className="break-all">{displayName}</span>}
                   meta={member.name ? <span className="break-all">{member.emailLower}</span> : undefined}
                   badges={
@@ -591,7 +590,7 @@ function PhoneAccessNotice({ status, enabled, superAdmin }: { status: ReturnType
     return (
       <Alert variant="warning">
         <ShieldOff />
-        <AlertTitle>Phone numbers need end-to-end encryption, which is not on yet</AlertTitle>
+        <AlertTitle>Encryption is off, so phone numbers can&apos;t be added yet</AlertTitle>
         <AlertDescription>
           Email works now. Numbers can be stored once encryption is on, so the server never sees them.{" "}
           {superAdmin ? (
@@ -624,7 +623,7 @@ function PhoneAccessNotice({ status, enabled, superAdmin }: { status: ReturnType
 
 /** Help under the Phone field: why it is greyed out right now, and what to do about it. */
 function PhoneFieldHint({ status, enabled, ready, superAdmin }: { status: ReturnType<typeof useE2ee>["status"]; enabled: boolean; ready: boolean; superAdmin: boolean }) {
-  if (ready) return <>Encrypted on this device before it is saved. Tick the call box below only if they agreed.</>;
+  if (ready) return <>Encrypted on this device before it is saved. Check the call box below only if they agreed.</>;
   if (status === "loading") return <>Checking encryption…</>;
   if (!enabled) {
     return (

@@ -24,8 +24,8 @@ export default async function CommunityLanding() {
             Greater Harrisburg Magar Organization
           </h1>
           <div className="w-full max-w-sm">
-            <Image src="/assets/ghmo-akkha.png" alt={AKKHA_ALT} width={1287} height={126} className="h-auto w-full dark:hidden" priority />
-            <Image src="/assets/ghmo-dark-mode.png" alt={AKKHA_ALT} width={1287} height={126} className="hidden h-auto w-full dark:block" priority />
+            <Image src="/assets/ghmo-akkha.png" alt={AKKHA_ALT} width={1287} height={126} className="h-auto w-full dark:hidden" />
+            <Image src="/assets/ghmo-dark-mode.png" alt={AKKHA_ALT} width={1287} height={126} className="hidden h-auto w-full dark:block" />
           </div>
           <p className="max-w-xl text-lg text-muted-foreground">
             We are the Magar community of Greater Harrisburg, keeping our language, culture and traditions alive for the next
@@ -46,6 +46,7 @@ export default async function CommunityLanding() {
             </Button>
           </div>
         </div>
+        {/* The whole scene, as the page's one preloaded picture (the Donate page crops the same art to the building). */}
         <div className="relative aspect-3/2 min-w-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs">
           <Image
             src={HOME_HERO_IMAGE.src}

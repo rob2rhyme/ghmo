@@ -57,6 +57,7 @@ test("importing needs the consent attestation, skips existing people and never r
   await members().doc("old").set({ email: "old@example.org", emailLower: "old@example.org", status: "active", roles: ["member"], emailOptOutAt: new Date() });
   await signInWithNewPasskey(page, "alice", "/admin/members");
 
+  await page.getByRole("button", { name: "Import a list" }).click();
   await page.getByLabel("Paste your list").fill("email,name\nnew@example.org,New Person\nold@example.org,Old Person\nbroken\n");
   await expect(shown(page, "2 valid addresses found.")).toBeVisible();
   await expect(page.getByText("is not a valid email address")).toBeVisible();

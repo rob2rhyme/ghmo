@@ -45,12 +45,18 @@ export function dateTile(date: Date, timeZone: string) {
   };
 }
 
+/** The pieces of the list line: { date: "Sat, Dec 12, 2026", time: "7:00 PM EST" }, so a card can keep time and zone on one line. */
+export function eventWhenParts(evt: Pick<EventRecord, "startsAt" | "timezone">): { date: string; time: string } | null {
+  const start = eventStart(evt);
+  if (!start) return null;
+  const timeZone = eventTimeZone(evt);
+  return { date: formatDate(start, { timeZone }), time: `${formatTime(start, { timeZone })} ${timeZoneLabel(start, timeZone)}`.trim() };
+}
+
 /** One line for lists: "Sat, Dec 12, 2026 · 7:00 PM EST". */
 export function eventWhenShort(evt: Pick<EventRecord, "startsAt" | "timezone">): string {
-  const start = eventStart(evt);
-  if (!start) return "Date to be announced";
-  const timeZone = eventTimeZone(evt);
-  return `${formatDate(start, { timeZone })} · ${formatTime(start, { timeZone })} ${timeZoneLabel(start, timeZone)}`.trim();
+  const parts = eventWhenParts(evt);
+  return parts ? `${parts.date} · ${parts.time}` : "Date to be announced";
 }
 
 /** Date and time range for the detail page: { date: "Sat, Dec 12, 2026", time: "7:00 PM – 9:00 PM EST" }. */

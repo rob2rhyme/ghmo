@@ -17,7 +17,7 @@ function Steps({ steps, label, layout = "row", className }: { steps: Step[]; lab
           key={i}
           aria-current={step.state === "current" ? "step" : undefined}
           className={cn(
-            "flex min-w-0 items-start gap-3 rounded-xl border p-3",
+            "flex min-w-0 flex-wrap items-start gap-3 rounded-xl border p-3",
             step.state === "current" ? "border-primary/50 bg-primary/5" : "border-border bg-card"
           )}
         >
@@ -39,7 +39,7 @@ function Steps({ steps, label, layout = "row", className }: { steps: Step[]; lab
             </span>
             {step.description ? <span className="mt-0.5 block text-sm text-muted-foreground">{step.description}</span> : null}
           </span>
-          {step.action ? <span className="shrink-0 self-center">{step.action}</span> : null}
+          {step.action ? <span className="basis-full pl-10 sm:basis-auto sm:shrink-0 sm:self-center sm:pl-0">{step.action}</span> : null}
         </li>
       ))}
     </ol>

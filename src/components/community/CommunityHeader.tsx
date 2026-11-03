@@ -40,7 +40,7 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
         <Link href="/" className="flex min-h-11 min-w-0 items-center gap-3 rounded-md text-foreground">
-          <ThemeLogo alt="" priority className="size-9" />
+          <ThemeLogo alt="" className="size-9" />
           <span className="truncate text-base font-semibold">
             <span className="xl:hidden">GHMO</span>
             <span className="hidden xl:inline">{label}</span>
@@ -136,17 +136,10 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
   );
 }
 
-/** The header's one call to action. On /donate it is marked as the current page (underline bar, like the links). */
+/** The header's one call to action. On /donate itself it steps back to an outline button marked as the current page. */
 function DonateButton({ label, current, iconFrom }: { label: string; current: boolean; iconFrom?: "sm" }) {
   return (
-    <Button
-      asChild
-      size="lg"
-      className={cn(
-        "relative px-4",
-        current && "after:absolute after:inset-x-3 after:-bottom-2 after:h-0.5 after:rounded-full after:bg-primary"
-      )}
-    >
+    <Button asChild size="lg" variant={current ? "outline" : "default"} className="px-4">
       <Link href={DONATE_HREF} aria-current={current ? "page" : undefined}>
         <HandHeart className={iconFrom === "sm" ? "hidden sm:block" : undefined} aria-hidden="true" />
         {label}
