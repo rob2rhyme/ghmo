@@ -88,6 +88,15 @@ scale and structure work. S7 (per-email sign-in limit), S10 (`__Host-` cookie: t
 (shape checks in Firestore rules), S16's SHA pinning and S18's permission matrix are next on the security list. L6's
 second half (different artwork on Donate) waits for the owner's photos.
 
+**Rerun after the fixes** (same method as the audit): typecheck and lint clean (75 warnings, cap 77), 331 unit tests,
+97 emulator tests, 221 browser tests, 334 screenshots with axe at 0, production build and its 41 browser tests.
+Lighthouse, phone score before → after: Home 50 → 80, Donate 59 → 84, Events 58 → 87, Minutes 51 → 83, Media 80 → 92,
+Board guide 78 → 99, Admin sign-in 72 → 99, Member sign-in 78 → 97; page weight 1.3 MB → 0.4–0.5 MB everywhere; phone
+blocking time 660–1,070 ms → 110–240 ms; desktop Donate CLS 0.91 → 0. The desktop Home shift (0.53) was the route's
+loading skeleton being replaced by the page: the events and feeds now stream behind placeholders of their own height.
+Media's phone LCP rose to 3.3 s because the featured card gained a picture (measured against the 4 MB original; now the
+WebP, preloaded). Phones are not at 90 yet: the rest is P2–P4 (server rendering per request and the self-calls).
+
 **Still needs the owner:** `GOFUNDME_PUBLIC_URL`, `CONTACT_EMAIL`, social links, community photos, and turning off
 password sign-in in the Firebase console (checklist).
 
