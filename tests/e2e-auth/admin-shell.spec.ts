@@ -107,3 +107,10 @@ test("on a phone the menu shows every page, then the user and Sign out at the en
   await expect(page).toHaveURL(/\/admin\/security$/);
   await context.close();
 });
+
+test("Plans & Issues: the header's New topic button opens the form with the title field ready", async ({ page }) => {
+  await signInWithNewPasskey(page, "alice", "/admin/comms");
+  await page.getByRole("link", { name: "New topic" }).click();
+  await expect(page).toHaveURL(/\/admin\/comms\?new=1$/);
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toBeFocused();
+});
