@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const entry = await getArchiveEntry((await params).id);
-  return { title: entry ? `${entry.eventTitle} minutes · GHMO` : "Minutes not found" };
+  // A missing record shows the 404 page, but streaming has already sent "200", so keep search engines out.
+  return entry ? { title: `${entry.eventTitle} minutes · GHMO` } : { title: "Page not found · GHMO", robots: { index: false, follow: true } };
 }
 
 function List({ title, items }: { title: string; items: string[] }) {

@@ -2,6 +2,7 @@
 
 import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   doc,
@@ -11,7 +12,7 @@ import {
   query,
   serverTimestamp
 } from "firebase/firestore";
-import { MessagesSquare, Plus, Search } from "lucide-react";
+import { MessagesSquare, Search } from "lucide-react";
 import type { Route } from "next";
 import { toast } from "sonner";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
@@ -68,6 +69,11 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   const [createStatus, setCreateStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  // The page header's "New topic" button links to ?new=1; the form opens and the title field gets focus.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const wantsNew = searchParams.get("new") === "1";
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const draft = useEncryptedDraft({
@@ -168,7 +174,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
       setBody("");
       setPriority("normal");
       setPinned(false);
-      setFormOpen(false);
+      closeForm();
       toast.success("Topic started.");
     } catch (error) {
       setCreateStatus(`Couldn't start the topic. ${(error instanceof Error && error.message) || "Check your connection and try again."}`);
@@ -184,17 +190,22 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   }, [threads]);
 
   // The form is shown when asked for, when there is nothing to list yet, or when a draft is waiting.
-  const showForm = formOpen || (!loading && !loadError && threads.length === 0) || Boolean(draft.pending);
-  const canHideForm = threads.length > 0 && !draft.pending;
+  const showForm = formOpen || wantsNew || (!loading && !loadError && threads.length === 0) || Boolean(draft.pending);
+  const closeForm = () => {
+    setFormOpen(false);
+    if (wantsNew) router.replace(pathname as Route, { scroll: false });
+  };
 
-  const openForm = () => {
-    setFormOpen(true);
-    setCreateStatus(null);
-    requestAnimationFrame(() => {
+  useEffect(() => {
+    if (!wantsNew) return;
+    const frame = requestAnimationFrame(() => {
       titleInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
       titleInputRef.current?.focus({ preventScroll: true });
     });
-  };
+    return () => cancelAnimationFrame(frame);
+  }, [wantsNew]);
+  const canHideForm = threads.length > 0 && !draft.pending;
+
 
   const retry = () => {
     setLoadError(null);
@@ -225,7 +236,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           description="Say what needs deciding. Other admins comment, and the topic closes with an agreed conclusion."
           actions={
             canHideForm ? (
-              <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>
+              <Button type="button" variant="ghost" onClick={closeForm}>
                 Cancel
               </Button>
             ) : null
@@ -270,14 +281,6 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
       <AdminSectionCard
         title="Topics"
         description="Newest activity first. Open a topic to read and reply."
-        actions={
-          !showForm && !loading && !loadError ? (
-            <Button type="button" onClick={openForm}>
-              <Plus aria-hidden="true" />
-              New topic
-            </Button>
-          ) : null
-        }
       >
         {!loading && !loadError && threads.length > 0 ? (
           <div className="flex flex-wrap items-center gap-3">
