@@ -8,6 +8,7 @@ import { parseJsonBody } from "@/src/lib/validation";
 import { toPlain } from "@/src/lib/serialize.server";
 import { isValidTimeZone, parseEventDate } from "@/src/lib/zonedTime";
 import { z } from "zod";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -169,6 +170,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
         route: "/api/admin/organizations/[orgSlug]/events/[eventId]"
       }
     });
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     return NextResponse.json({ ok: true, event: normalizeEvent(doc) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -214,6 +216,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
       resource: { type: "event", id: params.eventId, summary: `Deleted event: ${params.eventId}` },
       meta: { eventId: params.eventId, route: "/api/admin/organizations/[orgSlug]/events/[eventId]" }
     });
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AdminEnvError) {

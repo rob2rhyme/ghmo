@@ -2,46 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
-import { normalizeBroadcastContent, planBroadcastTransition, planContentEdit, selectRecipients } from "@/src/lib/broadcast";
+import { normalizeBroadcastContent, planBroadcastTransition, planContentEdit } from "@/src/lib/broadcast";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { orgBroadcastsCollectionPath, orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlain } from "@/src/lib/serialize.server";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { parseJsonBody } from "@/src/lib/validation";
-import { sendingConfigFromEnv } from "@/src/lib/broadcastSending";
-import { broadcastProgress, sendingBlocker } from "@/src/lib/broadcastSender.server";
-import { isMailConfigured } from "@/src/lib/mailer.server";
+import { broadcastRecipientCount, loadBroadcastDetail, loadBroadcastDoc } from "@/src/lib/adminData.server";
 
 export const dynamic = "force-dynamic";
 
-const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const ROUTE = "/api/admin/broadcasts/[broadcastId]";
-
-async function load(broadcastId: string) {
-  if (!ID_PATTERN.test(broadcastId)) return null;
-  const ref = getAdminDb().doc(`${orgBroadcastsCollectionPath(COMMUNITY_SLUG)}/${broadcastId}`);
-  const snap = await ref.get();
-  return snap.exists ? { ref, data: snap.data() as Record<string, unknown> } : null;
-}
-
-async function recipientCount(): Promise<number> {
-  const snap = await getAdminDb().collection(orgMembersCollectionPath(COMMUNITY_SLUG)).get();
-  return selectRecipients(snap.docs.map(doc => doc.data() as Parameters<typeof selectRecipients>[0][number])).length;
-}
+const load = loadBroadcastDoc;
+const recipientCount = broadcastRecipientCount;
 
 export async function GET(req: NextRequest, context: { params: Promise<{ broadcastId: string }> }) {
   const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
   if ("response" in guard) return guard.response;
-  const found = await load((await context.params).broadcastId);
-  if (!found) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
-  const sendingState = found.data.status === "sending" || found.data.status === "sent";
-  return NextResponse.json({
-    broadcast: toPlain({ id: found.ref.id, ...found.data }),
-    recipientCount: await recipientCount(),
-    progress: sendingState ? await broadcastProgress(found.ref) : null,
-    sendingBlocker: sendingBlocker(sendingConfigFromEnv(), isMailConfigured())
-  });
+  const detail = await loadBroadcastDetail((await context.params).broadcastId);
+  if (!detail) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
+  return NextResponse.json(detail);
 }
 
 const patchSchema = z.union([

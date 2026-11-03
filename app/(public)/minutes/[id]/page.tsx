@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { formatDate, formatShortDate } from "@/src/lib/format";
-import { getArchiveEntry } from "@/src/lib/minutesArchive.server";
+import { getArchiveEntry } from "@/src/lib/publicData.server";
 
-export const dynamic = "force-dynamic";
+// Built on first visit and refreshed every 5 minutes, or at once when minutes are approved (publicCache.server.ts).
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const entry = await getArchiveEntry((await params).id);

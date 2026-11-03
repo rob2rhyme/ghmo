@@ -1,5 +1,6 @@
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listAdminMinutes } from "@/src/lib/adminData.server";
+import { readDonationStats } from "@/src/lib/publicData.server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
@@ -14,7 +15,7 @@ import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { percentOf } from "@/src/lib/adminView";
 import { formatDate, formatDateTime, formatShortDate, toDate, type DateInput } from "@/src/lib/format";
-import { MeetingAttendance } from "@/src/lib/minutes";
+import type { MeetingAttendance, MeetingMinutesRecord } from "@/src/lib/minutes";
 import { resolveActorLabel } from "@/src/lib/actor";
 import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
 import { statusBadge } from "@/src/lib/statusBadges";
@@ -38,24 +39,8 @@ export default async function GumbaProjectPage() {
     throw error;
   }
 
-  const statsRes = await internalFetch(
-    `/api/organizations/${COMMUNITY_SLUG}/donations/stats`
-  );
-  if (!statsRes.ok) throw new Error("Failed to load donation stats");
-  const { stats } = (await statsRes.json()) as {
-    stats: {
-      totalRaised?: number;
-      goal?: number;
-      lastUpdatedAt?: DateInput;
-    };
-  };
-
-  const minutesRes = await internalFetch(`/api/admin/minutes`);
-  if (!minutesRes.ok) {
-    const body = await minutesRes.text().catch(() => "");
-    throw new Error(`Failed to load minutes (${minutesRes.status}): ${body}`);
-  }
-  const { minutes } = await minutesRes.json();
+  // Admins see the stored totals as they are now, not the public pages' 5-minute copy.
+  const [stats, minutes] = await Promise.all([readDonationStats(), listAdminMinutes() as Promise<MeetingMinutesRecord[]>]);
 
   const totalRaised = stats?.totalRaised ?? 0;
   const goal = stats?.goal ?? 0;

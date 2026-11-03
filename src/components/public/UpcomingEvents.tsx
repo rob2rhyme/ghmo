@@ -6,20 +6,18 @@ import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { EventCard, eventsHref } from "@/src/components/public/events/EventCard";
+import { eventStart } from "@/src/components/public/events/eventDates";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import type { EventRecord } from "@/src/lib/events.shared";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { cachedPageData } from "@/src/lib/publicCache.server";
+import { getPublishedEvents } from "@/src/lib/publicData.server";
 
 /** Up to `limit` published upcoming events, soonest first; null when they could not be loaded. */
 async function loadUpcomingEvents(limit: number): Promise<EventRecord[] | null> {
-  try {
-    const res = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/events?status=future`);
-    if (!res.ok) return null;
-    const { events } = (await res.json()) as { events?: EventRecord[] };
-    return (events ?? []).slice(0, limit);
-  } catch {
-    return null;
-  }
+  const events = cachedPageData(await getPublishedEvents(), "Upcoming events");
+  if (!events) return null;
+  const now = Date.now();
+  return events.filter(event => (eventStart(event)?.getTime() ?? now) >= now).slice(0, limit);
 }
 
 /** Home page "Next events": up to three published upcoming events, as the same cards as the Events page. */

@@ -5,7 +5,7 @@ import ActionItemsClient from "@/src/components/admin/actions/ActionItemsClient"
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listAdminMinutes } from "@/src/lib/adminData.server";
 import { toPlain } from "@/src/lib/serialize.server";
 import type { MeetingMinutesRecord } from "@/src/lib/minutes";
 
@@ -21,9 +21,7 @@ export default async function ActionItemsPage() {
     throw error;
   }
 
-  const res = await internalFetch("/api/admin/minutes");
-  if (!res.ok) throw new Error(`Failed to load minutes (${res.status})`);
-  const { minutes } = (await res.json()) as { minutes?: MeetingMinutesRecord[] };
+  const minutes = (await listAdminMinutes()) as MeetingMinutesRecord[];
   // Only approved minutes carry action items to track; their content is public, so no decryption is needed.
   const approved = toPlain((minutes ?? []).filter(record => record.status === "approved")) as MeetingMinutesRecord[];
 

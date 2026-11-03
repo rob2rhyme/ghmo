@@ -1,7 +1,7 @@
 //app/(admin)/admin/events/page.tsx
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listAdminEvents } from "@/src/lib/adminData.server";
 import Link from "next/link";
 import type { Route } from "next";
 import { CalendarDays, Plus } from "lucide-react";
@@ -28,12 +28,7 @@ export default async function AdminEventsPage() {
     redirect("/admin/login");
   }
 
-  const res = await internalFetch(
-    `/api/organizations/${COMMUNITY_SLUG}/admin/events`
-  );
-  if (!res.ok) throw new Error("Failed to load events");
-  const { events } = (await res.json()) as {
-    events: {
+  const events = (await listAdminEvents()) as {
       id: string;
       title?: string;
       summary?: string;
@@ -42,8 +37,7 @@ export default async function AdminEventsPage() {
       status?: string;
       featured?: boolean;
       announcementDocTemplate?: string | null;
-    }[];
-  };
+  }[];
 
   type AdminEvent = (typeof events)[number];
   const { upcoming, past } = splitByTime(events);

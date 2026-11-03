@@ -6,7 +6,7 @@ import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { loadRecipients } from "@/src/lib/broadcastSender.server";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listBroadcasts } from "@/src/lib/adminData.server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,9 +27,7 @@ export default async function BroadcastsPage() {
     if (error instanceof AdminAccessError) redirect("/admin/login?next=/admin/broadcasts");
     throw error;
   }
-  const res = await internalFetch("/api/admin/broadcasts");
-  if (!res.ok) throw new Error(`Failed to load broadcasts (${res.status})`);
-  const { broadcasts } = (await res.json()) as { broadcasts?: BroadcastSummary[] };
+  const broadcasts = (await listBroadcasts()) as BroadcastSummary[];
 
   return (
     <div className="flex flex-col gap-6">

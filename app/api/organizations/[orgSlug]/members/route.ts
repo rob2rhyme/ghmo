@@ -12,6 +12,7 @@ import { parseJsonBody } from "@/src/lib/validation";
 import { envelopeChecker } from "@/src/lib/e2eeEnvelope.server";
 import { MEMBER_ID_PATTERN, PHONE_CONSENT_INPUT, contactInputSchema, memberAuditView } from "@/src/lib/memberContact.server";
 import { z } from "zod";
+import { listMembers } from "@/src/lib/adminData.server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +41,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     const guard = await enforceActiveAdmin(req, params.orgSlug);
     if ("response" in guard) return guard.response;
 
-    const snapshot = await getAdminDb()
-      .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
-      .orderBy("emailLower")
-      .get();
-    const members = snapshot.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }));
-    return NextResponse.json({ members });
+    return NextResponse.json({ members: await listMembers() });
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(

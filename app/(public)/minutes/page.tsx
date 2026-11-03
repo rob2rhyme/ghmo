@@ -5,16 +5,19 @@ import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/componen
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { formatDate } from "@/src/lib/format";
-import { listArchive } from "@/src/lib/minutesArchive.server";
+import { cachedPageData } from "@/src/lib/publicCache.server";
+import { listArchive } from "@/src/lib/publicData.server";
 
-export const dynamic = "force-dynamic";
+// Built on first visit and refreshed every 5 minutes, or at once when minutes are approved (publicCache.server.ts).
+export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Meeting minutes · GHMO",
   description: "Approved meeting minutes of the Greater Harrisburg Magar Organization."
 };
 
 export default async function MinutesArchivePage() {
-  const entries = await listArchive();
+  const loaded = cachedPageData(await listArchive(), "Meeting minutes");
+  const entries = loaded ?? [];
   const byYear = new Map<string, typeof entries>();
   for (const entry of entries) {
     const year = entry.eventDate ? String(new Date(entry.eventDate).getFullYear()) : "Undated";
@@ -24,7 +27,13 @@ export default async function MinutesArchivePage() {
   return (
     <PublicPage width="reading" className="gap-6">
       <PublicPageHeader title="Meeting minutes" description="Approved minutes from our board and general meetings." />
-      {entries.length === 0 ? (
+      {!loaded ? (
+        <EmptyState
+          icon={<FileText />}
+          title="The minutes can't be shown right now"
+          description="Please try again in a few minutes."
+        />
+      ) : entries.length === 0 ? (
         <EmptyState
           icon={<FileText />}
           title="No minutes have been published yet"

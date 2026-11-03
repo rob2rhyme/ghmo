@@ -8,6 +8,7 @@ import { toPlain } from "@/src/lib/serialize.server";
 import { isValidTimeZone, parseEventDate } from "@/src/lib/zonedTime";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const now = new Date();
     const payload = {
       title: parsed.data.title,
-      summary: parsed.data.summary,
+      summary: parsed.data.summary ?? "",
       body: parsed.data.body,
       status: parsed.data.status || "draft",
       startsAt: startsAtResult.date,
@@ -158,6 +159,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
         route: "/api/admin/organizations/[orgSlug]/events"
       }
     });
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     return NextResponse.json({ ok: true, event: normalizeEvent(doc) });
   } catch (error) {
     if (error instanceof AdminEnvError) {

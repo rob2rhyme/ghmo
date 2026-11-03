@@ -1,4 +1,5 @@
 //src/lib/admin.ts
+import { cache } from "react";
 import { NextRequest } from "next/server";
 import { getAdminDb } from "./firebaseAdmin";
 import { AuthContext, AuthMethod, getAuthContextFromRequest } from "./auth";
@@ -83,14 +84,31 @@ type RequireAdminOptions = {
   allowMagicLink?: boolean;
 };
 
+/**
+ * The cookie session and its admin record, read once per server render: the admin layout and the page
+ * both call requireActiveAdmin(), and without this each would verify the cookie with Google and read
+ * the admin record again. React's cache() lasts for one request only; route handlers pass the request
+ * and are not memoized.
+ */
+async function readAdminDoc(orgSlug: string, uid: string) {
+  const doc = await getAdminDb().doc(orgAdminDocPath(orgSlug, uid)).get();
+  return doc.exists ? { id: doc.id, data: doc.data() as Record<string, unknown> } : null;
+}
+
+const sessionAdminForRender = cache(async (orgSlug: string) => {
+  const ctx = await getAuthContextFromRequest();
+  // undefined: not looked up (no session, or another organization); null: looked up and missing.
+  const adminDoc = ctx?.orgSlug === orgSlug ? await readAdminDoc(orgSlug, ctx.uid) : undefined;
+  return { ctx, adminDoc };
+});
+
 export async function requireActiveAdmin(
   input?: AdminAuthInput,
   orgSlug: string = COMMUNITY_SLUG,
   options: RequireAdminOptions = {}
 ) {
-  const ctx: AuthContext | null = isNextRequest(input)
-    ? await getAuthContextFromRequest(input)
-    : (input ?? (await getAuthContextFromRequest()));
+  const render = input === undefined ? await sessionAdminForRender(orgSlug) : null;
+  const ctx: AuthContext | null = render ? render.ctx : isNextRequest(input) ? await getAuthContextFromRequest(input) : (input ?? null);
 
   // Defense in depth on top of SameSite cookies: a browser says when a request was started by another site.
   if (isNextRequest(input) && !["GET", "HEAD", "OPTIONS"].includes(input.method)) {
@@ -103,10 +121,9 @@ export async function requireActiveAdmin(
   if (!ctx) throw new AdminAccessError(401, "Unauthorized", "NO_CONTEXT");
   if (!ctx.orgSlug) throw new AdminAccessError(403, "Organization missing", "ORGSLUG_MISSING");
   if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "Organization mismatch", "ORGSLUG_MISMATCH");
-  const docPath = orgAdminDocPath(orgSlug, ctx.uid);
-  const doc = await getAdminDb().doc(docPath).get();
-  if (!doc || !doc.exists) throw new AdminAccessError(403, "Admin profile not found", "ADMIN_DOC_NOT_FOUND");
-  const profile = mapAdminDoc(doc.id, doc.data() as Record<string, unknown>);
+  const adminDoc = render?.adminDoc !== undefined ? render.adminDoc : await readAdminDoc(orgSlug, ctx.uid);
+  if (!adminDoc) throw new AdminAccessError(403, "Admin profile not found", "ADMIN_DOC_NOT_FOUND");
+  const profile = mapAdminDoc(adminDoc.id, adminDoc.data);
   if (profile.status !== "active")
     throw new AdminAccessError(403, "Admin is disabled", "ADMIN_INACTIVE");
   if (!isStrongAdminAuth(ctx.authMethod) && !options.allowMagicLink) {

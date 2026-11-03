@@ -19,6 +19,8 @@ import { normalizeAttendance, normalizeContent } from "@/src/lib/minutesContent"
 import { planTransition } from "@/src/lib/minutesWorkflow";
 import { getAppOrigin } from "@/src/lib/appUrl";
 import { notifyAdmins } from "@/src/lib/notify.server";
+import { listAdminMinutes } from "@/src/lib/adminData.server";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -255,17 +257,7 @@ export async function GET(req: NextRequest) {
         .get();
       return NextResponse.json({ ok: true, versions: versions.docs.map(d => toPlain(d.data())) });
     }
-    const filterEventId = searchParams.get("eventId");
-    const minutesPath = orgMinutesCollectionPath(COMMUNITY_SLUG);
-    const db = getAdminDb();
-    let query: FirebaseFirestore.Query = db.collection(minutesPath);
-    if (filterEventId) {
-      query = query.where("eventId", "==", filterEventId);
-    }
-    query = query.orderBy("eventDate", "desc").limit(100);
-    const snap = await query.get();
-    const items = snap.docs.map(doc => toPlain(adminView({ id: doc.id, ...doc.data() })));
-
+    const items = await listAdminMinutes({ eventId: searchParams.get("eventId") });
     return NextResponse.json({ ok: true, minutes: items });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -387,6 +379,7 @@ export async function POST(req: NextRequest) {
     });
 
     const savedDoc = await createdDoc.get();
+    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
     return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id: createdDoc.id, ...savedDoc.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -501,6 +494,7 @@ export async function PATCH(req: NextRequest) {
 
     // Tell the other opted-in admins there is something to approve (content-free, best effort).
     if (outcome.audit === "minutes_submitted") void notifyAdmins("minutes_submitted", actor.uid, getAppOrigin(req));
+    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
     return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id, ...afterSnap.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {

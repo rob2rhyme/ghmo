@@ -3,7 +3,7 @@ import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import MembersClient, { type MemberRow } from "@/src/components/admin/members/MembersClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listMembers } from "@/src/lib/adminData.server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,9 +16,7 @@ export default async function MembersPage() {
     throw error;
   }
 
-  const res = await internalFetch(`/api/organizations/${COMMUNITY_SLUG}/members`);
-  if (!res.ok) throw new Error(`Failed to load members (${res.status})`);
-  const { members } = (await res.json()) as { members?: MemberRow[] };
+  const members = (await listMembers()) as MemberRow[];
 
   return (
     <div className="flex flex-col gap-6">

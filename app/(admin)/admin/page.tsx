@@ -3,7 +3,7 @@ import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { redirect } from "next/navigation";
 import AdminDashboardOverview from "@/src/components/admin/dashboard/AdminDashboardOverview";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { loadAdminDashboard } from "@/src/lib/adminData.server";
 import { toPlain } from "@/src/lib/serialize.server";
 
 export const dynamic = "force-dynamic";
@@ -27,16 +27,7 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const res = await internalFetch(
-    `/api/organizations/${COMMUNITY_SLUG}/admin/dashboard`
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to load admin dashboard data (${res.status}): ${body}`
-    );
-  }
-  const { stats, webhookEvents, auditLogs, blocks, minutes } = await res.json();
+  const { stats, webhookEvents, auditLogs, blocks, minutes } = await loadAdminDashboard();
 
   if (process.env.NODE_ENV !== "production") {
     const payload = {

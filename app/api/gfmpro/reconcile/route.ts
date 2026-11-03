@@ -4,6 +4,7 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
       meta: { route: "/api/gfmpro/reconcile" }
     });
 
+    expirePublicCache(PUBLIC_CACHE_TAGS.donations);
     return NextResponse.json({ ok: true, totals });
   } catch (error) {
     if (error instanceof AdminEnvError) {

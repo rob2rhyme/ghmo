@@ -3,7 +3,7 @@ import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import BroadcastDetailClient, { type BroadcastDetail } from "@/src/components/admin/broadcasts/BroadcastDetailClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { loadBroadcastDetail } from "@/src/lib/adminData.server";
 import { footerFromEnv } from "@/src/lib/broadcastMail";
 import { emailSetupProblem } from "@/src/components/admin/broadcasts/sendingSetup.server";
 import type { SendProgress } from "@/src/lib/broadcastSender.server";
@@ -20,10 +20,9 @@ export default async function BroadcastPage({ params }: { params: Promise<{ broa
     if (error instanceof AdminAccessError) redirect(`/admin/login?next=/admin/broadcasts/${encodeURIComponent(broadcastId)}`);
     throw error;
   }
-  const res = await internalFetch(`/api/admin/broadcasts/${encodeURIComponent(broadcastId)}`);
-  if (res.status === 404) notFound();
-  if (!res.ok) throw new Error(`Failed to load broadcast (${res.status})`);
-  const { broadcast, recipientCount, progress, sendingBlocker } = (await res.json()) as {
+  const detail = await loadBroadcastDetail(broadcastId);
+  if (!detail) notFound();
+  const { broadcast, recipientCount, progress, sendingBlocker } = detail as unknown as {
     broadcast: BroadcastDetail;
     recipientCount: number;
     progress: SendProgress | null;

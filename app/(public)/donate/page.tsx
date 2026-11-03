@@ -4,12 +4,12 @@ import { GoFundMeProDonationEmbed } from "@/src/components/GoFundMeProDonationEm
 import { DonateAction } from "@/src/components/public/DonateAction";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
-import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getDonateUrl, getDonationEmbedCampaignId } from "@/src/lib/donateLink";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { cachedPageData } from "@/src/lib/publicCache.server";
+import { getDonationStats } from "@/src/lib/publicData.server";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Built once and refreshed every 5 minutes, or at once when the totals change (see publicCache.server.ts).
+export const revalidate = 300;
 
 export default async function DonatePage() {
   let totalRaised = 0;
@@ -18,27 +18,13 @@ export default async function DonatePage() {
   let endAt: number | string | Date | null | undefined;
   let statsWarning: string | null = null;
 
-  try {
-    const statsRes = await internalFetch(
-      `/api/organizations/${COMMUNITY_SLUG}/donations/stats`
-    );
-    if (!statsRes.ok) {
-      statsWarning = "Donation totals are temporarily unavailable.";
-    } else {
-      const { stats } = (await statsRes.json()) as {
-        stats: {
-          totalRaised?: number;
-          goal?: number | null;
-          donorCount?: number | null;
-          endAt?: number | string | Date | null;
-        };
-      };
-      totalRaised = stats?.totalRaised ?? 0;
-      goal = stats?.goal;
-      donorCount = stats?.donorCount;
-      endAt = stats?.endAt ?? null;
-    }
-  } catch {
+  const stats = cachedPageData(await getDonationStats(), "Donation totals");
+  if (stats) {
+    totalRaised = stats.totalRaised ?? 0;
+    goal = stats.goal;
+    donorCount = stats.donorCount;
+    endAt = stats.endAt ?? null;
+  } else {
     statsWarning = "Donation totals are temporarily unavailable.";
   }
 
