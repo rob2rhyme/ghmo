@@ -29,6 +29,9 @@ test("the dashboard greets the admin, lists real activity with titles, and shows
   await expect(sidebar.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(sidebar.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
 
+  // On desktop the sidebar is the way to each page; the quick-action tiles only show where there is no sidebar.
+  await expect(page.locator("#admin-main").getByRole("link", { name: /Meeting minutes.*Draft, approve/ })).toBeHidden();
+  await page.setViewportSize({ width: 820, height: 900 });
   await expect(page.locator("#admin-main").getByRole("link", { name: /Meeting minutes.*Draft, approve/ })).toBeVisible();
 });
 

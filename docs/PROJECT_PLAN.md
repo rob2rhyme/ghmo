@@ -806,7 +806,11 @@ sizes, four code reviewers). 72 findings: 6 High, 27 Medium, 39 Low.
   every visitor, pages render per request and call their own API, and admin pages verify the session three times (P1–P4).
 - **Sound:** accessibility 100 and SEO 100 on every page; production dependencies at 0 vulnerabilities; session,
   input, CSP and rate-limit design hold up; desktop performance 69–100.
-- **Next:** the fix plan at the end of `docs/AUDIT_ROUND_2.md` (security Highs first, then content, layout, performance).
+- **Fix pass (same day):** 60 of the 72 rows fixed (two in part) in four commits (security, content, layout,
+  performance), each suite rerun; of the Highs only P2–P4 remain. The "Status after the fix pass" section of
+  `docs/AUDIT_ROUND_2.md` lists every row, what was deferred (static rendering and no self-calls P2–P4/P7, the `__Host-` cookie, Firestore rule shape checks,
+  the per-email sign-in limit) and what still needs the owner (GoFundMe link, contact email, photos, turning off
+  password sign-in in Firebase).
 
 ## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, built 2026-11-03)
 

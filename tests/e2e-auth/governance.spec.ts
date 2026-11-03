@@ -42,9 +42,10 @@ test("action items from approved minutes are tracked privately, and attendance e
   await page.getByRole("button", { name: "Done / not needed" }).click();
   await expect(page.getByText("Call the bank")).toBeVisible();
 
-  // --- At rest the status is ciphertext ---
-  const statuses = await db.collection("organizations/ghmo/actionItemStatus").get();
-  expect(statuses.size).toBe(1);
+  // --- At rest the status is ciphertext (the page shows the change before the server confirms the write) ---
+  const statusCollection = db.collection("organizations/ghmo/actionItemStatus");
+  await expect.poll(async () => (await statusCollection.get()).size, { timeout: 15_000 }).toBe(1);
+  const statuses = await statusCollection.get();
   expect(statuses.docs[0].data()).toHaveProperty("enc");
   expect(statuses.docs[0].data()).not.toHaveProperty("status");
   expect(statuses.docs[0].data()).toMatchObject({ updatedBy: "alice" });

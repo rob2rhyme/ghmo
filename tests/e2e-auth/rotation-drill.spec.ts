@@ -20,7 +20,7 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
   const chat = (page: typeof alice, text: string) => page.locator("p", { hasText: text });
   const nav = (page: typeof alice, name: string) => page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name }).click();
   const send = async (page: typeof alice, text: string) => {
-    await page.getByPlaceholder("Share an update or ask for help...").fill(text);
+    await page.getByPlaceholder("Share an update or ask for help…").fill(text);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(chat(page, text)).toBeVisible();
   };

@@ -47,6 +47,49 @@ the GoFundMe link and contact email (still unset), community photos (L6).
 
 ---
 
+## Status after the fix pass (2026-11-03)
+
+Fixed in this pass (one branch, four commits: security, content, layout, performance); every suite below was rerun on
+the result. Rows not listed are still open and summarised under "Deferred".
+
+**Security.** S1 (passkey enrolment needs the authenticator app once one is set up, with a browser test), S2 (member
+sign-in needs a verified email from the email-link or custom-token provider, plus a go-live checklist item to turn
+off password sign-in), S3 (timeline route checks the admin record), S4 (dead plaintext route deleted), S5 (server
+self-calls use the configured origin; production refuses to guess), S6 (webhook signature covers a timestamp, replay
+window 5 minutes, dedup by transaction, `event_id` required), S8 (date fallback escaped), S9 (generic error bodies on 31
+routes; details stay in server logs), S11 (`img-src` narrowed), S12 (WebAuthn origin must be configured in production),
+S13 (failed sign-in requests no longer store the typed address), S14 (broadcast PATCH in a transaction), S16 in part
+(production audit gate at `high`), S18 in part (the route sweep now covers every non-public route). From S17's notes:
+unlocked keys lock after 15 minutes without input, and passphrase devices lock when the tab is hidden.
+
+**Content.** C1 (no "TBD", placeholder salutations or invented contacts; empty fields leave their sentence out; template
+version 2 with tests), C2 ("Gumba Project" everywhere), C3 (flyer-template field removed), C4 ("remove" / "make new
+keys"), C5, C6, C7 (American spellings), C8, C9, C10, C11 (rate-limit and connection messages say what to do), C13
+(in-card email confirmation), C12 (site description), C14, C15 (error pages show the contact address when `CONTACT_EMAIL` is
+set), C16, C17, C18.
+
+**Layout.** L1 (`Steps` wraps its action under the text on phones), L2–L4 (Members list first at every width with Add
+and Import behind buttons; dashboard zero tiles collapsed, one Donations card, quick actions only where there is no
+sidebar), L5, L6 (Donate hero cropped to the building, no `priority` on hidden images), L7 (Media featured card with the
+video image and a whole-card link), L8 (one primary on Plans & Issues), L9 (time and zone on one line), L10 (chevron on
+row links), L11 (inline "What's this?"), L12 (flush last row), L13–L19.
+
+**Performance.** P1 (no Firebase SDK on public pages: Auth loads on sign-out only, Firestore only on the pages that
+listen), P5 (no Node crypto polyfill in the broadcast bundle), P6 (PDF, image and QR libraries load on Download), P8
+(10 KB favicon, WebP hero, letterhead and seal, unused files removed), P9 (YouTube feed cached for 15 minutes across
+cold starts), P10 (signature poll backs off to 5 s and pauses when hidden), P11 (chat limited to the last 100 messages;
+one listener per comment, kept across updates), P13 (public calendar, events and donation stats cacheable for 5
+minutes; admin and auth stay `no-store`), P18 (`next/font/local` Inter with a size-adjusted fallback; worker caches
+optimised images, no 158 KB icon precache).
+
+**Deferred, and why.** P2–P4 and P7 (static rendering, no self-calls, one session check per admin page, server-rendered
+events) change how every page fetches and are the next careful pass with the browser suite as the net. P12, P14–P17 are
+scale and structure work. S7 (per-email sign-in limit), S10 (`__Host-` cookie: the test suites run over http), S15
+(shape checks in Firestore rules), S16's SHA pinning and S18's permission matrix are next on the security list. L6's
+second half (different artwork on Donate) waits for the owner's photos.
+
+**Still needs the owner:** `GOFUNDME_PUBLIC_URL`, `CONTACT_EMAIL`, social links, community photos, and turning off
+password sign-in in the Firebase console (checklist).
 
 ---
 

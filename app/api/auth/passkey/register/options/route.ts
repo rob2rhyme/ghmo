@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const challengeId = await saveChallenge("register", options.challenge, actor.uid);
     return NextResponse.json({ options, challengeId }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message, code: error.reason }, { status: error.status });
     if (error instanceof AdminEnvError) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
     throw error;
   }
