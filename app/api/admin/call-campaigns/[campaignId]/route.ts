@@ -20,13 +20,13 @@ const actionSchema = z.object({ action: z.enum(["close", "remind", "export"]) })
 
 function errorResponse(error: unknown) {
   if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-  if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (error instanceof AdminEnvError) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   throw error;
 }
 
 /** The BOD view: the campaign, every call row, the people's names and the callers' names. Numbers stay in the envelopes. */
 export async function GET(req: NextRequest, context: Params) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const { campaignId } = await context.params;
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, context: Params) {
 
 /** Close the campaign, remind the callers who still have people to reach, or record that the BOD exported it. */
 export async function POST(req: NextRequest, context: Params) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const { campaignId } = await context.params;

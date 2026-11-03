@@ -26,7 +26,7 @@ const attemptSchema = z.object({
 
 /** Appends one call attempt (plan §12.3): the assigned caller or a super admin, on an open campaign, audited without the number or the note. */
 export async function POST(req: NextRequest, context: Params) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const { campaignId, memberId } = await context.params;
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, context: Params) {
     if (body.note) {
       const checker = await envelopeChecker(actor.uid);
       if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
-      if (!checker.ok(body.note as EnvelopeInput)) return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+      if (!checker.ok(body.note as EnvelopeInput)) return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
     }
     const now = new Date();
     const result = await recordAttempt({
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, context: Params) {
     return NextResponse.json({ ok: true, call: result.call, counts: result.counts });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    if (error instanceof AdminEnvError) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
     throw error;
   }
 }

@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
   const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json({ error: "Admin env not configured", missing: adminEnvStatus.missing }, { status: 503 });
+    return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
   }
 
   try {
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     return NextResponse.json({ ok: true, created, skipped, withPhone }, { status: 201 });
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Admin env not configured", missing: error.issues }, { status: 503 });
+      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
     }
     throw error;
   }

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const ip = getClientIp(req.headers);
   const rate = await checkRateLimit(`bootstrap:${ip}`, 5, 10 * 60 * 1000);
   if (!rate.success) {
-    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+    return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
   }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));

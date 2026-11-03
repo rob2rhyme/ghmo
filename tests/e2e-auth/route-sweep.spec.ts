@@ -83,7 +83,9 @@ for (const route of routes) {
  * People who are signed in but must not get admin data: a stranger with no admin record, a
  * disabled admin, and a real admin who has only used a magic link (admin routes need a passkey).
  */
-const ADMIN_ROUTES = routes.filter(route => route.path.startsWith("/api/admin/") || route.path.includes("/admin/"));
+// Every route that is not public by design: a disabled or magic-link-only admin must be refused everywhere,
+// not only under /admin/ (a route elsewhere once checked a token claim alone).
+const ADMIN_ROUTES = routes.filter(route => !isPublic(route.path));
 // Passkey enrollment is the one thing a magic-link admin may do: it is how they get a passkey.
 const MAGIC_LINK_ALLOWED = ["/api/admin/passkeys"];
 

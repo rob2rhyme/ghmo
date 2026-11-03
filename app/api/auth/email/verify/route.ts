@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
     const verifyLimit = await checkRateLimit(`email-verify:${getClientIp(req.headers)}`, 10, 10 * 60 * 1000);
     if (!verifyLimit.success) {
-      return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+      return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
     }
     const parsedBody = await parseJsonBody(req, bodySchema);
     if (!parsedBody.ok) return parsedBody.response;
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

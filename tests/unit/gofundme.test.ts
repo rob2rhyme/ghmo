@@ -31,3 +31,32 @@ describe("verifyGfmWebhookSignature", () => {
     expect(verifyGfmWebhookSignature("{}", undefined)).toBe(false);
   });
 });
+
+describe("verifyGfmWebhookSignature with a timestamp", () => {
+  let previous: string | undefined;
+  beforeEach(() => {
+    previous = process.env.GOFUNDME_PRO_WEBHOOK_SECRET;
+    process.env.GOFUNDME_PRO_WEBHOOK_SECRET = SECRET;
+  });
+  afterEach(() => {
+    if (previous === undefined) delete process.env.GOFUNDME_PRO_WEBHOOK_SECRET;
+    else process.env.GOFUNDME_PRO_WEBHOOK_SECRET = previous;
+  });
+  const signTs = (ts: string, body: string) => crypto.createHmac("sha256", SECRET).update(`${ts}.${body}`).digest("hex");
+  const body = JSON.stringify({ event_id: "evt_1", type: "transaction.completed", data: { amount: 2500 } });
+
+  it("accepts a fresh timestamped signature and refuses an old one", () => {
+    const now = 1_800_000_000_000;
+    const fresh = String(Math.floor(now / 1000) - 30);
+    const stale = String(Math.floor(now / 1000) - 3600);
+    expect(verifyGfmWebhookSignature(body, signTs(fresh, body), fresh, now)).toBe(true);
+    expect(verifyGfmWebhookSignature(body, signTs(stale, body), stale, now)).toBe(false);
+  });
+
+  it("refuses a body-only signature once a timestamp header is present", () => {
+    const now = 1_800_000_000_000;
+    const ts = String(Math.floor(now / 1000));
+    const bodyOnly = crypto.createHmac("sha256", SECRET).update(body).digest("hex");
+    expect(verifyGfmWebhookSignature(body, bodyOnly, ts, now)).toBe(false);
+  });
+});

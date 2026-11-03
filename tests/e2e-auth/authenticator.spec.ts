@@ -110,6 +110,25 @@ test("an email link alone cannot add an authenticator app to an admin who alread
   await stranger.close();
 });
 
+test("an email link alone cannot add a passkey to an admin who uses an authenticator app", async ({ browser }) => {
+  // Bob's only sign-in method is the authenticator app (the go-live default).
+  const bobContext = await browser.newContext();
+  await setSession(bobContext, await magicLinkSession("bob"));
+  const begun = (await (await bobContext.request.post("/api/auth/totp/setup", { data: {} })).json()) as { secret: string };
+  expect((await bobContext.request.post("/api/auth/totp/confirm", { data: { code: totpCode(secretBytes(begun.secret), Date.now()) } })).status()).toBe(200);
+  await bobContext.close();
+
+  // Someone holding only Bob's inbox gets a fresh email-link session and tries to add a passkey.
+  const inbox = await browser.newContext();
+  await setSession(inbox, await magicLinkSession("bob"));
+  const options = await inbox.request.post("/api/auth/passkey/register/options", { data: {} });
+  expect(options.status()).toBe(403);
+  expect(((await options.json()) as { code?: string }).code).toBe("TOTP_REQUIRED");
+  const passkeys = await admin().db.collection("organizations/ghmo/admins/bob/passkeys").get();
+  expect(passkeys.empty).toBe(true);
+  await inbox.close();
+});
+
 test("a super admin can reset another admin's authenticator, which signs that admin out", async ({ page, browser }) => {
   // Bob sets up an authenticator app through the API (same calls the page makes).
   const bobContext = await browser.newContext();

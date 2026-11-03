@@ -46,10 +46,10 @@ const bodySchema = z.object({
  * Every failure gives the same answer so the endpoint reveals nothing about accounts.
  */
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   const ip = getClientIp(req.headers);
   const rate = await checkRateLimit(`passkey-login:${ip}`, 20, 10 * 60 * 1000);
-  if (!rate.success) return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  if (!rate.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
 
   const parsed = await parseJsonBody(req, bodySchema, { maxBytes: 16 * 1024 });
   if (!parsed.ok) return parsed.response;
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     return await createSessionResponse(idToken, { ok: true });
   } catch (error) {
-    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
     throw error;
   }
 }

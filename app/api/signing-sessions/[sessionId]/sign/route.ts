@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   const ipLimit = await checkRateLimit(`sign:ip:${getClientIp(req.headers)}`, 20, 10 * 60 * 1000);
   const sessionLimit = await checkRateLimit(`sign:session:${sessionId}`, 5, 10 * 60 * 1000);
   if (!ipLimit.success || !sessionLimit.success) {
-    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+    return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
   }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));

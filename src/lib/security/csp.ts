@@ -46,7 +46,7 @@ export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDoma
     // Inline styles are used by the letterhead/document previews. Style injection
     // cannot run code, so this is an accepted trade-off.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://i.ytimg.com https://*.googleusercontent.com",
     "font-src 'self' data:",
     "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com" +
       (isDev ? " ws: http://localhost:*" : "") +

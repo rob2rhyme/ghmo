@@ -17,11 +17,11 @@ const bodySchema = z.object({ code: z.string().min(1).max(20) });
 
 /** Finishes setup with the first code from the app; returns the one-time recovery codes. */
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor, admin, authMethod } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
     const rate = await checkRateLimit(`totp-confirm:${actor.uid}`, 10, 10 * 60 * 1000);
-    if (!rate.success) return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+    if (!rate.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
     const parsed = await parseJsonBody(req, bodySchema);
     if (!parsed.ok) return parsed.response;
 

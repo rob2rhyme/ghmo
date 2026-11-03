@@ -24,13 +24,13 @@ async function resolve(context: Params) {
 
 function errorResponse(error: unknown) {
   if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-  if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (error instanceof AdminEnvError) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   throw error;
 }
 
 /** Approve another admin's pending passkey (needs a passkey session, and never your own). */
 export async function POST(req: NextRequest, context: Params) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const parsed = await parseJsonBody(req, bodySchema);
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, context: Params) {
 
 /** Remove a passkey: your own, or (super admins) another admin's, e.g. a lost device. */
 export async function DELETE(req: NextRequest, context: Params) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const found = await resolve(context);

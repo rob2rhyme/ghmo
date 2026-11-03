@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { z } from "zod";
 import { applyDonationStatsUpdate, logWebhookAudit, recordWebhookEvent, verifyGfmWebhookSignature } from "@/src/lib/gofundme";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -29,7 +28,8 @@ export async function POST(req: NextRequest) {
   }
 
   const signature = req.headers.get("x-gfmpro-signature") || req.headers.get("x-svix-signature") || req.headers.get("x-hub-signature");
-  if (!verifyGfmWebhookSignature(rawBody, signature || undefined)) {
+  const timestamp = req.headers.get("x-gfmpro-timestamp") || req.headers.get("x-svix-timestamp");
+  if (!verifyGfmWebhookSignature(rawBody, signature, timestamp)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -48,7 +48,9 @@ export async function POST(req: NextRequest) {
   // Single community: never take the target organization from the payload or headers (S-14).
   const orgSlug = COMMUNITY_SLUG;
 
-  const eventId = payload.event_id || crypto.randomUUID();
+  // Without a provider event id a replayed delivery could not be told from a new one.
+  if (!payload.event_id) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  const eventId = payload.event_id;
   const { duplicate } = await recordWebhookEvent(orgSlug, eventId, payload);
   if (duplicate) {
     return NextResponse.json({ ok: true, duplicate: true });

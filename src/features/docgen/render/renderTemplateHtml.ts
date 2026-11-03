@@ -77,14 +77,15 @@ export function escapeHtml(value?: string) {
     .replace(/'/g, "&#39;");
 }
 
+/** A date for letter HTML. Anything that isn't a date is shown as typed, escaped (it lands in HTML). */
 export function formatDate(value?: string) {
   if (!value) return "";
   try {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
+    if (Number.isNaN(date.getTime())) return escapeHtml(value);
     return DATE_FORMATTER.format(date);
-  } catch (error) {
-    return value;
+  } catch {
+    return escapeHtml(value);
   }
 }
 

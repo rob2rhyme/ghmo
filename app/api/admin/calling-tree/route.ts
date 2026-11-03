@@ -24,7 +24,7 @@ const saveSchema = z.object({
 
 function errorResponse(error: unknown) {
   if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-  if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (error instanceof AdminEnvError) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   throw error;
 }
 
@@ -33,7 +33,7 @@ function errorResponse(error: unknown) {
  * the counts per caller and only their own assignments, so a caller never needs the whole list.
  */
 export async function GET(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const superAdmin = isSuperAdmin(admin);
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
 /** Replaces callers and assignments (super admin). The browser plans the split; the server checks and stores it. */
 export async function PUT(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     if (!isSuperAdmin(admin)) return NextResponse.json({ error: "Only a super admin can change the calling tree." }, { status: 403 });

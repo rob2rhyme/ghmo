@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ broadc
   if (!snap.exists) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
   const content = normalizeBroadcastContent(snap.data() ?? {});
   if (!content.ok) return NextResponse.json({ error: content.error }, { status: 400 });
-  if (snap.get("status") === "cancelled") return NextResponse.json({ error: "This broadcast was cancelled." }, { status: 409 });
+  if (snap.get("status") === "cancelled") return NextResponse.json({ error: "This broadcast was canceled." }, { status: 409 });
 
   const to = admin.email ?? actor.email;
   if (!to) return NextResponse.json({ error: "Your admin profile has no email address to send to." }, { status: 400 });

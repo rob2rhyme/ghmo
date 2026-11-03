@@ -19,8 +19,8 @@ const SEED_THREADS = [
     body: "Use this to practice proposing a conclusion, voting to approve/reject, and finalizing the close."
   },
   {
-    title: "How to use Plans & Issues vs Admin Chat",
-    body: "Plans & Issues are for formal decisions. Admin Chat is for quick coordination and daily updates."
+    title: "How to use Plans & Issues and Admin chat",
+    body: "Plans & Issues is for proposals and decisions. Admin chat is for quick coordination and daily updates."
   }
 ];
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -79,11 +79,14 @@ export async function POST(req: NextRequest) {
       .get();
 
     if (snapshot.empty || snapshot.docs[0].data().status !== "active") {
+      // Not an active admin: don't keep a stranger's typed address in a log every admin can read.
+      const { emailLower: _typed, ...metaWithoutEmail } = meta;
+      void _typed;
       await logAuditEvent({
         orgSlug,
         action: "login_start",
-        resource: { type: "admin_login_request" },
-        meta
+        resource: { type: "admin_login_request", summary: "Email not on the admin list" },
+        meta: metaWithoutEmail
       });
       return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
     }
@@ -145,7 +148,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }
