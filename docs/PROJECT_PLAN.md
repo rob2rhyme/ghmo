@@ -514,7 +514,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ## 9. What is next (updated 2026-11-03)
 
-Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77). Nothing in the codebase is waiting; what is left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
+Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77), and the round-2 audit fixes and speed pass are done (§14). In the codebase, only the round-2 security lows are waiting (S7 per-email sign-in limit, S10 `__Host-` cookie, S15 Firestore rule shape checks, S16 SHA pinning, S18 permission matrix); everything else left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
 
 1. ~~Make the repository public, or fix GitHub Actions billing.~~ Done: CI runs again (PR #77's checks ran on GitHub).
 2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
@@ -811,6 +811,10 @@ sizes, four code reviewers). 72 findings: 6 High, 27 Medium, 39 Low.
   `docs/AUDIT_ROUND_2.md` lists every row, what was deferred (static rendering and no self-calls P2–P4/P7, the `__Host-` cookie, Firestore rule shape checks,
   the per-email sign-in limit) and what still needs the owner (GoFundMe link, contact email, photos, turning off
   password sign-in in Firebase).
+- **Speed pass (same day):** P2–P4 and P7. Public pages are served from a 5-minute cache that admin writes expire at
+  once; server pages read data directly instead of calling the site's own API; the admin session is checked once per
+  page; the events pages render on the server. Phone Lighthouse 80–99 → 88–99 (Home 88, Donate 97, Minutes 99),
+  desktop 100 everywhere. Details and numbers: "Speed pass" in `docs/AUDIT_ROUND_2.md`.
 
 ## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, built 2026-11-03)
 
