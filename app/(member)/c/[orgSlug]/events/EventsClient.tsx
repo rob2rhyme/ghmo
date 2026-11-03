@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarPlus, CalendarX } from "lucide-react";
 import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Segmented } from "@/src/components/ui/segmented";
-import { EventCard, EventCardSkeleton } from "@/src/components/public/events/EventCard";
+import { EventCard } from "@/src/components/public/events/EventCard";
 import { EventsCalendar } from "@/src/components/public/events/EventsCalendar";
 import { eventStart } from "@/src/components/public/events/eventDates";
 import type { EventRecord } from "@/src/lib/events.shared";
@@ -28,38 +28,24 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
   { value: "calendar", label: "Calendar" }
 ];
 
-/** The public events list. `contactEmail` (from getContactEmail on the server) is offered when loading fails. */
-export default function EventsClient({ contactEmail = null }: { contactEmail?: string | null }) {
-  const params = useParams();
-  const orgSlug = (params?.orgSlug as string) || "ghmo";
-  const [events, setEvents] = useState<EventRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  // "Now" for the Upcoming/Past split, taken when the list loads (keeps rendering pure).
-  const [loadedAt, setLoadedAt] = useState(0);
+type EventsClientProps = {
+  orgSlug: string;
+  /** Published events from the server, soonest first; null when they could not be loaded. */
+  events: EventRecord[] | null;
+  /** "Now" for the Upcoming/Past split, from the server render (keeps rendering pure). */
+  loadedAt: number;
+  /** From getContactEmail on the server; offered when loading fails. */
+  contactEmail?: string | null;
+};
+
+/** The public events list: the server sends the events, this adds the Show and View switches. */
+export default function EventsClient({ orgSlug, events: loadedEvents, loadedAt, contactEmail = null }: EventsClientProps) {
+  const router = useRouter();
+  const [retrying, startRetry] = useTransition();
+  const loadFailed = loadedEvents === null;
+  const events = useMemo(() => loadedEvents ?? [], [loadedEvents]);
   const [view, setView] = useState<ViewMode>("list");
   const [filter, setFilter] = useState<StatusFilter>("future");
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setLoadFailed(false);
-      try {
-        const res = await fetch(`/api/organizations/${orgSlug}/events`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(`Events request failed (${res.status})`);
-        setEvents(data.events || []);
-        setLoadedAt(Date.now());
-      } catch (err) {
-        console.error(err);
-        setLoadFailed(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, [orgSlug, attempt]);
 
   const filtered = useMemo(() => {
     const now = loadedAt;
@@ -92,20 +78,13 @@ export default function EventsClient({ contactEmail = null }: { contactEmail?: s
         <Segmented label="View" showLabel options={VIEW_OPTIONS} value={view} onChange={setView} />
       </div>
 
-      {loading ? (
-        <div role="status" aria-live="polite" className="grid gap-4 sm:grid-cols-2">
-          <span className="sr-only">Loading events…</span>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <EventCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : loadFailed ? (
+      {loadFailed ? (
         <Alert variant="destructive">
           <AlertTriangle />
           <AlertTitle>We couldn&apos;t load events</AlertTitle>
           <AlertDescription className="flex flex-col items-start gap-3">
             <p>
-              Check your internet connection and try again.
+              The events can&apos;t be read right now. Try again in a moment.
               {contactEmail ? (
                 <>
                   {" "}
@@ -117,8 +96,8 @@ export default function EventsClient({ contactEmail = null }: { contactEmail?: s
                 </>
               ) : null}
             </p>
-            <Button size="lg" onClick={() => setAttempt(n => n + 1)}>
-              Try again
+            <Button size="lg" disabled={retrying} onClick={() => startRetry(() => router.refresh())}>
+              {retrying ? "Trying again…" : "Try again"}
             </Button>
           </AlertDescription>
         </Alert>
