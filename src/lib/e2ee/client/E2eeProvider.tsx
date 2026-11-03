@@ -169,13 +169,26 @@ function newDeviceId() {
   return toBase64Url(randomBytes(18));
 }
 
-/** Fetches the signed device log, verifies it, and compares it with the server's records and this device's pin. */
+type RosterFetch = Promise<{ ok: true; entries: RosterEntry[] } | { ok: false; error: unknown }>;
+
+/** Starts fetching the signed device log; refresh() starts it alongside the overview to save a round trip. */
+function fetchRoster(): RosterFetch {
+  return api<{ entries: RosterEntry[] }>("/api/admin/e2ee/roster").then(
+    ({ entries }) => ({ ok: true as const, entries }),
+    error => ({ ok: false as const, error })
+  );
+}
+
+/** Verifies the signed device log and compares it with the server's records and this device's pin. */
 async function checkIntegrity(
   overview: { state: Overview["state"]; epochs: EpochRecord[]; devices: unknown[]; me: Overview["me"] },
-  stored: StoredDeviceIdentity | null
+  stored: StoredDeviceIdentity | null,
+  rosterFetch: RosterFetch
 ): Promise<{ roster: RosterState | null; integrity: Integrity; entries: RosterEntry[] }> {
   if (!overview.state.enabled) return { roster: null, integrity: { status: "none" }, entries: [] };
-  const { entries } = await api<{ entries: RosterEntry[] }>("/api/admin/e2ee/roster");
+  const fetched = await rosterFetch;
+  if (!fetched.ok) throw fetched.error;
+  const { entries } = fetched;
   if (entries.length === 0) return { roster: null, integrity: { status: "unsealed" }, entries };
   try {
     const roster = await verifyRoster(entries);
@@ -219,13 +232,16 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
+      // The device log is only used when encryption is on; it is requested alongside the overview, and its
+      // answer is ignored when the overview says encryption is off.
+      const rosterFetch = fetchRoster();
       const data = await api<Omit<Overview, "devices"> & { devices: Omit<DeviceView, "safetyCode">[] }>("/api/admin/e2ee");
       const devices = await Promise.all(
         data.devices.map(async d => ({ ...d, safetyCode: await deviceSafetyCode(d.ecdhPublic, d.ecdsaPublic) }))
       );
       const stored = (await loadIdentity(data.me.uid)) ?? null;
       // Check the server's key records against the signed device log before anything uses them.
-      const checked = await checkIntegrity(data, stored);
+      const checked = await checkIntegrity(data, stored, rosterFetch);
       rosterRef.current = checked.roster;
       integrityRef.current = checked.integrity;
       setIntegrity(checked.integrity);
