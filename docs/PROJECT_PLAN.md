@@ -514,7 +514,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ## 9. What is next (updated 2026-11-03)
 
-Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77). Nothing in the codebase is waiting; what is left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 2 of 29 items were ticked on 2026-10-31 (the Dependabot line was unticked while one dev-only alert waits on upstream)):
+Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77). Nothing in the codebase is waiting; what is left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
 
 1. ~~Make the repository public, or fix GitHub Actions billing.~~ Done: CI runs again (PR #77's checks ran on GitHub).
 2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
