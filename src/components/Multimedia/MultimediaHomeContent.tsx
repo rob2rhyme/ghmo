@@ -5,6 +5,7 @@ import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/componen
 import { SocialIcon } from "@/src/components/public/SocialIcon";
 import { SocialTiles } from "@/src/components/public/SocialTiles";
 import { feedProfiles, loadPublicFeeds } from "@/src/components/public/feeds";
+import { HOME_HERO_IMAGE } from "@/src/components/public/homeHero";
 import { Button } from "@/src/components/ui/button";
 import { COMMUNITY_NAME } from "@/src/lib/community";
 
@@ -20,9 +21,9 @@ function FeaturedYouTube({ href, thumbnail }: { href: string; thumbnail?: string
     >
       <div className="relative aspect-video bg-muted md:aspect-auto md:min-h-64" aria-hidden="true">
         {thumbnail ? (
-          <Image src={thumbnail} alt="" fill unoptimized sizes="(min-width: 768px) 40vw, 100vw" className="object-cover" />
+          <Image src={thumbnail} alt="" fill priority unoptimized sizes="(min-width: 768px) 40vw, 100vw" className="object-cover" />
         ) : (
-          <Image src="/assets/Ghmo-building.png" alt="" fill sizes="(min-width: 1152px) 440px, (min-width: 768px) 40vw, 100vw" className="object-cover" />
+          <Image src={HOME_HERO_IMAGE.src} alt="" fill priority sizes="(min-width: 1152px) 440px, (min-width: 768px) 40vw, 100vw" className="object-cover" />
         )}
         <span className="absolute bottom-4 left-4 grid size-12 place-items-center rounded-full bg-background/90 text-foreground shadow-xs">
           <Play className="size-5 translate-x-px" />
