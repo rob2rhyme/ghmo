@@ -1,6 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { ArrowRight, Clock, FileText, MapPin, Star } from "lucide-react";
+import { ArrowRight, Clock, FileText, History, MapPin, Star } from "lucide-react";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Skeleton } from "@/src/components/ui/skeleton";
@@ -29,27 +29,40 @@ type EventCardProps = {
   flyer?: boolean;
   /** h2 on the events page, h3 when the cards sit under a section title. */
   headingLevel?: "h2" | "h3";
+  /** The event is over: a "Past" badge and a muted date tile, so it reads differently from upcoming ones. */
+  past?: boolean;
 };
 
 /**
  * One event. The whole card opens the event (the title link stretches over it); the flyer is a
  * secondary link that sits above that layer.
  */
-export function EventCard({ evt, orgSlug, compact = false, flyer = true, headingLevel = "h2" }: EventCardProps) {
+export function EventCard({ evt, orgSlug, compact = false, flyer = true, headingLevel = "h2", past = false }: EventCardProps) {
   const start = eventStart(evt);
   const tile = start ? dateTile(start, eventTimeZone(evt)) : null;
   const when = eventWhenParts(evt);
   const Heading = headingLevel;
 
   return (
-    <article className={cn("relative flex h-full min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground shadow-xs transition-colors hover:border-primary/50 hover:bg-muted/30 md:p-6", evt.featured ? "border-primary/40" : "border-border")}>
+    <article className={cn("relative flex h-full min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground shadow-xs transition-colors hover:border-primary/50 hover:bg-muted/30 md:p-6", evt.featured && !past ? "border-primary/40" : "border-border")}>
       <div className="flex min-w-0 gap-4">
-        <div aria-hidden="true" className="flex size-14 shrink-0 flex-col items-center justify-center rounded-md bg-primary/10 text-primary">
+        <div
+          aria-hidden="true"
+          className={cn(
+            "flex size-14 shrink-0 flex-col items-center justify-center rounded-md",
+            past ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
+          )}
+        >
           <span className="text-sm font-medium leading-none">{tile?.month ?? "Date"}</span>
           <span className="text-xl font-semibold leading-tight">{tile?.day ?? "TBA"}</span>
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {evt.featured ? (
+          {past ? (
+            <Badge variant="secondary" className="mb-1">
+              <History aria-hidden="true" />
+              Past
+            </Badge>
+          ) : evt.featured ? (
             <Badge className="mb-1">
               <Star aria-hidden="true" />
               Featured
@@ -65,7 +78,7 @@ export function EventCard({ evt, orgSlug, compact = false, flyer = true, heading
             <span className="min-w-0">
               {when ? (
                 <>
-                  {when.date} · <span className="whitespace-nowrap">{when.time}</span>
+                  {when.date} <span className="whitespace-nowrap">· {when.time}</span>
                 </>
               ) : (
                 "Date to be announced"

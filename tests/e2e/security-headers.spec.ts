@@ -9,7 +9,7 @@ function collectCspViolations(page: Page) {
   return violations;
 }
 
-const SECURE_PAGES = ["/admin/login", "/login", "/docs/onboarding", "/sign/not-a-real-session", "/c/ghmo/events"];
+const SECURE_PAGES = ["/admin/login", "/login", "/docs/onboarding", "/sign/not-a-real-session"];
 
 for (const path of SECURE_PAGES) {
   test(`secure page ${path} runs under a nonce CSP without violations`, async ({ page }) => {
@@ -37,13 +37,16 @@ for (const path of SECURE_PAGES) {
   });
 }
 
-test("public home page gets the baseline CSP", async ({ page }) => {
-  const response = await page.goto("/");
-  const csp = response?.headers()["content-security-policy"] ?? "";
-  expect(csp).toContain("object-src 'none'");
-  expect(csp).toContain("frame-ancestors 'none'");
-  expect(csp).not.toContain("nonce-");
-});
+// The events list is a public, cached page (it moved out of the secure area in round 3).
+for (const path of ["/", "/c/ghmo/events"]) {
+  test(`public page ${path} gets the baseline CSP`, async ({ page }) => {
+    const response = await page.goto(path);
+    const csp = response?.headers()["content-security-policy"] ?? "";
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).not.toContain("nonce-");
+  });
+}
 
 test("baseline security headers are set", async ({ request }) => {
   const response = await request.get("/");

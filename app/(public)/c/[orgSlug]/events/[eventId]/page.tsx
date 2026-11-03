@@ -1,75 +1,52 @@
 import Link from "next/link";
-import { unstable_rethrow } from "next/navigation";
-import type { Route } from "next";
-import { AlertTriangle, CalendarDays, CalendarPlus, CalendarX, Clock, FileText, MapPin } from "lucide-react";
+import type { Metadata } from "next";
+import { CalendarDays, CalendarX, Clock, MapPin } from "lucide-react";
 import { MessagePage } from "@/src/components/public/MessagePage";
 import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
-import { RefreshButton } from "@/src/components/states/RefreshButton";
-import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { eventFlyerHref, eventsHref as eventsListHref } from "@/src/components/public/events/EventCard";
-import { eventStart, eventWhenLong } from "@/src/components/public/events/eventDates";
-import { requireActiveAdmin } from "@/src/lib/admin";
-import { listAdminMinutes } from "@/src/lib/adminData.server";
+import { EventActions, EventPassedNote } from "@/src/components/public/events/EventActions";
+import { eventsHref as eventsListHref } from "@/src/components/public/events/EventCard";
+import { EventMinutesCard } from "@/src/components/public/events/EventMinutesCard";
+import { eventWhenLong } from "@/src/components/public/events/eventDates";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import type { MeetingMinutesRecord, MinutesStatus } from "@/src/lib/minutes";
 import { getApprovedMinutesForEvent, getPublishedEvent } from "@/src/lib/publicData.server";
-import { statusBadge } from "@/src/lib/statusBadges";
+import { pageOpenGraph } from "@/src/lib/siteMetadata";
 
-export const dynamic = "force-dynamic";
+// Built on first visit and refreshed every 5 minutes, or at once when the event or its minutes change
+// (publicCache.server.ts). Nothing here depends on who is looking: admin extras load in the browser.
+export const revalidate = 300;
 
-// Shown to admins beside the status badge; visitors only ever see approved minutes.
-const adminStatusDescriptions: Record<MinutesStatus, string> = {
-  draft: "Draft minutes are visible to admins only.",
-  submitted: "Submitted minutes wait for approval before they are published.",
-  approved: "Approved minutes are the official record and are in the public archive."
-};
-
-/** True for a signed-in admin (the same check the admin minutes API makes); visitors without a session cost nothing. */
-async function isAdminViewer(): Promise<boolean> {
-  try {
-    await requireActiveAdmin(undefined, COMMUNITY_SLUG);
-    return true;
-  } catch (error) {
-    unstable_rethrow(error);
-    return false;
-  }
+/** No copies at build time: each event page is built on its first visit, then served from the cache. */
+export function generateStaticParams(): { orgSlug: string; eventId: string }[] {
+  return [];
 }
 
-/** Admins see the event's minutes in any status; everyone else only approved minutes. */
-async function loadMinutes(eventId: string, admin: boolean): Promise<MeetingMinutesRecord | null> {
-  if (!admin) return getApprovedMinutesForEvent(eventId);
-  try {
-    return ((await listAdminMinutes({ eventId }))[0] as MeetingMinutesRecord | undefined) ?? null;
-  } catch (error) {
-    unstable_rethrow(error);
-    return null;
-  }
+type Params = { params: Promise<{ orgSlug: string; eventId: string }> };
+
+/** The event, or null when it isn't published here. A failed read throws, so the cache keeps its last good copy. */
+async function loadEvent(orgSlug: string, eventId: string) {
+  if (orgSlug !== COMMUNITY_SLUG) return null;
+  const event = await getPublishedEvent(eventId);
+  if (event === undefined) throw new Error("Event could not be read");
+  return event;
 }
 
-export default async function EventDetailPage({ params }: { params: Promise<{ orgSlug: string; eventId: string }> }) {
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { orgSlug, eventId } = await params;
+  const event = await loadEvent(orgSlug, eventId);
+  if (!event) return { title: "Event not available · GHMO", robots: { index: false, follow: true } };
+  const when = eventWhenLong(event);
+  const fallback = [when ? `${when.date}, ${when.time}` : null, event.location].filter(Boolean).join(" · ");
+  const description = event.summary?.trim() || fallback || undefined;
+  // Link previews (Facebook, Viber, WhatsApp) show the event's own title and summary.
+  return { title: `${event.title} · GHMO`, description, openGraph: pageOpenGraph(event.title, description) };
+}
+
+export default async function EventDetailPage({ params }: Params) {
   const { orgSlug, eventId } = await params;
   const eventsHref = eventsListHref(orgSlug);
-  const event = orgSlug === COMMUNITY_SLUG ? await getPublishedEvent(eventId) : null;
-
-  if (event === undefined) {
-    return (
-      <MessagePage
-        icon={<AlertTriangle />}
-        title="We couldn't load this event"
-        description="The event can't be read right now. Try again in a moment."
-        actions={
-          <>
-            <RefreshButton />
-            <Button asChild size="lg" variant="outline">
-              <Link href={eventsHref}>See all events</Link>
-            </Button>
-          </>
-        }
-      />
-    );
-  }
+  const event = await loadEvent(orgSlug, eventId);
 
   if (!event) {
     return (
@@ -86,17 +63,20 @@ export default async function EventDetailPage({ params }: { params: Promise<{ or
     );
   }
 
-  const start = eventStart(event);
   const when = eventWhenLong(event);
-  // eslint-disable-next-line react-hooks/purity -- a server component renders once per request; "now" is that request's time
-  const isPastEvent = start ? start.getTime() < Date.now() : false;
-  const admin = isPastEvent ? await isAdminViewer() : false;
-  const meetingMinutes = isPastEvent ? await loadMinutes(event.id, admin) : null;
-  const minutesBadge = meetingMinutes ? statusBadge("minutes", meetingMinutes.status) : null;
+  // Visitors only ever see approved minutes (null: none yet). A failed read throws, so the cache keeps serving
+  // its last good copy of this page instead of one without the minutes link.
+  const approvedMinutes = await getApprovedMinutesForEvent(event.id);
+  if (approvedMinutes === undefined) throw new Error("The event's minutes could not be read");
+  // eslint-disable-next-line react-hooks/purity -- when this cached copy was built; the browser switches to its own clock (useNow)
+  const renderedAt = Date.now();
+  const timing = { id: event.id, startsAt: event.startsAt, endsAt: event.endsAt };
 
   return (
     <PublicPage width="reading" className="gap-6">
       <PublicPageHeader back={{ href: eventsHref, label: "All events" }} title={<span className="break-words">{event.title}</span>} />
+
+      <EventPassedNote event={timing} renderedAt={renderedAt} />
 
       <Card className="gap-3">
         <h2 className="sr-only">When and where</h2>
@@ -129,62 +109,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ or
 
       {event.body?.trim() ? <p className="whitespace-pre-wrap break-words text-base text-foreground">{event.body}</p> : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <Button asChild size="lg" className="w-full sm:w-auto">
-          <a href={`/api/calendar/${event.id}`}>
-            <CalendarPlus aria-hidden="true" />
-            Add to calendar
-          </a>
-        </Button>
-        <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-          <a href={eventFlyerHref(orgSlug, event.id)}>
-            <FileText aria-hidden="true" />
-            Download flyer (PDF)
-          </a>
-        </Button>
-      </div>
+      <EventActions event={timing} renderedAt={renderedAt} orgSlug={orgSlug} />
 
-      {isPastEvent ? (
-        <Card aria-labelledby="event-minutes-title">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 id="event-minutes-title" className="text-base font-semibold text-foreground">
-              Meeting minutes
-            </h2>
-            {admin && minutesBadge ? <Badge variant={minutesBadge.variant}>{minutesBadge.label}</Badge> : null}
-          </div>
-          {meetingMinutes ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                {admin ? adminStatusDescriptions[meetingMinutes.status] : "The board's approved minutes of this meeting are in the public archive."}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {meetingMinutes.status === "approved" && meetingMinutes.id ? (
-                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-                    <Link href={`/minutes/${encodeURIComponent(meetingMinutes.id)}` as Route}>
-                      <FileText aria-hidden="true" />
-                      Read the minutes
-                    </Link>
-                  </Button>
-                ) : null}
-                {admin && meetingMinutes.id ? (
-                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-                    <Link href={`/admin/minutes?minutesId=${encodeURIComponent(meetingMinutes.id)}` as Route}>Open meeting minutes</Link>
-                  </Button>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
-              {admin ? (
-                <Button asChild variant="outline" size="lg" className="w-full sm:w-auto sm:self-start">
-                  <Link href={`/admin/minutes?mode=new&eventId=${encodeURIComponent(event.id)}` as Route}>Add minutes</Link>
-                </Button>
-              ) : null}
-            </>
-          )}
-        </Card>
-      ) : null}
+      <EventMinutesCard event={timing} approvedMinutesId={approvedMinutes?.id || null} renderedAt={renderedAt} />
     </PublicPage>
   );
 }

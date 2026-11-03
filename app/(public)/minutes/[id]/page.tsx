@@ -7,10 +7,22 @@ import { getArchiveEntry } from "@/src/lib/publicData.server";
 // Built on first visit and refreshed every 5 minutes, or at once when minutes are approved (publicCache.server.ts).
 export const revalidate = 300;
 
+/** No copies at build time: each record's page is built on its first visit, then served from the cache. */
+export function generateStaticParams(): { id: string }[] {
+  return [];
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const entry = await getArchiveEntry((await params).id);
   // A missing record shows the 404 page, but streaming has already sent "200", so keep search engines out.
-  return entry ? { title: `${entry.eventTitle} minutes · GHMO` } : { title: "Page not found · GHMO", robots: { index: false, follow: true } };
+  if (!entry) return { title: "Page not found · GHMO", robots: { index: false, follow: true } };
+  const date = entry.eventDate ? formatDate(entry.eventDate) : null;
+  const kind = entry.meetingType.trim().toLowerCase();
+  const meeting = !kind || kind === "meeting" ? "meeting" : `${kind} meeting`;
+  return {
+    title: `${entry.eventTitle} minutes · GHMO`,
+    description: `Approved minutes of the ${meeting}${date ? ` on ${date}` : ""}, from the Greater Harrisburg Magar Organization.`
+  };
 }
 
 function List({ title, items }: { title: string; items: string[] }) {

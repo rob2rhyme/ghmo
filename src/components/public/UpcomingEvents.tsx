@@ -6,7 +6,7 @@ import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { EventCard, eventsHref } from "@/src/components/public/events/EventCard";
-import { eventStart } from "@/src/components/public/events/eventDates";
+import { eventIsOver } from "@/src/components/public/events/eventDates";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import type { EventRecord } from "@/src/lib/events.shared";
 import { cachedPageData } from "@/src/lib/publicCache.server";
@@ -17,7 +17,7 @@ async function loadUpcomingEvents(limit: number): Promise<EventRecord[] | null> 
   const events = cachedPageData(await getPublishedEvents(), "Upcoming events");
   if (!events) return null;
   const now = Date.now();
-  return events.filter(event => (eventStart(event)?.getTime() ?? now) >= now).slice(0, limit);
+  return events.filter(event => !eventIsOver(event, now)).slice(0, limit);
 }
 
 /** Home page "Next events": up to three published upcoming events, as the same cards as the Events page. */
@@ -34,7 +34,8 @@ export async function UpcomingEvents({ limit = 3 }: { limit?: number }) {
 
       {events?.length ? (
         <>
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3">
+          {/* Two columns on tablets, three from desktop width: three in a row at 768px left too little room for the text. */}
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 lg:grid-cols-3">
             {events.map(event => (
               <li key={event.id} className="min-w-0">
                 <EventCard evt={event} orgSlug={COMMUNITY_SLUG} compact flyer={false} headingLevel="h3" />
@@ -51,8 +52,8 @@ export async function UpcomingEvents({ limit = 3 }: { limit?: number }) {
       ) : (
         <EmptyState
           icon={<CalendarDays aria-hidden="true" />}
-          title={events ? "No upcoming events yet" : "Events couldn't be loaded right now"}
-          description={events ? "New events are posted here as soon as they're planned." : "Please try again in a little while."}
+          title={events ? "No upcoming events yet" : "We couldn't load the events right now"}
+          description={events ? "New events are posted here as soon as they're planned." : "Try again in a moment."}
           action={
             <Button asChild variant="outline" size="lg">
               <Link href={allEvents}>See all events</Link>

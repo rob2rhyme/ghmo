@@ -1,9 +1,12 @@
 import Link from "next/link";
 import type { Metadata, Route } from "next";
-import { ChevronRight, FileText } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText } from "lucide-react";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { RefreshButton } from "@/src/components/states/RefreshButton";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
+import { getContactEmail } from "@/src/lib/contact";
 import { formatDate } from "@/src/lib/format";
 import { cachedPageData } from "@/src/lib/publicCache.server";
 import { listArchive } from "@/src/lib/publicData.server";
@@ -28,11 +31,7 @@ export default async function MinutesArchivePage() {
     <PublicPage width="reading" className="gap-6">
       <PublicPageHeader title="Meeting minutes" description="Approved minutes from our board and general meetings." />
       {!loaded ? (
-        <EmptyState
-          icon={<FileText />}
-          title="The minutes can't be shown right now"
-          description="Please try again in a few minutes."
-        />
+        <MinutesLoadFailed contactEmail={getContactEmail()} />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={<FileText />}
@@ -68,5 +67,31 @@ export default async function MinutesArchivePage() {
         ))
       )}
     </PublicPage>
+  );
+}
+
+/** Only seen on a copy built while the minutes couldn't be read (see cachedPageData). */
+function MinutesLoadFailed({ contactEmail }: { contactEmail: string | null }) {
+  return (
+    <Alert variant="destructive">
+      <AlertTriangle />
+      <AlertTitle>We couldn&apos;t load the minutes right now</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-3">
+        <p>
+          Try again in a moment.
+          {contactEmail ? (
+            <>
+              {" "}
+              If it keeps happening, email us at{" "}
+              <a href={`mailto:${contactEmail}`} className="font-semibold text-foreground underline underline-offset-4">
+                {contactEmail}
+              </a>
+              .
+            </>
+          ) : null}
+        </p>
+        <RefreshButton />
+      </AlertDescription>
+    </Alert>
   );
 }
