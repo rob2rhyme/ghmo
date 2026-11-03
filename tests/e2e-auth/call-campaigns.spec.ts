@@ -43,7 +43,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   await addMember(page, "Bina Thapa", "bina@example.org", "717-555-0102");
   await addMember(page, "Deepak Gurung", "deepak@example.org", "717-555-0103");
 
-  await nav(page, "Calling Tree");
+  await nav(page, "Calling tree");
   const callers = page.getByRole("list", { name: "Callers" });
   await callers.getByLabel("Alice").check();
   await callers.getByLabel("Bob").check();
@@ -52,7 +52,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   await expect(page.getByText(/Calling tree saved \(v1\)/)).toBeVisible();
 
   // --- Open the campaign from the event, with an encrypted script ---
-  await nav(page, "Call Campaigns");
+  await nav(page, "Call campaigns");
   await page.getByLabel("Event (optional)").selectOption({ label: "General meeting" });
   await expect(page.getByLabel("Title")).toHaveValue("General meeting");
   await page.getByLabel("Calls done by (optional)").fill("2026-11-14");
@@ -82,12 +82,14 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   expect(dup).toBe(409);
 
   // --- Alice logs a call from My Calls: reached, coming, with an encrypted note ---
-  await nav(page, "My Calls");
+  await nav(page, "My calls");
   await expect(page.getByText("What to say")).toBeVisible();
   await expect(page.getByText("Agenda: budget, elections, picnic.")).toBeVisible();
   const campaignList = page.getByRole("list", { name: "Calls for General meeting" });
   // Read both names before logging anything: rows re-sort once someone is done.
-  const rowNames = (await campaignList.getByRole("listitem").locator("p:first-child").allTextContents()).map(t => t.trim());
+  const rowNames = await campaignList
+    .getByRole("button", { name: /^Log call to / })
+    .evaluateAll(buttons => buttons.map(button => (button.getAttribute("aria-label") ?? "").replace(/^Log call to /, "").trim()));
   expect(rowNames).toHaveLength(2);
   const [firstName, secondName] = rowNames;
   await page.getByRole("button", { name: `Log call to ${firstName}` }).click();
@@ -127,7 +129,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   const bobList = bob.getByRole("list", { name: "Calls for General meeting" });
   await expect(bobList.getByRole("listitem")).toHaveCount(1);
   await expect(bob.getByText("Agenda: budget, elections, picnic.")).toBeVisible();
-  const bobsPerson = (await bobList.getByRole("listitem").first().locator("p").first().textContent())!.trim();
+  const bobsPerson = (await bobList.getByRole("button", { name: /^Log call to / }).first().getAttribute("aria-label"))!.replace(/^Log call to /, "").trim();
   await bob.getByRole("button", { name: `Log call to ${bobsPerson}` }).click();
   await bob.getByRole("radio", { name: "Reached", exact: true }).check();
   await bob.getByRole("radio", { name: "Not coming", exact: true }).check();
@@ -176,7 +178,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   await expect(page.getByRole("list", { name: "Call log" }).getByRole("listitem")).toHaveCount(3);
   await expect(page.getByText("Bringing two guests")).toBeVisible();
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
+  await page.getByRole("button", { name: "Download spreadsheet (CSV)" }).click();
   const file = await download;
   const csv = await (await import("node:fs/promises")).readFile(await file.path(), "utf8");
   expect(csv.split("\n")[0]).toBe("Name,Email,Caller,Outcome,RSVP,Attempts,Last attempt");
@@ -186,6 +188,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   expect((await db.collection(`${ORG}/auditLogs`).where("action", "==", "call_campaign_exported").get()).size).toBe(1);
 
   await page.getByRole("button", { name: "Close campaign" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close campaign" }).click();
   await expect(page.getByText("Campaign closed")).toBeVisible();
   expect((await db.doc(`${ORG}/callCampaigns/${campaignId}`).get()).data()).toMatchObject({ status: "closed", closedBy: "alice" });
   const afterClose = await bob.evaluate(async (args: { campaignId: string; memberId: string }) => {

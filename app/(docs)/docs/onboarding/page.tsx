@@ -1,47 +1,92 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { KeyRound, LifeBuoy, LockKeyhole, LogIn, Smartphone } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
+import { Button } from "@/src/components/ui/button";
+
+export const metadata: Metadata = { title: "Board member guide · GHMO" };
+
+type Section = { icon: LucideIcon; title: string; steps: string[]; note?: string };
+
+const SECTIONS: Section[] = [
+  {
+    icon: LogIn,
+    title: "Signing in for the first time",
+    steps: [
+      "Ask a super admin to add your email address to the board list.",
+      "Open Board member sign in, type your email and press “Email me a sign-in link”.",
+      "Open the link from your email on the same device.",
+      "Install an authenticator app on your phone (Google Authenticator, Microsoft Authenticator or similar) and scan the QR code shown on screen.",
+      "Type the 6-digit code from the app. You will see 8 recovery codes once: write them down and keep them somewhere other than your email."
+    ]
+  },
+  {
+    icon: Smartphone,
+    title: "Signing in after that",
+    steps: [
+      "Request an email link as before, then type the current 6-digit code from your authenticator app.",
+      "Optional and faster: add a passkey under Security. A passkey lets you sign in with your fingerprint, face or phone screen lock."
+    ]
+  },
+  {
+    icon: LockKeyhole,
+    title: "Setting up encryption on your device",
+    steps: [
+      "Open Encryption in the admin menu and give this device a name you will recognize, such as “Sita’s laptop”.",
+      "Another board member approves your device. Before they do, compare the safety code on both screens by phone or in person.",
+      "After that, private records (chat, minutes, phone numbers) open on this device. Lock it when you step away."
+    ],
+    note: "A super admin turns encryption on once, with two trusted people present. Each of them keeps a paper copy of the recovery key."
+  },
+  {
+    icon: LifeBuoy,
+    title: "If you lose your phone or leave the board",
+    steps: [
+      "Lost your phone: sign in with one of your recovery codes, or ask a super admin to reset your authenticator app.",
+      "Lost a device that was set up for encryption: tell a super admin straight away so they can remove it.",
+      "Leaving the board: a super admin turns off your access and removes your devices."
+    ]
+  }
+];
+
 export default function OnboardingDocPage() {
   return (
-    <main className="mx-auto max-w-4xl space-y-4 px-6 py-10">
-      <h1 className="text-3xl font-bold">Community Operations</h1>
-      <p className="text-muted-foreground">
-        This deployment is a single community instance for the Greater Harrisburg Magar Organization. Configure Firebase, GoFundMe Pro, and social handles via env vars, then manage content and meeting minutes from Admin. The full roadmap and security plan live in docs/PROJECT_PLAN.md.
-      </p>
-      <ul className="list-disc space-y-2 pl-5 text-foreground/80">
-        <li>Define environment variables before running the app (Firebase client + admin, GoFundMe Pro secrets, social URLs).</li>
-        <li>
-          Set `FEATURE_EMAIL_ADMIN_LOGIN=true`. Admins sign in with an email magic link at `/admin/login` (PIN login
-          has been removed).
-        </li>
-        <li>
-          Every admin signs in with a passkey (fingerprint, face or device PIN). The first time, use the email link on
-          `/admin/login`, then create a passkey. Add a second passkey on another device under Admin → Security.
-        </li>
-        <li>
-          Lost a device? Use the email link again and create a new passkey. Another admin must approve it under Admin →
-          Security before it works; confirm with them by phone or in person first.
-        </li>
-        <li>
-          First admin: set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters), then `POST /api/admin/bootstrap` with
-          the secret, email and name. It works once; remove the secret afterwards.
-        </li>
-        <li>Use the manual reconcile action to sync donation totals after webhook setup.</li>
-        <li>
-          Allowlist admins by adding docs under `organizations/ghmo/admins` with `emailLower` and
-          `status: &quot;active&quot;` (and optional `name`/`roles`) set.
-        </li>
-        <li>
-          End-to-end encryption: a super admin turns it on under Admin → Encryption with both trustees present. Each
-          trustee keeps one paper copy of the recovery key. Without it, losing every admin device means losing all
-          encrypted data. Test the recovery key once a year.
-        </li>
-        <li>
-          After turning encryption on, run Admin → Encryption → &quot;Encrypt existing records&quot; once and keep the
-          page open until it says Done. Then delete older backups, which still contain the earlier plaintext.
-        </li>
-        <li>
-          Each admin sets up encryption on each device they use; another admin approves it after comparing the 20-digit
-          safety code by phone or in person.
-        </li>
-      </ul>
-    </main>
+    <PublicPage width="reading">
+      <PublicPageHeader
+        eyebrow="For board members"
+        title="Board member guide"
+        description="How to sign in to the GHMO admin console, keep your account safe, and set up encryption on your devices."
+        actions={
+          <Button asChild size="lg" className="w-full sm:w-auto">
+            <Link href="/admin/login">
+              <KeyRound aria-hidden="true" />
+              Board member sign in
+            </Link>
+          </Button>
+        }
+      />
+
+      <ol className="flex flex-col gap-4">
+        {SECTIONS.map(({ icon: Icon, title, steps, note }) => (
+          <li key={title} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-xs md:p-6">
+            <h2 className="flex items-center gap-3 text-lg font-semibold">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon className="size-5" aria-hidden="true" />
+              </span>
+              {title}
+            </h2>
+            <ol className="flex list-decimal flex-col gap-2 pl-6 text-foreground/90 marker:font-semibold marker:text-muted-foreground">
+              {steps.map(step => (
+                <li key={step} className="pl-1">
+                  {step}
+                </li>
+              ))}
+            </ol>
+            {note ? <p className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">{note}</p> : null}
+          </li>
+        ))}
+      </ol>
+    </PublicPage>
   );
 }

@@ -16,7 +16,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
   const violations = collectCspViolations(page);
   await signInWithNewPasskey(page, "alice", "/admin/encryption");
   await turnOnEncryption(page, "Alice laptop");
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Document Generator" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Document generator" }).click();
 
   // --- Fill a name, then reach the signature step and request a signature ---
   await page.getByRole("button", { name: "Wedding Certificate" }).first().click();
@@ -69,7 +69,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
     await page.getByRole("button", { name: "Next", exact: true }).click();
   }
   await page.getByRole("button", { name: "Save to Gallery" }).click();
-  await expect(page.getByText(/Document saved \(ID/)).toBeVisible();
+  await expect(page.getByText("Saved to the document gallery")).toBeVisible();
   const docs = await db.collection("organizations/ghmo/documents").get();
   expect(docs.size).toBe(1);
   expect(docs.docs[0].data()).toHaveProperty("enc");

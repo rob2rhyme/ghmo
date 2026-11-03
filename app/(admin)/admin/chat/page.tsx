@@ -26,16 +26,17 @@ export default async function AdminChatPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader
-        title="Admin Chat"
-        description="WhatsApp-style coordination for quick admin updates."
-      />
-      <FirebaseAdminAuthBootstrap>
-        <EncryptionGate what="Admin Chat">
-          <AdminChatClient actor={toPlain(actorInfo)} />
-        </EncryptionGate>
-      </FirebaseAdminAuthBootstrap>
+    // One full-height column: the shell's top bar and padding are taken off the screen height, and the chat
+    // (marked data-fill) takes whatever is left below the header and any notice, so Send stays on screen.
+    <div className="flex h-[calc(100dvh-7.25rem)] min-h-112 flex-col gap-6 lg:h-[calc(100dvh-8.25rem)]">
+      <AdminPageHeader title="Admin chat" description="Quick updates and reminders between admins. Decisions belong in Plans & Issues." />
+      <div className="flex min-h-0 flex-1 flex-col *:has-[>[data-fill]]:min-h-0 *:has-[>[data-fill]]:flex-1">
+        <FirebaseAdminAuthBootstrap>
+          <EncryptionGate what="admin chat" detail="Messages are readable only on approved admin devices.">
+            <AdminChatClient actor={toPlain(actorInfo)} />
+          </EncryptionGate>
+        </FirebaseAdminAuthBootstrap>
+      </div>
     </div>
   );
 }

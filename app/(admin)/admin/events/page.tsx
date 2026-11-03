@@ -3,6 +3,16 @@ import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import Link from "next/link";
+import type { Route } from "next";
+import { CalendarDays, Plus } from "lucide-react";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { formatDateTime, toDate, type DateInput } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -27,92 +37,110 @@ export default async function AdminEventsPage() {
       id: string;
       title?: string;
       summary?: string;
-      startsAt?: { toDate?: () => Date } | Date | number | null;
+      startsAt?: DateInput;
+      timezone?: string;
       status?: string;
       featured?: boolean;
       announcementDocTemplate?: string | null;
     }[];
   };
 
+  type AdminEvent = (typeof events)[number];
+  const { upcoming, past } = splitByTime(events);
+
+  const row = (evt: AdminEvent) => {
+    const status = statusBadge("event", evt.status);
+    const when = eventDate(evt.startsAt, evt.timezone);
+    return (
+      <AdminListRow
+        key={evt.id}
+        href={`/admin/events/${evt.id}/edit` as Route}
+        title={<span className="break-words">{evt.title || "Untitled event"}</span>}
+        badges={
+          <>
+            <Badge variant={status.variant}>{status.label}</Badge>
+            {evt.featured ? <Badge variant="outline">Featured</Badge> : null}
+          </>
+        }
+        meta={
+          <>
+            <span>{when || "No date set"}</span>
+            {evt.summary ? <span className="mt-0.5 line-clamp-2 block">{evt.summary}</span> : null}
+          </>
+        }
+      />
+    );
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Events</h1>
-          <p className="text-sm text-muted-foreground">Manage organization events</p>
-        </div>
-        <Link
-          href="/admin/events/new"
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
-        >
-          New Event
-        </Link>
-      </div>
-      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-        <div className="grid grid-cols-7 bg-background px-4 py-2 text-xs font-semibold uppercase text-muted-foreground">
-          <div className="col-span-2">Title</div>
-          <div>Start</div>
-          <div>Status</div>
-          <div>Featured</div>
-          <div>Template</div>
-          <div className="text-right">Actions</div>
-        </div>
-        <div className="divide-y divide-border">
-          {events.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-muted-foreground">
-              No events yet.
-            </div>
-          ) : (
-            events.map((evt) => (
-              <div
-                key={evt.id}
-                className="grid grid-cols-7 items-center px-4 py-3 text-sm"
-              >
-                <div className="col-span-2">
-                  <div className="font-semibold text-foreground">
-                    {evt.title}
-                  </div>
-                  {evt.summary ? (
-                    <div className="text-xs text-muted-foreground line-clamp-2">
-                      {evt.summary}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="text-xs text-foreground/80">
-                  {(() => {
-                    if (!evt.startsAt) return "—";
-                    if (
-                      typeof evt.startsAt === "object" &&
-                      "toDate" in evt.startsAt &&
-                      typeof evt.startsAt.toDate === "function"
-                    ) {
-                      return new Date(evt.startsAt.toDate()).toLocaleString();
-                    }
-                    return new Date(
-                      evt.startsAt as Date | number
-                    ).toLocaleString();
-                  })()}
-                </div>
-                <div className="text-xs font-semibold capitalize">
-                  {evt.status}
-                </div>
-                <div className="text-xs">{evt.featured ? "Yes" : "No"}</div>
-                <div className="text-xs">
-                  {evt.announcementDocTemplate || "—"}
-                </div>
-                <div className="text-right">
-                  <Link
-                    href={`/admin/events/${evt.id}/edit`}
-                    className="text-sm font-semibold text-primary hover:underline"
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        title="Events"
+        description="Meetings and community gatherings. Published events show on the public Events page."
+        actions={
+          <Button asChild>
+            <Link href="/admin/events/new">
+              <Plus aria-hidden="true" />
+              New event
+            </Link>
+          </Button>
+        }
+      />
+
+      {events.length === 0 ? (
+        <EmptyState
+          icon={<CalendarDays aria-hidden="true" />}
+          title="No events yet"
+          description="Add your first meeting or gathering. It stays a draft until you publish it."
+          action={
+            <Button asChild>
+              <Link href="/admin/events/new">
+                <Plus aria-hidden="true" />
+                New event
+              </Link>
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <AdminSectionCard title="Upcoming" description="Soonest first. Select an event to edit it.">
+            {upcoming.length ? (
+              <AdminList bare label="Upcoming events">
+                {upcoming.map(row)}
+              </AdminList>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nothing coming up. Add the next meeting or gathering with New event.</p>
+            )}
+          </AdminSectionCard>
+          {past.length ? (
+            <AdminSectionCard title="Past" description="Most recent first.">
+              <AdminList bare label="Past events">
+                {past.map(row)}
+              </AdminList>
+            </AdminSectionCard>
+          ) : null}
+        </>
+      )}
     </div>
   );
+}
+
+/** Upcoming soonest first (events without a date count as upcoming, at the end), then past, latest first. */
+function splitByTime<T extends { startsAt?: DateInput }>(events: T[]): { upcoming: T[]; past: T[] } {
+  const now = Date.now();
+  const startMs = (evt: T) => toDate(evt.startsAt)?.getTime() ?? Infinity;
+  const byStart = (a: T, b: T) => (startMs(a) === startMs(b) ? 0 : startMs(a) - startMs(b));
+  return {
+    upcoming: events.filter(evt => startMs(evt) >= now).sort(byStart),
+    past: events.filter(evt => startMs(evt) < now).sort((a, b) => byStart(b, a))
+  };
+}
+
+/** "Sat, Dec 12, 2026 · 7:00 PM" in the event's own time zone (falls back to the server's if it is unknown). */
+function eventDate(value: DateInput, timeZone?: string): string {
+  try {
+    return formatDateTime(value, { timeZone });
+  } catch {
+    return formatDateTime(value);
+  }
 }

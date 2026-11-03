@@ -6,15 +6,15 @@ export const bhajanProgram: DocTemplate = {
   version: 1,
   title: "Bhajan Program",
   category: "Religious",
-  description: "Invitation for a home religious gathering and bhajan program.",
+  description: "Invite the community to a bhajan program and prayers at a family's home.",
   fields: [
-    { id: "hostName", label: "Host Name", type: "text", placeholder: "Gurung Family", required: true },
-    { id: "programTitle", label: "Program Title", type: "text", placeholder: "Bhajan Program", required: true },
+    { id: "hostName", label: "Host family", type: "text", placeholder: "Gurung Family", required: true },
+    { id: "programTitle", label: "Program title", type: "text", placeholder: "Bhajan Program", required: true },
     { id: "programDate", label: "Date", type: "date", required: true },
     { id: "programTime", label: "Time", type: "text", placeholder: "6:30 PM", required: true },
-    { id: "location", label: "Location / Address", type: "textarea", rows: 3, placeholder: "123 Harmony Lane, Harrisburg", required: true },
-    { id: "occasion", label: "Occasion / Purpose", type: "textarea", rows: 3, placeholder: "Daily bhajan, community blessing" },
-    { id: "contact", label: "Contact Person / Info", type: "text", placeholder: "bhajan@ghmo.org" }
+    { id: "location", label: "Address", type: "textarea", rows: 3, placeholder: "123 Harmony Lane, Harrisburg", required: true },
+    { id: "occasion", label: "Occasion", type: "textarea", rows: 3, placeholder: "Blessing for the new home" },
+    { id: "contact", label: "Contact person or phone", type: "text", placeholder: "bhajan@ghmo.org" }
   ],
   renderHtml(inputs) {
     const organizationName =

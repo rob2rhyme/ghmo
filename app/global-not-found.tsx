@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
+import Providers from "@/src/components/Providers";
+import ThemeLogo from "@/src/components/ThemeLogo";
+import { NotFoundBody } from "@/src/components/public/NotFoundBody";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,18 +11,26 @@ export const metadata: Metadata = {
   description: "The page you are looking for does not exist."
 };
 
-export default function GlobalNotFound() {
+/**
+ * 404 for URLs that match no route. It renders its own <html>, so it sets up the theme the same way
+ * SiteShell does: next-themes' inline script carries this request's CSP nonce on secure paths (proxy.ts
+ * sets x-nonce there; public paths have no script restriction and no nonce). The message itself is the
+ * same NotFoundBody the route groups' not-found.tsx files use.
+ */
+export default async function GlobalNotFound() {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
-    <html lang="en">
-      <body className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground antialiased">
-        <main className="max-w-md space-y-4 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">404</p>
-          <h1 className="text-2xl font-bold">Page not found</h1>
-          <p className="text-muted-foreground dark:text-slate-400">The page you are looking for does not exist or has moved.</p>
-          <Link href="/" className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white">
-            Go to the home page
-          </Link>
-        </main>
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <Providers nonce={nonce}>
+          <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center px-4 py-12">
+            <Link href="/" className="rounded-md" aria-label="Greater Harrisburg Magar Organization home">
+              <ThemeLogo alt="" priority className="size-20" />
+            </Link>
+            <NotFoundBody />
+          </main>
+        </Providers>
       </body>
     </html>
   );

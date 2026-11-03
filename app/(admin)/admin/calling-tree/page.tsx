@@ -15,11 +15,8 @@ export default async function CallingTreePage() {
     throw error;
   }
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader
-        title="Calling Tree"
-        description="Every member who can be called is assigned to one board member, split as evenly as possible with households kept together. Assignments stay put from one announcement to the next."
-      />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="Calling tree" description="Who phones whom: each callable member keeps one caller, shared out evenly, with households kept together." />
       <CallingTreeClient />
     </div>
   );

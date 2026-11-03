@@ -10,6 +10,10 @@ export type MediaItem = {
   viewCount?: number;
 };
 
+/**
+ * A social feed for the public pages. Without API keys a feed has no items, only the profile link
+ * when one is configured: the site never shows stand-in photos or videos. `error` is for logs only.
+ */
 export type MediaFeed = {
   source: "facebook" | "youtube" | "tiktok" | "instagram";
   mode: "api" | "embed" | "links";
@@ -65,7 +69,7 @@ export async function loadFacebookMedia(): Promise<MediaFeed> {
           mode: "links",
           embedUrl,
           profileUrl: embedUrl,
-          items: facebookFallbackItems(),
+          items: [],
           error: err?.message || "Facebook fetch failed"
         };
       }
@@ -76,8 +80,7 @@ export async function loadFacebookMedia(): Promise<MediaFeed> {
       mode: embedUrl ? "embed" : "links",
       embedUrl,
       profileUrl: embedUrl,
-      items: facebookFallbackItems(),
-      error: embedUrl ? undefined : "Configure FACEBOOK_PAGE_URL or GRAPH token for live posts"
+      items: []
     };
   });
 }
@@ -148,7 +151,7 @@ export async function loadYouTubeMedia(): Promise<MediaFeed> {
         return {
           source: "youtube",
           mode: "links",
-          items: youtubeFallbackItems(channelUrl),
+          items: [],
           profileUrl: channelLink,
           error: err?.message || "YouTube fetch failed"
         };
@@ -160,8 +163,7 @@ export async function loadYouTubeMedia(): Promise<MediaFeed> {
       mode: channelUrl ? "embed" : "links",
       embedUrl: channelUrl ? `${channelUrl}/videos` : undefined,
       profileUrl: channelLink,
-      items: youtubeFallbackItems(channelUrl),
-      error: channelUrl ? undefined : "Configure YOUTUBE_API_KEY + YOUTUBE_CHANNEL_ID for live videos"
+      items: []
     };
   });
 }
@@ -175,16 +177,7 @@ export async function loadTikTokFeature(): Promise<MediaFeed> {
       mode: embedUrl ? "embed" : "links",
       embedUrl,
       profileUrl,
-      items: [
-        {
-          id: "tiktok-feature",
-          title: "Follow us on TikTok",
-          url: profileUrl || "https://www.tiktok.com/",
-          thumbnail: process.env.TIKTOK_FEATURE_THUMBNAIL,
-          type: "video"
-        }
-      ],
-      error: profileUrl ? undefined : "Set TIKTOK_PROFILE_URL for a live embed"
+      items: []
     };
   });
 }
@@ -198,48 +191,7 @@ export async function loadInstagramFeature(): Promise<MediaFeed> {
       mode: embedUrl ? "embed" : "links",
       embedUrl,
       profileUrl,
-      items: [
-        {
-          id: "instagram-feature",
-          title: "See our latest Instagram posts",
-          url: profileUrl || "https://www.instagram.com/",
-          thumbnail: process.env.INSTAGRAM_FEATURE_THUMBNAIL,
-          type: "image"
-        }
-      ],
-      error: profileUrl ? undefined : "Set INSTAGRAM_PROFILE_URL for live posts"
+      items: []
     };
   });
-}
-
-function facebookFallbackItems(): MediaItem[] {
-  return [
-    {
-      id: "fb-1",
-      title: "Community photo gallery",
-      url: process.env.FACEBOOK_PAGE_URL || "#",
-      thumbnail: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=60",
-      type: "post"
-    },
-    {
-      id: "fb-2",
-      title: "Event highlights",
-      url: process.env.FACEBOOK_PAGE_URL || "#",
-      thumbnail: "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=60",
-      type: "post"
-    }
-  ];
-}
-
-function youtubeFallbackItems(channelUrl?: string): MediaItem[] {
-  const base = channelUrl || "https://www.youtube.com";
-  return [
-    {
-      id: "yt-1",
-      title: "Featured video",
-      url: `${base}/watch?v=dQw4w9WgXcQ`,
-      thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-      type: "video"
-    }
-  ];
 }

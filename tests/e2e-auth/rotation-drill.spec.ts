@@ -41,8 +41,8 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
   // --- Bob's phone is "lost": Alice revokes it and rotates ---
   await nav(alice, "Encryption");
   await alice.getByLabel("Select Bob phone to revoke").check();
-  alice.once("dialog", dialog => void dialog.accept());
   await alice.getByRole("button", { name: "Revoke selected and rotate keys" }).click();
+  await alice.getByRole("dialog", { name: "Revoke 1 device and create new keys?" }).getByRole("button", { name: "Revoke and rotate keys" }).click();
   await expect(alice.getByText("Devices revoked and keys rotated")).toBeVisible({ timeout: 20_000 });
 
   const { db } = admin();
@@ -57,7 +57,7 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
   expect(wraps2).not.toContain(bobDevice);
 
   // --- New data is written under the new epoch ---
-  await nav(alice, "Admin Chat");
+  await nav(alice, "Admin chat");
   await send(alice, "After rotation");
   // (The bubble shows from the local cache first, so wait for the write to reach the database.)
   await expect

@@ -7,11 +7,34 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/src/com
 import { cn } from "@/src/lib/utils";
 import { ADMIN_NAV } from "./adminNav";
 
-type Entry = { href: (typeof ADMIN_NAV)[number]["items"][number]["href"]; label: string; group: string; icon: (typeof ADMIN_NAV)[number]["items"][number]["icon"] };
+type Entry = {
+  href: (typeof ADMIN_NAV)[number]["items"][number]["href"];
+  label: string;
+  group: string;
+  icon: (typeof ADMIN_NAV)[number]["items"][number]["icon"];
+  keywords: string[];
+};
 
-const ENTRIES: Entry[] = ADMIN_NAV.flatMap(group => group.items.map(item => ({ href: item.href, label: item.label, group: group.label, icon: item.icon })));
+const ENTRIES: Entry[] = ADMIN_NAV.flatMap(group =>
+  group.items.map(item => ({
+    href: item.href,
+    label: item.label,
+    group: group.label,
+    icon: item.icon,
+    keywords: (item.keywords ?? "")
+      .split(",")
+      .map(word => word.trim())
+      .filter(Boolean)
+  }))
+);
 
-/** "Jump to…" palette (Ctrl/⌘ K): type a few letters of a page name, press Enter. */
+/** The keyword that matched, when the page name itself did not (shown as a hint beside the result). */
+function keywordHit(entry: Entry, q: string): string | null {
+  if (!q || `${entry.label} ${entry.group}`.toLowerCase().includes(q)) return null;
+  return entry.keywords.find(word => word.toLowerCase().includes(q)) ?? null;
+}
+
+/** "Jump to…" palette (Ctrl/⌘ K): type a few letters of a page name or a task ("passkey", "donations"), press Enter. */
 export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -19,8 +42,9 @@ export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? ENTRIES.filter(entry => `${entry.label} ${entry.group}`.toLowerCase().includes(q)) : ENTRIES;
+    return q ? ENTRIES.filter(entry => `${entry.label} ${entry.group} ${entry.keywords.join(" ")}`.toLowerCase().includes(q)) : ENTRIES;
   }, [query]);
+  const q = query.trim().toLowerCase();
   const current = Math.min(active, Math.max(results.length - 1, 0));
 
   const go = (entry: Entry | undefined) => {
@@ -44,7 +68,7 @@ export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenC
     >
       <DialogContent className="top-[20%] max-w-xl translate-y-0 gap-0 overflow-hidden p-0">
         <DialogTitle className="sr-only">Jump to a page</DialogTitle>
-        <DialogDescription className="sr-only">Type to filter the admin pages, use the arrow keys, then press Enter.</DialogDescription>
+        <DialogDescription className="sr-only">Type a page name or what you want to do, use the arrow keys, then press Enter.</DialogDescription>
         <div className="flex items-center gap-3 border-b border-border px-4">
           <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
@@ -71,7 +95,7 @@ export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenC
                 go(results[current]);
               }
             }}
-            placeholder="Jump to a page…"
+            placeholder="Jump to a page, or type a task like “passkey”…"
             className="h-12 w-full bg-transparent text-sm text-foreground outline-hidden placeholder:text-muted-foreground"
           />
         </div>
@@ -81,6 +105,7 @@ export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenC
           ) : (
             results.map((entry, index) => {
               const Icon = entry.icon;
+              const hit = keywordHit(entry, q);
               return (
                 <li
                   key={entry.href}
@@ -90,13 +115,13 @@ export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenC
                   onMouseMove={() => setActive(index)}
                   onClick={() => go(entry)}
                   className={cn(
-                    "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
+                    "flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm",
                     index === current ? "bg-accent text-accent-foreground" : "text-foreground/80"
                   )}
                 >
                   <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span className="font-medium">{entry.label}</span>
-                  <span className="text-xs text-muted-foreground">{entry.group}</span>
+                  <span className="min-w-0 truncate font-medium">{entry.label}</span>
+                  <span className="truncate text-xs text-muted-foreground">{hit ? `matches “${hit}”` : entry.group}</span>
                   {index === current ? <CornerDownLeft className="ml-auto size-3.5 text-muted-foreground" aria-hidden="true" /> : null}
                 </li>
               );

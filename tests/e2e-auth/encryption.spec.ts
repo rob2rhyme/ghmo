@@ -32,7 +32,7 @@ test("super admin turns on E2EE, locks/unlocks with passkey PRF, approves a seco
   // --- Recovery drill with the paper key (changes nothing) ---
   await alice.getByLabel("Test a recovery key (changes nothing)").fill(groups.join(" "));
   await alice.getByRole("button", { name: "Test", exact: true }).click();
-  await expect(alice.getByText(/Recovery key works: it opens all 1 key generation/)).toBeVisible();
+  await expect(alice.getByText(/Recovery key works: it opens the encryption keys/)).toBeVisible();
 
   // --- Bob sets up his device in another browser; Alice approves it after comparing safety codes ---
   const bobContext = await browser.newContext();

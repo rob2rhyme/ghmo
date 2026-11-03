@@ -13,6 +13,9 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] In Vercel → Domains, make the other addresses (such as `ghmo.vercel.app`) redirect to that one.
 - [x] Firebase Auth → Settings → Authorized domains lists that domain (and only your real domains).
 - [ ] Node version in Vercel is 22 or later (the app requires `>=22.12`).
+- [ ] **Donate button:** set `GOFUNDME_PUBLIC_URL` to the real Gumba Project campaign page (`https://www.gofundme.com/f/…`). Until it is set, the Donate buttons are hidden and the site says "Donations open soon". Optional: `GOFUNDME_PRO_CAMPAIGN_ID` for the embedded donation form.
+- [ ] **Contact email:** set `CONTACT_EMAIL` (for example `info@…`). The footer's Contact line and the "email us" links on help messages appear once it is set.
+- [ ] **Social links (optional):** `FACEBOOK_PAGE_URL`, `INSTAGRAM_PROFILE_URL`, `TIKTOK_PROFILE_URL`, `YOUTUBE_CHANNEL_URL`. Sections without a link are hidden; YouTube defaults to GHMO's channel.
 - [ ] Optional: Resend account, verified sending domain, `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Admin → Security.
 - [ ] **Before the first broadcast to members (Phase 8):** in Resend add a webhook to `https://<your domain>/api/resend/webhook` for `email.bounced` and `email.complained`, and set its signing secret as `RESEND_WEBHOOK_SECRET`; set `BROADCAST_ORG_NAME` and `BROADCAST_POSTAL_ADDRESS` (the footer of every broadcast); verify the sending domain (SPF, DKIM, DMARC). Test one-click unsubscribe from a real mail app. Then set `FEATURE_BROADCASTS=true` (and `BROADCAST_DAILY_LIMIT` to your Resend plan's daily allowance), and send a first broadcast to a small test list of members before the real one.
 
@@ -47,7 +50,14 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] Fill in names and phone numbers in `docs/RUNBOOK_INCIDENT.md`, print it, and keep it with the recovery keys.
 - [ ] Calendar reminder: test the recovery key every year (Admin → Encryption → Test).
 
-## 6. After going live
+## 6. UI layout upgrade (Phase 10, code work; see `docs/PROJECT_PLAN.md` §13)
+
+- [ ] **Audit 1** (layout only: beginner friendly, premium and modern look) done and findings reviewed by the owner. *Audit done 2026-11-02 (`docs/UI_AUDIT_1.md`); waiting for the owner's review and the real GoFundMe link.*
+- [ ] Upgrade 1 fixes merged. *Built and tested 2026-11-02 on `claude/elegant-hypatia-klg5se`; not pushed yet.*
+- [ ] **Audit 2** done and findings reviewed by the owner. *Audit done 2026-11-02 (`docs/UI_AUDIT_2.md`); waiting for the owner's review, a contact email and the go-ahead for B9 (event time zones).*
+- [ ] Upgrade 2 fixes merged. *Built and tested 2026-11-02 on `claude/elegant-hypatia-klg5se`; not pushed yet.*
+
+## 7. After going live
 
 - [ ] Open `/admin/login`, `/admin`, `/admin/encryption`, `/minutes` and a public page in a normal browser window with the console open. There should be no red errors.
 - [ ] If the Encryption page shows "The device list failed its integrity check", stop and follow `docs/RUNBOOK_INCIDENT.md` case E.

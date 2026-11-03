@@ -3,6 +3,7 @@
 import { notifyActivity } from "@/src/lib/notifyClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Check, MessageSquare, Reply, ThumbsUp } from "lucide-react";
 import {
   collection,
   deleteDoc,
@@ -14,7 +15,21 @@ import {
   serverTimestamp,
   setDoc
 } from "firebase/firestore";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card } from "@/src/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { Field } from "@/src/components/ui/field";
+import { Skeleton } from "@/src/components/ui/skeleton";
+import { Steps } from "@/src/components/ui/steps";
+import { Textarea } from "@/src/components/ui/textarea";
+import { toast } from "sonner";
+import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
@@ -41,12 +56,6 @@ const PRIORITY_LABELS: Record<string, string> = {
   high: "High"
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  open: "Open",
-  closing: "Closing",
-  closed: "Closed"
-};
-
 export default function CommsThreadDetailClient({ threadId, actor }: CommsThreadDetailClientProps) {
   const { packPrivate, unpackPrivate } = useE2ee();
   const [thread, setThread] = useState<ThreadView | null>(null);
@@ -56,8 +65,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     reject: 0,
     mine: null
   });
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => Boolean(firestore));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
+  const [missing, setMissing] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const [commentBody, setCommentBody] = useState("");
   const [replyToId, setReplyToId] = useState<string | null>(null);
@@ -82,18 +93,14 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    if (!firestore) {
-      setLoadError(firebaseInitError || "Firebase is not configured.");
-      setLoading(false);
-      return;
-    }
+    if (!firestore) return;
     const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
     let cancelled = false;
     const unsubscribe = onSnapshot(
       threadRef,
       snapshot => {
         if (!snapshot.exists()) {
-          setLoadError("Thread not found.");
+          setMissing(true);
           setThread(null);
           setLoading(false);
           return;
@@ -101,12 +108,13 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
         void unpackThread(unpackPrivate, snapshot.id, snapshot.data() as Record<string, unknown>).then(next => {
           if (cancelled) return;
           setThread(next);
+          setMissing(false);
           setLoadError(null);
           setLoading(false);
         });
       },
       error => {
-        setLoadError(error.message || "Unable to load thread");
+        setLoadError(error.message || "The connection failed.");
         setLoading(false);
       }
     );
@@ -114,7 +122,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       cancelled = true;
       unsubscribe();
     };
-  }, [threadId, unpackPrivate]);
+  }, [threadId, unpackPrivate, attempt]);
 
   useEffect(() => {
     if (!firestore) return;
@@ -130,7 +138,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
         });
       },
       error => {
-        setCommentStatus(error.message || "Unable to load comments");
+        toast.error(`Couldn't load the comments. ${error.message || "Reload the page to try again."}`);
       }
     );
     return () => {
@@ -154,7 +162,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           setLikedComments(prev => ({ ...prev, [comment.id]: iLiked }));
         },
         error => {
-          setLikeStatus(error.message || "Unable to load likes");
+          setLikeStatus(`Couldn't load the likes. ${error.message || ""}`.trim());
         }
       );
     });
@@ -186,7 +194,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
         });
       },
       error => {
-        setConclusionVoteStatus(error.message || "Unable to load votes");
+        setConclusionVoteStatus(`Couldn't load the votes. ${error.message || "Reload the page to try again."}`);
       }
     );
     return () => {
@@ -230,8 +238,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           { merge: false }
         );
       }
-    } catch (error: any) {
-      setLikeStatus(error.message || "Unable to update like");
+    } catch (error) {
+      toast.error(`Couldn't update your like. ${errorText(error)}`);
     } finally {
       setIsLiking(false);
     }
@@ -258,8 +266,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           }
         })
       });
-    } catch (error: any) {
-      setConclusionVoteStatus(error.message || "Unable to submit vote");
+    } catch (error) {
+      toast.error(`Couldn't record your vote. ${errorText(error)}`);
     } finally {
       setIsVotingConclusion(false);
     }
@@ -269,7 +277,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     if (!firestore || !thread || !isOpen) return;
     const trimmed = commentBody.trim();
     if (!trimmed) {
-      setCommentStatus("Comment cannot be empty.");
+      setCommentStatus("Write a comment first.");
       return;
     }
     if (isPostingComment) return;
@@ -281,10 +289,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       const privateFields = await packPrivate(commentLoc(threadId, commentRef.id), { body: trimmed });
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
+        if (!threadSnap.exists()) throw new Error("This topic is no longer available.");
         const threadData = threadSnap.data() as { status?: string; commentCount?: number };
         if ((threadData.status || "open") !== "open") {
-          throw new Error("Thread is closed");
+          throw new Error("This topic is closed to new comments.");
         }
         transaction.set(commentRef, {
           ...privateFields,
@@ -312,8 +320,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       setCommentBody("");
       setReplyToId(null);
       commentInputRef.current?.focus();
-    } catch (error: any) {
-      setCommentStatus(error.message || "Unable to post comment");
+    } catch (error) {
+      toast.error(`Couldn't post the comment. ${errorText(error)}`);
     } finally {
       setIsPostingComment(false);
     }
@@ -323,7 +331,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     if (!firestore || !thread || !isOpen) return;
     const trimmed = proposedConclusion.trim();
     if (trimmed.length < 6) {
-      setProposeStatus("Conclusion must be at least 6 characters.");
+      setProposeStatus("Write at least 6 characters.");
       return;
     }
     if (isProposing) return;
@@ -334,10 +342,10 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       const privateFields = await packPrivate(conclusionLoc(threadId), { text: trimmed });
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
+        if (!threadSnap.exists()) throw new Error("This topic is no longer available.");
         const threadData = threadSnap.data() as { status?: string };
         if ((threadData.status || "open") !== "open") {
-          throw new Error("Thread is not open");
+          throw new Error("A conclusion was already proposed for this topic.");
         }
         transaction.update(threadRef, {
           status: "closing",
@@ -363,8 +371,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       });
       setProposeModalOpen(false);
       setProposedConclusion("");
-    } catch (error: any) {
-      setProposeStatus(error.message || "Unable to propose conclusion");
+    } catch (error) {
+      setProposeStatus(`Couldn't propose the conclusion. ${errorText(error)}`);
     } finally {
       setIsProposing(false);
     }
@@ -379,13 +387,13 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
       const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
       await runTransaction(firestore, async transaction => {
         const threadSnap = await transaction.get(threadRef);
-        if (!threadSnap.exists()) throw new Error("Thread unavailable");
+        if (!threadSnap.exists()) throw new Error("This topic is no longer available.");
         const threadData = threadSnap.data() as { status?: string; conclusion?: { text?: string; enc?: unknown } };
         if ((threadData.status || "open") !== "closing") {
-          throw new Error("Thread is not in closing");
+          throw new Error("This topic isn't waiting for a conclusion any more.");
         }
         if (!threadData.conclusion?.text?.trim() && !threadData.conclusion?.enc) {
-          throw new Error("Conclusion is required");
+          throw new Error("Propose a conclusion first.");
         }
         transaction.update(threadRef, {
           status: "closed",
@@ -405,8 +413,8 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
           }
         })
       });
-    } catch (error: any) {
-      setFinalizeStatus(error.message || "Unable to finalize close");
+    } catch (error) {
+      setFinalizeStatus(`Couldn't close the topic. ${errorText(error)}`);
     } finally {
       setIsFinalizing(false);
     }
@@ -441,332 +449,315 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     return comments.find(comment => comment.id === replyToId) || null;
   }, [comments, replyToId]);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Link href="/admin/comms" className="text-sm font-semibold text-primary">
-          ← Back to Plans & Issues
-        </Link>
-        {isOpen && thread ? (
-          <button
-            type="button"
-            onClick={() => setProposeModalOpen(true)}
-            className="rounded-full border border-border px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary hover:text-foreground"
-          >
-            Propose Conclusion
-          </button>
-        ) : null}
-      </div>
+  const back = { href: "/admin/comms", label: "Plans & Issues" } as const;
+  const badge = threadMeta ? statusBadge("topic", threadMeta.status) : null;
 
+  return (
+    <div className="flex flex-col gap-6">
       {loading ? (
-        <AdminSectionCard>
-          <p className="text-sm text-muted-foreground">Loading thread...</p>
-        </AdminSectionCard>
+        <div role="status" className="flex flex-col gap-4">
+          <span className="sr-only">Loading the topic…</span>
+          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
+      ) : missing ? (
+        <EmptyState
+          icon={<MessageSquare aria-hidden="true" />}
+          title="This topic doesn't exist"
+          description="It may have been removed, or the link is wrong."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/admin/comms">Open Plans &amp; Issues</Link>
+            </Button>
+          }
+        />
       ) : loadError ? (
-        <AdminSectionCard>
-          <p className="text-sm text-destructive">{loadError}</p>
-        </AdminSectionCard>
+        <Alert variant="destructive">
+          <AlertTitle>Couldn&apos;t load this topic</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-3">
+            <span>{loadError}</span>
+            {firestore ? (
+              <Button
+                variant="outline"
+                size="row"
+                onClick={() => {
+                  setLoadError(null);
+                  setLoading(true);
+                  setAttempt(n => n + 1);
+                }}
+              >
+                Try again
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
       ) : thread && threadMeta ? (
         <>
-          <AdminSectionCard>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold text-foreground">{thread.title}</h1>
-                  {(threadMeta.pinned || threadMeta.priority) && (
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {threadMeta.pinned ? "Pinned" : null}
-                      {threadMeta.pinned && threadMeta.priority ? " • " : null}
-                      {threadMeta.priority ? PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority : null}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">{thread.body}</p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Created {threadMeta.createdAt} by {threadMeta.createdBy}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase">
-                <span
-                  className={`rounded-full border px-2 py-0.5 ${
-                    threadMeta.status === "open"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : threadMeta.status === "closing"
-                        ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-border bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {STATUS_LABELS[threadMeta.status] || threadMeta.status}
-                </span>
-                <span className="rounded-full border border-border bg-card px-2 py-0.5 text-muted-foreground">
-                  {threadMeta.commentCount} comments
-                </span>
-              </div>
+          {/* The topic's own title is the page title (data-topic-header hides the page's placeholder header). */}
+          <div data-topic-header>
+            <AdminPageHeader
+              back={back}
+              title={thread.title}
+              badge={badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+              description={`Started ${threadMeta.createdAt} by ${threadMeta.createdBy}.`}
+              actions={
+                isOpen ? (
+                  <Button type="button" variant="outline" onClick={() => setProposeModalOpen(true)}>
+                    Propose conclusion
+                  </Button>
+                ) : null
+              }
+            />
+          </div>
+
+          <Steps
+            label="How a topic is decided"
+            className="max-sm:hidden"
+            steps={[
+              { title: "Discuss", description: "Admins comment and reply.", state: isOpen ? "current" : "done" },
+              { title: "Agree a conclusion", description: "Someone proposes it; admins vote.", state: isClosing ? "current" : isClosed ? "done" : "todo" },
+              { title: "Closed", description: "The conclusion is final.", state: isClosed ? "done" : "todo" }
+            ]}
+          />
+
+          <Card>
+            <div className="flex flex-wrap items-center gap-2">
+              {threadMeta.pinned ? <Badge variant="outline">Pinned</Badge> : null}
+              {threadMeta.priority && threadMeta.priority !== "normal" ? (
+                <Badge variant={threadMeta.priority === "high" ? "warning" : "outline"}>{PRIORITY_LABELS[threadMeta.priority] || threadMeta.priority} priority</Badge>
+              ) : null}
+              <span className="text-sm text-muted-foreground">
+                {threadMeta.commentCount} {threadMeta.commentCount === 1 ? "comment" : "comments"}
+              </span>
             </div>
-            {(isClosing || isClosed) && thread.conclusion?.text ? (
-              <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conclusion</p>
-                    <p className="mt-2 text-sm text-foreground/80">{thread.conclusion.text}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Proposed {formatTimestamp(thread.conclusion.proposedAt)} by{" "}
-                      {resolveActorName(thread.conclusion.proposedBy)}
-                    </p>
+            <p className="text-base break-words whitespace-pre-wrap text-foreground">{thread.body}</p>
+          </Card>
+
+          {(isClosing || isClosed) && thread.conclusion?.text ? (
+            <AdminSectionCard
+              title="Conclusion"
+              description={`Proposed ${formatTimestamp(thread.conclusion.proposedAt)} by ${resolveActorName(thread.conclusion.proposedBy)}.`}
+              actions={
+                isClosing ? (
+                  <>
+                    <Badge variant="success">{voteTally.approve} approve</Badge>
+                    <Badge variant="destructive">{voteTally.reject} reject</Badge>
+                  </>
+                ) : null
+              }
+            >
+              <p className="text-base break-words whitespace-pre-wrap text-foreground">{thread.conclusion.text}</p>
+
+              {isClosing ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Your vote">
+                    <Button
+                      type="button"
+                      variant={conclusionVote === "approve" ? "secondary" : "outline"}
+                      aria-pressed={conclusionVote === "approve"}
+                      onClick={() => handleConclusionVote("approve")}
+                      disabled={isVotingConclusion || conclusionVote === "approve"}
+                    >
+                      {conclusionVote === "approve" ? <Check aria-hidden="true" /> : null}
+                      Approve
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={conclusionVote === "reject" ? "secondary" : "outline"}
+                      aria-pressed={conclusionVote === "reject"}
+                      onClick={() => handleConclusionVote("reject")}
+                      disabled={isVotingConclusion || conclusionVote === "reject"}
+                    >
+                      {conclusionVote === "reject" ? <Check aria-hidden="true" /> : null}
+                      Reject
+                    </Button>
                   </div>
-                  {isClosing ? (
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                        {voteTally.approve} approve
-                      </span>
-                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-destructive">
-                        {voteTally.reject} reject
-                      </span>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="button" onClick={handleFinalizeClose} loading={isFinalizing}>
+                      {isFinalizing ? "Finalizing…" : "Finalize close"}
+                    </Button>
+                    <p className="text-sm text-muted-foreground">Closes the topic with this conclusion.</p>
+                  </div>
+                  {conclusionVoteStatus ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {conclusionVoteStatus}
+                    </p>
+                  ) : null}
+                  {finalizeStatus ? (
+                    <p role="alert" className="text-sm font-medium text-destructive">
+                      {finalizeStatus}
+                    </p>
                   ) : null}
                 </div>
+              ) : null}
 
-                {isClosing ? (
-                  <div className="mt-4 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleConclusionVote("approve")}
-                        disabled={isVotingConclusion || conclusionVote === "approve"}
-                        className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-                          conclusionVote === "approve"
-                            ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                        } disabled:cursor-not-allowed disabled:opacity-60`}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleConclusionVote("reject")}
-                        disabled={isVotingConclusion || conclusionVote === "reject"}
-                        className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-                          conclusionVote === "reject"
-                            ? "border border-rose-200 bg-rose-50 text-destructive"
-                            : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                        } disabled:cursor-not-allowed disabled:opacity-60`}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleFinalizeClose}
-                        disabled={isFinalizing}
-                        className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isFinalizing ? "Finalizing..." : "Finalize Close"}
-                      </button>
-                      {conclusionVoteStatus ? (
-                        <p className="text-xs text-muted-foreground">{conclusionVoteStatus}</p>
+              {isClosed ? (
+                <p className="text-sm text-muted-foreground">
+                  Finalized {formatTimestamp(thread.finalizedAt)} by {resolveActorName(thread.finalizedBy)}
+                </p>
+              ) : null}
+            </AdminSectionCard>
+          ) : null}
+
+          <AdminSectionCard title="Discussion" description="Comments and replies from the admin team.">
+            {topLevelComments.length === 0 ? (
+              <EmptyState
+                icon={<MessageSquare aria-hidden="true" />}
+                title="No comments yet"
+                description={isOpen ? "Be the first to share your view below." : "Nobody commented on this topic."}
+                className="py-8"
+              />
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {topLevelComments.map(comment => {
+                  const replies = repliesByParent[comment.id] || [];
+                  return (
+                    <li key={comment.id} className="flex flex-col gap-2">
+                      <CommentCard
+                        comment={comment}
+                        liked={Boolean(likedComments[comment.id])}
+                        likeCount={likeCounts[comment.id] ?? 0}
+                        canAct={isOpen}
+                        likeBusy={isLiking}
+                        onLike={() => handleToggleLike(comment.id)}
+                        onReply={() => {
+                          setReplyToId(comment.id);
+                          commentInputRef.current?.focus();
+                        }}
+                      />
+                      {replies.length > 0 ? (
+                        <ul className="flex flex-col gap-2 border-l-2 border-border pl-3 sm:pl-4">
+                          {replies.map(reply => (
+                            <li key={reply.id}>
+                              <CommentCard
+                                comment={reply}
+                                liked={Boolean(likedComments[reply.id])}
+                                likeCount={likeCounts[reply.id] ?? 0}
+                                canAct={isOpen}
+                                likeBusy={isLiking}
+                                onLike={() => handleToggleLike(reply.id)}
+                              />
+                            </li>
+                          ))}
+                        </ul>
                       ) : null}
-                      {finalizeStatus ? <p className="text-xs text-destructive">{finalizeStatus}</p> : null}
-                    </div>
-                  </div>
-                ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
-                {isClosed ? (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Finalized {formatTimestamp(thread.finalizedAt)} by {resolveActorName(thread.finalizedBy)}
+            <div className="flex flex-col gap-3 border-t border-border pt-5">
+              {replyTarget ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <span>Replying to {resolveActorName(replyTarget.createdBy)}</span>
+                  <Button type="button" variant="ghost" onClick={() => setReplyToId(null)}>
+                    Cancel reply
+                  </Button>
+                </div>
+              ) : null}
+              <Field label={replyTarget ? "Your reply" : "Add a comment"}>
+                <Textarea
+                  ref={commentInputRef}
+                  value={commentBody}
+                  onChange={event => setCommentBody(event.target.value)}
+                  rows={3}
+                  disabled={!isOpen}
+                  placeholder={isOpen ? "Share feedback or a decision." : "This topic is closed to new comments."}
+                />
+              </Field>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant={isOpen ? "default" : "outline"} onClick={handlePostComment} disabled={!isOpen} loading={isPostingComment}>
+                  {isPostingComment ? "Posting…" : "Post comment"}
+                </Button>
+                {commentStatus ? (
+                  <p role="alert" className="text-sm font-medium text-destructive">
+                    {commentStatus}
+                  </p>
+                ) : null}
+                {likeStatus ? (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {likeStatus}
                   </p>
                 ) : null}
               </div>
-            ) : null}
+            </div>
           </AdminSectionCard>
-
-          <div className="grid gap-6">
-            <AdminSectionCard title="Discussion" description="Add context, replies, and lightweight likes.">
-              {topLevelComments.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-center">
-                  <p className="text-sm text-muted-foreground">No comments yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {topLevelComments.map(comment => {
-                    const replies = repliesByParent[comment.id] || [];
-                    const likeCount = likeCounts[comment.id] ?? 0;
-                    const liked = Boolean(likedComments[comment.id]);
-                    return (
-                      <div key={comment.id} className="space-y-2">
-                        <div className="rounded-xl border border-border bg-background px-4 py-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold text-foreground">
-                              {resolveActorName(comment.createdBy)}
-                            </p>
-                            <span className="text-xs text-muted-foreground">
-                              {formatTimestamp(comment.createdAt)}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-foreground/80">{comment.body}</p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleLike(comment.id)}
-                              disabled={!isOpen || isLiking}
-                              className={`rounded-full border px-3 py-1 transition ${
-                                liked
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                              } disabled:cursor-not-allowed disabled:opacity-60`}
-                            >
-                              {liked ? "Liked" : "Like"} · {likeCount}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setReplyToId(comment.id)}
-                              disabled={!isOpen}
-                              className="rounded-full border border-border px-3 py-1 text-muted-foreground transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Reply
-                            </button>
-                          </div>
-                        </div>
-                        {replies.length > 0 ? (
-                          <div className="space-y-2 pl-4">
-                            {replies.map(reply => {
-                              const replyLikeCount = likeCounts[reply.id] ?? 0;
-                              const replyLiked = Boolean(likedComments[reply.id]);
-                              return (
-                                <div key={reply.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <p className="text-sm font-semibold text-foreground">
-                                      {resolveActorName(reply.createdBy)}
-                                    </p>
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatTimestamp(reply.createdAt)}
-                                    </span>
-                                  </div>
-                                  <p className="mt-2 text-sm text-foreground/80">{reply.body}</p>
-                                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleLike(reply.id)}
-                                      disabled={!isOpen || isLiking}
-                                      className={`rounded-full border px-3 py-1 transition ${
-                                        replyLiked
-                                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                          : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                                      } disabled:cursor-not-allowed disabled:opacity-60`}
-                                    >
-                                      {replyLiked ? "Liked" : "Like"} · {replyLikeCount}
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="mt-4 space-y-2">
-                {replyTarget ? (
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>
-                      Replying to {resolveActorName(replyTarget.createdBy)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setReplyToId(null)}
-                      className="text-xs font-semibold text-muted-foreground hover:text-foreground"
-                    >
-                      Cancel reply
-                    </button>
-                  </div>
-                ) : null}
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Add comment
-                  <textarea
-                    ref={commentInputRef}
-                    value={commentBody}
-                    onChange={event => setCommentBody(event.target.value)}
-                    rows={3}
-                    disabled={!isOpen}
-                    className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden disabled:bg-muted"
-                    placeholder={isOpen ? "Share feedback or a decision." : "Thread is not open for comments."}
-                  />
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePostComment}
-                    disabled={!isOpen || isPostingComment}
-                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isPostingComment ? "Posting..." : "Post comment"}
-                  </button>
-                  {commentStatus ? <p className="text-sm text-muted-foreground">{commentStatus}</p> : null}
-                  {likeStatus ? <p className="text-sm text-muted-foreground">{likeStatus}</p> : null}
-                </div>
-              </div>
-            </AdminSectionCard>
-          </div>
         </>
       ) : null}
 
-      {proposeModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
-          <div className="w-full max-w-lg rounded-2xl bg-card p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Propose conclusion</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Proposing a conclusion moves the thread into the closing review stage.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setProposeModalOpen(false)}
-                className="text-sm font-semibold text-muted-foreground hover:text-foreground/80"
-              >
-                Close
-              </button>
-            </div>
-            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Conclusion
-              <textarea
-                value={proposedConclusion}
-                onChange={event => setProposedConclusion(event.target.value)}
-                rows={4}
-                className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden"
-                placeholder="Summarize the decision or outcome."
-              />
-            </label>
-            {proposeStatus ? <p className="mt-2 text-sm text-destructive">{proposeStatus}</p> : null}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setProposeModalOpen(false)}
-                className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleProposeConclusion}
-                disabled={isProposing}
-                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isProposing ? "Proposing..." : "Propose conclusion"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Dialog open={proposeModalOpen} onOpenChange={setProposeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Propose conclusion</DialogTitle>
+            <DialogDescription>Write down what was decided. Admins then vote to approve or reject it before the topic is closed.</DialogDescription>
+          </DialogHeader>
+          <Field label="Conclusion" error={proposeStatus ?? undefined}>
+            <Textarea
+              value={proposedConclusion}
+              onChange={event => setProposedConclusion(event.target.value)}
+              rows={4}
+              placeholder="Summarize the decision or outcome."
+            />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setProposeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleProposeConclusion} loading={isProposing}>
+              {isProposing ? "Proposing…" : "Propose conclusion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function CommentCard({
+  comment,
+  liked,
+  likeCount,
+  canAct,
+  likeBusy,
+  onLike,
+  onReply
+}: {
+  comment: CommentView;
+  liked: boolean;
+  likeCount: number;
+  canAct: boolean;
+  likeBusy: boolean;
+  onLike: () => void;
+  onReply?: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="text-sm font-semibold text-foreground">{resolveActorName(comment.createdBy)}</p>
+        <span className="text-sm text-muted-foreground">{formatTimestamp(comment.createdAt)}</span>
+      </div>
+      <p className="mt-1 text-sm break-words whitespace-pre-wrap text-foreground">{comment.body}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <Button type="button" variant="ghost" aria-pressed={liked} onClick={onLike} disabled={!canAct || likeBusy} className="text-muted-foreground">
+          <ThumbsUp aria-hidden="true" className={liked ? "fill-current text-primary" : undefined} />
+          {liked ? "Liked" : "Like"} · {likeCount}
+        </Button>
+        {onReply ? (
+          <Button type="button" variant="ghost" onClick={onReply} disabled={!canAct} className="text-muted-foreground">
+            <Reply aria-hidden="true" />
+            Reply
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
 
 function formatTimestamp(value?: { toDate?: () => Date } | null) {
-  if (!value || typeof value?.toDate !== "function") return "Timestamp unavailable";
-  return value.toDate().toLocaleString();
+  return formatDateTime(value) || "date unknown";
+}
+
+function errorText(error: unknown) {
+  return (error instanceof Error && error.message) || "Check your connection and try again.";
 }

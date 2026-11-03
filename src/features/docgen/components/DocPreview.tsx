@@ -15,13 +15,24 @@ type DocPreviewProps = {
   template: DocTemplate;
   inputs: Record<string, string>;
   onBackgroundLoad?: () => void;
+  /** Live preview only: show `hintValue(...)` inputs as grey [bracketed] hints. Never used for the copy that is exported. */
+  hints?: boolean;
 };
+
+const HINT_MARK = "\u2063";
+const HINT_PATTERN = new RegExp(`${HINT_MARK}([^${HINT_MARK}<>]*)${HINT_MARK}`, "g");
+
+/** An input value that the live preview shows as a grey "[label]" hint instead of the template's fallback text. */
+export const hintValue = (label: string) => `${HINT_MARK}${label}${HINT_MARK}`;
+
+const showHints = (html: string) => html.replace(HINT_PATTERN, '<span style="color:#8a94a6;">[$1]</span>');
 
 const VIEWER_PADDING = 32;
 const CONTENT_HEIGHT_PX = LETTER_HEIGHT_PX - HEADER_SAFE_PX - MARGIN_BOTTOM_PX;
 
-const DocPreview = forwardRef<HTMLDivElement, DocPreviewProps>(({ template, inputs, onBackgroundLoad }, ref) => {
-  const previewHtml = renderTemplateHtml(template, inputs);
+const DocPreview = forwardRef<HTMLDivElement, DocPreviewProps>(({ template, inputs, onBackgroundLoad, hints = false }, ref) => {
+  const rendered = renderTemplateHtml(template, inputs);
+  const previewHtml = hints ? showHints(rendered) : rendered;
   const viewerRef = useRef<HTMLDivElement | null>(null);
   const measureRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -76,11 +87,7 @@ const DocPreview = forwardRef<HTMLDivElement, DocPreviewProps>(({ template, inpu
   const pages = Array.from({ length: pageCount }, (_, index) => index);
 
   return (
-    <div
-      ref={viewerRef}
-      className="relative w-full overflow-auto"
-      style={{ minHeight: LETTER_HEIGHT_PX * 0.6 }}
-    >
+    <div ref={viewerRef} className="relative w-full overflow-hidden">
       <div className="flex flex-col items-center gap-6 py-4">
         {pages.map(pageIndex => {
           const pageOffset = pageIndex * CONTENT_HEIGHT_PX;
@@ -93,23 +100,24 @@ const DocPreview = forwardRef<HTMLDivElement, DocPreviewProps>(({ template, inpu
           `;
 
           return (
-            <div key={`preview-page-${pageIndex}`} className="space-y-2">
-              <p className="text-[0.65rem] uppercase tracking-wide text-slate-400 text-center">
-                Page {pageIndex + 1}
-              </p>
-              <div
-                style={{
-                  width: LETTER_WIDTH_PX,
-                  height: LETTER_HEIGHT_PX,
-                  transform: `scale(${scale})`,
-                  transformOrigin: "top center"
-                }}
-              >
-                <LetterheadPage
-                  ref={pageIndex === 0 ? ref : undefined}
-                  contentHtml={pageHtml}
-                  onBackgroundLoad={onBackgroundLoad}
-                />
+            <div key={`preview-page-${pageIndex}`} className="flex flex-col items-center gap-2">
+              <p className="text-center text-xs text-muted-foreground">Page {pageIndex + 1}</p>
+              {/* The outer box takes the scaled size, so a small screen gets no empty space or sideways scroll. */}
+              <div style={{ width: LETTER_WIDTH_PX * scale, height: LETTER_HEIGHT_PX * scale }}>
+                <div
+                  style={{
+                    width: LETTER_WIDTH_PX,
+                    height: LETTER_HEIGHT_PX,
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top left"
+                  }}
+                >
+                  <LetterheadPage
+                    ref={pageIndex === 0 ? ref : undefined}
+                    contentHtml={pageHtml}
+                    onBackgroundLoad={onBackgroundLoad}
+                  />
+                </div>
               </div>
             </div>
           );

@@ -15,11 +15,8 @@ export default async function CallCampaignsPage() {
     throw error;
   }
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader
-        title="Call Campaigns"
-        description="One campaign per announcement: every caller phones their assigned people, records what happened, and the board sees who was reached."
-      />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="Call campaigns" description="One campaign per announcement: callers phone their people and note what happened, so admins see who was reached." />
       <CallCampaignsClient />
     </div>
   );

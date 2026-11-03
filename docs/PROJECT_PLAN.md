@@ -1,6 +1,6 @@
 # GHMO Platform — Upgraded Project Plan (v2)
 
-_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-10-27_
+_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-11-01_
 
 This plan replaces the "Upcoming Roadmap" in `README.md` as the source of truth for what gets built next.
 It has three parts:
@@ -372,7 +372,7 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 - Approval trusts the approver's browser to supply the content to publish; Phase 5 adds separation of duties and server-side checks.
 - The migrated record's envelope is signed by the migrating admin's device, not the original author's (the readable `createdBy` is unchanged).
 - Encrypted finalized certificates are capped near 1 MiB; Phase 5 moves PDFs to Cloud Storage.
-- The events collection is read from two paths (`organizations/ghmo-site/events` by the admin list, `organizations/ghmo/events` by the public minutes route). Worth unifying.
+- The events collection is read from two paths (`organizations/ghmo-site/events` by the admin list, `organizations/ghmo/events` by the public minutes route). Worth unifying. *(2026-11-02: every read now merges both, edits act where the event is, new events go to `organizations/ghmo/events`; see §13.6 10-B.)*
 - Metadata stays readable: who wrote what and when, thread status, event titles, who voted.
 
 **Owner actions after deploying Phase 4**
@@ -514,7 +514,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ## 9. What is next (updated 2026-10-27)
 
-Phases 0–7 and decision D6 are built and merged. Nothing in the codebase is waiting; what is left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 2 of 29 items were ticked on 2026-10-31 (the Dependabot line was unticked while one dev-only alert waits on upstream)):
+Phases 0–9 and decision D6 are built and merged. The one planned code item is Phase 10, a two-pass UI layout audit and upgrade (§13); it can run alongside the steps below. Everything else needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 2 of 29 items were ticked on 2026-10-31 (the Dependabot line was unticked while one dev-only alert waits on upstream)):
 
 1. **Make the repository public, or fix GitHub Actions billing.** CI cannot run while the repo is private (jobs fail in about 2 seconds with no runner), so every change has been verified by the local gate only.
 2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
@@ -522,6 +522,7 @@ Phases 0–7 and decision D6 are built and merged. Nothing in the codebase is wa
 4. **People and keys:** at least two active admins, each with an authenticator app and recovery codes kept outside email; encryption set up with both trustees; every admin device approved; seal the device list; run "Encrypt existing records".
 5. **Assurance (outside the codebase):** external cryptography review, penetration test, key-rotation drill and recovery-key test, fill in `docs/RUNBOOK_INCIDENT.md`.
 6. **After going live:** open the main pages with the console open and confirm there are no red errors.
+7. **Phase 10 (code, can start any time):** two layout-only UI audits, each followed by fixes, so the site is beginner friendly with a premium, modern look (§13).
 
 **Weekly progress check.** A scheduled routine ("Weekly go-live checklist progress", Mondays 08:41 UTC) is meant to report checklist progress. As of 2026-10-27 its sessions start without the repository attached, so it fails; the same report was produced by hand from a normal session. Fix it in claude.ai (select `rob2rhyme/ghmo` on the routine) or recreate the routine there.
 
@@ -760,7 +761,7 @@ Unit: split rule (equal counts, household grouping, stability, add and remove ca
 
 ### 12.7 Progress
 
-**9-A · Encrypted member contacts · built 2026-10-31 (local, not yet pushed)**
+**9-A · Encrypted member contacts · built 2026-10-31 (merged in PR #76)**
 - `members/{id}.contact` is one envelope (phone, altPhone, language, household, notes) encrypted in the browser with the workspace key and bound to `members/{id}#contact`; plaintext flags `hasPhone`, `phoneConsent` {at, source, byUid} and `callOptOutAt` sit beside it. The browser chooses the member id before encrypting (as the minutes editor does), and the server creates the document with `create()` so a chosen id can never overwrite someone.
 - The members API accepts `contact` only while encryption is on and only from an active device of the signed-in admin (`envelopeChecker`, one device-list read per request so a 500-row import stays cheap); a plaintext `phone` field is dropped by the schema. Audit entries replace the ciphertext with `[encrypted]`.
 - Members page: phone field and call-consent box on add (disabled until this device is unlocked), masked numbers with Show/Hide and a `tel:` Call button, Edit contact dialog, "They asked not to be called" / "Record call consent", a "With phone" filter, and CSV import with a `phone` column (headered or detected) that encrypts each row before sending and needs a second attestation.
@@ -768,14 +769,14 @@ Unit: split rule (equal counts, household grouping, stability, add and remove ca
 - Tests: `tests/unit/members.test.ts` (normalizing, masking, contact form, call state, CSV phone column); `tests/rules/firestore.rules.test.ts` (clients cannot write `contact`, `hasPhone` or `callOptOutAt`); `tests/e2e-auth/members-contact.spec.ts` (ciphertext in Firestore and the audit log, masked until tapped, edit keeps the number, import encrypts and records consent, opt-out, a second approved device reads it; with encryption off the number field is disabled, an envelope is refused and a stray plaintext phone is never stored).
 - Guide: `docs/BROADCASTS_GUIDE.md` §1b; README data model updated.
 
-**9-B · Calling tree · built 2026-10-31 (local, not yet pushed)**
+**9-B · Calling tree · built 2026-10-31 (merged in PR #76)**
 - `src/lib/callingTree.ts` (pure, unit-tested): `planAssignments` keeps every existing assignment, drops members who can no longer be called and assignments to callers who left, joins a newcomer to the caller their household already has, and places the rest one household at a time (largest first, then a stable order) onto the caller with the fewest people. Equal within one without households; the same input plans nothing; removing a caller moves only that caller's people. `moveMember` for hand moves.
 - The split runs in the browser because the household is inside the encrypted contact. `/api/admin/calling-tree` (GET: super admins see all assignments, other admins the callers, counts and their own; PUT, super admin: callers + assignments, checked against active admins and callable members, written in batches, version bumped, audited with counts only) and `/api/admin/calling-tree/mine` (the caller's members with their envelopes, already filtered to those still callable). Storage `callingTree/current` + `assignments/{memberId}` is denied to every client in the rules.
 - Pages: **Calling Tree** (`/admin/calling-tree`, behind the encryption gate): tick callers among active admins, Plan assignments with a preview of every change and its reason, per-caller lists with a Caller select for hand moves (recorded as placed by that admin), Save, Discard. **My Calls** (`/admin/my-calls`): the caller's own people, numbers decrypted on the device, masked until Show, tap-to-dial, language, household and notes.
 - Shared `useMemberContacts` hook decrypts envelopes on an unlocked device and forgets them on lock; the Members page now uses it too.
 - Tests: `tests/unit/callingTree.test.ts` (equal split, determinism and stability, households, caller removal, ineligible members, no callers, duplicate callers); rules test (calling tree unreadable and unwritable from a browser); `tests/e2e-auth/calling-tree.spec.ts` (super admin plans and saves a 3/2 split of five people with the unconsented one left out, audit has counts only, a hand move sticks and is attributed, Bob's My Calls and API show only his slice and his PUT is refused, Carol is not a caller; removing Bob moves only his two, a call opt-out is skipped at once and removed on the next plan).
 
-**9-C · Call campaigns · built 2026-10-31 (local, not yet pushed)**
+**9-C · Call campaigns · built 2026-10-31 (merged in PR #76)**
 - `callCampaigns/{id}` (title, eventId and eventTitle, script envelope bound to `{id}#script`, dueAt, status open → closed, createdBy/At, closedBy/At, treeVersion, counts) and `callCampaigns/{id}/calls/{memberId}` (callerUid, outcome, rsvp, append-only `attempts[]` {id, at, outcome, byUid, note envelope bound to `{id}/{memberId}#{attemptId}`}). Opening a campaign snapshots the calling tree into it (callable members only), so later tree changes do not move people mid-announcement; one open campaign per event. Server-written only; denied to every client in the rules.
 - Pure rules in `src/lib/callCampaigns.ts`: outcomes (reached, voicemail, no answer, wrong number, call back, declined; reached/declined/wrong number count as done), `planAttempt` (open campaign, assigned caller or super admin, RSVP only when reached, counts delta), `computeCounts`, `progressByCaller`, `campaignCsv` (names and outcomes, never a number or a note).
 - API: `/api/admin/call-campaigns` (GET list, `?mine=1` adds the caller's rows and members per open campaign; POST opens one from the tree and emails the callers involved), `/[id]` (GET the BOD view: rows, names, caller names; POST close, remind the callers who still have people to reach, or record an export), `/[id]/calls/[memberId]` (POST one attempt in a transaction: refused when closed, for another caller's person, for someone who can no longer be called, or for a repeated attempt id; counts move by the plan's delta; audited with member id, outcome and RSVP only).
@@ -783,10 +784,97 @@ Unit: split rule (equal counts, household grouping, stability, add and remove ca
 - Reminder emails reuse the content-free notification kind `calls` ("You have calls to make"), sent only to callers with people left, still at most one per person every 30 minutes.
 - Tests: `tests/unit/callCampaigns.test.ts` (transitions, refusals, counts and deltas, per-caller progress, CSV quoting); rules test (campaigns and call records unreadable and unwritable from a browser); `tests/e2e-auth/call-campaigns.spec.ts` (open from an event with ciphertext script, duplicate refused, Alice logs reached + coming with an encrypted note and the audit holds no number or note, voicemail offers no RSVP, Bob logs his own person on his device and is refused on Alice's, stored counts equal the rows, dashboard totals and log, CSV without numbers is audited, closing refuses further attempts).
 
-**9-D · Copy for Messenger, runbook and checklist · built 2026-11-01 (local, not yet pushed)**
+**9-D · Copy for Messenger, runbook and checklist · built 2026-11-01 (merged in PR #76)**
 - The announcement for the group chats is the existing broadcast (Phase 8) rather than a new collection: it already has drafting, second-admin approval bound to the text's fingerprint, and withdraw-to-edit. On an approved, sending or sent broadcast a **Post to the Messenger group chats** card shows `messengerText` (subject, blank line, message, no email footer), a **Copy text** button, and **I posted it in the BOD / Community group chat** buttons. Works without any email set-up.
 - `POST /api/admin/broadcasts/[id]/manual-post` appends {channel, at, byUid, byName} to `manualPosts` in a transaction, only when the stored text still matches the approved fingerprint and the copied fingerprint; audited as `broadcast_posted_manually` with the channel and fingerprint, not the text. `planManualPost` holds the rules (unit-tested).
 - `docs/RUNBOOK_INCIDENT.md` cases **K** (wrong group-chat post), **L** (caller's device lost or caller leaves: revoke, re-plan the tree, open campaigns), **M** (member asks not to be called or to have their number removed). Go-live checklist item before the first campaign; admin guide §5.
 - Tests: `tests/unit/broadcast.test.ts` (formatting; only approved and unchanged text, known chats); `tests/e2e-auth/broadcasts.spec.ts` (no card and a refused API call on a draft; after approval the text is copied to the clipboard without footer, two posts are recorded and listed, nothing is emailed, the audit holds the approved fingerprint and not the text, a stale fingerprint is refused).
 
-**Phase 9 status:** all four steps are built and tested locally. Before the first real campaign the owner completes the Phase 9 item in `docs/GO_LIVE_CHECKLIST.md` §4.
+**Phase 9 status:** all four steps are built, tested and merged (PR #76). Before the first real campaign the owner completes the Phase 9 item in `docs/GO_LIVE_CHECKLIST.md` §4.
+
+---
+
+## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, not started)
+
+**Goal.** Make the whole site **beginner friendly** (a first-time member or a new BOD admin can find what they need and finish a task without help) with a **premium, modern look**. The work is **layout only**: how pages look and read, not what they do.
+
+### 13.1 Scope
+**In scope:** page structure and visual hierarchy, spacing and alignment, navigation and wayfinding, typography, colour and contrast, cards, tables, forms and buttons, empty/loading/error states, plain-language labels and help text, phone and desktop layouts, light and dark mode.
+
+**Out of scope:** features, data, API routes, Firestore rules, sign-in and encryption logic. Security screens (encryption setup, device approval, safety codes, recovery key) may be restyled and reworded, but their steps, confirmations and warnings stay exactly as they are; their browser tests must keep passing unchanged.
+
+**Pages:** every route group: public (`app/(public)`), member (`app/(member)`), sign-in (`app/(auth)`), signing (`app/(sign)`), documents (`app/(docs)`) and admin (`app/(admin)`), plus the offline page.
+
+### 13.2 Method
+Two audit passes, each followed by fixes. Each pass ends deployable (lint, tests, build green).
+
+| Step | What happens | Output |
+|---|---|---|
+| **10-A · Audit 1** | Screenshot every page at 360, 768 and 1280 px wide, light and dark (Playwright), signed out, as a member and as an admin. Score each page against the checklist in §13.3. | A findings table here (page, problem, severity, fix), like §5.4 |
+| **10-B · Upgrade 1** | Fix the findings, highest severity first: shared design changes (type scale, spacing, colour tokens, components in `src/components/ui/`) before page-by-page changes. | Before/after screenshots of the main pages |
+| **10-C · Audit 2** | A fresh pass over the upgraded site with the same method and checklist, looking for what Audit 1 missed and anything the upgrade broke or made inconsistent. | A second findings table |
+| **10-D · Upgrade 2** | Fix the Audit 2 findings and polish. | Final screenshots; README and this section updated |
+
+### 13.3 Audit checklist
+**Beginner friendly**
+- Each page says what it is for in one plain sentence and has one clear main action.
+- Words a newcomer knows: no jargon ("envelope", "epoch", "roster") in labels; short help text where a step is unfamiliar.
+- A first-time admin is guided: empty states explain what to do next and link to it.
+- Navigation: the current page is obvious, every page is reachable in two taps on a phone, back paths are clear.
+- Forms: labels above fields, examples, errors next to the field in plain words, the main button says what it does ("Send invite", not "Submit").
+- Touch targets at least 44 px; nothing needs a hover to be found.
+- WCAG 2.2 AA contrast and focus states (§5.3) still hold.
+
+**Premium and modern**
+- One type scale and one spacing scale used everywhere; generous whitespace; aligned grids.
+- A restrained colour palette with one accent; status colours used consistently, never colour alone.
+- Consistent cards, radii, borders and shadows; no leftover one-off styles.
+- Real loading skeletons, calm transitions (respecting reduced-motion), sharp icons and images.
+- Public pages feel like the organisation's own site: strong hero, clear sections, polished footer.
+- Light and dark mode both look finished.
+
+### 13.4 Tests
+Existing unit, rules and browser suites must pass unchanged (layout work must not change behaviour). Add a Playwright screenshot run of the main pages at three widths in both themes, kept as review material, and an axe accessibility check of the same pages.
+
+### 13.5 Risks
+| Risk | Mitigation |
+|---|---|
+| A restyle hides or weakens a security warning | Security screens keep every step and warning; their e2e tests are not edited |
+| Changes break browser tests that look for text or roles | Keep accessible names stable, or update the test in the same commit with a reason |
+| Taste disagreements | Owner reviews Audit 1 findings and before/after screenshots before Upgrade 2 |
+
+### 13.6 Progress
+
+**10-A · Audit 1 · done 2026-11-02 (local, not yet pushed)**
+- New screenshot run: `npm run ui:screens` (`playwright.ui-audit.config.ts`, `tests/ui-audit/screenshots.spec.ts`) seeds sample data in the emulators, signs in as a super admin, and saves 33 pages at 375/768/1280 px in light and dark (198 images in the git-ignored `ui-audit-screens/`). A size check flags sideways scrolling.
+- Findings, causes and fixes: **`docs/UI_AUDIT_1.md`**. About 100 problems merged into 8 bugs and 53 layout rows (17 High, 30 Medium, 6 Low).
+- The worst: developer text and placeholder media (including a Rick-roll video and stock photos) on the public home page; a Donate button to a GoFundMe page that doesn't exist; public events show "Invalid Date" / "No events yet"; white-on-teal buttons fail contrast in dark mode; three pages scroll sideways (Meeting Minutes and event detail on phones, Encryption on tablets); the admin Events table breaks on phones; the document generator is unreadable in dark mode; the Calling Tree pages give a new admin no order of steps; admin sign-in leads with passkeys although most admins use the authenticator app.
+- Owner approved fixing the 8 bugs inside Phase 10 (2026-11-02). No GoFundMe link yet, so Donate buttons stay hidden until `GOFUNDME_PUBLIC_URL` is set.
+
+**10-B · Upgrade 1 · built 2026-11-02 (local, not yet pushed)**
+- **Bugs (UI_AUDIT_1 §1), all fixed:** public event dates sent as epoch milliseconds; the edit-event blank form traced to events being stored in two places (admin writes went to `organizations/ghmo-site/events`, lists read `organizations/ghmo/events`): every list now merges all known locations, single-event routes find the event wherever it is, new events go to `organizations/ghmo/events`, no data moved; a new `GET` for one event, a "couldn't load" state and a confirmed delete; `GOFUNDME_PUBLIC_URL` (`src/lib/donateLink.ts`) instead of the placeholder link; no stand-in media (`src/lib/media.ts`); `/gumba-project` → `/donate`; public `/document-generator` explains it's a board tool; onboarding rewritten as a board member guide; sample-threads button removed; calling-tree status line.
+- **Foundations:** rules in **`docs/UI_STYLE.md`**; new `Select`, `Segmented`, `ConfirmDialog`; `src/lib/format.ts` (no seconds, no "Invalid Date"); destructive and disabled button styles readable in both themes; admin sidebar from laptop width with encryption status, public-site link and theme in the top bar; one admin content width; 44 px theme and sign-out buttons.
+- **Public:** new header menu (Events, Gumba Project, Minutes, Media, Donate) and themed footer; home rebuilt for the community (hero, About, next events, Gumba strip, Follow us); one media style; Donate restructured around its ask; events list/detail with labelled filters, friendly dates and no sideways scroll; minutes, certificate check, member and admin sign-in (email + authenticator first, passkey as the faster option, every step kept), unsubscribe, signing page and 404 on shared components.
+- **Admin:** Meeting Minutes (no sideways scroll, one tab bar, sticky save, plain fields), dashboard activity in plain sentences, Plans & Issues list-first, Chat fills the screen, Action Items, Events list as cards on phones, Members, Broadcasts (Write → Approve → Send), guided Calling Tree / Campaigns / My Calls, GUMBA progress, Document generator usable in dark mode with a template grid and stepper, Gallery, Encryption (no tablet overflow, 3-step progress, "What is this?" lines, styled confirmations with the same wording), Security (sign-in summary, plain badges).
+- **Measures:** raw palette classes 189 → 4 (paper previews only); `text-white` on primary 23+ → 0; lint warnings 110 cap → 93. Tests: unit `format`, `media`, `donateLink`, `adminView`; browser `events.spec.ts`; three browser tests updated (calling-tree sentence, two confirmations now dialogs), two public footer-link tests.
+
+**10-C · Audit 2 · done 2026-11-02 (local, not yet pushed)**
+- Screenshot run extended: open phone menus, and the encryption-on admin pages both locked and unlocked (268 images; `UI_AUDIT_ONLY=page,…` targets pages). None scrolls sideways.
+- Findings: **`docs/UI_AUDIT_2.md`**. Audit 1: all 8 bugs fixed, most rows resolved, the rest partly. New: 69 findings (5 High, 41 Medium, 23 Low) and 1 bug: event times ignore the event's time zone (B9).
+- Main themes: a phone admin-menu regression; five builders' differing patterns (lists, back links, steps, cards, badges, title case); the Encryption page and locked states after launch; three remaining day-one dead ends; the public home and closed-Donate states not yet premium; no contact route.
+- **Waiting on the owner:** go-ahead for B9; a contact email; community photos (optional). Upgrade 2 then follows `docs/UI_AUDIT_2.md` "Upgrade 2 plan".
+- Owner approved B9 and Upgrade 2 (2026-11-02). No contact email or photos yet: the contact slots stay hidden and the home hero uses the building artwork.
+
+**10-D · Upgrade 2 · built 2026-11-02 (local, not yet pushed)**
+- **B9 fixed:** `src/lib/zonedTime.ts` reads and writes wall-clock times in a named zone (daylight-saving safe, no library). The event API reads zone-less form dates in the event's own zone (PATCH falls back to the stored zone) and rejects unknown zones; the form shows stored times in that zone; the flyer PDF prints friendly times in it. Unit tests run under three machine zones; a browser test runs as an admin in Tokyo.
+- **Regression fixed:** the phone admin menu scrolls as one, so every page is reachable (A1).
+- **Shared building blocks** (listed in `docs/UI_STYLE.md`): `back` and `badge` on `AdminPageHeader`; `AdminSectionCard` aligned with `Card`; `AdminList`/`AdminListRow`; `size="row"` buttons; `statusBadge()`; `Steps`; `StatGrid`/`StatTile`/`ProgressBar`; `SegmentedNav` and a selected state that reads in dark mode; Alert `success`; one locked-state card and a one-line "Encryption is off" note; e2ee activity sentences; skeleton + "Couldn't connect / Try again" for the live connection; `PublicPage`/`PublicPageHeader`/`PublicSectionTitle`, `MessagePage`, a styled 404 in every route group; `getContactEmail()` (`CONTACT_EMAIL`).
+- **Pages:** every Audit 2 row worked through (details per area in the commit messages). Highlights: Encryption page next-action-first with plain wording (every check kept); confirmation dialogs for sending a broadcast, cancelling it, closing a campaign and disabling a member; Broadcasts warns when nobody can be emailed; Call campaigns hidden until the tree is planned; Members list-first on phones; Meeting minutes shows only the approval step that applies; sentence-case nav and titles; "topic", "unlock/open", no "(s)", ids or setting names; home hero with an image slot; honest closed-Donate state; Media as one featured YouTube card; Featured events get a public badge; gallery Download buttons download.
+- **Accessibility check:** `tests/ui-audit/axe.spec.ts` (axe-core, WCAG 2.2 A/AA) runs with `npm run ui:screens`; `@axe-core/playwright` 4.14.0 added as a dev dependency.
+- **Measures:** lint warning cap 93 → 77; no raw palette classes outside the paper previews; no `text-white` on primary, arbitrary text sizes or `size="sm"` buttons. Tests updated for deliberate wording changes (listed in the commits).
+
+**Accessibility pass · 2026-11-03 (local, not yet pushed)**
+- The first axe-core run (WCAG 2.2 A/AA) found 75 serious problems across 3 rules; now **0** on 26 pages, light and dark, at 375 and 1280 px. The check fails on any serious or critical problem from now on (`UI_AXE_STRICT=0` to report only).
+- Contrast: light-mode text tokens darkened so each passes 4.5:1 on every surface it sits on, tinted notices included (`--muted-foreground` #64748b → #4b5868, `--destructive` #dc2626 → #b91c1c, `--success` #15803d → #166534, `--warning` #b45309 → #92400e); "What is this?" links are body-coloured with an accent underline. Dark mode already passed.
+- Names: the "Jump to a page… Ctrl K" button is named by its visible text (shortcut via `aria-keyshortcuts`); document template cards are named by their visible title and description.
+- Keyboard: the scrolling minutes preview is focusable and labelled.

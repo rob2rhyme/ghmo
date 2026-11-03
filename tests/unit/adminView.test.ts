@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityActorName,
+  activitySentence,
   auditTitle,
   firstName,
   formatMoney,
@@ -50,6 +52,44 @@ describe("audit titles", () => {
   });
 });
 
+describe("activity sentences", () => {
+  const alice = { name: "Alice Rai", role: "super_admin" };
+
+  it("says how someone signed in, without the raw method", () => {
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Passkey: Passkey" } })).toEqual({ text: "Alice Rai signed in with a passkey" });
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Authenticator app" } }).text).toBe("Alice Rai signed in with the authenticator app");
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Authenticator: recovery code" } }).text).toBe("Alice Rai signed in with a recovery code");
+    expect(activitySentence({ action: "login", actor: alice, resource: { summary: "Email magic link" } }).text).toBe("Alice Rai signed in with an email link");
+  });
+
+  it("keeps a useful detail and drops codes and generic names", () => {
+    expect(activitySentence({ action: "passkey_registered", actor: alice, resource: { summary: "Sita's iPhone (magic_link)" } })).toEqual({
+      text: "Alice Rai added a passkey",
+      detail: "Sita's iPhone"
+    });
+    expect(activitySentence({ action: "passkey_registered", actor: alice, resource: { summary: "Passkey (magic_link)" } })).toEqual({ text: "Alice Rai added a passkey" });
+    expect(activitySentence({ action: "event_created", actor: alice, resource: { summary: "Created event: Spring picnic" } })).toEqual({
+      text: "Alice Rai created an event",
+      detail: "Spring picnic"
+    });
+    expect(activitySentence({ action: "members_imported", actor: alice, resource: { summary: "Imported 6 members (0 skipped, 2 with a phone number)" } }).detail).toBe(
+      "Imported 6 members (0 skipped, 2 with a phone number)"
+    );
+    expect(activitySentence({ action: "minutes_approved", actor: alice, resource: { summary: "Approved minutes" } })).toEqual({ text: "Alice Rai approved minutes" });
+    expect(activitySentence({ action: "totp_enrolled", actor: alice, resource: { summary: "Authenticator app set up" } })).toEqual({ text: "Alice Rai set up an authenticator app" });
+  });
+
+  it("names the role when there is no name, and covers system entries and unknown actions", () => {
+    expect(activityActorName({ role: "super_admin" })).toBe("A super admin");
+    expect(activityActorName({ name: "alice@example.org", roles: ["admin"] })).toBe("An admin");
+    expect(activityActorName(undefined)).toBe("Someone");
+    expect(activityActorName({ actor: { name: "Bob" } })).toBe("Bob");
+    expect(activitySentence({ action: "webhook_received" }).text).toBe("A donation update arrived from GoFundMe");
+    expect(activitySentence({ action: "something_new", actor: alice, resource: { summary: "Did a new thing" } }).text).toBe("Did a new thing");
+    expect(activitySentence({ action: "something_new", actor: alice }).text).toBe("Something new");
+  });
+});
+
 describe("relative time", () => {
   const now = Date.UTC(2026, 9, 26, 12, 0, 0);
   it("reads naturally at each scale", () => {
@@ -80,6 +120,21 @@ describe("numbers and dates", () => {
     expect(formatMoney(48250)).toBe("$48,250");
     expect(formatMoney(undefined)).toBe("$0");
     expect(formatShortDate(Date.UTC(2026, 9, 23, 12))).toBe("Oct 23, 2026");
-    expect(formatShortDate(null)).toBe("Date unavailable");
+    expect(formatShortDate(null)).toBe("Date unknown");
   });
 });
+
+describe("encryption activity", () => {
+  const alice = { name: "Alice Rai", role: "super_admin" };
+  it("reads as sentences with the useful detail", () => {
+    expect(
+      activitySentence({ action: "e2ee_enabled", actor: alice, resource: { summary: "End-to-end encryption enabled; recovery key held by Trustee One and Trustee Two" } })
+    ).toEqual({ text: "Alice Rai turned on encryption", detail: "Recovery key held by Trustee One and Trustee Two" });
+    expect(activitySentence({ action: "e2ee_device_registered", actor: alice, resource: { summary: "Alice laptop" } })).toEqual({
+      text: "Alice Rai set up a device for encryption",
+      detail: "Alice laptop"
+    });
+    expect(activitySentence({ action: "e2ee_rotated", actor: alice })).toEqual({ text: "Alice Rai made new encryption keys" });
+  });
+});
+

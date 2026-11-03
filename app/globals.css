@@ -27,17 +27,20 @@
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted-foreground: #4b5868;
   --accent: #f1f5f9;
   --accent-foreground: #0f172a;
   /* GHMO orange, for highlights only */
   --highlight: #ea580c;
 
-  --destructive: #dc2626;
-  --success: #15803d;
-  --warning: #b45309;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --success: #166534;
+  --warning: #92400e;
 
   --border: #e2e8f0;
+  /* Light text tokens are chosen for at least 4.5:1 on every surface they sit on, including tinted
+     notices and the muted track (checked by tests/ui-audit/axe.spec.ts). */
   --input: #cbd5e1;
   --ring: #0f766e;
 
@@ -69,6 +72,7 @@
   --highlight: #fb923c;
 
   --destructive: #f87171;
+  --destructive-foreground: #2a0a0a;
   --success: #4ade80;
   --warning: #fbbf24;
 
@@ -102,6 +106,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-highlight: var(--highlight);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-border: var(--border);

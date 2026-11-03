@@ -1,3 +1,4 @@
+import { formatDateTime, formatShortDate } from "@/src/lib/format";
 import type { CampaignCounts, CampaignStatus, Outcome, Rsvp } from "@/src/lib/callCampaigns";
 
 /** Shapes the campaign API returns to the browser (dates as epoch milliseconds, script as an envelope or null). */
@@ -54,12 +55,12 @@ export function newId(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(20)), byte => alphabet[byte % alphabet.length]).join("");
 }
 
+/** "Sat, Dec 12, 2026 · 7:00 PM" (no seconds; see src/lib/format.ts). */
 export function formatWhen(ms: number | null | undefined): string {
-  if (!ms) return "";
-  return new Date(ms).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  return ms ? formatDateTime(ms) : "";
 }
 
+/** "Dec 12, 2026" */
 export function formatDay(ms: number | null | undefined): string {
-  if (!ms) return "";
-  return new Date(ms).toLocaleDateString("en-US", { dateStyle: "medium" });
+  return ms ? formatShortDate(ms) : "";
 }

@@ -15,8 +15,8 @@ export default async function MyCallsPage() {
     throw error;
   }
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <AdminPageHeader title="My Calls" description="The people assigned to you. Numbers are decrypted on this device only and never leave it." />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="My calls" description="The people you phone, and what to tell them." />
       <MyCallsClient />
     </div>
   );

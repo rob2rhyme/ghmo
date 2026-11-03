@@ -5,14 +5,15 @@ test("public header shows a mobile menu with the main links", async ({ page }, t
   await page.goto("/");
   await page.getByRole("button", { name: "Open menu" }).click();
   const menu = page.getByRole("dialog");
-  await expect(menu.getByRole("link", { name: "Donate" })).toBeVisible();
+  // "Support the Gumba" until a GoFundMe link is set (the e2e build has none), then "Donate".
+  await expect(menu.getByRole("link", { name: /^(Support the Gumba|Donate)$/ })).toBeVisible();
   await expect(menu.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
 });
 
 test("signed-out visitors do not see an Admin link in the header", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("banner").getByRole("link", { name: "Admin", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Admin sign in" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Board member sign in" })).toBeVisible();
 });
 
 test("a placeholder session cookie does not get into the admin area", async ({ page, context }) => {

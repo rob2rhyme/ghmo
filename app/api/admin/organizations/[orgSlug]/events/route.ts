@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID } from "@/src/lib/community";
-import { eventsCollectionPath, normalizeEvent, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
+import { normalizeEvent, primaryEventsPath, queryAllEvents, DEFAULT_TIMEZONE, ensureOrgSlug } from "@/src/lib/events";
 import { logAuditEvent } from "@/src/lib/audit";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { z } from "zod";
 import { toPlain } from "@/src/lib/serialize.server";
+import { isValidTimeZone, parseEventDate } from "@/src/lib/zonedTime";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
 
@@ -34,15 +34,15 @@ const createEventSchema = z.object({
     .optional()
 });
 
+/** Reads a form date in the event's own time zone (zone-less "2026-12-12T19:00" means 7 PM there). */
 function parseOptionalDate(
   value: string | null | undefined,
-  label: "startsAt" | "endsAt"
+  label: "startsAt" | "endsAt",
+  timeZone: string
 ): { date: Date | null } | { response: NextResponse } {
-  if (value === undefined || value === null || value === "") {
-    return { date: null };
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  if (value === undefined || value === null || value === "") return { date: null };
+  const parsed = parseEventDate(value, timeZone);
+  if (!parsed) {
     return {
       response: NextResponse.json({ ok: false, error: "INVALID_DATE", field: label }, { status: 400 })
     };
@@ -69,13 +69,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     const status = searchParams.get("status");
 
     const db = getAdminDb();
-    let query: FirebaseFirestore.Query = db.collection(eventsCollectionPath(COMMUNITY_ID));
-    if (status === "published" || status === "draft") {
-      query = query.where("status", "==", status);
-    }
-    query = query.orderBy("startsAt", "desc");
-    const snap = await query.limit(200).get();
-    const events = snap.docs.map(doc => toPlain(normalizeEvent(doc)));
+    const docs = await queryAllEvents(db, query => {
+      let q = query;
+      if (status === "published" || status === "draft") q = q.where("status", "==", status);
+      return q.orderBy("startsAt", "desc").limit(200);
+    });
+    const events = docs.map(doc => toPlain(normalizeEvent(doc)));
     return NextResponse.json({ ok: true, events });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -107,10 +106,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const parsed = await parseJsonBody(req, createEventSchema);
     if (!parsed.ok) return parsed.response;
 
+    if (parsed.data.timezone && !isValidTimeZone(parsed.data.timezone)) {
+      return NextResponse.json({ ok: false, error: "INVALID_TIMEZONE" }, { status: 400 });
+    }
+    const timeZone = parsed.data.timezone || DEFAULT_TIMEZONE;
+
     // Dates require explicit parsing to avoid storing Invalid Date values.
-    const startsAtResult = parseOptionalDate(parsed.data.startsAt, "startsAt");
+    const startsAtResult = parseOptionalDate(parsed.data.startsAt, "startsAt", timeZone);
     if ("response" in startsAtResult) return startsAtResult.response;
-    const endsAtResult = parseOptionalDate(parsed.data.endsAt, "endsAt");
+    const endsAtResult = parseOptionalDate(parsed.data.endsAt, "endsAt", timeZone);
     if ("response" in endsAtResult) return endsAtResult.response;
     if (startsAtResult.date && endsAtResult.date && endsAtResult.date < startsAtResult.date) {
       return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });
@@ -134,7 +138,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       createdByUid: actor.uid
     };
 
-    const ref = await getAdminDb().collection(eventsCollectionPath(COMMUNITY_ID)).add(payload);
+    const ref = await getAdminDb().collection(primaryEventsPath()).add(payload);
     const doc = await ref.get();
     await logAuditEvent({
       orgSlug: params.orgSlug,

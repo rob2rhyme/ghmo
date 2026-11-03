@@ -5,11 +5,11 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { toPlain } from "@/src/lib/serialize.server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import MinutesEditorClient from "@/src/components/admin/minutes/MinutesEditorClient";
 import MinutesRecordsClient from "@/src/components/admin/minutes/MinutesRecordsClient";
+import { SegmentedNav } from "@/src/components/ui/segmented";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -45,52 +45,24 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
   const mode = modeParam === "records" ? "records" : "new";
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="flex flex-col gap-6">
+      {/* The tabs sit in the header, so any encryption notice comes straight under it, as on every other page. */}
       <AdminPageHeader
-        title="Meeting Minutes"
-        description="Create, approve, and export official minutes for each event."
+        title="Meeting minutes"
+        description="Write up each meeting, have another admin approve it, then download or publish it."
         actions={
-          <>
-            <Link
-              href="/admin/minutes?mode=new"
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary/90"
-            >
-              Create Minutes
-            </Link>
-            <Link
-              href="/admin/minutes?mode=records"
-              className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 transition hover:border-primary hover:text-foreground"
-            >
-              View Records
-            </Link>
-          </>
+          <SegmentedNav
+            label="Minutes views"
+            links={[
+              { href: "/admin/minutes?mode=new", label: "Write minutes", active: mode === "new" },
+              // "Records" is the name the browser tests click; keep it in step with tests/e2e-auth.
+              { href: "/admin/minutes?mode=records", label: "Records", active: mode === "records" }
+            ]}
+          />
         }
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/admin/minutes?mode=new"
-          className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-            mode === "new"
-              ? "bg-slate-900 text-white"
-              : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-          }`}
-        >
-          Create / Edit
-        </Link>
-        <Link
-          href="/admin/minutes?mode=records"
-          className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-            mode === "records"
-              ? "bg-slate-900 text-white"
-              : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-          }`}
-        >
-          Records
-        </Link>
-      </div>
-
-      <EncryptionGate what="Meeting Minutes">
+      <EncryptionGate what="the meeting minutes">
         {mode === "records" ? (
           <MinutesRecordsClient initialMinutes={minutes} />
         ) : (

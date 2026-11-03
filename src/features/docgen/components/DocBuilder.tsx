@@ -4,8 +4,20 @@ import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import * as htmlToImage from "html-to-image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ArrowLeft, ArrowRight, Copy, Download, Eye, EyeOff, FileCheck2, FileText, Image as ImageIcon, Save, TriangleAlert } from "lucide-react";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { ProgressBar } from "@/src/components/ui/stat";
+import { Steps } from "@/src/components/ui/steps";
+import { cn } from "@/src/lib/utils";
 import DocForm from "./DocForm";
-import DocPreview from "./DocPreview";
+import DocPreview, { hintValue } from "./DocPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "./LetterheadPage";
 import TemplateTabs from "./TemplateTabs";
 import LocalQrCode from "@/src/components/LocalQrCode";
@@ -41,6 +53,8 @@ type DocBuilderProps = {
   initialDocId?: string;
   /** Template version the saved document was made with. */
   initialTemplateVersion?: number;
+  /** Opened from a gallery "Download …" link: start on the last step and download once the page is ready. */
+  initialExport?: "pdf" | "jpeg";
 };
 
 type ExportFormat = "pdf" | "jpeg";
@@ -59,7 +73,7 @@ const SIGNATURE_ROLES: Array<{ role: SignatureRole; label: string; inputKey: str
   { role: "witness1", label: "Witness 1", inputKey: "witness1SignatureImage" },
   { role: "witness2", label: "Witness 2", inputKey: "witness2SignatureImage" },
   { role: "officiant", label: "Officiant", inputKey: "officiantSignatureImage" },
-  { role: "issuingAuthority", label: "Issuing Authority", inputKey: "issuingAuthoritySignatureImage" }
+  { role: "issuingAuthority", label: "Issuing authority", inputKey: "issuingAuthoritySignatureImage" }
 ];
 const SIGNATURE_FIELDS: Record<SignatureRole, string> = {
   witness1: "witness1Signature",
@@ -98,12 +112,7 @@ const LOCKED_FIELD_VALUES: Record<string, string> = {
   organizationName: "Greater Harrisburg Magar Organization"
 };
 const LOCKED_FIELD_IDS = new Set([...Object.keys(LOCKED_FIELD_VALUES), "officialSeal"]);
-const FALLBACK_STEP_TITLES = [
-  "Document Details",
-  "Recipient/Parties",
-  "Event/Main Content",
-  "Additional Details"
-];
+const FALLBACK_STEP_TITLES = ["Details", "Recipient", "Event", "More details"];
 
 const slugify = (value: string) =>
   value
@@ -135,7 +144,7 @@ const buildTemplateSteps = (meta?: DocTemplateMeta): DocTemplateStep[] => {
       } else {
         cleaned.push({
           id: "additional-details",
-          title: "Additional Details",
+          title: "More details",
           fieldKeys: missing
         });
       }
@@ -164,7 +173,8 @@ export default function DocBuilder({
   initialTemplateId,
   initialInputs,
   initialDocId,
-  initialTemplateVersion
+  initialTemplateVersion,
+  initialExport
 }: DocBuilderProps) {
   const { openSealedSignature, packPrivate, enabled: encrypted } = useE2ee();
   const defaultTemplateId = initialTemplateId ?? templatesMeta[0]?.id ?? "";
@@ -174,8 +184,14 @@ export default function DocBuilder({
     if (!defaultTemplateId) return {};
     return { [defaultTemplateId]: initialInputs };
   });
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  // A gallery download link opens the last step (the review), where the page that is downloaded is drawn.
+  const [activeStepIndex, setActiveStepIndex] = useState(() =>
+    initialExport ? buildTemplateSteps(templatesMeta.find(meta => meta.id === defaultTemplateId)).length : 0
+  );
+  const pendingExport = useRef<ExportFormat | undefined>(initialExport);
+  const shownTemplateId = useRef(selectedTemplateId);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -202,6 +218,16 @@ export default function DocBuilder({
     }),
     [currentInputs]
   );
+  /** Live preview only: empty text fields show as grey "[label]" hints instead of "TBD". The exported copy uses mergedInputs. */
+  const hintedInputs = useMemo(() => {
+    if (!selectedTemplateMeta || selectedTemplateMeta.id === "wedding-certificate") return mergedInputs;
+    const hinted: Record<string, string> = { ...mergedInputs };
+    for (const field of selectedTemplateMeta.fields) {
+      if (LOCKED_FIELD_IDS.has(field.id) || !["text", "textarea", "date"].includes(field.type)) continue;
+      if (!hinted[field.id]?.trim()) hinted[field.id] = hintValue(field.label);
+    }
+    return hinted;
+  }, [mergedInputs, selectedTemplateMeta]);
   const stepDefinitions = useMemo(
     () => buildTemplateSteps(selectedTemplateMeta),
     [selectedTemplateMeta]
@@ -209,7 +235,7 @@ export default function DocBuilder({
   const steps = useMemo(
     () => [
       ...stepDefinitions,
-      { id: "review-print", title: "Review & Print", fieldKeys: [] }
+      { id: "review-print", title: "Review", fieldKeys: [] }
     ],
     [stepDefinitions]
   );
@@ -266,6 +292,9 @@ export default function DocBuilder({
   };
 
   useEffect(() => {
+    // Only when the template really changes (not on first render, which already starts clean).
+    if (shownTemplateId.current === selectedTemplateId) return;
+    shownTemplateId.current = selectedTemplateId;
     setSignatureSessions({
       witness1: undefined,
       witness2: undefined,
@@ -338,8 +367,13 @@ export default function DocBuilder({
   }, [signatureSessions, currentInputs, openSealedSignature]);
 
   const handleExport = async (format: ExportFormat) => {
-    if (!previewRef.current || !selectedTemplate || !selectedTemplateMeta || !letterheadReady) return;
-    setStatusMessage("Generating preview...");
+    if (!letterheadReady) return;
+    await exportPage(format);
+  };
+
+  /** Draws the review-step page and downloads it (call only once the letterhead has loaded). */
+  const exportPage = async (format: ExportFormat) => {
+    if (!previewRef.current || !selectedTemplate || !selectedTemplateMeta) return;
     setIsExporting(true);
     try {
       const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
@@ -353,18 +387,18 @@ export default function DocBuilder({
 
       if (format === "jpeg") {
         downloadDataUrl(dataUrl, `${selectedTemplateMeta?.title.replace(/\s+/g, "-") ?? "document"}.jpg`);
-        setStatusMessage("JPEG ready to download");
+        toast.success("Image (JPEG) downloaded");
       } else {
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.addImage(dataUrl, "PNG", 0, 0, pageWidth, pageHeight);
         doc.save(`${selectedTemplateMeta?.title.replace(/\s+/g, "-") ?? "document"}.pdf`);
-        setStatusMessage("PDF downloaded");
+        toast.success("PDF downloaded");
       }
     } catch (error) {
       console.error("Document export failed", error);
-      setStatusMessage("Failed to export document");
+      toast.error("Couldn't make the download. Try again.");
     } finally {
       setIsExporting(false);
     }
@@ -372,10 +406,9 @@ export default function DocBuilder({
 
   const handleSave = async () => {
     if (!selectedTemplate || !selectedTemplateMeta) {
-      setStatusMessage("Template data unavailable");
+      toast.error("This template couldn't be loaded. Reload the page and try again.");
       return;
     }
-    setStatusMessage("Saving to gallery...");
     setIsSaving(true);
     try {
       const sanitizedInputs = Object.keys(currentInputs).reduce<Record<string, string>>((acc, key) => {
@@ -408,14 +441,13 @@ export default function DocBuilder({
             `Unexpected response (${response.status})`
         );
       }
-      const payload = await response.json();
-      setStatusMessage("Document saved to gallery");
-      if (payload?.id) {
-        setStatusMessage(`Document saved (ID: ${payload.id})`);
-      }
+      await response.json().catch(() => null);
+      toast.success("Saved to the document gallery", {
+        action: { label: "Open document gallery", onClick: () => router.push("/admin/document-gallery") }
+      });
     } catch (error) {
       console.error("Failed to save document", error);
-      setStatusMessage(error instanceof Error ? error.message : "Failed to save document");
+      toast.error(error instanceof Error ? error.message : "Couldn't save the document. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -423,7 +455,6 @@ export default function DocBuilder({
 
   const handleRequestSignature = async (role: SignatureRole) => {
     if (!selectedTemplateMeta) return;
-    setStatusMessage("Creating signing session...");
     try {
       const certificateId = signingCertificateId();
       const response = await fetch("/api/admin/signing-sessions", {
@@ -446,10 +477,9 @@ export default function DocBuilder({
       setSignatureSessions(prev => ({ ...prev, [role]: session }));
       handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[role], "");
       setActiveQrRole(role);
-      setStatusMessage("Signature session created");
     } catch (error) {
       console.error("Failed to create signing session", error);
-      setStatusMessage(error instanceof Error ? error.message : "Failed to create signing session");
+      toast.error(error instanceof Error ? error.message : "Couldn't make a signature link. Try again.");
     }
   };
 
@@ -459,11 +489,10 @@ export default function DocBuilder({
       session => session && session.status === "signed"
     ) as SignatureSession[];
     if (signedSessions.length === 0) {
-      setStatusMessage("No signed sessions to finalize yet");
+      toast.error("Nobody has signed yet. Request a signature first.");
       return;
     }
     setIsFinalizing(true);
-    setStatusMessage("Finalizing signed certificate...");
     try {
       const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
       const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
@@ -530,7 +559,7 @@ export default function DocBuilder({
       const issued = signedPdf ?? (payload?.pdfBase64 ? Uint8Array.from(atob(payload.pdfBase64), c => c.charCodeAt(0)) : undefined);
       if (issued) downloadBytes(`${slugify(signingCertificateId() || "certificate")}.pdf`, issued as Uint8Array<ArrayBuffer>);
       VERIFICATION_KEYS.forEach(key => handleFieldChange(key, ""));
-      setStatusMessage(payload?.documentId ? `Signed PDF saved (ID: ${payload.documentId})` : "Signed PDF saved");
+      toast.success("Signed PDF saved to the document gallery and downloaded");
       setSignatureSessions({
         witness1: undefined,
         witness2: undefined,
@@ -541,13 +570,12 @@ export default function DocBuilder({
       setActiveQrRole(null);
     } catch (error) {
       console.error("Failed to finalize signed certificate", error);
-      setStatusMessage(error instanceof Error ? error.message : "Failed to finalize signed certificate");
+      toast.error(error instanceof Error ? error.message : "Couldn't save the signed certificate. Try again.");
     } finally {
       setIsFinalizing(false);
     }
   };
 
-  const statusColor = statusMessage?.toLowerCase().includes("failed") ? "text-destructive" : "text-muted-foreground";
   const signatureEnabled = selectedTemplateId === "wedding-certificate";
   const activeSession = activeQrRole ? signatureSessions[activeQrRole] : undefined;
   const signatureActions = signatureEnabled
@@ -573,258 +601,267 @@ export default function DocBuilder({
       )
     : undefined;
 
+  const showVersionNote = Boolean(
+    initialDocId &&
+      initialTemplateVersion &&
+      selectedTemplateMeta &&
+      selectedTemplateMeta.id === initialTemplateId &&
+      initialTemplateVersion < selectedTemplateMeta.version
+  );
+
   return (
-    <section className="space-y-6">
-      <div className="space-y-2 rounded-2xl border border-border bg-card p-5 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Document generator</p>
-            <h1 className="text-2xl font-semibold text-foreground">Document builder</h1>
-            {initialDocId ? (
-              <p className="text-xs text-slate-400">Editing saved document ({initialDocId})</p>
-            ) : null}
-            {initialDocId && initialTemplateVersion && selectedTemplateMeta && selectedTemplateMeta.id === initialTemplateId && initialTemplateVersion < selectedTemplateMeta.version ? (
-              <p className="text-xs text-warning">
-                Saved with version {initialTemplateVersion} of this template; it now shows version {selectedTemplateMeta.version}, so
-                wording or layout may differ.
+    <section className="flex flex-col gap-6">
+      {showVersionNote ? (
+        <Alert variant="warning">
+          <TriangleAlert />
+          <AlertTitle>This template has changed since you saved</AlertTitle>
+          <AlertDescription>
+            The wording or layout may look a little different from your saved copy. Check the preview before you print.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <AdminSectionCard
+        title="Choose a template"
+        description="Pick what you want to make. You can switch any time; what you typed is kept for each template."
+      >
+        <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
+      </AdminSectionCard>
+
+      {selectedTemplateMeta ? (
+        <>
+          <nav aria-label="Steps" className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 md:hidden">
+              <p className="text-sm font-medium text-foreground">
+                Step {Math.min(activeStepIndex + 1, steps.length)} of {steps.length}: {activeStep?.title}
               </p>
+              <ProgressBar value={activeStepIndex + 1} max={steps.length} label="Progress through the steps" />
+            </div>
+            <Steps
+              label="Steps in this document"
+              className="hidden md:grid"
+              steps={steps.map((step, index) => ({
+                title: (
+                  <button
+                    type="button"
+                    onClick={() => setActiveStepIndex(index)}
+                    className="cursor-pointer rounded-md text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {step.title}
+                  </button>
+                ),
+                state: index < activeStepIndex ? "done" : index === activeStepIndex ? "current" : "todo"
+              }))}
+            />
+          </nav>
+
+          <div className={cn("grid gap-6", !isReviewStep && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+            <AdminSectionCard className="min-w-0" title={selectedTemplateMeta.title} description={selectedTemplateMeta.description}>
+              {!isReviewStep ? (
+                <>
+                  <fieldset className="min-w-0">
+                    <legend className="sr-only">{activeStep?.title}</legend>
+                    <DocForm fields={stepFields} values={mergedInputs} onChange={handleFieldChange} />
+                  </fieldset>
+                  <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
+                      disabled={activeStepIndex === 0}
+                    >
+                      <ArrowLeft aria-hidden="true" />
+                      Back
+                    </Button>
+                    <Button type="button" size="lg" onClick={() => setActiveStepIndex(index => Math.min(steps.length - 1, index + 1))}>
+                      Next
+                      <ArrowRight aria-hidden="true" />
+                    </Button>
+                  </div>
+                  {selectedTemplate ? (
+                    <div className="flex flex-col gap-3 lg:hidden">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" aria-expanded={previewOpen} onClick={() => setPreviewOpen(open => !open)}>
+                          {previewOpen ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                          {previewOpen ? "Hide preview" : "Preview"}
+                        </Button>
+                      </div>
+                      {previewOpen ? (
+                        <div className="rounded-xl border border-border bg-muted/50">
+                          <DocPreview template={selectedTemplate} inputs={hintedInputs} hints />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">Preview</h3>
+                    {selectedTemplate ? (
+                      <div className="rounded-xl border border-border bg-muted/50">
+                        <DocPreview
+                          template={selectedTemplate}
+                          inputs={mergedInputs}
+                          ref={previewRef}
+                          onBackgroundLoad={() => {
+                            setLetterheadReady(true);
+                            const format = pendingExport.current;
+                            if (format) {
+                              pendingExport.current = undefined;
+                              void exportPage(format);
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <EmptyState title="No preview yet" description="Choose a template to see a preview here." />
+                    )}
+                    <p className="text-sm text-muted-foreground">This is how the letter-size (8.5 × 11 in) page will print and download.</p>
+                  </div>
+
+                  {signatureEnabled ? (
+                    <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/40 p-4">
+                      <div className="flex flex-col gap-1">
+                        <h3 className="text-base font-semibold text-foreground">Signatures</h3>
+                        <p className="text-sm text-muted-foreground">Send each person a link. They sign on their phone and the signature appears here.</p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {SIGNATURE_ROLES.map(roleConfig => {
+                          const action = signatureActions?.[SIGNATURE_FIELDS[roleConfig.role]];
+                          if (!action) return null;
+                          return (
+                            <div key={roleConfig.role} className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-foreground">{roleConfig.label}</p>
+                                {action.badge ? <Badge variant="success">{action.badge}</Badge> : null}
+                              </div>
+                              {action.status ? <p className="text-sm text-muted-foreground">{action.status}</p> : null}
+                              <Button type="button" variant="outline" size="row" onClick={action.onClick} disabled={action.disabled} className="w-full">
+                                {action.label}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="lg"
+                            onClick={handleFinalizeSigned}
+                            disabled={!selectedTemplate || isFinalizing || !letterheadReady}
+                            loading={isFinalizing}
+                          >
+                            <FileCheck2 aria-hidden="true" />
+                            Finalize &amp; save signed certificate
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          When everyone has signed, this saves the signed certificate and downloads its PDF. It can&apos;t be changed after.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="lg" onClick={handleSave} disabled={!selectedTemplate || isSaving} loading={isSaving}>
+                      <Save aria-hidden="true" />
+                      Save to gallery
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleExport("pdf")}
+                      disabled={!selectedTemplate || isExporting || !letterheadReady}
+                      className="max-sm:h-11"
+                    >
+                      <Download aria-hidden="true" />
+                      Download PDF
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleExport("jpeg")}
+                      disabled={!selectedTemplate || isExporting || !letterheadReady}
+                      className="max-sm:h-11"
+                    >
+                      <ImageIcon aria-hidden="true" />
+                      Download image (JPEG)
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+                    <Button type="button" variant="outline" size="lg" onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}>
+                      <ArrowLeft aria-hidden="true" />
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </AdminSectionCard>
+
+            {!isReviewStep && selectedTemplate ? (
+              <aside aria-label="Live preview" className="hidden min-w-0 lg:block">
+                <AdminSectionCard className="sticky top-20" title="Live preview" description="Updates as you type. Grey [hints] show what still needs filling in.">
+                  <div className="rounded-xl border border-border bg-muted/50">
+                    <DocPreview template={selectedTemplate} inputs={hintedInputs} hints />
+                  </div>
+                </AdminSectionCard>
+              </aside>
             ) : null}
           </div>
-        </div>
-        <div className="hidden lg:block">
-          <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
-        </div>
-        <div className="block lg:hidden">
-          <TemplateTabs tabs={templatesMeta} activeTabId={selectedTemplateId} onTabChange={handleTemplateChange} />
-        </div>
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {steps.map((step, index) => {
-              const active = index === activeStepIndex;
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  onClick={() => setActiveStepIndex(index)}
-                  className={`rounded-full border px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-wide transition ${
-                    active
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground/80"
-                  }`}
-                >
-                  {step.title}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p>
-              Step {Math.min(activeStepIndex + 1, steps.length)} of {steps.length}
-            </p>
-            <p className="uppercase tracking-wide">{activeStep?.title}</p>
-          </div>
-        </div>
-        {selectedTemplateMeta ? (
-          <div className="space-y-4 rounded-2xl border border-border bg-white/70 p-5">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">{selectedTemplateMeta.category}</p>
-              <p className="text-sm text-muted-foreground">{selectedTemplateMeta.description}</p>
-            </div>
-            {!isReviewStep ? (
-              <>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">{activeStep?.title}</p>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      {stepFields.length} fields
-                    </p>
-                  </div>
-                  <DocForm fields={stepFields} values={mergedInputs} onChange={handleFieldChange} />
-                </div>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
-                    disabled={activeStepIndex === 0}
-                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-input disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveStepIndex(index => Math.min(steps.length - 1, index + 1))}
-                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800"
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Letter preview</p>
-                  {selectedTemplate ? (
-                    <DocPreview
-                      template={selectedTemplate}
-                      inputs={mergedInputs}
-                      ref={previewRef}
-                      onBackgroundLoad={() => setLetterheadReady(true)}
-                    />
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-border bg-white/70 p-6 text-center text-xs text-slate-400">
-                      Add a template to see a preview here.
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-400">
-                    Preview is letter-size (8.5x11) and used for export.
-                  </p>
-                </div>
-                {signatureEnabled ? (
-                  <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Signature requests</p>
-                      <p className="text-[0.65rem] uppercase tracking-wide text-slate-400">
-                        Request links for mobile signing
-                      </p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {SIGNATURE_ROLES.map(roleConfig => {
-                        const action = signatureActions?.[SIGNATURE_FIELDS[roleConfig.role]];
-                        if (!action) return null;
-                        return (
-                          <div
-                            key={roleConfig.role}
-                            className="rounded-xl border border-border bg-background/70 p-3"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-foreground/80">{roleConfig.label}</p>
-                              {action.badge ? (
-                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700">
-                                  {action.badge}
-                                </span>
-                              ) : null}
-                            </div>
-                            {action.status ? <p className="text-xs text-slate-400">{action.status}</p> : null}
-                            <button
-                              type="button"
-                              onClick={action.onClick}
-                              disabled={action.disabled}
-                              className="mt-3 w-full rounded-full border border-border px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {action.label}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-start">
-                  <button
-                    type="button"
-                    onClick={() => handleExport("pdf")}
-                    disabled={!selectedTemplate || isExporting || !letterheadReady}
-                    className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                  >
-                    Download PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport("jpeg")}
-                    disabled={!selectedTemplate || isExporting || !letterheadReady}
-                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                  >
-                    Download JPEG
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={!selectedTemplate || isSaving}
-                    className="rounded-full border border-emerald-400 bg-emerald-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                  >
-                    Save to Gallery
-                  </button>
-                  {signatureEnabled ? (
-                    <button
-                      type="button"
-                      onClick={handleFinalizeSigned}
-                      disabled={!selectedTemplate || isFinalizing || !letterheadReady}
-                      className="rounded-full border border-border bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 w-full sm:w-auto"
-                    >
-                      Finalize & Save Signed Certificate
-                    </button>
-                  ) : null}
-                </div>
-                {statusMessage ? <p className={`text-xs ${statusColor}`}>{statusMessage}</p> : null}
-                <div className="flex flex-wrap justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActiveStepIndex(index => Math.max(0, index - 1))}
-                    className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-input"
-                  >
-                    Back
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No template selected.</p>
-        )}
-      </div>
-      {activeSession ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="w-full max-w-md space-y-4 rounded-2xl bg-card p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Signature link</p>
-                <p className="text-lg font-semibold text-foreground">
-                  {SIGNATURE_ROLES.find(role => role.role === activeSession.role)?.label}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveQrRole(null)}
-                className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground"
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background/60 p-4 text-center">
+        </>
+      ) : (
+        <EmptyState icon={<FileText />} title="No template selected" description="Choose a template above to start." />
+      )}
+      <Dialog open={Boolean(activeSession)} onOpenChange={open => (open ? undefined : setActiveQrRole(null))}>
+        {activeSession ? (
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Signature link: {SIGNATURE_ROLES.find(role => role.role === activeSession.role)?.label}</DialogTitle>
+              <DialogDescription>Ask them to scan this code with their phone camera, or send them the link.</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/40 p-4 text-center">
               <LocalQrCode
                 value={activeSession.signUrl}
                 alt="QR code for signing link"
                 className="h-48 w-48 rounded-lg border border-border bg-card p-2"
               />
-              <p className="text-xs text-muted-foreground">Scan on phone to sign</p>
+              <p className="text-sm text-muted-foreground">Scan on a phone to sign</p>
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Direct link</p>
-              <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-sm font-medium text-foreground">Link</p>
+              <div className="rounded-md border border-border bg-muted/40 p-3 text-sm break-all text-muted-foreground">
                 {activeSession.signUrl}
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(activeSession.signUrl);
-                    setStatusMessage("Signing link copied");
-                  } catch (error) {
-                    console.error("Failed to copy link", error);
-                    setStatusMessage("Unable to copy link");
-                  }
-                }}
-                className="rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground/80 transition hover:border-primary"
-              >
-                Copy link
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(activeSession.signUrl);
+                      toast.success("Signing link copied");
+                    } catch (error) {
+                      console.error("Failed to copy link", error);
+                      toast.error("Couldn't copy the link. Select it and copy it by hand.");
+                    }
+                  }}
+                >
+                  <Copy aria-hidden="true" />
+                  Copy link
+                </Button>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </section>
   );
 }
+
 
 function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");

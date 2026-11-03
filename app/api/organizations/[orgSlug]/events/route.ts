@@ -1,10 +1,10 @@
 //app/api/organizations/[orgSlug]/events/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID } from "@/src/lib/community";
-import { ensureOrgSlug, eventsCollectionPath, normalizeEvent } from "@/src/lib/events";
+import { ensureOrgSlug, normalizeEvent, queryAllEvents } from "@/src/lib/events";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { toPlain } from "@/src/lib/serialize.server";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +53,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
       return entries.sort((a, b) => toMillis(a.startsAt) - toMillis(b.startsAt));
     };
 
-    const buildQuery = (path: string, withOrderBy: boolean) => {
-      let q: FirebaseFirestore.Query = db.collection(path);
+    const buildQuery = (collection: FirebaseFirestore.Query, withOrderBy: boolean) => {
+      let q = collection;
       if (statusConstraint) {
         q = q.where("status", "==", statusConstraint);
       }
@@ -70,16 +70,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
       return q.limit(200);
     };
 
-    const runQueries = async (withOrderBy: boolean) => {
-      const primarySnap = await buildQuery(eventsCollectionPath(params.orgSlug), withOrderBy).get();
-      if (!primarySnap.empty) return primarySnap.docs;
-      if (COMMUNITY_ID !== params.orgSlug) {
-        const orgIdSnap = await buildQuery(eventsCollectionPath(COMMUNITY_ID), withOrderBy).get();
-        if (!orgIdSnap.empty) return orgIdSnap.docs;
-      }
-      const legacySnap = await buildQuery(`community/${COMMUNITY_ID}/events`, withOrderBy).get();
-      return legacySnap.docs;
-    };
+    // Every events location, merged (see eventCollectionPaths).
+    const runQueries = (withOrderBy: boolean) => queryAllEvents(db, collection => buildQuery(collection, withOrderBy));
 
     let events: ReturnType<typeof normalizeEvent>[] = [];
     try {
@@ -121,7 +113,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
           ? events.filter(evt => (evt.startsAt ? new Date(evt.startsAt.toDate?.() || evt.startsAt).getTime() < now : false))
           : events.filter(evt => (evt.startsAt ? new Date(evt.startsAt.toDate?.() || evt.startsAt).getTime() >= now : true));
 
-    const response = NextResponse.json({ ok: true, events: filtered });
+    // Firestore timestamps become epoch milliseconds; raw Timestamp objects reach the browser as
+    // {_seconds, _nanoseconds}, which `new Date()` cannot read ("Invalid Date", and no upcoming events).
+    const response = NextResponse.json({ ok: true, events: filtered.map(evt => toPlain(evt)) });
     if (process.env.NODE_ENV !== "production") {
       response.headers.set("x-events-auth", authMode);
     }

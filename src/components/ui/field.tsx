@@ -26,7 +26,7 @@ function Field({ label, description, error, className, children }: FieldProps) {
   const describedBy = [children.props["aria-describedby"], descriptionId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div data-slot="field" className={cn("grid gap-2", className)}>
+    <div data-slot="field" className={cn("grid content-start gap-2", className)}>
       <Label htmlFor={id}>{label}</Label>
       {React.cloneElement(children, {
         id,
@@ -34,12 +34,12 @@ function Field({ label, description, error, className, children }: FieldProps) {
         "aria-invalid": error ? true : children.props["aria-invalid"]
       })}
       {description ? (
-        <p id={descriptionId} className="text-xs text-muted-foreground">
+        <p id={descriptionId} className="text-sm text-muted-foreground">
           {description}
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="text-xs font-medium text-destructive">
+        <p id={errorId} role="alert" className="text-sm font-medium text-destructive">
           {error}
         </p>
       ) : null}

@@ -31,11 +31,15 @@ export default async function AdminCommsThreadPage({ params }: AdminCommsThreadP
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
-      <AdminPageHeader
-        title="Thread Detail"
-        description="Review discussion, propose a conclusion, and finalize when resolved."
-      />
+    <div className="group/topic flex flex-col gap-6">
+      {/* Shown while the topic loads or is locked; once it opens, its own title becomes the page title. */}
+      <div className="group-has-data-topic-header/topic:hidden">
+        <AdminPageHeader
+          back={{ href: "/admin/comms", label: "Plans & Issues" }}
+          title="Topic"
+          description="Read the discussion, add your view, and agree a conclusion together."
+        />
+      </div>
       <FirebaseAdminAuthBootstrap>
         <EncryptionGate what="Plans & Issues">
           <CommsThreadDetailClient threadId={threadId} actor={toPlain(actorInfo)} />

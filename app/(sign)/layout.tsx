@@ -10,7 +10,7 @@ export const viewport = siteViewport;
 export default function SignRootLayout({ children }: { children: ReactNode }) {
   return (
     <SiteShell secure>
-      <div className="min-h-screen bg-slate-950 px-2.5 py-3 md:py-10">{children}</div>
+      <div className="py-2 md:py-6">{children}</div>
     </SiteShell>
   );
 }

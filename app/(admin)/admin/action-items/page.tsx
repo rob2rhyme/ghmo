@@ -28,10 +28,10 @@ export default async function ActionItemsPage() {
   const approved = toPlain((minutes ?? []).filter(record => record.status === "approved")) as MeetingMinutesRecord[];
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader title="Action Items" description="Follow up on tasks assigned in approved meeting minutes." />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="Action items" description="Tasks agreed in approved meeting minutes. Mark each one done when it's finished." />
       <FirebaseAdminAuthBootstrap>
-        <EncryptionGate what="Action Items">
+        <EncryptionGate what="the action items">
           <ActionItemsClient minutes={approved} uid={uid} />
         </EncryptionGate>
       </FirebaseAdminAuthBootstrap>

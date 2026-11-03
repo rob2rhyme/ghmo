@@ -56,7 +56,7 @@ test("an approved broadcast is sent in chunks to each consenting member once, wi
   await expect(page.locator("#admin-main").getByText("Ready to send to 5 members.")).toBeVisible();
 
   await page.getByRole("button", { name: "Send to 5 members" }).click();
-  await page.getByRole("button", { name: "Yes, send it now" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Yes, send it now" }).click();
   await expect(page.getByTestId("send-progress")).toContainText("5 sent · 0 skipped · 0 failed · 0 to go (of 5)");
   await expect(page.locator('[data-slot="badge"]', { hasText: "Sent" })).toBeVisible();
 

@@ -1,49 +1,77 @@
+import { ExternalLink, Play } from "lucide-react";
 import { MediaSection } from "@/src/components/MediaSection";
-import { internalFetch } from "@/src/lib/internalFetch";
-import { loadFacebookMedia, loadInstagramFeature, loadTikTokFeature, loadYouTubeMedia, MediaFeed } from "@/src/lib/media";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { SocialIcon } from "@/src/components/public/SocialIcon";
+import { SocialTiles } from "@/src/components/public/SocialTiles";
+import { feedProfiles, loadPublicFeeds } from "@/src/components/public/feeds";
+import { Button } from "@/src/components/ui/button";
+import { COMMUNITY_NAME } from "@/src/lib/community";
 
-type Feed = Awaited<ReturnType<typeof loadFacebookMedia>>;
-
-async function fetchYouTubeFeed(): Promise<MediaFeed> {
-  try {
-    const res = await internalFetch("/api/media/youtube");
-    if (!res.ok) {
-      return loadYouTubeMedia();
-    }
-    return (await res.json()) as MediaFeed;
-  } catch {
-    return loadYouTubeMedia();
-  }
+/** One large card for GHMO's YouTube channel, shown while no feed has posts to list. */
+function FeaturedYouTube({ href }: { href: string }) {
+  return (
+    <section
+      aria-labelledby="media-youtube"
+      className="grid overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+    >
+      <div className="flex aspect-video items-center justify-center bg-primary/10 text-primary md:aspect-auto md:min-h-64" aria-hidden="true">
+        <span className="grid size-20 place-items-center rounded-full bg-background shadow-xs">
+          <Play className="size-8 translate-x-0.5" />
+        </span>
+      </div>
+      <div className="flex min-w-0 flex-col justify-center gap-3 p-6 md:p-8">
+        <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+          <SocialIcon source="youtube" className="size-4" />
+          YouTube
+        </p>
+        <PublicSectionTitle id="media-youtube">{COMMUNITY_NAME}</PublicSectionTitle>
+        <p className="text-base text-muted-foreground">Watch our programs, celebrations and community gatherings.</p>
+        <Button asChild size="lg" className="w-full sm:w-auto sm:self-start">
+          <a href={href} target="_blank" rel="noreferrer">
+            Open our YouTube channel
+            <ExternalLink aria-hidden="true" />
+            <span className="sr-only">(opens in a new tab)</span>
+          </a>
+        </Button>
+      </div>
+    </section>
+  );
 }
 
+/**
+ * The Media page: sources with posts or videos as sections, the rest as profile tiles. While no feed has
+ * posts, the YouTube channel is shown as one featured card instead of a lone tile.
+ */
 export default async function MultimediaHomeContent() {
-  const channelUrlFallback = "https://www.youtube.com/@greaterharrisburgmagarorga4597";
-  const [facebook, youtube, tiktok, instagram] = await Promise.all([
-    loadFacebookMedia(),
-    fetchYouTubeFeed(),
-    loadTikTokFeature(),
-    loadInstagramFeature()
-  ]);
-  const youtubeFeed = {
-    ...youtube,
-    profileUrl: youtube.profileUrl || channelUrlFallback
-  };
+  const feeds = await loadPublicFeeds();
+  const withItems = feeds.filter(feed => feed.items.length > 0);
+  const empty = feeds.filter(feed => feed.items.length === 0);
+  const youtubeUrl = withItems.length ? null : (empty.find(feed => feed.source === "youtube")?.profileUrl ?? null);
+  const profileOnly = feedProfiles(youtubeUrl ? empty.filter(feed => feed.source !== "youtube") : empty);
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2 rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-sm uppercase tracking-wide text-primary/80">Multimedia</p>
-        <h1 className="text-3xl font-bold">Stories & Highlights</h1>
-        <p className="text-muted-foreground dark:text-slate-300">
-          Aggregated social content across Facebook, YouTube, TikTok, and Instagram. API-ready when tokens are present; graceful
-          embeds otherwise.
-        </p>
-      </header>
+    <PublicPage className="gap-10">
+      <PublicPageHeader
+        title="Media"
+        description={
+          youtubeUrl
+            ? "Watch our programs and celebrations on YouTube."
+            : "Videos, photos and news from the Greater Harrisburg Magar community, and where to follow us."
+        }
+      />
 
-      <MediaSection title="Facebook" feed={facebook as Feed} />
-      <MediaSection title="YouTube" feed={youtubeFeed as Feed} variant="youtube" />
-      <MediaSection title="TikTok" feed={tiktok as Feed} />
-      <MediaSection title="Instagram" feed={instagram as Feed} />
-    </div>
+      {youtubeUrl ? <FeaturedYouTube href={youtubeUrl} /> : null}
+
+      {withItems.map(feed => (
+        <MediaSection key={feed.source} feed={feed} headingLevel="h2" />
+      ))}
+
+      {profileOnly.length ? (
+        <section aria-labelledby="media-follow" className="flex flex-col gap-4">
+          <PublicSectionTitle id="media-follow">{withItems.length || youtubeUrl ? "More places to follow us" : "Follow us"}</PublicSectionTitle>
+          <SocialTiles profiles={profileOnly} />
+        </section>
+      ) : null}
+    </PublicPage>
   );
 }

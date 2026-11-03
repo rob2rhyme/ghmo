@@ -1,20 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Phone, PhoneCall } from "lucide-react";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
-import { Label } from "@/src/components/ui/label";
+import { Field } from "@/src/components/ui/field";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
 import { OUTCOMES, OUTCOME_LABELS, RSVPS, RSVP_LABELS, attemptNoteLoc, campaignScriptLoc, isFinalOutcome, type Outcome, type Rsvp } from "@/src/lib/callCampaigns";
+import { statusBadge } from "@/src/lib/statusBadges";
 import { formatPhone, maskPhone } from "@/src/lib/members";
 import { api, formatDay, memberLabel, newId, type CallView, type CampaignView, type MemberLite } from "./campaignShared";
 
@@ -28,7 +31,7 @@ type CampaignsResponse = { campaigns: CampaignView[]; mine: Record<string, { cal
  */
 export default function MyCallsClient() {
   return (
-    <EncryptionGate what="Your call list">
+    <EncryptionGate what="your call list" detail="Phone numbers are readable only on approved admin devices.">
       <MyCalls />
     </EncryptionGate>
   );
@@ -50,6 +53,7 @@ function MyCalls() {
   }, [mine, campaigns]);
   const { contacts, e2ee } = useMemberContacts(everyone);
   const { decrypt, encrypt, status } = e2ee;
+  const superAdmin = Boolean(e2ee.overview?.me.superAdmin);
   const [scripts, setScripts] = useState<Map<string, string>>(() => new Map());
 
   const fetchAll = () => Promise.all([api<MineResponse>("/api/admin/calling-tree/mine"), api<CampaignsResponse>("/api/admin/call-campaigns?mine=1")]);
@@ -88,7 +92,7 @@ function MyCalls() {
         try {
           return [c.id, (await decrypt<{ script?: string }>(c.script, campaignScriptLoc(c.id))).script ?? ""] as const;
         } catch {
-          return [c.id, "(the script can't be read on this device)"] as const;
+          return [c.id, "(the script can't be opened on this device)"] as const;
         }
       })
     ).then(entries => {
@@ -129,7 +133,20 @@ function MyCalls() {
     }
   };
 
-  if (error) return <EmptyState icon={<PhoneCall aria-hidden="true" />} title="Could not load your calls" description={error} action={<Button onClick={load}>Try again</Button>} />;
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <PhoneCall />
+        <AlertTitle>Couldn&apos;t load your calls</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-2">
+          <span>{error}</span>
+          <Button variant="outline" size="row" onClick={load}>
+            Try again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
   if (!mine || !campaigns) {
     return (
       <div role="status" className="flex flex-col gap-3">
@@ -143,102 +160,112 @@ function MyCalls() {
   const openCampaigns = campaigns.campaigns.filter(c => c.status === "open" && campaigns.mine[c.id]);
 
   if (!mine.isCaller && openCampaigns.length === 0) {
-    return <EmptyState icon={<PhoneCall aria-hidden="true" />} title="You are not on the caller list" description="A super admin adds callers under Calling Tree." />;
+    return (
+      <EmptyState
+        icon={<PhoneCall aria-hidden="true" />}
+        title="You are not on the caller list"
+        description={
+          superAdmin
+            ? "Add yourself as a caller: tick your name under Calling tree, plan assignments and save. Your people then show up here."
+            : "Ask a super admin to add you under Calling tree."
+        }
+        action={
+          superAdmin ? (
+            <Button asChild variant="outline" size="row">
+              <Link href="/admin/calling-tree">Open Calling tree</Link>
+            </Button>
+          ) : null
+        }
+      />
+    );
   }
 
   const sortedPeople = [...mine.members].sort((a, b) => memberLabel(a, a.id).localeCompare(memberLabel(b, b.id)));
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {openCampaigns.map(campaign => {
         const slice = campaigns.mine[campaign.id];
         const memberById = new Map(slice.members.map(m => [m.id, m]));
         const rows = [...slice.calls].sort((a, b) => Number(isFinalOutcome(a.outcome)) - Number(isFinalOutcome(b.outcome)) || memberLabel(memberById.get(a.memberId), a.memberId).localeCompare(memberLabel(memberById.get(b.memberId), b.memberId)));
         const left = rows.filter(r => !isFinalOutcome(r.outcome)).length;
         return (
-          <Card key={campaign.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PhoneCall aria-hidden="true" className="size-5" /> {campaign.title}
-              </CardTitle>
-              <CardDescription>
-                {left === 0 ? "All done: everyone was reached or finished." : `${left} of ${rows.length} still to reach.`}
-                {campaign.dueAt ? ` Calls by ${formatDay(campaign.dueAt)}.` : ""}
-              </CardDescription>
-            </CardHeader>
+          <AdminSectionCard
+            key={campaign.id}
+            title={campaign.title}
+            description={`${left === 0 ? "All done: everyone was reached or finished." : `${left} of ${rows.length} still to reach.`}${campaign.dueAt ? ` Calls by ${formatDay(campaign.dueAt)}.` : ""}`}
+          >
             {campaign.script ? (
-              <details className="mb-3 rounded-md border border-border p-3 text-sm" open={left > 0}>
-                <summary className="flex cursor-pointer items-center gap-1 font-medium">
+              <details className="rounded-md border border-border bg-muted/40 p-3 text-sm" open={left > 0}>
+                <summary className="flex min-h-11 cursor-pointer items-center gap-1.5 font-medium">
                   <Lock aria-hidden="true" className="size-3.5" /> What to say
                 </summary>
-                <p className="mt-2 whitespace-pre-wrap">{scripts.get(campaign.id) ?? "Decrypting…"}</p>
+                <p className="mt-2 whitespace-pre-wrap">{scripts.get(campaign.id) ?? "Unlocking…"}</p>
               </details>
             ) : null}
-            <ul className="divide-y divide-border" aria-label={`Calls for ${campaign.title}`}>
+            <AdminList bare label={`Calls for ${campaign.title}`}>
               {rows.map(call => {
                 const member = memberById.get(call.memberId);
                 const label = memberLabel(member, call.memberId);
                 const view = contacts.get(call.memberId);
-                const done = isFinalOutcome(call.outcome);
+                const outcome = call.outcome ? statusBadge("callOutcome", call.outcome) : null;
                 return (
-                  <li key={call.memberId} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {label}
-                        {call.outcome ? (
-                          <Badge variant={done ? "success" : "warning"} className="ml-2">
-                            {OUTCOME_LABELS[call.outcome]}
-                            {call.rsvp ? ` · ${RSVP_LABELS[call.rsvp]}` : ""}
-                          </Badge>
-                        ) : null}
-                      </p>
-                      <PhoneLine view={view} revealed={revealed.has(call.memberId)} />
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-1.5">
-                      <RevealAndCall label={label} view={view} revealed={revealed.has(call.memberId)} onToggle={() => toggle(call.memberId)} />
-                      <Button size="sm" variant={done ? "outline" : "default"} onClick={() => setLogging({ campaign, call, member })} aria-label={`Log call to ${label}`}>
-                        Log call
-                      </Button>
-                    </div>
-                  </li>
+                  <AdminListRow
+                    key={call.memberId}
+                    title={label}
+                    badges={
+                      outcome ? (
+                        <Badge variant={outcome.variant}>
+                          {outcome.label}
+                          {call.rsvp ? ` · ${RSVP_LABELS[call.rsvp]}` : ""}
+                        </Badge>
+                      ) : null
+                    }
+                    actions={
+                      <>
+                        <RevealAndCall label={label} view={view} revealed={revealed.has(call.memberId)} onToggle={() => toggle(call.memberId)} />
+                        <Button variant="outline" size="row" onClick={() => setLogging({ campaign, call, member })} aria-label={`Log call to ${label}`}>
+                          Log call
+                        </Button>
+                      </>
+                    }
+                  >
+                    <PhoneLine view={view} revealed={revealed.has(call.memberId)} />
+                  </AdminListRow>
                 );
               })}
-            </ul>
-          </Card>
+            </AdminList>
+          </AdminSectionCard>
         );
       })}
 
       {mine.isCaller ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Phone aria-hidden="true" className="size-4" /> Your people
-            </CardTitle>
-            <CardDescription>
-              {sortedPeople.length} {sortedPeople.length === 1 ? "person" : "people"} assigned to you in the calling tree. Numbers are decrypted on this device only.
-              {mine.skipped > 0 ? ` ${mine.skipped} left out (asked not to be called, or no number).` : ""}
-            </CardDescription>
-          </CardHeader>
+        <AdminSectionCard
+          title="Your people"
+          description={`${sortedPeople.length} ${sortedPeople.length === 1 ? "person" : "people"} assigned to you in the calling tree.${e2ee.enabled ? " Numbers are unlocked on this device only and never leave it." : ""}${
+            mine.skipped > 0 ? ` ${mine.skipped} left out (asked not to be called, or no number).` : ""
+          }`}
+        >
           {sortedPeople.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nobody assigned to you yet.</p>
+            <p className="text-sm text-muted-foreground">Nobody assigned to you yet. People are shared out when a super admin plans assignments under Calling tree.</p>
           ) : (
-            <ul className="divide-y divide-border" aria-label="Your call list">
+            <AdminList bare label="Your call list">
               {sortedPeople.map(member => {
                 const label = memberLabel(member, member.id);
                 const view = contacts.get(member.id);
                 return (
-                  <li key={member.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{label}</p>
-                      <PhoneLine view={view} revealed={revealed.has(member.id)} />
-                    </div>
-                    <RevealAndCall label={label} view={view} revealed={revealed.has(member.id)} onToggle={() => toggle(member.id)} />
-                  </li>
+                  <AdminListRow
+                    key={member.id}
+                    title={label}
+                    actions={<RevealAndCall label={label} view={view} revealed={revealed.has(member.id)} onToggle={() => toggle(member.id)} />}
+                  >
+                    <PhoneLine view={view} revealed={revealed.has(member.id)} />
+                  </AdminListRow>
                 );
               })}
-            </ul>
+            </AdminList>
           )}
-        </Card>
+        </AdminSectionCard>
       ) : null}
 
       {!mine.isCaller && openCampaigns.length > 0 ? (
@@ -265,8 +292,8 @@ function MyCalls() {
 }
 
 function PhoneLine({ view, revealed }: { view: ContactView | undefined; revealed: boolean }) {
-  if (!view) return <p className="text-sm text-muted-foreground">Decrypting…</p>;
-  if (!view.ok) return <p className="text-sm text-destructive">Number can&apos;t be read on this device: {view.error}</p>;
+  if (!view) return <p className="mt-0.5 text-sm text-muted-foreground">Unlocking…</p>;
+  if (!view.ok) return <p className="mt-0.5 text-sm text-destructive">Number can&apos;t be opened on this device.</p>;
   const { phone, altPhone, language, household, notes } = view.contact;
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -284,17 +311,17 @@ function PhoneLine({ view, revealed }: { view: ContactView | undefined; revealed
 function RevealAndCall({ label, view, revealed, onToggle }: { label: string; view: ContactView | undefined; revealed: boolean; onToggle: () => void }) {
   if (!view?.ok || !view.contact.phone) return null;
   return (
-    <div className="flex shrink-0 gap-1.5">
-      <Button size="sm" variant="ghost" onClick={onToggle} aria-label={revealed ? `Hide ${label}'s number` : `Show ${label}'s number`}>
+    <>
+      <Button variant="ghost" size="row" onClick={onToggle} aria-label={revealed ? `Hide ${label}'s number` : `Show ${label}'s number`}>
         {revealed ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
         {revealed ? "Hide" : "Show"}
       </Button>
-      <Button asChild size="sm" variant="outline">
+      <Button asChild variant="outline" size="row">
         <a href={`tel:${view.contact.phone}`} aria-label={`Call ${label}`}>
           <Phone aria-hidden="true" className="size-4" /> Call
         </a>
       </Button>
-    </div>
+    </>
   );
 }
 
@@ -339,7 +366,7 @@ function LogCallDialog({
             <legend className="text-sm font-medium">What happened?</legend>
             <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Outcome">
               {OUTCOMES.map(value => (
-                <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${outcome === value ? "border-primary bg-primary/5" : "border-border"}`}>
+                <label key={value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${outcome === value ? "border-primary bg-primary/5" : "border-border"}`}>
                   <input type="radio" name="outcome" value={value} checked={outcome === value} onChange={() => setOutcome(value)} />
                   {OUTCOME_LABELS[value]}
                 </label>
@@ -351,24 +378,23 @@ function LogCallDialog({
               <legend className="text-sm font-medium">Are they coming?</legend>
               <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="RSVP">
                 {RSVPS.map(value => (
-                  <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${rsvp === value ? "border-primary bg-primary/5" : "border-border"}`}>
+                  <label key={value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${rsvp === value ? "border-primary bg-primary/5" : "border-border"}`}>
                     <input type="radio" name="rsvp" value={value} checked={rsvp === value} onChange={() => setRsvp(value)} />
                     {RSVP_LABELS[value]}
                   </label>
                 ))}
-                <label className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${rsvp === null ? "border-primary bg-primary/5" : "border-border"}`}>
+                <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${rsvp === null ? "border-primary bg-primary/5" : "border-border"}`}>
                   <input type="radio" name="rsvp" value="" checked={rsvp === null} onChange={() => setRsvp(null)} />
                   Didn&apos;t say
                 </label>
               </div>
             </fieldset>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="call-note">Note (optional, encrypted)</Label>
+          <Field label="Note (optional, encrypted)">
             <Textarea id="call-note" rows={2} value={note} onChange={e => setNote(e.target.value)} maxLength={1000} placeholder="Asked to call back after 6 pm, bringing two guests…" />
-          </div>
+          </Field>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" loading={saving}>

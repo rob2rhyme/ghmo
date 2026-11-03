@@ -1,6 +1,15 @@
 //app/(admin)/admin/document-gallery/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { Route } from "next";
+import { Download, FilePlus2, FileText, Image as ImageIcon } from "lucide-react";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
+import { formatDateTime } from "@/src/lib/format";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listDocuments } from "@/src/features/docgen/firestore/docRepo";
@@ -8,14 +17,6 @@ import { resolveActorLabel } from "@/src/lib/actor";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 export default async function DocumentGalleryPage() {
   try {
@@ -29,86 +30,67 @@ export default async function DocumentGalleryPage() {
 
   const documents = await listDocuments();
 
+  const makeButton = (
+    <Button asChild>
+      <Link href="/admin/document-generator">
+        <FilePlus2 aria-hidden="true" />
+        Make a document
+      </Link>
+    </Button>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Document gallery
-            </p>
-            <h1 className="text-2xl font-semibold text-foreground">
-              Saved letters & certificates
-            </h1>
-          </div>
-          <Link
-            href="/admin/document-generator"
-            className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground"
-          >
-            Build new document
-          </Link>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Each record stores the template, inputs, and creator so you can
-          reopen, re-export, or iterate.
-        </p>
-      </div>
-      <section className="space-y-3">
-        {documents.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-background/70 p-5 text-sm text-muted-foreground">
-            No documents saved yet. Use the Document Generator to create a new
-            letter or certificate and save it to the gallery.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {documents.map((doc) => (
-              <div
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        title="Document gallery"
+        description="Letters and certificates you saved. Open one to edit, print or download."
+        actions={documents.length > 0 ? makeButton : undefined}
+      />
+      {documents.length === 0 ? (
+        <EmptyState
+          icon={<FileText />}
+          title="No saved documents yet"
+          description="When you make a letter or certificate and choose “Save to gallery”, it shows up here so you can open it again later."
+          action={makeButton}
+        />
+      ) : (
+        <AdminList label="Documents">
+          {documents.map(doc => {
+            const savedAt = doc.updatedAt ?? doc.createdAt;
+            const openHref = `/admin/document-generator?docId=${doc.id}`;
+            return (
+              <AdminListRow
                 key={doc.id}
-                className="rounded-2xl border border-border bg-card p-5 shadow-xs"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold text-foreground">
-                      {doc.templateTitle}
-                    </p>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {doc.category || "General"}{doc.templateVersion ? ` · template v${doc.templateVersion}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    {doc.createdAt
-                      ? DATE_FORMATTER.format(doc.createdAt)
-                      : "Timestamp unknown"}
-                  </p>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  <Link
-                    href={`/admin/document-generator?docId=${doc.id}`}
-                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
-                  >
-                    Open
-                  </Link>
-                  <Link
-                    href={`/admin/document-generator?docId=${doc.id}&focus=export&format=pdf`}
-                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
-                  >
-                    Export PDF
-                  </Link>
-                  <Link
-                    href={`/admin/document-generator?docId=${doc.id}&focus=export&format=jpeg`}
-                    className="rounded-full border border-border px-3 py-1 font-semibold text-foreground/80 transition hover:border-primary"
-                  >
-                    Export JPEG
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+                href={openHref as Route}
+                title={doc.templateTitle || "Untitled document"}
+                badges={<Badge variant="secondary">{doc.category || "General"}</Badge>}
+                meta={
+                  <>
+                    Saved by {resolveActorLabel({ name: doc.createdByName, roles: doc.createdByRoles })}
+                    {savedAt ? ` · ${formatDateTime(savedAt, { timeZone: DEFAULT_TIMEZONE })}` : ""}
+                  </>
+                }
+                actions={
+                  <>
+                    <Button asChild variant="outline" size="row">
+                      <Link href={`${openHref}&focus=export&format=pdf` as Route}>
+                        <Download aria-hidden="true" />
+                        Download PDF
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="row">
+                      <Link href={`${openHref}&focus=export&format=jpeg` as Route}>
+                        <ImageIcon aria-hidden="true" />
+                        Download image (JPEG)
+                      </Link>
+                    </Button>
+                  </>
+                }
+              />
+            );
+          })}
+        </AdminList>
+      )}
     </div>
   );
 }

@@ -1,17 +1,22 @@
 "use client";
 
-import Link from "next/link";
+import type { Route } from "next";
 import { useMemo, useState } from "react";
-import {
-  MeetingMinutesRecord,
-  meetingTypes,
-  MinutesStatus,
-  minutesStatusLabels,
-  minutesStatusPillClasses
-} from "@/src/lib/minutes";
+import { Download, NotebookPen } from "lucide-react";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { Field } from "@/src/components/ui/field";
+import { Input } from "@/src/components/ui/input";
+import { Select } from "@/src/components/ui/select";
+import { MeetingMinutesRecord, meetingTypes, MinutesStatus } from "@/src/lib/minutes";
 import { useUnpackedMinutes } from "@/src/components/admin/minutes/useUnpackedMinutes";
 import { resolveActorLabel } from "@/src/lib/actor";
 import { attendanceCsv } from "@/src/lib/attendanceCsv";
+import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
 
 const statusOptions: MinutesStatus[] = ["draft", "submitted", "approved"];
 
@@ -54,147 +59,100 @@ export default function MinutesSearchClient({ initialMinutes: rawMinutes }: Minu
     URL.revokeObjectURL(url);
   };
 
+  const count = filteredMinutes.length;
+
   return (
-    <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          <div className="md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Search</label>
-            <input
-              type="search"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Event title, agenda, decisions, attendees..."
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting type</label>
-            <select
-              value={meetingTypeFilter}
-              onChange={e => setMeetingTypeFilter(e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
-            >
+    <div className="flex flex-col gap-6">
+      <AdminSectionCard title="Find minutes" description="Search the text, or narrow by type, status and date.">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Field label="Search" className="md:col-span-2">
+            <Input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Event title, agenda, decisions, attendees..." />
+          </Field>
+          <Field label="Meeting type">
+            <Select value={meetingTypeFilter} onChange={e => setMeetingTypeFilter(e.target.value)}>
               <option value="">All types</option>
               {meetingTypes.map(type => (
                 <option key={type} value={type}>
                   {type}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</label>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
-            >
+            </Select>
+          </Field>
+          <Field label="Status">
+            <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
               <option value="">All statuses</option>
               {statusOptions.map(status => (
                 <option key={status} value={status}>
-                  {minutesStatusLabels[status]}
+                  {statusBadge("minutes", status).label}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
+          <Field label="From date">
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </Field>
+          <Field label="Through date">
+            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          </Field>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">From date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Through date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
-            />
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">{filteredMinutes.length} result{filteredMinutes.length === 1 ? "" : "s"}</p>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={exportAttendance}
-              disabled={filteredMinutes.length === 0}
-              className="text-sm font-semibold text-primary disabled:opacity-50"
-            >
-              Export attendance (CSV)
-            </button>
-            <Link href="/admin/minutes?mode=new" className="text-sm font-semibold text-primary">
-              Go to minutes editor
-            </Link>
-          </div>
-        </div>
-        <div className="divide-y divide-border">
-          {filteredMinutes.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">No minutes match the criteria.</p>
-          ) : (
-            filteredMinutes.map(entry => (
-              <div key={entry.id} className="space-y-3 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{entry.eventTitle}</p>
-                    <p className="text-xs text-muted-foreground">
-                    {entry.meetingType} • {formatDateLabel(entry.eventDate ?? undefined)}
+      </AdminSectionCard>
+
+      <AdminSectionCard
+        title="Records"
+        description={
+          <span role="status">
+            {count} {count === 1 ? "result" : "results"}, newest meeting first.
+          </span>
+        }
+        actions={
+          <Button type="button" variant="outline" onClick={exportAttendance} disabled={count === 0}>
+            <Download aria-hidden="true" />
+            Download attendance (CSV)
+          </Button>
+        }
+      >
+        {count === 0 ? (
+          <EmptyState
+            icon={<NotebookPen aria-hidden="true" />}
+            title={initialMinutes.length ? "No minutes match" : "No minutes yet"}
+            description={initialMinutes.length ? "Try another word or clear a filter." : "Write the first minutes after a meeting. They show up here once saved."}
+            className="py-8"
+          />
+        ) : (
+          <AdminList bare label="Minutes records">
+            {filteredMinutes.map(entry => {
+              const badge = statusBadge("minutes", entry.status);
+              const attendance = formatAttendanceSummary(entry.attendance);
+              return (
+                <AdminListRow
+                  key={entry.id}
+                  href={`/admin/minutes?mode=new&minutesId=${entry.id}` as Route}
+                  title={entry.eventTitle}
+                  badges={<Badge variant={badge.variant}>{badge.label}</Badge>}
+                  meta={`${entry.meetingType} · ${formatDateLabel(entry.eventDate ?? undefined)}`}
+                >
+                  <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
+                    {entry._e2ee === "failed" ? <p className="font-medium text-destructive">Can&apos;t be opened on this device.</p> : null}
+                    {entry.agenda.length ? (
+                      <p className="break-words">
+                        Agenda: {entry.agenda.slice(0, 3).join(", ")}
+                        {entry.agenda.length > 3 ? "…" : ""}
+                      </p>
+                    ) : null}
+                    {entry.decisions.length ? <p className="break-words">Decisions: {entry.decisions.join(", ")}</p> : null}
+                    {entry.actionItems.length ? <p className="break-words">Action items: {entry.actionItems.map(item => item.task).join(", ")}</p> : null}
+                    {attendance ? <p className="break-words">{attendance}</p> : null}
+                    <p>
+                      Recorded by {resolveActorLabel(entry.recordedBy)} · {formatDateLabel(entry.createdAt)}
                     </p>
+                    {entry.approvalNotes ? <p className="break-words">Approval notes: {entry.approvalNotes}</p> : null}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${minutesStatusPillClasses[entry.status]}`}
-                    >
-                      {minutesStatusLabels[entry.status]}
-                    </span>
-                    <Link
-                      href={`/admin/minutes?mode=new&minutesId=${entry.id}`}
-                      className="text-xs font-semibold text-primary"
-                    >
-                      Edit
-                    </Link>
-                  </div>
-                </div>
-                {entry._e2ee === "failed" ? (
-                  <p className="text-xs text-destructive">Can&apos;t be decrypted on this device.</p>
-                ) : null}
-                {entry.agenda.length ? (
-                  <p className="text-xs text-muted-foreground">
-                    Agenda: {entry.agenda.slice(0, 3).join(", ")}
-                    {entry.agenda.length > 3 ? "…" : ""}
-                  </p>
-                ) : null}
-                {entry.decisions.length ? (
-                  <p className="text-xs text-muted-foreground">
-                    Decisions: {entry.decisions.join(", ")}
-                  </p>
-                ) : null}
-                {entry.actionItems.length ? (
-                  <p className="text-xs text-muted-foreground">
-                    Action items: {entry.actionItems.map(item => item.task).join(", ")}
-                  </p>
-                ) : null}
-                {formatAttendanceSummary(entry.attendance) ? (
-                  <p className="text-xs text-muted-foreground">{formatAttendanceSummary(entry.attendance)}</p>
-                ) : null}
-                <p className="text-xs text-muted-foreground">
-                  Recorded by {resolveActorLabel(entry.recordedBy)} • {formatDateLabel(entry.createdAt)}
-                </p>
-                {entry.approvalNotes ? (
-                  <p className="text-xs text-muted-foreground">Approval notes: {entry.approvalNotes}</p>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+                </AdminListRow>
+              );
+            })}
+          </AdminList>
+        )}
+      </AdminSectionCard>
     </div>
   );
 }
@@ -220,8 +178,7 @@ function flattenAttendance(attendance?: MeetingMinutesRecord["attendance"]) {
 }
 
 function formatDateLabel(value?: number) {
-  if (!value) return "Date unavailable";
-  return new Date(value).toLocaleString();
+  return (value && formatDateTime(value)) || "Date unavailable";
 }
 
 function formatAttendanceSummary(attendance?: MeetingMinutesRecord["attendance"]) {
@@ -236,7 +193,7 @@ function formatAttendanceSummary(attendance?: MeetingMinutesRecord["attendance"]
   if (attendance.guests && attendance.guests.length) {
     parts.push(`Guests: ${attendance.guests.join(", ")}`);
   }
-  return parts.length ? parts.join(" • ") : null;
+  return parts.length ? parts.join(" · ") : null;
 }
 
 function parseDate(value: string, startOfDay: boolean) {

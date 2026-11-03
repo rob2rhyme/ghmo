@@ -22,11 +22,21 @@ export default async function AdminSecurityPage() {
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Security"
-        description="Your authenticator app and passkeys, and new passkeys from other admins that are waiting for approval."
+        description="How you sign in to the admin area, and which emails you get."
       />
-      <AuthenticatorPanel superAdmin={superAdmin} />
-      <PasskeysPanel />
-      <NotificationsPanel />
+      <section aria-labelledby="security-sign-in" className="flex flex-col gap-4">
+        <h2 id="security-sign-in" className="text-lg font-semibold">
+          Sign-in
+        </h2>
+        <AuthenticatorPanel superAdmin={superAdmin} />
+        <PasskeysPanel />
+      </section>
+      <section aria-labelledby="security-notifications" className="flex flex-col gap-4">
+        <h2 id="security-notifications" className="text-lg font-semibold">
+          Notifications
+        </h2>
+        <NotificationsPanel />
+      </section>
     </div>
   );
 }

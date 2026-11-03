@@ -21,8 +21,8 @@ export default async function MembersPage() {
   const { members } = (await res.json()) as { members?: MemberRow[] };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader title="Members" description="Who can be emailed or called, and who has agreed to it. Phone numbers are end-to-end encrypted; nobody is contacted without a recorded consent." />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="Members" description="Everyone on the community list, and whether they agreed to be emailed or called." />
       <MembersClient initialMembers={members ?? []} />
     </div>
   );

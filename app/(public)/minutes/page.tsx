@@ -1,5 +1,10 @@
 import Link from "next/link";
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
+import { ChevronRight, FileText } from "lucide-react";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { Button } from "@/src/components/ui/button";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { formatShortDate } from "@/src/lib/format";
 import { listArchive } from "@/src/lib/minutesArchive.server";
 
 export const dynamic = "force-dynamic";
@@ -17,30 +22,35 @@ export default async function MinutesArchivePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 py-6">
-      <header>
-        <h1 className="text-3xl font-semibold text-foreground">Meeting minutes</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Minutes of our board and general meetings, published after approval. Attendance is shown as numbers only.
-        </p>
-      </header>
+    <PublicPage width="reading" className="gap-6">
+      <PublicPageHeader title="Meeting minutes" description="Approved minutes from our board and general meetings." />
       {entries.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">No minutes have been published yet.</p>
+        <EmptyState
+          icon={<FileText />}
+          title="No minutes have been published yet"
+          description="Minutes are added here after the board approves them. Meanwhile, see what's coming up."
+          action={
+            <Button asChild variant="outline" size="lg">
+              <Link href={"/c/ghmo/events" as Route}>See upcoming events</Link>
+            </Button>
+          }
+        />
       ) : (
         [...byYear.entries()].map(([year, items]) => (
-          <section key={year} aria-labelledby={`year-${year}`}>
-            <h2 id={`year-${year}`} className="text-lg font-semibold text-foreground">
-              {year}
-            </h2>
-            <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
+          <section key={year} aria-labelledby={`year-${year}`} className="flex flex-col gap-3">
+            <PublicSectionTitle id={`year-${year}`}>{year}</PublicSectionTitle>
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
               {items.map(entry => (
                 <li key={entry.id}>
-                  <Link href={`/minutes/${entry.id}`} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 hover:bg-muted/50">
-                    <span className="font-medium text-foreground">{entry.eventTitle}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {entry.meetingType}
-                      {entry.eventDate ? ` · ${new Date(entry.eventDate).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}
+                  <Link href={`/minutes/${entry.id}`} className="flex min-h-11 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="font-medium break-words text-foreground">{entry.eventTitle}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {entry.meetingType}
+                        {entry.eventDate ? ` · ${formatShortDate(entry.eventDate)}` : ""}
+                      </span>
                     </span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </Link>
                 </li>
               ))}
@@ -48,6 +58,6 @@ export default async function MinutesArchivePage() {
           </section>
         ))
       )}
-    </div>
+    </PublicPage>
   );
 }

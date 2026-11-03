@@ -1,4 +1,5 @@
 /** Small, pure helpers for how the admin screens present people, times and numbers. */
+import { formatShortDate as formatDate } from "./format";
 
 export function firstName(name?: string | null): string {
   const first = (name ?? "").trim().split(/\s+/)[0];
@@ -35,6 +36,139 @@ export function auditTitle(log: AuditLike): string {
   return log.summary || log.resource?.summary || humanizeAction(log.action) || humanizeAction(log.type) || "Activity";
 }
 
+type ActivityActor = { name?: string | null; role?: string | null; roles?: readonly string[] | null; actor?: unknown } | string | null | undefined;
+
+export type ActivityLog = AuditLike & { actor?: ActivityActor; role?: string | null };
+
+/** The person in a sentence: their name, else their role ("A super admin"), else "Someone". */
+export function activityActorName(actor: ActivityActor, fallbackRole?: string | null): string {
+  if (actor && typeof actor === "object" && actor.actor && typeof actor.actor === "object") {
+    return activityActorName(actor.actor as ActivityActor, fallbackRole);
+  }
+  const rawName = typeof actor === "string" ? actor : actor?.name;
+  const name = (rawName ?? "").trim();
+  if (name && !name.includes("@")) return name;
+  const role = (actor && typeof actor === "object" ? actor.roles?.[0] || actor.role : null) || fallbackRole || "";
+  if (role === "super_admin") return "A super admin";
+  if (role === "admin") return "An admin";
+  if (role === "developer") return "A developer";
+  if (role === "system") return "The system";
+  return "Someone";
+}
+
+/**
+ * What each audit action means, as the end of a sentence ("Alice … added a passkey"). `detail: true`
+ * keeps the entry's summary as a second line when it adds something (a device name, a count, a title).
+ */
+const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
+  login_start: { verb: "asked for a sign-in email" },
+  login_dev: { verb: "signed in (test mode)" },
+  logout: { verb: "signed out" },
+  passkey_registered: { verb: "added a passkey", detail: true },
+  passkey_pending_approval: { verb: "added a passkey that needs approval", detail: true },
+  passkey_approved: { verb: "approved a passkey" },
+  passkey_removed: { verb: "removed a passkey" },
+  totp_enrolled: { verb: "set up an authenticator app" },
+  totp_reset: { verb: "reset an admin's authenticator app" },
+  totp_login_failed: { verb: "entered a wrong authenticator code" },
+  totp_recovery_codes_regenerated: { verb: "made new recovery codes" },
+  admin_bootstrap: { verb: "set up the first super admin account" },
+  minutes_created: { verb: "saved new minutes", detail: true },
+  minutes_updated: { verb: "edited minutes" },
+  minutes_submitted: { verb: "submitted minutes for approval" },
+  minutes_approved: { verb: "approved minutes" },
+  minutes_reopened: { verb: "reopened approved minutes" },
+  minutes_returned_to_draft: { verb: "returned minutes to draft" },
+  event_created: { verb: "created an event", detail: true },
+  event_updated: { verb: "updated an event", detail: true },
+  event_deleted: { verb: "deleted an event", detail: true },
+  member_created: { verb: "added a member" },
+  member_updated: { verb: "updated a member" },
+  members_imported: { verb: "imported members", detail: true },
+  calling_tree_updated: { verb: "updated the calling tree", detail: true },
+  call_campaign_created: { verb: "opened a call campaign", detail: true },
+  call_campaign_closed: { verb: "closed a call campaign", detail: true },
+  call_campaign_reminded: { verb: "reminded callers", detail: true },
+  call_campaign_exported: { verb: "downloaded a call campaign", detail: true },
+  call_attempt_recorded: { verb: "logged a call", detail: true },
+  broadcast_created: { verb: "started a broadcast" },
+  broadcast_updated: { verb: "edited a broadcast" },
+  broadcast_edited_returned_to_draft: { verb: "edited a broadcast (back to draft)" },
+  broadcast_submitted: { verb: "submitted a broadcast for approval" },
+  broadcast_approved: { verb: "approved a broadcast" },
+  broadcast_withdrawn: { verb: "withdrew a broadcast" },
+  broadcast_cancelled: { verb: "cancelled a broadcast" },
+  broadcast_sending_started: { verb: "started sending a broadcast" },
+  broadcast_test_sent: { verb: "sent a test broadcast" },
+  broadcast_posted_manually: { verb: "posted a broadcast by hand", detail: true },
+  comms_thread_created: { verb: "started a topic in Plans & Issues" },
+  comms_thread_closed: { verb: "closed a topic in Plans & Issues" },
+  comms_comment_created: { verb: "commented in Plans & Issues" },
+  comms_conclusion_proposed: { verb: "proposed a conclusion in Plans & Issues" },
+  comms_conclusion_vote: { verb: "voted on a conclusion in Plans & Issues" },
+  admin_chat_message_sent: { verb: "sent a message in Admin chat" },
+  timeline_created: { verb: "added to the GUMBA project timeline" },
+  timeline_updated: { verb: "updated the GUMBA project timeline" },
+  timeline_entry_updated: { verb: "updated the GUMBA project timeline" },
+  home_blocks_updated: { verb: "updated the homepage" },
+  doc_generated: { verb: "made a document", detail: true },
+  reconcile: { verb: "synced donations" },
+  e2ee_enabled: { verb: "turned on encryption", detail: true },
+  e2ee_device_registered: { verb: "set up a device for encryption", detail: true },
+  e2ee_device_approved: { verb: "approved a device", detail: true },
+  e2ee_device_recovered: { verb: "restored a device with the recovery key", detail: true },
+  e2ee_device_withdrawn: { verb: "removed a device", detail: true },
+  e2ee_rotated: { verb: "made new encryption keys" },
+  e2ee_recovery_replaced: { verb: "replaced the recovery key" },
+  e2ee_roster_sealed: { verb: "sealed the device list" },
+  e2ee_record_migrated: { verb: "encrypted existing records", detail: true }
+};
+
+/** Whole sentences for things nobody in particular did. */
+const SYSTEM_ACTIVITY: Record<string, string> = {
+  webhook_received: "A donation update arrived from GoFundMe",
+  reconcile: "Donations were synced"
+};
+
+function signInVerb(summary: string): string {
+  if (/recovery code/i.test(summary)) return "signed in with a recovery code";
+  if (/^passkey/i.test(summary)) return "signed in with a passkey";
+  if (/^authenticator/i.test(summary)) return "signed in with the authenticator app";
+  if (/email|magic link/i.test(summary)) return "signed in with an email link";
+  return "signed in";
+}
+
+/** "Sita's iPhone (magic_link)" -> "Sita's iPhone"; "Created event: Picnic" -> "Picnic". */
+function cleanDetail(summary: string): string {
+  return summary
+    .replace(/\s*\([a-z_]+\)$/, "")
+    .replace(/^(created|updated|deleted) event:\s*/i, "")
+    .replace(/^minutes for\s+/i, "")
+    .replace(/^end-to-end encryption enabled;\s*/i, "")
+    .replace(/^recovery key held by/i, "Recovery key held by")
+    .trim();
+}
+
+/**
+ * A plain sentence for an audit entry ("Alice Rai signed in with a passkey"), plus an optional detail
+ * line. Unknown actions fall back to the entry's own summary.
+ */
+export function activitySentence(log: ActivityLog): { text: string; detail?: string } {
+  const action = log.action || log.type || "";
+  const summary = (log.summary || log.resource?.summary || "").trim();
+  const hasActor = Boolean(log.actor || log.role);
+  if (!hasActor && SYSTEM_ACTIVITY[action]) return { text: SYSTEM_ACTIVITY[action] };
+
+  const who = activityActorName(log.actor, log.role);
+  if (action === "login") return { text: `${who} ${signInVerb(summary)}` };
+
+  const known = ACTIVITY[action];
+  if (!known) return { text: auditTitle(log) };
+  const detail = known.detail ? cleanDetail(summary) : "";
+  const generic = !detail || detail.toLowerCase() === "passkey" || detail.toLowerCase() === humanizeAction(action).toLowerCase();
+  return generic ? { text: `${who} ${known.verb}` } : { text: `${who} ${known.verb}`, detail };
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -61,6 +195,7 @@ export function formatMoney(amount: number | undefined): string {
   return `$${(amount ?? 0).toLocaleString("en-US")}`;
 }
 
+/** "Dec 12, 2026", or "Date unknown" (wraps src/lib/format.ts so every page formats dates the same way). */
 export function formatShortDate(ms: number | null | undefined): string {
-  return ms ? new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date unavailable";
+  return (ms && formatDate(ms)) || "Date unknown";
 }

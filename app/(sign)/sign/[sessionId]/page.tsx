@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { AlertTriangle, CheckCircle2, Clock, Eraser } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Button } from "@/src/components/ui/button";
+import { Card } from "@/src/components/ui/card";
+import { Field } from "@/src/components/ui/field";
+import { Input } from "@/src/components/ui/input";
 import { fromBase64Url, sealSignature, type PublicJwk } from "@/src/lib/e2ee";
+import { formatDateTime } from "@/src/lib/format";
 
 type SigningStatus = "pending" | "signed" | "expired" | "finalized" | "cancelled";
 
@@ -164,71 +171,73 @@ export default function SigningPage() {
 
   const isExpired = status === "expired";
   const isSigned = status === "signed" || status === "finalized";
+  // The session could not be loaded (status stays null once a message is set).
+  const loadFailed = status === null && message !== null;
 
   return (
     <div className="mx-auto w-full max-w-md">
-      <div className="space-y-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Signature request</p>
-          <h1 className="text-2xl font-semibold text-slate-100">Signature for {roleLabel}</h1>
-          {expiresAt ? (
-            <p className="text-xs text-muted-foreground">Session expires at {new Date(expiresAt).toLocaleString()}</p>
-          ) : null}
+      <Card className="gap-6">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-primary">Signature request</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Signature for {roleLabel}</h1>
+          {expiresAt ? <p className="text-sm text-muted-foreground">This link expires {formatDateTime(expiresAt)}.</p> : null}
         </div>
-        {message ? <p className="text-sm text-slate-300">{message}</p> : null}
-        {isExpired ? (
-          <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 p-4 text-sm text-rose-200">
-            This signing session has expired. Please request a new link.
-          </div>
+        {loadFailed ? (
+          <Alert variant="destructive">
+            <AlertTriangle />
+            <AlertTitle>{message}</AlertTitle>
+            <AlertDescription>Check that you opened the full link, or ask the person who sent it for a new one.</AlertDescription>
+          </Alert>
+        ) : message ? (
+          <p role="status" className="text-sm text-foreground">
+            {message}
+          </p>
+        ) : null}
+        {loadFailed ? null : isExpired ? (
+          <Alert variant="destructive">
+            <Clock />
+            <AlertDescription className="text-foreground">This signing session has expired. Please request a new link.</AlertDescription>
+          </Alert>
         ) : isSigned ? (
-          <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-            Signature received. Thank you.
+          <div className="flex items-start gap-3 rounded-xl border border-success/40 bg-success/10 p-4 text-sm text-foreground">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
+            <span>Signature received. Thank you.</span>
           </div>
         ) : (
           <>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Signer name (optional)
-              </label>
-              <input
-                type="text"
-                value={signerName}
-                onChange={event => setSignerName(event.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary/50"
-                placeholder="Name"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Signature
-              </label>
-              <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3">
+            <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-muted-foreground">
+              <li>Type your name (optional).</li>
+              <li>Sign inside the box with your finger, a stylus or the mouse.</li>
+              <li>Press the submit button. You can clear the box and start again first.</li>
+            </ol>
+            <Field label="Your name (optional)">
+              <Input type="text" value={signerName} onChange={event => setSignerName(event.target.value)} autoComplete="name" placeholder="Name" />
+            </Field>
+            <div className="flex flex-col gap-2">
+              <p id="signature-pad-label" className="text-sm font-medium text-foreground">
+                Your signature
+              </p>
+              <div className="rounded-xl border border-border bg-muted p-2">
+                {/* The pad's own colours are drawn into the saved image, so they are set in code above, not by the theme. */}
                 <canvas
                   ref={canvasRef}
-                  className="h-48 w-full touch-none rounded-xl border border-dashed border-slate-700 bg-slate-950"
+                  aria-labelledby="signature-pad-label"
+                  className="h-48 w-full touch-none rounded-md border border-dashed border-border"
                 />
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleClear}
-                className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-primary"
-              >
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="lg" onClick={handleClear}>
+                <Eraser aria-hidden="true" />
                 Clear
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              </Button>
+              <Button type="button" size="lg" onClick={handleSubmit} disabled={isSubmitting}>
                 {isSubmitting ? "Submitting..." : "Submit signature"}
-              </button>
+              </Button>
             </div>
           </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

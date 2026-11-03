@@ -1,14 +1,17 @@
-//app/(public)/donate/page.tsx
 import Image from "next/image";
+import { Info } from "lucide-react";
 import { GoFundMeProDonationEmbed } from "@/src/components/GoFundMeProDonationEmbed";
-import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
+import { DonateAction } from "@/src/components/public/DonateAction";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
+import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { getDonateUrl, getDonationEmbedCampaignId } from "@/src/lib/donateLink";
 import { internalFetch } from "@/src/lib/internalFetch";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function DonatePage() {
-  const community = await getCommunity();
   let totalRaised = 0;
   let goal: number | null | undefined;
   let donorCount: number | null | undefined;
@@ -46,218 +49,189 @@ export default async function DonatePage() {
   });
   const numberFormatter = new Intl.NumberFormat("en-US");
 
-  const goalLabel = goal != null ? currencyFormatter.format(goal) : "—";
-  const donorsLabel = donorCount != null ? numberFormatter.format(donorCount) : "—";
-  const timeLeftLabel = formatTimeLeft(endAt);
+  const donateUrl = getDonateUrl();
+  const embedCampaignId = getDonationEmbedCampaignId();
 
-  const campaigns = community.gofundmePro?.campaignIds || [];
-  const GOFUNDME_PUBLIC_URL =
-    "https://www.gofundme.com/f/replace-with-ghmo-gumba-project";
-  // TODO: Replace GOFUNDME_PUBLIC_URL with the official GHMO Gumba Project GoFundMe campaign link.
+  const hasGoal = goal != null && goal > 0;
+  const percent = hasGoal ? Math.min(100, Math.round((totalRaised / (goal as number)) * 100)) : 0;
+  const timeLeftLabel = formatTimeLeft(endAt);
+  const showDonors = donorCount != null && donorCount > 0;
+  // Nothing raised and no campaign link yet: say plainly that fundraising hasn't started, with no figures.
+  const notStarted = !donateUrl && totalRaised <= 0;
 
   return (
-    <main className="w-full">
-      <section className="relative w-screen left-1/2 right-1/2 ml-[-50vw] mr-[-50vw] -mt-3 border-b border-border/60 bg-muted dark:border-slate-800/60 dark:bg-slate-950 md:-mt-8">
-        <div className="mx-auto w-full max-h-[70vh] max-w-none">
-          <div className="relative h-full w-full overflow-hidden aspect-3500/2333 max-h-[70vh]">
-            <div className="absolute inset-0">
-              <Image
-                src="/assets/Ghmo-building.png"
-                alt="GHMO community building"
-                fill
-                priority
-                sizes="100vw"
-                className="object-contain object-center"
-              />
-            </div>
-
-            <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-black/35 via-black/10 to-transparent dark:from-black/45 dark:via-black/20" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-b from-transparent to-white dark:to-slate-950" />
-          </div>
+    <PublicPage className="gap-10 md:gap-12">
+      {/* Hero: title, one-line ask and the main action, with the picture beside it from desktop width */}
+      <section aria-labelledby="donate-title" className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
+        <div className="flex min-w-0 flex-col gap-6">
+          <PublicPageHeader
+            eyebrow="Gumba Project"
+            titleId="donate-title"
+            title="A home for our language, culture, and community"
+            description="Help us build a Gumba for the Magar community in Harrisburg. Every contribution, large or small, brings us closer."
+          />
+          <DonateAction donateUrl={donateUrl} />
+        </div>
+        <div className="relative aspect-3/2 min-w-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs">
+          <Image
+            src="/assets/Ghmo-building.png"
+            alt="Artwork of the planned GHMO Gumba building, with children in traditional Magar dress outside"
+            fill
+            priority
+            sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
+            className="object-cover object-center"
+          />
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-5xl space-y-6 px-[2.5%] py-8 sm:space-y-8 sm:px-6 lg:px-8">
-        <header className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-            Gumba Project - A Home for Our Language, Culture, and Community
-          </h2>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            Greater Harrisburg Magar Organization (GHMO) was founded in 2017 to
-            serve the growing Magar community in Harrisburg, Pennsylvania. As
-            our population has increased, so has our responsibility to protect,
-            preserve, and uplift our language, culture, and traditions for
-            present and future generations.
-          </p>
-        </header>
-
-        <section className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
-            <h2 className="text-base font-semibold sm:text-lg">
-              Building a Gumba for the Magar Community in Harrisburg
+      {/* Campaign and progress */}
+      <section aria-labelledby="donate-progress" className="flex flex-col gap-5 rounded-xl border border-primary/20 bg-primary/5 p-5 md:p-6">
+        {notStarted ? (
+          <div className="flex flex-col gap-1">
+            <h2 id="donate-progress" className="text-lg font-semibold">
+              Fundraising starts soon
             </h2>
-            <p className="mt-2 text-sm sm:text-base">
-              A 6-month community fundraising effort to preserve our language,
-              culture, and traditions for future generations. Your support today
-              helps create a permanent home for unity, learning, and faith.
+            <p className="text-base text-muted-foreground">
+              When the campaign opens, every gift goes toward planning and building the Gumba, our community&apos;s permanent
+              home in Harrisburg.
             </p>
           </div>
-          <div className="mt-4 rounded-lg border border-border bg-background p-4 sm:mt-6 sm:p-5">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-              <div className="rounded-lg border border-border bg-card p-3 sm:p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Raised</p>
-                <p className="mt-2 text-2xl font-semibold text-primary">
-                  {currencyFormatter.format(totalRaised)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-card p-3 sm:p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Goal</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">
-                  {goalLabel}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-card p-3 sm:p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Donors</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">
-                  {donorsLabel}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-card p-3 sm:p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time Left</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">
-                  {timeLeftLabel}
-                </p>
-              </div>
-            </div>
-            {statsWarning ? (
-              <p className="mt-2 text-xs text-amber-700">{statsWarning}</p>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-            Why the Gumba Project Matters
-          </h2>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            Our community needs a common place where we can come together,
-            learn, and grow. Without a shared space, it becomes harder to pass
-            on our language, cultural values, and spiritual traditions to our
-            children and younger generations.
-          </p>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            The GHMO Gumba Project is our vision to create that shared space.
-          </p>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-foreground/80 sm:mt-4 sm:text-base">
-            <li>A place to teach the Magar language to people of all ages</li>
-            <li>
-              A center to preserve and practice Magar culture and traditions
-            </li>
-            <li>A home for Bhajan and cultural programs</li>
-            <li>
-              A space to socialize, unite, and strengthen our community bonds
-            </li>
-            <li>
-              A symbol of unity, identity, and pride for Magar people in
-              Harrisburg
-            </li>
-          </ul>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-            Our Goal
-          </h2>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            GHMO is launching a 6-month fundraising campaign to make the Gumba
-            Project a reality. This is a mass donation effort, and every
-            contribution - large or small - brings us closer to our goal.
-          </p>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-foreground/80 sm:mt-4 sm:text-base">
-            <li>Planning and development of the Gumba space</li>
-            <li>Cultural and language education programs</li>
-            <li>Community gatherings and religious/cultural events</li>
-            <li>Long-term preservation of Magar heritage</li>
-          </ul>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-            A Message to Our Donors
-          </h2>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            This project is not just about building a structure. It is about
-            protecting our identity, educating our children, and creating a
-            future where Magar language and culture continue to thrive.
-          </p>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            Your generosity today will benefit:
-          </p>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-foreground/80 sm:mt-4 sm:text-base">
-            <li>Our elders, who carry our traditions</li>
-            <li>Our youth, who will carry them forward</li>
-            <li>Our entire community, now and for generations to come</li>
-          </ul>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-            How to Contribute
-          </h2>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            To ensure transparency and security, all donations are collected
-            through GoFundMe.
-          </p>
-          <p className="mt-2 text-sm text-foreground/80 sm:mt-3 sm:text-base">
-            Please click the &quot;Donate via GoFundMe&quot; button below to
-            make your contribution. You will be redirected to the official
-            GoFundMe page, where you can safely donate and support the GHMO
-            Gumba Project.
-          </p>
-          <p className="mt-3 text-sm text-foreground/80 sm:mt-4 sm:text-base">
-            Together, we can build a shared home for our language, culture, and
-            community. Thank you for standing with GHMO and supporting this
-            important mission.
-          </p>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4 shadow-xs sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-                Donate Now
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <h2 id="donate-progress" className="text-lg font-semibold">
+                Building a Gumba for the Magar community in Harrisburg
               </h2>
-              <p className="mt-2 text-sm text-foreground/80 sm:text-base">
-                Support {community.name} through our official GoFundMe campaign.
+              <p className="text-base text-muted-foreground">
+                A community fundraising campaign for a permanent home for unity, learning, and faith.
               </p>
             </div>
-            <a
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary/90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-auto"
-              href={GOFUNDME_PUBLIC_URL}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Donate via GoFundMe
-            </a>
-          </div>
-          <div className="mt-4 sm:mt-6">
-            {community.gofundmePro?.enabled && campaigns.length > 0 ? (
-              <GoFundMeProDonationEmbed campaignId={campaigns[0]} />
+
+            {statsWarning ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Info className="size-4 shrink-0" aria-hidden="true" />
+                {statsWarning}
+              </p>
             ) : (
-              <div className="rounded-lg border border-dashed border-input bg-card p-4 text-sm text-muted-foreground sm:p-6">
-                Configure GoFundMe Pro campaign IDs for this community to enable
-                embedded donations.
+              <div className="flex flex-col gap-4">
+                {totalRaised > 0 ? (
+                  <p className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-3xl font-semibold tracking-tight">{currencyFormatter.format(totalRaised)}</span>
+                    <span className="text-base text-muted-foreground">
+                      raised{hasGoal ? ` of ${currencyFormatter.format(goal as number)} goal` : ""}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-2xl font-semibold tracking-tight">Be the first to give</span>
+                    {hasGoal ? (
+                      <span className="text-base text-muted-foreground">Goal: {currencyFormatter.format(goal as number)}</span>
+                    ) : null}
+                  </p>
+                )}
+
+                {hasGoal ? (
+                  <ProgressBar
+                    value={totalRaised}
+                    max={goal as number}
+                    label={`${currencyFormatter.format(totalRaised)} of ${currencyFormatter.format(goal as number)} raised`}
+                    className="h-3"
+                  />
+                ) : null}
+
+                {hasGoal || showDonors || timeLeftLabel ? (
+                  <StatGrid>
+                    {hasGoal ? <StatTile label="Progress" value={`${percent}%`} hint="of the goal" /> : null}
+                    {showDonors ? <StatTile label="Donors" value={numberFormatter.format(donorCount as number)} /> : null}
+                    {timeLeftLabel ? <StatTile label="Time left" value={timeLeftLabel} /> : null}
+                  </StatGrid>
+                ) : null}
               </div>
             )}
+          </>
+        )}
+      </section>
+
+      {/* The story, grouped */}
+      <section aria-labelledby="donate-why" className="flex max-w-3xl flex-col gap-4">
+        <PublicSectionTitle id="donate-why">Why the Gumba Project matters</PublicSectionTitle>
+        <p className="text-base">
+          Greater Harrisburg Magar Organization (GHMO) was founded in 2017 to serve the growing Magar community in Harrisburg,
+          Pennsylvania. As our population has increased, so has our responsibility to protect, preserve, and uplift our
+          language, culture, and traditions for present and future generations.
+        </p>
+        <p className="text-base">
+          Our community needs a common place where we can come together, learn, and grow. Without a shared space, it becomes
+          harder to pass on our language, cultural values, and spiritual traditions to our children and younger generations.
+        </p>
+        <p className="text-base">The GHMO Gumba Project is our vision to create that shared space:</p>
+        <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
+          <li>A place to teach the Magar language to people of all ages</li>
+          <li>A center to preserve and practice Magar culture and traditions</li>
+          <li>A home for Bhajan and cultural programs</li>
+          <li>A space to socialize, unite, and strengthen our community bonds</li>
+          <li>A symbol of unity, identity, and pride for Magar people in Harrisburg</li>
+        </ul>
+
+        <h3 className="pt-4 text-lg font-semibold">Our goal</h3>
+        <p className="text-base">
+          GHMO is planning a 6-month fundraising campaign to make the Gumba Project a reality. This is a mass donation effort,
+          and every contribution — large or small — brings us closer to our goal. Your gift supports:
+        </p>
+        <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
+          <li>Planning and development of the Gumba space</li>
+          <li>Cultural and language education programs</li>
+          <li>Community gatherings and religious/cultural events</li>
+          <li>Long-term preservation of Magar heritage</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="donate-message" className="flex max-w-3xl flex-col gap-4">
+        <PublicSectionTitle id="donate-message">A message to our donors</PublicSectionTitle>
+        <figure className="border-l-4 border-primary py-1 pl-5">
+          <blockquote className="text-xl font-medium leading-relaxed text-balance md:text-2xl">
+            This project is not just about building a structure. It is about protecting our identity, educating our children,
+            and creating a future where Magar language and culture continue to thrive.
+          </blockquote>
+        </figure>
+        <p className="text-base">Your generosity today will benefit:</p>
+        <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
+          <li>Our elders, who carry our traditions</li>
+          <li>Our youth, who will carry them forward</li>
+          <li>Our entire community, now and for generations to come</li>
+        </ul>
+      </section>
+
+      {/* How to give, with the action repeated once the campaign link is set */}
+      <section
+        aria-labelledby="donate-how"
+        className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xs md:p-8"
+      >
+        <PublicSectionTitle id="donate-how">How to contribute</PublicSectionTitle>
+        <p className="max-w-3xl text-base">
+          To ensure transparency and security, all donations are collected through GoFundMe.
+          {donateUrl
+            ? " Use the “Donate via GoFundMe” button to go to the official GoFundMe page, where you can safely donate and support the GHMO Gumba Project."
+            : " The official GoFundMe page will be linked here as soon as it opens."}
+        </p>
+        <p className="max-w-3xl text-base text-muted-foreground">
+          Together, we can build a shared home for our language, culture, and community. Thank you for standing with GHMO and
+          supporting this important mission.
+        </p>
+        {donateUrl ? <DonateAction donateUrl={donateUrl} /> : null}
+        {embedCampaignId ? (
+          <div className="pt-2">
+            <GoFundMeProDonationEmbed campaignId={embedCampaignId} fallbackUrl={donateUrl} />
           </div>
-        </section>
-      </div>
-    </main>
+        ) : null}
+      </section>
+    </PublicPage>
   );
 }
 
-function formatTimeLeft(value?: number | string | Date | null) {
-  if (!value) return "Ongoing";
+/** "12 days left", "5 hours left", "Ended", or null when there is no end date (then "Time left" is hidden). */
+function formatTimeLeft(value?: number | string | Date | null): string | null {
+  if (!value) return null;
   let timestamp: number | null = null;
   if (value instanceof Date) {
     timestamp = value.getTime();
@@ -267,14 +241,14 @@ function formatTimeLeft(value?: number | string | Date | null) {
   } else if (typeof value === "number") {
     timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
   }
-  if (!timestamp) return "Ongoing";
+  if (!timestamp) return null;
   const diffMs = timestamp - Date.now();
   if (diffMs <= 0) return "Ended";
   const totalMinutes = Math.ceil(diffMs / (1000 * 60));
   const totalHours = Math.floor(totalMinutes / 60);
   const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  if (days > 0) return `${days}d${hours ? ` ${hours}h` : ""}`;
-  if (hours > 0) return `${hours}h`;
-  return `${totalMinutes}m`;
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"} left`;
+  if (days > 0) return plural(days, "day");
+  if (totalHours > 0) return plural(totalHours, "hour");
+  return plural(totalMinutes, "minute");
 }

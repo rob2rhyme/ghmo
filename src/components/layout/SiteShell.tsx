@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { headers } from "next/headers";
 import Providers from "@/src/components/Providers";
 import { CommunityHeader } from "@/src/components/community/CommunityHeader";
 import { ScrollToTopButton } from "@/src/components/ScrollToTopButton";
 import { ServiceWorkerRegistration } from "@/src/components/ServiceWorkerRegistration";
+import { SiteFooter } from "@/src/components/public/SiteFooter";
 import { getCommunity } from "@/src/lib/community";
+import { getContactEmail } from "@/src/lib/contact";
+import { getDonateUrl } from "@/src/lib/donateLink";
+import { cn } from "@/src/lib/utils";
 
 type SiteShellProps = {
   children: ReactNode;
@@ -34,16 +36,25 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
   const community = await getCommunity();
   const nonce = secure ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
 
+  // With the header and footer, body is a flex column so the footer sits at the bottom of short pages.
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground antialiased">
+      <body className={cn("min-h-screen bg-background text-foreground antialiased", chrome && "flex flex-col")}>
         <Providers nonce={nonce}>
           {bodyStart}
           {chrome ? (
             <>
-              <CommunityHeader name={community.name} />
-              <main className="mx-auto max-w-6xl px-4 py-4 md:px-6 md:py-8">{children}</main>
-              <SiteFooter />
+              <a
+                href="#main-content"
+                className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+              >
+                Skip to content
+              </a>
+              <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} />
+              <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10">
+                {children}
+              </main>
+              <SiteFooter name={community.name} contactEmail={getContactEmail()} />
             </>
           ) : (
             children
@@ -53,28 +64,5 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
         </Providers>
       </body>
     </html>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <div className="border-t border-white/10 bg-[#121212] py-4 text-xs text-neutral-300">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-6 text-center sm:flex-row sm:justify-center sm:gap-3 sm:text-left lg:px-8">
-        <Image src="/assets/rob2rhyme.png" alt="Robin Thapa logo" width={28} height={28} />
-        <div className="text-neutral-300">
-          Built from scratch with custom code by Robin Thapa
-          <span className="mx-2 inline-block">|</span>
-          Copyright © {new Date().getFullYear()} GHMO, All Rights Reserved.
-          <span className="mx-2 inline-block">|</span>
-          <Link href="/minutes" className="underline-offset-4 hover:underline">
-            Meeting minutes
-          </Link>
-          <span className="mx-2 inline-block">|</span>
-          <Link href="/admin/login" className="underline-offset-4 hover:underline">
-            Admin sign in
-          </Link>
-        </div>
-      </div>
-    </div>
   );
 }

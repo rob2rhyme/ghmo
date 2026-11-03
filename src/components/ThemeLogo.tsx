@@ -1,32 +1,22 @@
-"use client";
-
 import Image from "next/image";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { cn } from "@/src/lib/utils";
 
-export default function ThemeLogo() {
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+type ThemeLogoProps = {
+  className?: string;
+  /** Use "" when a visible name sits next to the logo. */
+  alt?: string;
+  priority?: boolean;
+};
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const src =
-    resolvedTheme === "dark"
-      ? "/assets/logo-dark.png"
-      : "/assets/logo-light.png";
-
+/**
+ * The GHMO logo in the right variant for the theme. Both images are in the page and CSS (`dark:`) picks
+ * one, so there is no flash of the light logo in dark mode while the page loads.
+ */
+export default function ThemeLogo({ className, alt = "Greater Harrisburg Magar Organization logo", priority = false }: ThemeLogoProps) {
   return (
-    <div className="mx-auto mb-4 inline-flex w-[120px] items-center justify-center sm:w-[180px] md:w-[220px] lg:w-[240px]">
-      <Image
-        src={mounted ? src : "/assets/logo-light.png"}
-        alt="Greater Harrisburg Magar Organization logo"
-        width={200}
-        height={40}
-        className="h-auto w-full object-contain"
-        priority
-      />
-    </div>
+    <span className={cn("inline-flex size-28 shrink-0 items-center justify-center", className)}>
+      <Image src="/assets/logo-light.png" alt={alt} width={240} height={240} priority={priority} className="size-full object-contain dark:hidden" />
+      <Image src="/assets/logo-dark.png" alt={alt} width={240} height={240} priority={priority} className="hidden size-full object-contain dark:block" />
+    </span>
   );
 }

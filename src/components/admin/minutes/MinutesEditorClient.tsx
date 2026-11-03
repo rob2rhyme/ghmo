@@ -1,24 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { jsPDF } from "jspdf";
 import * as htmlToImage from "html-to-image";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Download, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   meetingTypes,
   MeetingAttendance,
   MeetingMinutesFormInput,
   MeetingMinutesRecord,
   MeetingSignatures,
-  MinutesStatus,
-  minutesStatusLabels,
-  minutesStatusPillClasses
+  MinutesStatus
 } from "@/src/lib/minutes";
 import MinutesPreview, { MinutesPreviewData } from "@/src/features/minutes/components/MinutesPreview";
 import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
 import { COMMUNITY_SLUG } from "@/src/lib/community.constants";
 import { resolveActorName } from "@/src/lib/actor";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Field } from "@/src/components/ui/field";
+import { Input } from "@/src/components/ui/input";
+import { Segmented } from "@/src/components/ui/segmented";
+import { Select } from "@/src/components/ui/select";
+import { Steps, type Step } from "@/src/components/ui/steps";
+import { Textarea } from "@/src/components/ui/textarea";
+import { formatDateTime } from "@/src/lib/format";
+import { statusBadge } from "@/src/lib/statusBadges";
+import { cn } from "@/src/lib/utils";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { approvalLoc, minutesLoc, unpackMinutes } from "@/src/lib/minutesRecords";
 import { hashContent } from "@/src/lib/minutesContent";
@@ -57,11 +69,6 @@ type ExportFormat = "pdf" | "jpeg";
 type PreviewZoomMode = "fit" | "100";
 
 const PIXEL_RATIO = 2;
-const statusHelperText: Record<MinutesStatus, string> = {
-  draft: "Draft minutes can be updated before submission.",
-  submitted: "Submitted minutes are awaiting approval.",
-  approved: "Approved minutes are locked until you return them to draft."
-};
 const isNonNull = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
 /** A random Firestore-style document id; chosen here so the ciphertext can be bound to it. */
@@ -123,12 +130,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       setEventsLoading(true);
       try {
         const res = await fetch(`/api/admin/organizations/${COMMUNITY_SLUG}/events?status=all`);
-        if (!res.ok) throw new Error("Failed to load events");
+        if (!res.ok) throw new Error(`The server answered ${res.status}.`);
         const data = await res.json();
         if (!isActive) return;
         setEvents(Array.isArray(data.events) ? data.events : []);
-      } catch (err: any) {
-        if (isActive) setEventsError(err.message || "Unable to load events");
+      } catch (err) {
+        if (isActive) setEventsError(`Couldn't load the meetings. ${(err instanceof Error && err.message) || ""} Reload the page to try again.`.replace("  ", " "));
       } finally {
         if (isActive) setEventsLoading(false);
       }
@@ -271,16 +278,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const handleMinutesSubmit = async () => {
     if (isSavingMinutes) return;
     if (isApproved) {
-      setMinutesSaveStatus("Approved minutes are locked. Return to draft to update.");
+      setMinutesSaveStatus("Error: Approved minutes are locked. Return them to draft to change them.");
       return;
     }
     if (!formState.eventId) {
-      setMinutesSaveStatus("Select an event before saving minutes.");
+      setMinutesSaveStatus("Error: Choose the meeting first.");
       return;
     }
 
     setIsSavingMinutes(true);
-    setMinutesSaveStatus("Saving minutes...");
+    setMinutesSaveStatus(null);
     const trimmedAgenda = formState.agenda.map(item => item.trim()).filter(Boolean);
     const trimmedDecisions = formState.decisions.map(item => item.trim()).filter(Boolean);
     const cleanedActionItems = formState.actionItems
@@ -311,7 +318,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
     }
     const method = editingId ? "PATCH" : "POST";
     try {
-      if (editingEntry?._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device, so they can't be edited here.");
+      if (editingEntry?._e2ee === "failed") throw new Error("These minutes can't be opened on this device, so they can't be edited here.");
       const id = editingId ?? newMinutesId();
       const { eventId, meetingType, ...content } = payload;
       // With encryption on this is {enc}; before that it is the plain fields, as always.
@@ -326,13 +333,13 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       if (!res.ok) throw new Error(data.error || "Failed to save");
       const saved = await unpackMinutes(unpackPrivate, data.minutes);
       setSavedEntries(prev => [saved, ...prev.filter(entry => entry.id !== saved.id)]);
-      setMinutesSaveStatus(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
+      toast.success(editingId ? "Updated meeting minutes" : "Meeting minutes saved");
       draft.clear();
       setFormState(createEmptyForm());
       setBaseline(JSON.stringify(createEmptyForm()));
       setEditingId(null);
-    } catch (err: any) {
-      setMinutesSaveStatus(`Error: ${err.message || "Unable to save minutes"}`);
+    } catch (err) {
+      setMinutesSaveStatus(`Error: ${(err instanceof Error && err.message) || "The minutes couldn't be saved. Try again."}`);
     } finally {
       setIsSavingMinutes(false);
     }
@@ -341,16 +348,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const handleMinutesExport = async (format: ExportFormat) => {
     if (isExportingMinutes) return;
     if (!formState.eventId) {
-      setMinutesExportStatus("Select an event before exporting.");
+      setMinutesExportStatus("Error: Choose a meeting first to download these minutes.");
       return;
     }
     if (!minutesPreviewRef.current || !previewReady) {
-      setMinutesExportStatus("Preview is still loading.");
+      setMinutesExportStatus("Error: The preview is still getting ready. Try again in a moment.");
       return;
     }
 
     setIsExportingMinutes(true);
-    setMinutesExportStatus("Generating export...");
+    setMinutesExportStatus(null);
     const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
     const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
     try {
@@ -369,18 +376,18 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       const baseName = safeTitle || "meeting-minutes";
       if (format === "jpeg") {
         downloadDataUrl(`${baseName}.jpg`, dataUrl);
-        setMinutesExportStatus("JPEG ready to download.");
+        toast.success("Image (JPEG) downloaded.");
       } else {
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.addImage(dataUrl, "PNG", 0, 0, pageWidth, pageHeight);
         doc.save(`${baseName}.pdf`);
-        setMinutesExportStatus("PDF downloaded.");
+        toast.success("PDF downloaded.");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Minutes export failed", err);
-      setMinutesExportStatus(err?.message ? `Error: ${err.message}` : "Failed to export minutes.");
+      setMinutesExportStatus(`Error: ${(err instanceof Error && err.message) || "The download couldn't be made. Try again."}`);
     } finally {
       setIsExportingMinutes(false);
     }
@@ -389,16 +396,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const handleMinutesStatusAction = async (action: "submit" | "approve" | "returnToDraft") => {
     if (isUpdatingStatus) return;
     if (!editingId) {
-      setStatusActionStatus("Save minutes before changing status.");
+      setStatusActionStatus("Error: Save the minutes first.");
       return;
     }
     setIsUpdatingStatus(true);
-    setStatusActionStatus("Updating status...");
+    setStatusActionStatus(null);
     try {
       const notes = action === "approve" ? approvalNotesInput.trim() : "";
       const extra: Record<string, unknown> = {};
       if (action === "approve" && encrypted && editingEntry?.encrypted) {
-        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be opened on this device.");
         // Approving publishes the saved content as a plaintext copy for the public pages.
         const { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures } = editingEntry;
         extra.published = { chairedBy, agenda, discussionSummary, decisions, actionItems, attendance, signatures };
@@ -408,7 +415,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       }
       if (action === "submit" && editingEntry?.encrypted) {
         // The approver's copy must hash to exactly this, so the minutes can't change during approval.
-        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be decrypted on this device.");
+        if (editingEntry._e2ee === "failed") throw new Error("These minutes can't be opened on this device.");
         extra.contentHash = await hashContent(editingEntry as unknown as Record<string, unknown>);
       }
       if (action === "returnToDraft" && editingStatus === "approved") extra.reason = reopenReason.trim();
@@ -423,15 +430,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       setSavedEntries(prev => [updated, ...prev.filter(entry => entry.id !== updated.id)]);
       loadMinutesIntoForm(updated);
       setReopenReason("");
-      setStatusActionStatus(
-        action === "approve"
-          ? "Minutes approved."
-          : action === "returnToDraft"
-            ? "Marked as draft."
-            : "Submitted for approval."
-      );
-    } catch (err: any) {
-      setStatusActionStatus(`Error: ${err.message || "Unable to change status."}`);
+      toast.success(action === "approve" ? "Minutes approved." : action === "returnToDraft" ? "Marked as draft." : "Submitted for approval.");
+    } catch (err) {
+      setStatusActionStatus(`Error: ${(err instanceof Error && err.message) || "The status couldn't be changed. Try again."}`);
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -456,12 +457,10 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const editingEntry = editingId ? minutesEntries.find(entry => entry.id === editingId) ?? null : null;
   const editingStatus: MinutesStatus = (editingEntry?.status as MinutesStatus) ?? "draft";
   const isApproved = editingStatus === "approved";
-  const canSubmitForApproval = Boolean(editingEntry && editingStatus === "draft");
-  const canApproveMinutes = Boolean(editingEntry && editingStatus === "submitted");
-  const canReturnToDraft = Boolean(editingEntry && editingStatus !== "draft");
+  const editingBadge = statusBadge("minutes", editingStatus);
   const displayEventTitle = selectedEvent?.title || editingEntry?.eventTitle;
   const displayEventDateMs = selectedEvent?.startsAtMs ?? editingEntry?.eventDate ?? null;
-  const displayEventDate = displayEventDateMs ? new Date(displayEventDateMs).toLocaleString() : null;
+  const displayEventDate = displayEventDateMs ? formatDateTime(displayEventDateMs) : null;
   const adminRecordedBy = resolveActorName(adminActor);
   const previewMinutesData = useMemo<MinutesPreviewData>(() => {
     const agenda = formState.agenda.map(item => item.trim()).filter(Boolean);
@@ -523,10 +522,36 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   }, [editingId, editingVersion]);
 
   const attendanceState = ensureAttendanceState(formState.attendance);
+  const exportBlockedReason = !formState.eventId
+    ? "Choose a meeting first to download these minutes."
+    : !previewReady
+      ? "Getting the preview ready…"
+      : null;
+  const saveHint = isApproved
+    ? "Approved minutes are locked. Return them to draft to change them."
+    : "Saved as a draft. Nothing is public until another admin approves it.";
+  const saveError = minutesSaveStatus?.startsWith("Error: ") ? minutesSaveStatus.slice(7) : null;
+  const submittedByMe = editingStatus === "submitted" && editingEntry?.submittedByUid === adminActor.uid;
+  const nextStepText = !editingEntry
+    ? ""
+    : editingStatus === "draft"
+      ? "When the minutes are complete, submit them. Another admin then checks and approves them."
+      : editingStatus === "submitted"
+        ? submittedByMe
+          ? "You submitted these minutes, so another admin must approve them."
+          : "Read the minutes and the preview. Approving publishes them on the public minutes page."
+        : "Approved and published. To change them, return them to draft and say why.";
+  // Write → submit → another admin approves; "current" is the step waiting to be done.
+  const currentStep = !editingEntry ? 0 : editingStatus === "draft" ? 1 : editingStatus === "submitted" ? 2 : 3;
+  const minutesSteps: Step[] = [
+    { title: "Write and save", description: "Fill in what you can. You can finish later." },
+    { title: "Submit for approval", description: "When the minutes are complete." },
+    { title: "Another admin approves", description: "Then they're published." }
+  ].map((step, index) => ({ ...step, state: index < currentStep ? "done" : index === currentStep ? "current" : "todo" }));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
-      <div className="space-y-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="flex min-w-0 flex-col gap-6">
         {draft.pending ? (
           <DraftBanner
             savedAt={draft.pending.savedAt}
@@ -537,78 +562,69 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
             onDiscard={draft.discard}
           />
         ) : null}
-        <AdminSectionCard>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {editingId ? "Update Meeting Minutes" : "Add Meeting Minutes"}
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold text-foreground">
-                {selectedEvent?.title || displayEventTitle || "Create minutes"}
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Link structured minutes to a past event. Admin-only governance tool.
-              </p>
-              {editingEntry ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${minutesStatusPillClasses[editingStatus]}`}
-                  >
-                    {minutesStatusLabels[editingStatus]}
-                  </span>
-                  <p className="text-xs text-muted-foreground">{statusHelperText[editingStatus]}</p>
-                </div>
-              ) : null}
-            </div>
-            {editingId ? (
-              <button
-                onClick={cancelMinutesEdit}
-                className="whitespace-nowrap rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground/80 hover:border-primary hover:text-foreground"
-                type="button"
-              >
-                Cancel edit
-              </button>
-            ) : null}
-          </div>
-        </AdminSectionCard>
 
-        <fieldset disabled={isApproved} className="space-y-5">
-          <AdminSectionCard title="Event & Meeting Metadata" description="Attach minutes to a completed event.">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event</label>
-                <select
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+        <Steps label="How minutes are approved" steps={minutesSteps} className="max-sm:hidden" />
+
+        {editingId ? (
+          <AdminSectionCard
+            title={`Editing: ${displayEventTitle || "minutes"}`}
+            description="Change what you need, then save. The next step is below the form."
+            actions={
+              <Button type="button" variant="outline" onClick={cancelMinutesEdit}>
+                Cancel edit
+              </Button>
+            }
+          >
+            {editingEntry ? (
+              <Badge variant={editingBadge.variant} className="w-fit">
+                {editingBadge.label}
+              </Badge>
+            ) : null}
+          </AdminSectionCard>
+        ) : null}
+
+        <fieldset disabled={isApproved} className="flex min-w-0 flex-col gap-6">
+          <AdminSectionCard title="Which meeting?" description="Minutes belong to a meeting that has already happened.">
+            <div className="grid gap-4">
+              <Field
+                label="Meeting"
+                description={
+                  eventsLoading ? (
+                    "Loading past meetings…"
+                  ) : eventsError ? undefined : pastEvents.length === 0 ? (
+                    <>
+                      Minutes are added after a meeting has happened. No past meetings yet:{" "}
+                      <Link href="/admin/events" className="font-medium text-primary underline-offset-4 hover:underline">
+                        open Events
+                      </Link>
+                      .
+                    </>
+                  ) : undefined
+                }
+                error={eventsError ?? undefined}
+              >
+                <Select
                   value={formState.eventId}
                   onChange={e => setFormState(prev => ({ ...prev, eventId: e.target.value }))}
                   disabled={Boolean(editingId)}
                 >
-                  <option value="">Select a past event</option>
+                  <option value="">Choose a past meeting</option>
                   {pastEvents.map(evt => (
                     <option key={evt.id} value={evt.id}>
-                      {evt.title || "Untitled event"} — {new Date(evt.startsAtMs).toLocaleString()}
+                      {evt.title || "Untitled event"} · {formatDateTime(evt.startsAtMs)}
                     </option>
                   ))}
-                </select>
-                {eventsLoading ? (
-                  <p className="text-xs text-muted-foreground">Loading past events...</p>
-                ) : eventsError ? (
-                  <p className="text-xs text-destructive">{eventsError}</p>
-                ) : pastEvents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No past events available yet.</p>
-                ) : null}
-              </div>
+                </Select>
+              </Field>
               {displayEventTitle ? (
-                <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
                   <p className="font-semibold text-foreground">{displayEventTitle}</p>
-                  <p>{displayEventDate ?? "Date unavailable"}</p>
+                  <p className="text-muted-foreground">{displayEventDate ?? "Date unavailable"}</p>
                 </div>
               ) : null}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting Type</label>
-                  <select
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Type of meeting">
+                  <Select
                     value={formState.meetingType}
                     onChange={e =>
                       setFormState(prev => ({
@@ -622,384 +638,340 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                         {type}
                       </option>
                     ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chaired by</label>
-                  <input
-                    className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+                  </Select>
+                </Field>
+                <Field label="Chaired by (optional)">
+                  <Input
                     value={formState.chairedBy}
                     onChange={e => setFormState(prev => ({ ...prev, chairedBy: e.target.value }))}
-                    placeholder="Optional chair"
+                    placeholder="Name of the chair"
                   />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recorded by</label>
-                  <input
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground focus:outline-hidden"
-                    value={adminRecordedBy}
-                    readOnly
-                  />
-                </div>
+                </Field>
+                <Field label="Recorded by" description="Filled in from your account." className="sm:col-span-2">
+                  <Input value={adminRecordedBy} readOnly className="bg-muted/40 text-muted-foreground" />
+                </Field>
               </div>
             </div>
           </AdminSectionCard>
 
-          <AdminSectionCard title="Agenda Items" description="Capture the flow of the meeting for reference.">
-            <div className="space-y-3">
+          <AdminSectionCard title="Agenda" description="The topics, in the order they came up.">
+            <div className="flex flex-col gap-3">
               {formState.agenda.map((item, index) => (
-                <div
-                  key={`agenda-${index}`}
-                  className="flex items-start gap-3 rounded-2xl border border-border bg-background p-3"
-                >
-                  <input
-                    className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+                <RemovableRow key={`agenda-${index}`} removeLabel={`Remove agenda item ${index + 1}`} onRemove={() => removeTextListEntry("agenda", index)}>
+                  <Input
+                    aria-label={`Agenda item ${index + 1}`}
                     value={item}
                     onChange={e => updateTextList("agenda", index, e.target.value)}
                     placeholder="Agenda item"
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeTextListEntry("agenda", index)}
-                    className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
-                  >
-                    ×
-                  </button>
-                </div>
+                </RemovableRow>
               ))}
-              <button
-                type="button"
-                onClick={() => appendTextList("agenda")}
-                className="text-xs font-semibold text-primary"
-              >
-                + Add agenda item
-              </button>
+              <AddButton onClick={() => appendTextList("agenda")}>Add agenda item</AddButton>
             </div>
           </AdminSectionCard>
 
-          <AdminSectionCard title="Discussion Summary" description="Summarize key discussions and context.">
-            <textarea
-              className="w-full rounded-2xl border border-border px-3 py-3 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+          <AdminSectionCard title="What was discussed" description="A short summary of the conversation.">
+            <Textarea
+              aria-label="Discussion summary"
               value={formState.discussionSummary}
               onChange={e => setFormState(prev => ({ ...prev, discussionSummary: e.target.value }))}
-              rows={4}
+              rows={5}
               placeholder="Summarize the discussion"
             />
           </AdminSectionCard>
 
-          <AdminSectionCard title="Decisions / Motions" description="Capture each motion or decision for history.">
-            <div className="space-y-3">
+          <AdminSectionCard title="Decisions made" description="One line per motion or decision.">
+            <div className="flex flex-col gap-3">
               {formState.decisions.map((item, index) => (
-                <div
-                  key={`decision-${index}`}
-                  className="flex items-start gap-3 rounded-2xl border border-border bg-background p-3"
-                >
-                  <input
-                    className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
+                <RemovableRow key={`decision-${index}`} removeLabel={`Remove decision ${index + 1}`} onRemove={() => removeTextListEntry("decisions", index)}>
+                  <Input
+                    aria-label={`Decision ${index + 1}`}
                     value={item}
                     onChange={e => updateTextList("decisions", index, e.target.value)}
                     placeholder="Decision"
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeTextListEntry("decisions", index)}
-                    className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
-                  >
-                    ×
-                  </button>
-                </div>
+                </RemovableRow>
               ))}
-              <button
-                type="button"
-                onClick={() => appendTextList("decisions")}
-                className="text-xs font-semibold text-primary"
-              >
-                + Add decision
-              </button>
+              <AddButton onClick={() => appendTextList("decisions")}>Add decision</AddButton>
             </div>
           </AdminSectionCard>
 
-          <AdminSectionCard title="Action Items" description="Assign follow ups with owners and due dates.">
-            <div className="space-y-3">
+          <AdminSectionCard title="Action items" description="Tasks that came out of the meeting, who does them and by when.">
+            <div className="flex flex-col gap-3">
               {formState.actionItems.map((item, index) => (
-                <div key={`action-${index}`} className="space-y-3 rounded-2xl border border-border bg-background p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                      value={item.task}
-                      onChange={e => updateActionItem(index, "task", e.target.value)}
-                      placeholder="Task"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeActionItem(index)}
-                      className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
-                    >
-                      ×
-                    </button>
+                <div key={`action-${index}`} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:p-4">
+                  <div className="flex min-w-0 items-end gap-2">
+                    <Field label={`Task ${index + 1}`} className="min-w-0 flex-1">
+                      <Input value={item.task} onChange={e => updateActionItem(index, "task", e.target.value)} placeholder="Task" />
+                    </Field>
+                    <RemoveButton label={`Remove action item ${index + 1}`} onRemove={() => removeActionItem(index)} />
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <input
-                      className="rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                      value={item.assignedTo}
-                      onChange={e => updateActionItem(index, "assignedTo", e.target.value)}
-                      placeholder="Assigned to (optional)"
-                    />
-                    <input
-                      type="date"
-                      className="rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                      value={item.dueDate || ""}
-                      onChange={e => updateActionItem(index, "dueDate", e.target.value)}
-                    />
+                    <Field label="Who will do it (optional)">
+                      <Input value={item.assignedTo} onChange={e => updateActionItem(index, "assignedTo", e.target.value)} placeholder="Name" />
+                    </Field>
+                    <Field label="Due date (optional)">
+                      <Input type="date" value={item.dueDate || ""} onChange={e => updateActionItem(index, "dueDate", e.target.value)} />
+                    </Field>
                   </div>
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={appendActionItem}
-                className="text-xs font-semibold text-primary"
-              >
-                + Add action item
-              </button>
+              <AddButton onClick={appendActionItem}>Add action item</AddButton>
             </div>
           </AdminSectionCard>
 
-          <AdminSectionCard title="Attendance" description="Optional attendee listing.">
-            <button
-              type="button"
-              onClick={() => setAttendanceExpanded(prev => !prev)}
-              className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              <span>{attendanceExpanded ? "Hide attendance" : "Add attendance"}</span>
-              <span className="text-xs text-slate-400">{attendanceExpanded ? "Hide" : "Show"}</span>
-            </button>
+          <AdminSectionCard
+            title="Who attended"
+            description="Optional. Names of people present, absent and any guests."
+            actions={
+              <Button type="button" variant="outline" aria-expanded={attendanceExpanded} onClick={() => setAttendanceExpanded(prev => !prev)}>
+                {attendanceExpanded ? "Hide attendance" : "Add attendance"}
+              </Button>
+            }
+          >
             {attendanceExpanded ? (
-              <div className="mt-4 space-y-4">
+              <div className="grid gap-5">
                 {(["present", "absent", "guests"] as AttendanceSection[]).map(section => {
                   const rows = attendanceState[section] ?? [""];
+                  const sectionLabel = section === "present" ? "Present" : section === "absent" ? "Absent" : "Guests";
                   return (
-                    <div key={section} className="space-y-2">
-                      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <span>
-                          {section === "present" ? "Present" : section === "absent" ? "Absent" : "Guests"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => appendAttendanceItem(section)}
-                          className="flex items-center gap-1 text-xs font-semibold text-primary"
+                    <div key={section} className="flex flex-col gap-2">
+                      <h3 className="text-sm font-medium text-foreground">{sectionLabel}</h3>
+                      {rows.map((person, index) => (
+                        <RemovableRow
+                          key={`${section}-${index}`}
+                          removeLabel={`Remove ${sectionLabel.toLowerCase()} name ${index + 1}`}
+                          onRemove={() => removeAttendanceItem(section, index)}
                         >
-                          <span aria-hidden>+</span>
-                          Add
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {rows.map((person, index) => (
-                          <div
-                            key={`${section}-${index}`}
-                            className="flex items-center gap-3 rounded-full border border-border bg-white/80 px-3 py-2"
-                          >
-                            <input
-                              className="flex-1 bg-transparent text-sm focus:outline-hidden"
-                              value={person}
-                              onChange={e => updateAttendanceItem(section, index, e.target.value)}
-                              placeholder="Name or role"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeAttendanceItem(section, index)}
-                              className="rounded-full p-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground/80"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                          <Input
+                            aria-label={`${sectionLabel}: name ${index + 1}`}
+                            value={person}
+                            onChange={e => updateAttendanceItem(section, index, e.target.value)}
+                            placeholder="Name or role"
+                          />
+                        </RemovableRow>
+                      ))}
+                      <AddButton onClick={() => appendAttendanceItem(section)}>Add name</AddButton>
                     </div>
                   );
                 })}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted-foreground">Not added.</p>
+            )}
           </AdminSectionCard>
 
-          <AdminSectionCard title="Signatures" description="Optional sign-off for chair and secretary.">
-            <button
-              type="button"
-              onClick={() => setSignaturesExpanded(prev => !prev)}
-              className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              <span>{signaturesExpanded ? "Hide signatures" : "Add signatures"}</span>
-              <span className="text-xs text-slate-400">{signaturesExpanded ? "Hide" : "Show"}</span>
-            </button>
+          <AdminSectionCard
+            title="Signatures"
+            description="Optional. Names printed on the signature lines."
+            actions={
+              <Button type="button" variant="outline" aria-expanded={signaturesExpanded} onClick={() => setSignaturesExpanded(prev => !prev)}>
+                {signaturesExpanded ? "Hide signatures" : "Add signatures"}
+              </Button>
+            }
+          >
             {signaturesExpanded ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <input
-                  className="rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                  value={formState.signatures?.chairName || ""}
-                  onChange={e => updateSignatureField("chairName", e.target.value)}
-                  placeholder="Chair name"
-                />
-                <input
-                  className="rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                  value={formState.signatures?.secretaryName || ""}
-                  onChange={e => updateSignatureField("secretaryName", e.target.value)}
-                  placeholder="Secretary name"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Chair">
+                  <Input value={formState.signatures?.chairName || ""} onChange={e => updateSignatureField("chairName", e.target.value)} placeholder="Chair name" />
+                </Field>
+                <Field label="Secretary">
+                  <Input
+                    value={formState.signatures?.secretaryName || ""}
+                    onChange={e => updateSignatureField("secretaryName", e.target.value)}
+                    placeholder="Secretary name"
+                  />
+                </Field>
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted-foreground">Not added.</p>
+            )}
           </AdminSectionCard>
 
-          <div className="flex items-center justify-between">
-            {minutesSaveStatus ? <p className="text-xs text-muted-foreground">{minutesSaveStatus}</p> : <span />}
-            <button
-              onClick={handleMinutesSubmit}
-              disabled={isSavingMinutes || isApproved}
-              className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-primary/90 disabled:bg-primary/70"
-              type="button"
+          {/* Compact on phones (one button, a line only for errors), so it covers little of the form while typing. */}
+          <div className="sticky bottom-0 z-20 flex flex-col gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-lg backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3">
+            <p
+              role="status"
+              className={cn(
+                "min-w-0 text-sm sm:flex-1",
+                saveError ? "px-2 font-medium text-destructive sm:px-0" : "text-muted-foreground max-sm:hidden"
+              )}
             >
-              {editingId ? "Update Minutes" : "Save Minutes"}
-            </button>
+              {saveError ?? saveHint}
+            </p>
+            <Button type="button" size="lg" className="max-sm:w-full" onClick={handleMinutesSubmit} loading={isSavingMinutes} disabled={isApproved}>
+              {editingId ? "Save changes" : "Save minutes"}
+            </Button>
           </div>
         </fieldset>
 
         {editingEntry ? (
-          <AdminSectionCard title="Status Actions" description="Submit, approve, or unlock minutes based on their workflow state.">
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handleMinutesStatusAction("submit")}
-                disabled={!canSubmitForApproval || isUpdatingStatus}
-                className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Submit for approval
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMinutesStatusAction("approve")}
-                disabled={!canApproveMinutes || isUpdatingStatus}
-                className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMinutesStatusAction("returnToDraft")}
-                disabled={!canReturnToDraft || isUpdatingStatus}
-                className="rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Return to draft
-              </button>
-            </div>
-            <div className="mt-4 space-y-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approval notes</label>
-              <textarea
-                className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                value={approvalNotesInput}
-                onChange={e => setApprovalNotesInput(e.target.value)}
-                rows={3}
-                placeholder="Optional context for approvers"
-              />
-            </div>
-            {editingStatus === "submitted" && editingEntry?.submittedByUid === adminActor.uid ? (
-              <p className="mt-3 text-xs text-muted-foreground">You submitted these minutes, so another admin must approve them.</p>
-            ) : null}
-            {editingStatus === "approved" ? (
-              <div className="mt-4 space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reason for reopening</label>
-                <textarea
-                  className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/20"
-                  value={reopenReason}
-                  onChange={e => setReopenReason(e.target.value)}
-                  rows={2}
-                  placeholder="Required. Recorded in the audit log; reopening unpublishes the minutes."
-                />
-              </div>
-            ) : null}
-            {versions.length ? (
-              <div className="mt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved versions</p>
-                <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-                  {versions.map(v => (
-                    <li key={v.version}>
-                      Version {v.version} · {v.approvedAt ? new Date(v.approvedAt).toLocaleString() : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {statusActionStatus ? <p className="mt-2 text-xs text-muted-foreground">{statusActionStatus}</p> : null}
-          </AdminSectionCard>
+          <MinutesNextStep
+            status={editingStatus}
+            description={nextStepText}
+            approvalNotes={approvalNotesInput}
+            onApprovalNotesChange={setApprovalNotesInput}
+            reopenReason={reopenReason}
+            onReopenReasonChange={setReopenReason}
+            busy={isUpdatingStatus}
+            onAction={handleMinutesStatusAction}
+            error={statusActionStatus?.replace(/^Error: /, "") ?? null}
+            versions={versions}
+          />
         ) : null}
       </div>
 
-      <div className="space-y-5">
-        <div className="sticky top-6 space-y-4">
-          <AdminSectionCard className="bg-background">
-            <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span aria-hidden>🧾</span>
-                  <span>Live preview</span>
-                </div>
-                <p className="text-xs text-slate-400">Preview matches export</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Zoom</span>
-                <button
-                  type="button"
-                  onClick={() => setPreviewZoomMode("fit")}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
-                    previewZoomMode === "fit"
-                      ? "bg-slate-900 text-white"
-                      : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                  }`}
-                >
-                  Fit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewZoomMode("100")}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
-                    previewZoomMode === "100"
-                      ? "bg-slate-900 text-white"
-                      : "border border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                  }`}
-                >
-                  100%
-                </button>
-              </div>
+      <aside aria-label="Preview" className="min-w-0 xl:sticky xl:top-20">
+        <AdminSectionCard
+          title="Preview"
+          description="Exactly what the download will look like."
+          className="flex flex-col xl:max-h-[calc(100dvh-6rem)]"
+          actions={
+            <Segmented
+              label="Zoom"
+              value={previewZoomMode}
+              onChange={setPreviewZoomMode}
+              options={[
+                { value: "fit", label: "Fit" },
+                { value: "100", label: "100%" }
+              ]}
+            />
+          }
+        >
+          <MinutesPreview
+            ref={minutesPreviewRef}
+            minutes={previewMinutesData}
+            onBackgroundLoad={() => setPreviewReady(true)}
+            zoomMode={previewZoomMode}
+            className="min-h-0 xl:flex-1"
+          />
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => handleMinutesExport("pdf")} disabled={Boolean(exportBlockedReason)} loading={isExportingMinutes}>
+                <Download aria-hidden="true" />
+                Download PDF
+              </Button>
+              <Button type="button" variant="outline" onClick={() => handleMinutesExport("jpeg")} disabled={Boolean(exportBlockedReason) || isExportingMinutes}>
+                Download image (JPEG)
+              </Button>
             </div>
-            <div className="mt-4">
-              <MinutesPreview
-                ref={minutesPreviewRef}
-                minutes={previewMinutesData}
-                onBackgroundLoad={() => setPreviewReady(true)}
-                zoomMode={previewZoomMode}
-                className="min-h-[520px] w-full sm:min-h-[620px] lg:min-h-[720px]"
-              />
-            </div>
-            {minutesExportStatus ? <p className="mt-3 text-xs text-muted-foreground">{minutesExportStatus}</p> : null}
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => handleMinutesExport("pdf")}
-                disabled={!formState.eventId || isExportingMinutes || !previewReady}
-                className="flex-1 rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Download Minutes PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMinutesExport("jpeg")}
-                disabled={!formState.eventId || isExportingMinutes || !previewReady}
-                className="flex-1 rounded-full border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/80 transition hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Download Minutes JPEG
-              </button>
-            </div>
-          </AdminSectionCard>
-        </div>
-      </div>
+            {minutesExportStatus || exportBlockedReason ? (
+              <p role="status" className={cn("text-sm", minutesExportStatus ? "font-medium text-destructive" : "text-muted-foreground")}>
+                {minutesExportStatus?.replace(/^Error: /, "") ?? exportBlockedReason}
+              </p>
+            ) : null}
+          </div>
+        </AdminSectionCard>
+      </aside>
     </div>
+  );
+}
+
+type MinutesVersion = { version: number; approvedAt?: number; contentHash: string };
+
+/** The one approval step that applies now (as on Broadcasts): submit a draft, approve submitted minutes, or reopen approved ones. */
+function MinutesNextStep({
+  status,
+  description,
+  approvalNotes,
+  onApprovalNotesChange,
+  reopenReason,
+  onReopenReasonChange,
+  busy,
+  onAction,
+  error,
+  versions
+}: {
+  status: MinutesStatus;
+  description: string;
+  approvalNotes: string;
+  onApprovalNotesChange: (value: string) => void;
+  reopenReason: string;
+  onReopenReasonChange: (value: string) => void;
+  busy: boolean;
+  onAction: (action: "submit" | "approve" | "returnToDraft") => void;
+  error: string | null;
+  versions: MinutesVersion[];
+}) {
+  return (
+    <AdminSectionCard title="Next step" description={description}>
+      {status === "submitted" ? (
+        <Field label="Approval notes (optional)">
+          <Textarea value={approvalNotes} onChange={e => onApprovalNotesChange(e.target.value)} rows={3} placeholder="Optional context for approvers" />
+        </Field>
+      ) : null}
+      {status === "approved" ? (
+        <Field label="Reason for reopening" description="Reopening takes the minutes off the public page until they are approved again.">
+          <Textarea
+            value={reopenReason}
+            onChange={e => onReopenReasonChange(e.target.value)}
+            rows={2}
+            placeholder="Required. Recorded in the audit log; reopening unpublishes the minutes."
+          />
+        </Field>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {status === "draft" ? (
+          <Button type="button" variant="outline" onClick={() => onAction("submit")} loading={busy}>
+            Submit for approval
+          </Button>
+        ) : null}
+        {status === "submitted" ? (
+          <Button type="button" variant="outline" onClick={() => onAction("approve")} loading={busy}>
+            Approve
+          </Button>
+        ) : null}
+        {status !== "draft" ? (
+          <Button type="button" variant="outline" onClick={() => onAction("returnToDraft")} disabled={busy}>
+            Return to draft
+          </Button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
+      {versions.length ? (
+        <div className="border-t border-border pt-4">
+          <h3 className="text-sm font-medium text-foreground">Approved versions</h3>
+          <ul className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground">
+            {versions.map(v => (
+              <li key={v.version} className="break-words">
+                Version {v.version} · {v.approvedAt ? formatDateTime(v.approvedAt) : "date unknown"} · fingerprint {v.contentHash.slice(0, 12)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </AdminSectionCard>
+  );
+}
+
+/** A text field with a 44 px labelled remove button beside it. */
+function RemovableRow({ children, removeLabel, onRemove }: { children: ReactNode; removeLabel: string; onRemove: () => void }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="min-w-0 flex-1">{children}</div>
+      <RemoveButton label={removeLabel} onRemove={onRemove} />
+    </div>
+  );
+}
+
+function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground hover:text-destructive" aria-label={label} title={label} onClick={onRemove}>
+      <X aria-hidden="true" />
+    </Button>
+  );
+}
+
+function AddButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <Button type="button" variant="outline" className="self-start" onClick={onClick}>
+      <Plus aria-hidden="true" />
+      {children}
+    </Button>
   );
 }
 

@@ -1,17 +1,24 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Network, Users } from "lucide-react";
+import { Network } from "lucide-react";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { EmptyState } from "@/src/components/ui/empty-state";
+import { Select } from "@/src/components/ui/select";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { Steps } from "@/src/components/ui/steps";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
+import { WhatIsThis } from "@/src/components/admin/encryption/WhatIsThis";
 import { useMemberContacts } from "@/src/components/admin/members/useMemberContacts";
 import { countByCaller, moveMember, planAssignments, spread, type Assignment, type AssignmentChange, type TreeMember } from "@/src/lib/callingTree";
+import { formatShortDate } from "@/src/lib/format";
 import { memberCallState } from "@/src/lib/members";
 
 type Candidate = { id: string; name: string; status: "active" | "disabled" };
@@ -51,7 +58,7 @@ const REASON_LABEL: Record<AssignmentChange["reason"], string> = {
 
 export default function CallingTreeClient() {
   return (
-    <EncryptionGate what="The calling tree">
+    <EncryptionGate what="the calling tree">
       <CallingTree />
     </EncryptionGate>
   );
@@ -66,7 +73,7 @@ function CallingTree() {
   const [manual, setManual] = useState<Set<string>>(() => new Set());
   const [changes, setChanges] = useState<AssignmentChange[] | null>(null);
   const [saving, setSaving] = useState(false);
-  const { contacts, ready } = useMemberContacts(members ?? []);
+  const { contacts, ready, e2ee } = useMemberContacts(members ?? []);
 
   const fetchAll = () => Promise.all([api<TreeResponse>("/api/admin/calling-tree"), api<{ members: MemberLite[] }>("/api/organizations/ghmo/members")]);
   const apply = ([tree, list]: [TreeResponse, { members: MemberLite[] }]) => {
@@ -147,7 +154,18 @@ function CallingTree() {
   };
 
   if (error) {
-    return <EmptyState icon={<Network aria-hidden="true" />} title="Could not load the calling tree" description={error} action={<Button onClick={load}>Try again</Button>} />;
+    return (
+      <Alert variant="destructive">
+        <Network />
+        <AlertTitle>Couldn&apos;t load the calling tree</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-2">
+          <span>{error}</span>
+          <Button variant="outline" size="row" onClick={load}>
+            Try again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
   }
   if (!data || !members) {
     return (
@@ -161,68 +179,151 @@ function CallingTree() {
 
   const superAdmin = data.me.superAdmin;
   const activeCandidates = data.candidates.filter(c => c.status === "active");
+  const encryptionOn = e2ee.enabled;
+  const planBlocker =
+    callers.length === 0
+      ? "Tick at least one caller first."
+      : !encryptionOn
+        ? "Turn on encryption first: households and numbers are read from encrypted contacts."
+        : !ready
+          ? "Unlock this device to plan assignments."
+          : awaitingDecrypt
+            ? "Reading contacts on this device. One moment…"
+            : null;
+  const lastSaved = data.tree.updatedAt ? formatShortDate(data.tree.updatedAt) : "";
+  // One status line under the buttons: why Plan is greyed out, or else where the assignments stand.
+  // On day one the checklist already says nobody can be called, so only the reason is shown then.
+  const assignmentStatus =
+    eligibleCount === 0
+      ? null
+      : unassigned.length > 0
+        ? `${unassigned.length} callable ${unassigned.length === 1 ? "person has" : "people have"} no caller yet.`
+        : "Everyone callable has a caller.";
+
+  const setupSteps: { done: boolean; title: string; detail: string; href?: Route; linkLabel?: string }[] = [
+    {
+      done: encryptionOn,
+      title: "Turn on encryption",
+      detail: "Phone numbers are stored with end-to-end encryption, so it has to be on before anyone can add a number.",
+      href: "/admin/encryption",
+      linkLabel: "Open Encryption"
+    },
+    {
+      done: eligibleCount > 0,
+      title: "Add phone numbers and call consent",
+      detail: "On Members, add each person's number and tick that they gave it for community calls.",
+      href: "/admin/members",
+      linkLabel: "Open Members"
+    },
+    { done: callers.length > 0, title: "Choose callers", detail: "Tick the admins who will phone people, in Callers below." },
+    {
+      done: false,
+      title: "Open a campaign",
+      detail: "When there is news to share, open a campaign and each caller gets their list under My calls.",
+      href: "/admin/call-campaigns",
+      linkLabel: "Open Call campaigns"
+    }
+  ];
+  const firstOpen = setupSteps.findIndex(step => !step.done);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {!superAdmin ? (
         <Alert variant="info">
           <Network />
           <AlertTitle>Only a super admin can change the calling tree</AlertTitle>
-          <AlertDescription>You can see the callers and how many people each one has. Your own people are under My Calls.</AlertDescription>
+          <AlertDescription>You can see the callers and how many people each one has. Your own people are under My calls.</AlertDescription>
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users aria-hidden="true" className="size-5" /> Callers
-          </CardTitle>
-          <CardDescription>
-            Board members who phone their assigned people. {eligibleCount} of {members.length} members can be called (active, number on file, consent recorded, no
-            opt-out). Version {data.tree.version}.
-          </CardDescription>
-        </CardHeader>
+      {eligibleCount === 0 ? (
+        <AdminSectionCard title="Get the calling tree ready" description="Nobody can be called yet. Work through these steps in order; each one ticks itself once it is done.">
+          <Steps
+            layout="list"
+            label="Steps to get the calling tree ready"
+            steps={setupSteps.map((step, index) => ({
+              title: step.title,
+              description: step.detail,
+              state: step.done ? "done" : index === firstOpen ? "current" : "todo",
+              action: step.done ? (
+                <Badge variant="success">Done</Badge>
+              ) : step.href && step.linkLabel ? (
+                <Button asChild variant="outline" size="row">
+                  <Link href={step.href}>{step.linkLabel}</Link>
+                </Button>
+              ) : undefined
+            }))}
+          />
+        </AdminSectionCard>
+      ) : null}
+
+      <AdminSectionCard
+        title="Callers"
+        description="Admins who phone their assigned people."
+        actions={<span className="text-sm text-muted-foreground">{lastSaved ? `Last saved ${lastSaved}` : "Not saved yet"}</span>}
+      >
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-lg font-semibold text-foreground tabular-nums">
+              {eligibleCount} of {members.length}
+            </strong>{" "}
+            members can be called.
+          </p>
+          <WhatIsThis question="Why?">
+            Someone can be called when they are an active member, a phone number is on file, their call consent is recorded, and they haven&apos;t asked not to be
+            called.
+          </WhatIsThis>
+        </div>
         <ul className="grid gap-2 sm:grid-cols-2" aria-label="Callers">
           {activeCandidates.map(candidate => {
             const on = callers.includes(candidate.id);
             return (
-              <li key={candidate.id} className="flex items-center justify-between rounded-md border border-border p-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={on} disabled={!superAdmin} onChange={() => toggleCaller(candidate.id)} />
-                  <span>{candidate.name}</span>
+              <li key={candidate.id} className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border px-3">
+                <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 text-sm">
+                  <input type="checkbox" className="size-4 accent-primary" checked={on} disabled={!superAdmin} onChange={() => toggleCaller(candidate.id)} />
+                  <span className="truncate">{candidate.name}</span>
                 </label>
-                {on ? <Badge variant="secondary">{counts[candidate.id] ?? 0} people</Badge> : null}
+                {on ? <Badge variant="secondary">{people(counts[candidate.id] ?? 0)}</Badge> : null}
               </li>
             );
           })}
         </ul>
         {superAdmin ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button onClick={plan} disabled={!ready || awaitingDecrypt || callers.length === 0}>
-              Plan assignments
-            </Button>
-            <Button onClick={save} loading={saving} disabled={!dirty} variant={dirty ? "default" : "outline"}>
-              Save calling tree
-            </Button>
-            {dirty ? (
-              <Button variant="ghost" onClick={load} disabled={saving}>
-                Discard changes
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={plan} disabled={planBlocker !== null} variant={dirty ? "outline" : "default"} className="max-sm:h-11">
+                Plan assignments
               </Button>
+              <Button onClick={save} loading={saving} disabled={!dirty} variant={dirty ? "default" : "outline"} className="max-sm:h-11">
+                Save calling tree
+              </Button>
+              {dirty ? (
+                <Button variant="ghost" onClick={load} disabled={saving} className="max-sm:h-11">
+                  Discard changes
+                </Button>
+              ) : null}
+            </div>
+            {planBlocker || assignmentStatus ? (
+              <p className="text-sm text-muted-foreground" aria-live="polite">
+                {planBlocker ? (
+                  planBlocker
+                ) : (
+                  <>
+                    <span>{assignmentStatus}</span>
+                    {spread(counts) > 1 ? ` Lists differ by ${people(spread(counts))}.` : ""}
+                  </>
+                )}
+              </p>
             ) : null}
-            <span className="text-sm text-muted-foreground">
-              {unassigned.length > 0 ? `${unassigned.length} callable ${unassigned.length === 1 ? "person has" : "people have"} no caller yet.` : "Everyone callable has a caller."}
-              {spread(counts) > 1 ? ` Lists differ by ${spread(counts)}.` : ""}
-            </span>
           </div>
         ) : null}
-      </Card>
+      </AdminSectionCard>
 
       {changes && changes.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Planned changes ({changes.length})</CardTitle>
-            <CardDescription>Nothing is saved until you press Save calling tree. People already assigned stay where they are.</CardDescription>
-          </CardHeader>
+        <AdminSectionCard
+          title={`Planned changes (${changes.length})`}
+          description="Nothing is saved until you press Save calling tree. People already assigned stay where they are."
+        >
           <ul className="max-h-64 space-y-1 overflow-y-auto text-sm" aria-label="Planned changes">
             {changes.map(change => (
               <li key={change.memberId}>
@@ -232,65 +333,62 @@ function CallingTree() {
               </li>
             ))}
           </ul>
-        </Card>
+        </AdminSectionCard>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {callers.map(uid => {
-          const mine = draft.filter(a => a.callerUid === uid).map(a => memberById.get(a.memberId)).filter((m): m is MemberLite => Boolean(m));
-          return (
-            <Card key={uid}>
-              <CardHeader>
-                <CardTitle className="text-base">{nameOf(uid)}</CardTitle>
-                <CardDescription>{mine.length} {mine.length === 1 ? "person" : "people"}</CardDescription>
-              </CardHeader>
-              {mine.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nobody yet.</p>
-              ) : (
-                <ul className="divide-y divide-border text-sm" aria-label={`People assigned to ${nameOf(uid)}`}>
-                  {mine
-                    .sort((a, b) => (a.name || a.emailLower).localeCompare(b.name || b.emailLower))
-                    .map(m => {
-                      const view = contacts.get(m.id);
-                      const household = view?.ok ? view.contact.household : undefined;
-                      return (
-                        <li key={m.id} className="flex items-center justify-between gap-2 py-1.5">
-                          <span className="min-w-0 truncate">
-                            {m.name || m.emailLower}
-                            {household ? <span className="text-muted-foreground"> · {household}</span> : null}
-                            {manual.has(m.id) ? <Badge variant="outline" className="ml-2">moved</Badge> : null}
-                          </span>
-                          {superAdmin && callers.length > 1 ? (
-                            <select
-                              aria-label={`Caller for ${m.name || m.emailLower}`}
-                              className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-                              value={uid}
-                              onChange={e => move(m.id, e.target.value)}
-                            >
-                              {callers.map(c => (
-                                <option key={c} value={c}>
-                                  {nameOf(c)}
-                                </option>
-                              ))}
-                            </select>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                </ul>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-
-      {callers.length === 0 ? (
+      {callers.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {callers.map(uid => {
+            const mine = draft.filter(a => a.callerUid === uid).map(a => memberById.get(a.memberId)).filter((m): m is MemberLite => Boolean(m));
+            return (
+              <AdminSectionCard key={uid} as="h3" title={nameOf(uid)} description={people(mine.length)} className="min-w-0">
+                {mine.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nobody yet. Press Plan assignments to share people out.</p>
+                ) : (
+                  <AdminList bare label={`People assigned to ${nameOf(uid)}`}>
+                    {mine
+                      .sort((a, b) => (a.name || a.emailLower).localeCompare(b.name || b.emailLower))
+                      .map(m => {
+                        const view = contacts.get(m.id);
+                        const household = view?.ok ? view.contact.household : undefined;
+                        return (
+                          <AdminListRow
+                            key={m.id}
+                            title={m.name || m.emailLower}
+                            meta={household || undefined}
+                            badges={manual.has(m.id) ? <Badge variant="outline">Moved</Badge> : null}
+                            actions={
+                              superAdmin && callers.length > 1 ? (
+                                <div className="w-full sm:w-44">
+                                  <Select aria-label={`Caller for ${m.name || m.emailLower}`} className="max-sm:h-11" value={uid} onChange={e => move(m.id, e.target.value)}>
+                                    {callers.map(c => (
+                                      <option key={c} value={c}>
+                                        {nameOf(c)}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </div>
+                              ) : null
+                            }
+                          />
+                        );
+                      })}
+                  </AdminList>
+                )}
+              </AdminSectionCard>
+            );
+          })}
+        </div>
+      ) : eligibleCount > 0 ? (
+        // On day one the checklist above already covers this step.
         <EmptyState
           icon={<Network aria-hidden="true" />}
           title="No callers yet"
-          description={superAdmin ? "Tick the board members who will phone people, then press Plan assignments." : "A super admin chooses the callers."}
+          description={superAdmin ? "Tick the admins who will phone people, then press Plan assignments." : "A super admin chooses the callers."}
         />
       ) : null}
     </div>
   );
 }
+
+const people = (n: number) => `${n} ${n === 1 ? "person" : "people"}`;

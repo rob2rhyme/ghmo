@@ -3,31 +3,40 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_TIMEZONE, type EventRecord } from "@/src/lib/events.shared";
-import {
-  MeetingAttendance,
-  MeetingMinutesRecord,
-  MinutesStatus,
-  minutesStatusLabels,
-  minutesStatusPillClasses
-} from "@/src/lib/minutes";
-import { resolveActorLabel } from "@/src/lib/actor";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import type { Route } from "next";
+import { AlertTriangle, CalendarDays, CalendarPlus, CalendarX, Clock, FileText, MapPin } from "lucide-react";
+import { MessagePage } from "@/src/components/public/MessagePage";
+import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card } from "@/src/components/ui/card";
+import { Skeleton } from "@/src/components/ui/skeleton";
+import { eventFlyerHref, eventsHref as eventsListHref } from "@/src/components/public/events/EventCard";
+import { eventStart, eventWhenLong } from "@/src/components/public/events/eventDates";
+import type { EventRecord } from "@/src/lib/events.shared";
+import type { MeetingMinutesRecord, MinutesStatus } from "@/src/lib/minutes";
+import { statusBadge } from "@/src/lib/statusBadges";
 
+// Shown to admins beside the status badge; visitors only ever see approved minutes.
 const adminStatusDescriptions: Record<MinutesStatus, string> = {
   draft: "Draft minutes are visible to admins only.",
-  submitted: "Submitted minutes await approval before publication.",
-  approved: "Approved minutes are the official record."
+  submitted: "Submitted minutes wait for approval before they are published.",
+  approved: "Approved minutes are the official record and are in the public archive."
 };
-import Link from "next/link";
-import { notFound, useParams, useRouter } from "next/navigation";
 
 export default function EventDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const orgSlug = (params?.orgSlug as string) || "ghmo";
   const eventId = params?.eventId as string;
+  const eventsHref = eventsListHref(orgSlug);
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadState, setLoadState] = useState<"ok" | "unavailable" | "failed">("ok");
+  const [attempt, setAttempt] = useState(0);
+  // "Now" for deciding whether the event is past, taken when it loads (keeps rendering pure).
+  const [loadedAt, setLoadedAt] = useState(0);
   const [meetingMinutes, setMeetingMinutes] = useState<MeetingMinutesRecord | null>(null);
   const [minutesLoading, setMinutesLoading] = useState(true);
   const [adminMinutesAccess, setAdminMinutesAccess] = useState(false);
@@ -36,25 +45,28 @@ export default function EventDetailPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setLoadState("ok");
       try {
         const res = await fetch(`/api/organizations/${orgSlug}/events`, { cache: "no-store" });
         const data = await res.json();
+        if (!res.ok) throw new Error(`Events request failed (${res.status})`);
         const found = (data.events || []).find((e: EventRecord) => e.id === eventId) as EventRecord | undefined;
         if (!found || found.status !== "published") {
-          router.replace("/login");
+          setEvent(null);
+          setLoadState("unavailable");
           return;
         }
         setEvent(found);
+        setLoadedAt(Date.now());
+      } catch (err) {
+        console.error(err);
+        setLoadState("failed");
       } finally {
         setLoading(false);
       }
     };
     if (eventId) void load();
-  }, [eventId, orgSlug, router]);
-
-  if (!event && !loading) {
-    notFound();
-  }
+  }, [eventId, orgSlug, attempt]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -81,7 +93,7 @@ export default function EventDetailPage() {
         }
         setMinutesSource(adminMinutesAccess ? "admin" : "public");
         setMeetingMinutes(record);
-      } catch (err) {
+      } catch {
         if (active) {
           setMeetingMinutes(null);
         }
@@ -112,205 +124,166 @@ export default function EventDetailPage() {
     };
   }, []);
 
-  if (!event) {
-    return <div className="px-4 py-10 text-sm text-muted-foreground">Loading event...</div>;
+  const back = { href: eventsHref, label: "All events" };
+
+  if (loading) {
+    return (
+      <PublicPage width="reading">
+        <div role="status" aria-live="polite" className="flex flex-col gap-6">
+          <span className="sr-only">Loading event…</span>
+          <Skeleton className="h-11 w-32" />
+          <Skeleton className="h-10 w-3/4" />
+          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-5 w-full" />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-11 w-40" />
+            <Skeleton className="h-11 w-40" />
+          </div>
+        </div>
+      </PublicPage>
+    );
   }
 
-  const start = event.startsAt ? new Date(event.startsAt.toDate?.() || event.startsAt) : null;
-  const end = event.endsAt ? new Date(event.endsAt.toDate?.() || event.endsAt) : null;
-  const isPastEvent = start ? start.getTime() < Date.now() : false;
+  if (loadState === "failed") {
+    return (
+      <MessagePage
+        icon={<AlertTriangle />}
+        title="We couldn't load this event"
+        description="Check your internet connection and try again."
+        actions={
+          <>
+            <Button size="lg" onClick={() => setAttempt(n => n + 1)}>
+              Try again
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href={eventsHref}>See all events</Link>
+            </Button>
+          </>
+        }
+      />
+    );
+  }
+
+  if (!event) {
+    return (
+      <MessagePage
+        icon={<CalendarX />}
+        title="This event isn't available"
+        description="It may have been removed, or it hasn't been announced yet."
+        actions={
+          <Button asChild size="lg">
+            <Link href={eventsHref}>See all events</Link>
+          </Button>
+        }
+      />
+    );
+  }
+
+  const start = eventStart(event);
+  const when = eventWhenLong(event);
+  const isPastEvent = start ? start.getTime() < loadedAt : false;
   const isAdminMinutesView = adminMinutesAccess && minutesSource === "admin";
-  const normalizedMeetingAttendance = meetingMinutes
-    ? normalizeEventAttendance(meetingMinutes.attendance)
-    : undefined;
+  const minutesBadge = meetingMinutes ? statusBadge("minutes", meetingMinutes.status) : null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 px-4 py-10">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold">{event.title}</h1>
-          {start ? (
-            <p className="text-sm text-muted-foreground">
-              {start.toLocaleString("en-US", { timeZone: event.timezone || DEFAULT_TIMEZONE })}
-              {end ? ` - ${end.toLocaleString("en-US", { timeZone: event.timezone || DEFAULT_TIMEZONE })}` : ""}
+    <PublicPage width="reading" className="gap-6">
+      <PublicPageHeader back={back} title={<span className="break-words">{event.title}</span>} />
+
+      <Card className="gap-3">
+        <h2 className="sr-only">When and where</h2>
+        {when ? (
+          <>
+            <p className="flex items-start gap-3 text-base">
+              <CalendarDays className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0">{when.date}</span>
             </p>
-          ) : null}
-          {event.location ? <p className="text-sm text-muted-foreground">{event.location}</p> : null}
-        </div>
-        <a
-          href={`/api/calendar/${event.id}`}
-          className="rounded-md border border-border px-3 py-2 text-sm font-semibold text-foreground hover:border-primary"
-        >
-          Add to calendar
-        </a>
-        <Link
-          href={`/api/organizations/${params.orgSlug}/events/${event.id}/announcement.pdf`}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90"
-        >
-          Download Announcement PDF
-        </Link>
+            <p className="flex items-start gap-3 text-base">
+              <Clock className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0">{when.time}</span>
+            </p>
+          </>
+        ) : (
+          <p className="flex items-start gap-3 text-base">
+            <CalendarDays className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span>Date to be announced</span>
+          </p>
+        )}
+        {event.location ? (
+          <p className="flex items-start gap-3 text-base">
+            <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 break-words">{event.location}</span>
+          </p>
+        ) : null}
+      </Card>
+
+      {event.summary ? <p className="text-lg text-foreground/90">{event.summary}</p> : null}
+
+      {event.body?.trim() ? <p className="whitespace-pre-wrap break-words text-base text-foreground">{event.body}</p> : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Button asChild size="lg" className="w-full sm:w-auto">
+          <a href={`/api/calendar/${event.id}`}>
+            <CalendarPlus aria-hidden="true" />
+            Add to calendar
+          </a>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+          <a href={eventFlyerHref(orgSlug, event.id)}>
+            <FileText aria-hidden="true" />
+            Download flyer (PDF)
+          </a>
+        </Button>
       </div>
-      {event.summary ? <p className="text-lg text-foreground/80">{event.summary}</p> : null}
-      <div className="rounded-lg border border-border bg-card p-4 shadow-xs">
-        <p className="whitespace-pre-wrap text-foreground">{event.body}</p>
-      </div>
+
       {isPastEvent ? (
-        <div className="rounded-lg border border-border bg-card p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Meeting Minutes</h2>
-            {!meetingMinutes && !minutesLoading && adminMinutesAccess ? (
-              <Link href={`/admin/minutes?mode=new&eventId=${event.id}`} className="text-sm font-semibold text-primary">
-                Add minutes
-              </Link>
-            ) : null}
+        <Card aria-labelledby="event-minutes-title">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="event-minutes-title" className="text-base font-semibold text-foreground">
+              Meeting minutes
+            </h2>
+            {isAdminMinutesView && minutesBadge ? <Badge variant={minutesBadge.variant}>{minutesBadge.label}</Badge> : null}
           </div>
           {minutesLoading ? (
-            <p className="mt-2 text-sm text-muted-foreground">Loading minutes...</p>
+            <div role="status" aria-live="polite" className="flex flex-col gap-2">
+              <span className="sr-only">Loading minutes…</span>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-11 w-40" />
+            </div>
           ) : meetingMinutes ? (
-            <div className="mt-4 space-y-4 text-sm text-foreground/80">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${minutesStatusPillClasses[meetingMinutes.status]}`}
-                  >
-                    {minutesStatusLabels[meetingMinutes.status]}
-                  </span>
-                </div>
-                {isAdminMinutesView ? (
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>{adminStatusDescriptions[meetingMinutes.status]}</p>
-                    {meetingMinutes.encrypted && meetingMinutes.status !== "approved" ? (
-                      <p>The content of unapproved minutes is encrypted. Open Meeting Minutes to read it.</p>
-                    ) : null}
-                    {meetingMinutes.submittedAt ? (
-                      <p>
-                        Submitted by {resolveActorLabel({ roles: ["admin"] })} •{" "}
-                        {formatTimestamp(meetingMinutes.submittedAt)}
-                      </p>
-                    ) : null}
-                    {meetingMinutes.approvedAt ? (
-                      <p>
-                        Approved by {resolveActorLabel({ roles: ["admin"] })} •{" "}
-                        {formatTimestamp(meetingMinutes.approvedAt)}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : meetingMinutes.status === "approved" ? (
-                  <p className="text-xs text-muted-foreground">Official minutes for this event.</p>
+            <>
+              <p className="text-sm text-muted-foreground">
+                {isAdminMinutesView
+                  ? adminStatusDescriptions[meetingMinutes.status]
+                  : "The board's approved minutes of this meeting are in the public archive."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {meetingMinutes.status === "approved" && meetingMinutes.id ? (
+                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+                    <Link href={`/minutes/${encodeURIComponent(meetingMinutes.id)}` as Route}>
+                      <FileText aria-hidden="true" />
+                      Read the minutes
+                    </Link>
+                  </Button>
+                ) : null}
+                {isAdminMinutesView && meetingMinutes.id ? (
+                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+                    <Link href={`/admin/minutes?minutesId=${encodeURIComponent(meetingMinutes.id)}` as Route}>Open meeting minutes</Link>
+                  </Button>
                 ) : null}
               </div>
-              {meetingMinutes.agenda.length ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Agenda</p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    {meetingMinutes.agenda.map((item, idx) => (
-                      <li key={`agenda-${idx}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {meetingMinutes.discussionSummary ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Discussion summary</p>
-                  <p className="text-sm text-foreground/80">{meetingMinutes.discussionSummary}</p>
-                </div>
-              ) : null}
-              {meetingMinutes.decisions.length ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Decisions</p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    {meetingMinutes.decisions.map((decision, idx) => (
-                      <li key={`decision-${idx}`}>{decision}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {meetingMinutes.actionItems.length ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Action items</p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    {meetingMinutes.actionItems.map((action, idx) => (
-                      <li key={`action-${idx}`}>
-                        {action.task}
-                        {action.assignedTo ? ` — ${action.assignedTo}` : ""}
-                        {action.dueDate ? ` (due ${new Date(action.dueDate).toLocaleDateString()})` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {renderAttendanceBlock(normalizedMeetingAttendance)}
-              {meetingMinutes.signatures && (meetingMinutes.signatures.chairName || meetingMinutes.signatures.secretaryName) ? (
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  {meetingMinutes.signatures.chairName ? (
-                    <p>
-                      <span className="font-semibold text-foreground/80">Chair:</span>{" "}
-                      {meetingMinutes.signatures.chairName}
-                    </p>
-                  ) : null}
-                  {meetingMinutes.signatures.secretaryName ? (
-                    <p>
-                      <span className="font-semibold text-foreground/80">Secretary:</span>{" "}
-                      {meetingMinutes.signatures.secretaryName}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-              {meetingMinutes.approvalNotes ? (
-                <p className="text-xs text-muted-foreground">Approval notes: {meetingMinutes.approvalNotes}</p>
-              ) : null}
-              <p className="text-xs text-muted-foreground">
-                Recorded by {resolveActorLabel(meetingMinutes.recordedBy)} • {formatTimestamp(meetingMinutes.createdAt)}
-              </p>
-            </div>
+            </>
           ) : (
-            <p className="mt-2 text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
+            <>
+              <p className="text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
+              {adminMinutesAccess ? (
+                <Button asChild variant="outline" size="lg" className="w-full sm:w-auto sm:self-start">
+                  <Link href={`/admin/minutes?mode=new&eventId=${encodeURIComponent(event.id)}` as Route}>Add minutes</Link>
+                </Button>
+              ) : null}
+            </>
           )}
-        </div>
+        </Card>
       ) : null}
-    </div>
-  );
-}
-
-function formatTimestamp(value?: number) {
-  return value ? new Date(value).toLocaleString() : "Date unavailable";
-}
-
-function normalizeEventAttendance(value?: MeetingMinutesRecord["attendance"] | string[]): MeetingAttendance | undefined {
-  if (!value) return undefined;
-  if (Array.isArray(value)) {
-    const present = value.map(item => item.trim()).filter(Boolean);
-    return present.length ? { present } : undefined;
-  }
-  const present = (value.present || []).map(item => item.trim()).filter(Boolean);
-  const absent = (value.absent || []).map(item => item.trim()).filter(Boolean);
-  const guests = (value.guests || []).map(item => item.trim()).filter(Boolean);
-  if (!present.length && !absent.length && !guests.length) return undefined;
-  const result: MeetingAttendance = { present };
-  if (absent.length) result.absent = absent;
-  if (guests.length) result.guests = guests;
-  return result;
-}
-
-function renderAttendanceBlock(attendance?: MeetingAttendance) {
-  if (!attendance) return null;
-  return (
-    <div className="space-y-1 text-xs text-muted-foreground">
-      {attendance.present && attendance.present.length ? (
-        <p>
-          <span className="font-semibold text-foreground/80">Present:</span> {attendance.present.join(", ")}
-        </p>
-      ) : null}
-      {attendance.absent && attendance.absent.length ? (
-        <p>
-          <span className="font-semibold text-foreground/80">Absent:</span> {attendance.absent.join(", ")}
-        </p>
-      ) : null}
-      {attendance.guests && attendance.guests.length ? (
-        <p>
-          <span className="font-semibold text-foreground/80">Guests:</span> {attendance.guests.join(", ")}
-        </p>
-      ) : null}
-    </div>
+    </PublicPage>
   );
 }

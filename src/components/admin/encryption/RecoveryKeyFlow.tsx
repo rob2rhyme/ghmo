@@ -8,6 +8,7 @@ import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { normalizeRecoveryKeyInput, pickVerificationGroups } from "@/src/lib/e2ee/recovery";
 import type { PreparedRecovery } from "@/src/lib/e2ee/client/E2eeProvider";
+import { formatShortDate } from "@/src/lib/format";
 
 type Props = {
   prepared: PreparedRecovery;
@@ -46,19 +47,21 @@ export function RecoveryKeyFlow({ prepared, submitLabel, onSubmit }: Props) {
           <ol className="grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-lg tracking-widest sm:grid-cols-4" aria-label="Recovery key groups">
             {groups.map((g, i) => (
               <li key={i} className="flex items-baseline gap-2">
-                <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}</span>
+                <span className="w-5 text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
                 <span>{g}</span>
               </li>
             ))}
           </ol>
-          <p className="mt-3 text-xs text-muted-foreground">Created {new Date().toLocaleDateString()}. Keep in a safe place.</p>
+          <p className="mt-3 text-sm text-muted-foreground">Created {formatShortDate(new Date())}. Keep in a safe place.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="outline" onClick={() => window.print()}>
+        <div className="flex flex-wrap gap-2">
+          <Button size="lg" onClick={() => setStep("verify")}>
+            I have written it down
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => window.print()}>
             <Printer aria-hidden="true" />
             Print
           </Button>
-          <Button onClick={() => setStep("verify")}>I have written it down</Button>
         </div>
       </div>
     );
@@ -76,7 +79,9 @@ export function RecoveryKeyFlow({ prepared, submitLabel, onSubmit }: Props) {
     };
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted-foreground">Type these groups from your paper copy to make sure it is correct.</p>
+        <p className="text-sm text-muted-foreground">
+          To make sure your copy is right, type these groups from your paper copy. Each group is 4 letters or numbers.
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {checkGroups.map((g, i) => (
             <Field key={g} label={`Group ${g + 1}`}>
@@ -91,15 +96,17 @@ export function RecoveryKeyFlow({ prepared, submitLabel, onSubmit }: Props) {
           ))}
         </div>
         {verifyError ? (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm font-medium text-destructive">
             {verifyError}
           </p>
         ) : null}
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => setStep("show")}>
+        <div className="flex flex-wrap gap-2">
+          <Button size="lg" onClick={check}>
+            Check
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => setStep("show")}>
             Back
           </Button>
-          <Button onClick={check}>Check</Button>
         </div>
       </div>
     );
@@ -125,14 +132,15 @@ export function RecoveryKeyFlow({ prepared, submitLabel, onSubmit }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Two different people each keep one paper copy, somewhere safe and separate (for example, two board members).
+        Two different people each keep one paper copy, somewhere safe and separate (for example, two board members). Write their names
+        here so everyone knows who to ask.
       </p>
       {[0, 1].map(i => (
-        <div key={i} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+        <div key={i} className="flex flex-col gap-3 rounded-xl border border-border p-4">
           <Field label={`Trustee ${i + 1}`}>
             <Input value={trustees[i]} maxLength={80} onChange={e => setTrustees(t => t.map((v, j) => (j === i ? e.target.value : v)))} />
           </Field>
-          <label className="flex items-start gap-2 text-sm">
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm sm:min-h-0">
             <input
               type="checkbox"
               className="mt-1 size-4 accent-primary"
@@ -144,16 +152,18 @@ export function RecoveryKeyFlow({ prepared, submitLabel, onSubmit }: Props) {
         </div>
       ))}
       {trustees[0].trim() && trustees[0].trim().toLowerCase() === trustees[1].trim().toLowerCase() ? (
-        <p className="text-sm text-destructive">The two trustees must be different people.</p>
+        <p className="text-sm font-medium text-destructive">The two trustees must be different people.</p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-medium text-destructive">
           {error}
         </p>
       ) : null}
-      <Button onClick={submit} disabled={!ready} loading={busy}>
-        {submitLabel}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button size="lg" onClick={submit} disabled={!ready} loading={busy}>
+          {submitLabel}
+        </Button>
+      </div>
     </div>
   );
 }

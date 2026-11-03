@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useRef, useState, useMemo } from "react";
 import LetterheadPage, { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
 import { MeetingAttendance } from "@/src/lib/minutes";
 import { escapeHtml, formatDate } from "@/src/features/docgen/render/renderTemplateHtml";
+import { cn } from "@/src/lib/utils";
 
 export type MinutesPreviewData = {
   eventTitle?: string;
@@ -31,72 +32,66 @@ type MinutesPreviewProps = {
   zoomMode?: MinutesPreviewZoomMode;
 };
 
-const VIEWER_PADDING = 64;
+/** Before the viewer is measured, show a small page rather than a full-size one. */
+const UNMEASURED_SCALE = 0.4;
 
+/**
+ * The letter page, shrunk to fit its column. The page keeps its real 816 × 1056 px layout (so the
+ * export is exact) and is scaled inside a box sized to the scaled page, so it takes no more room than
+ * it shows and never pushes the layout sideways.
+ */
 const MinutesPreview = forwardRef<HTMLDivElement, MinutesPreviewProps>(
   ({ minutes, onBackgroundLoad, className, zoomMode = "fit" }, ref) => {
     const previewHtml = useMemo(() => buildMinutesHtml(minutes), [minutes]);
     const viewerRef = useRef<HTMLDivElement | null>(null);
-    const [scale, setScale] = useState(1);
     const [containerWidth, setContainerWidth] = useState(0);
 
     useEffect(() => {
-      if (!viewerRef.current) return undefined;
-
-      function handleResize(width: number) {
-        setContainerWidth(width);
-      }
+      const viewer = viewerRef.current;
+      if (!viewer) return undefined;
+      // contentRect excludes the viewer's padding, which is what the page has to fit into.
+      const measure = () => setContainerWidth(viewer.clientWidth - parseFloat(getComputedStyle(viewer).paddingLeft) * 2);
 
       if (typeof ResizeObserver !== "undefined") {
         const observer = new ResizeObserver(entries => {
-          for (const entry of entries) {
-            handleResize(entry.contentRect.width);
-          }
+          for (const entry of entries) setContainerWidth(entry.contentRect.width);
         });
-        observer.observe(viewerRef.current);
-        handleResize(viewerRef.current.getBoundingClientRect().width);
+        observer.observe(viewer);
+        measure();
         return () => observer.disconnect();
       }
 
-      const onWindowResize = () => {
-        const rect = viewerRef.current?.getBoundingClientRect();
-        if (rect) handleResize(rect.width);
-      };
-      window.addEventListener("resize", onWindowResize);
-      onWindowResize();
-      return () => window.removeEventListener("resize", onWindowResize);
+      window.addEventListener("resize", measure);
+      measure();
+      return () => window.removeEventListener("resize", measure);
     }, []);
 
-    useEffect(() => {
-      if (zoomMode === "100") {
-        setScale(1);
-        return;
-      }
-      const normalized = Math.max(0, containerWidth - VIEWER_PADDING);
-      const computedScale = normalized > 0 ? Math.min(1, normalized / LETTER_WIDTH_PX) : 1;
-      setScale(computedScale);
-    }, [containerWidth, zoomMode]);
-
-    const rootClassName = ["w-full overflow-auto", className].filter(Boolean).join(" ");
+    const scale =
+      zoomMode === "100" ? 1 : containerWidth > 0 ? Math.min(1, containerWidth / LETTER_WIDTH_PX) : UNMEASURED_SCALE;
 
     return (
-      <div ref={viewerRef} className={rootClassName} style={{ minHeight: LETTER_HEIGHT_PX * 0.6 }}>
-        <div className="flex min-h-full items-start justify-center">
-          <div className="relative w-full max-w-[360px] px-4 py-4 sm:max-w-[420px] lg:max-w-[520px]">
-            <div className="relative mx-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10">
-              <div className="flex justify-center">
-                <div
-                  style={{
-                    width: LETTER_WIDTH_PX,
-                    height: LETTER_HEIGHT_PX,
-                    transform: `scale(${scale})`,
-                    transformOrigin: "top center"
-                  }}
-                >
-                  <LetterheadPage ref={ref} contentHtml={previewHtml} onBackgroundLoad={onBackgroundLoad} />
-                </div>
-              </div>
-            </div>
+      <div
+        ref={viewerRef}
+        // Scrollable, so keyboard users can focus it and scroll with the arrow keys (WCAG 2.1.1).
+        tabIndex={0}
+        role="region"
+        aria-label="Minutes preview"
+        className={cn(
+          "w-full min-w-0 rounded-xl border border-border bg-muted/50 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          zoomMode === "100" ? "overflow-auto" : "overflow-x-hidden overflow-y-auto",
+          className
+        )}
+      >
+        <div className="mx-auto" style={{ width: LETTER_WIDTH_PX * scale, height: LETTER_HEIGHT_PX * scale }}>
+          <div
+            style={{
+              width: LETTER_WIDTH_PX,
+              height: LETTER_HEIGHT_PX,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left"
+            }}
+          >
+            <LetterheadPage ref={ref} contentHtml={previewHtml} onBackgroundLoad={onBackgroundLoad} />
           </div>
         </div>
       </div>

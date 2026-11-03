@@ -16,7 +16,7 @@ test("a device slipped into the database without a signed entry is refused", asy
 
   // The log covers the workspace and its fingerprint is shown.
   await page.goto("/admin/encryption");
-  await expect(page.getByText("Device list verified")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Device list checked")).toBeVisible({ timeout: 20_000 });
 
   // Someone with database access adds an extra "active" device and a mismatched record.
   const { db } = admin();

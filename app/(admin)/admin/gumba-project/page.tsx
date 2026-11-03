@@ -1,16 +1,28 @@
-//app/(admin)/admin/gumba-project/page.tsx
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { internalFetch } from "@/src/lib/internalFetch";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Route } from "next";
+import { NotebookPen } from "lucide-react";
+import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { EmptyState } from "@/src/components/ui/empty-state";
+import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
+import { percentOf } from "@/src/lib/adminView";
+import { formatDate, formatDateTime, formatShortDate, toDate, type DateInput } from "@/src/lib/format";
 import { MeetingAttendance } from "@/src/lib/minutes";
 import { resolveActorLabel } from "@/src/lib/actor";
+import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
+import { statusBadge } from "@/src/lib/statusBadges";
 
 type MinutesActionItem = {
   task: string;
   assignedTo?: string;
-  dueDate?: string | number | Date | null;
+  dueDate?: DateInput;
 };
 
 export const dynamic = "force-dynamic";
@@ -34,7 +46,7 @@ export default async function GumbaProjectPage() {
     stats: {
       totalRaised?: number;
       goal?: number;
-      lastUpdatedAt?: number | Date | null;
+      lastUpdatedAt?: DateInput;
     };
   };
 
@@ -47,134 +59,123 @@ export default async function GumbaProjectPage() {
 
   const totalRaised = stats?.totalRaised ?? 0;
   const goal = stats?.goal ?? 0;
-  const lastUpdatedAt =
-    stats?.lastUpdatedAt instanceof Date
-      ? stats.lastUpdatedAt.getTime()
-      : typeof stats?.lastUpdatedAt === "number"
-      ? stats.lastUpdatedAt
-      : null;
+  const lastUpdated = formatDateTime(stats?.lastUpdatedAt ?? null, { timeZone: DEFAULT_TIMEZONE });
+  const percent = percentOf(totalRaised, goal);
+  const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const recentMinutes = (Array.isArray(minutes) ? [...minutes] : [])
+    .sort((a, b) => (toDate(b.eventDate)?.getTime() ?? 0) - (toDate(a.eventDate)?.getTime() ?? 0))
+    .slice(0, 3);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="text-2xl font-semibold">GUMBA Project</h1>
-        <p className="text-muted-foreground dark:text-slate-300">
-          Project overview and fundraising progress.
-        </p>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-md bg-primary/10 px-4 py-3">
-            <p className="text-xs uppercase text-muted-foreground">Raised</p>
-            <p className="text-2xl font-bold text-primary">
-              ${totalRaised.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-md bg-highlight/10 px-4 py-3">
-            <p className="text-xs uppercase text-muted-foreground">Goal</p>
-            <p className="text-2xl font-bold text-highlight">
-              ${goal.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-md bg-muted px-4 py-3 dark:bg-slate-800/70">
-            <p className="text-xs uppercase text-muted-foreground">Last updated</p>
-            <p className="text-lg font-semibold text-foreground dark:text-slate-100">
-              {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : "—"}
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="GUMBA project" description="Our fundraising campaign for a Gumba, a shared home for Magar language and culture in Harrisburg." />
 
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Meeting minutes</h2>
-          <Link
-            href="/admin/minutes?mode=records"
-            className="text-sm font-semibold text-primary"
-          >
-            Manage minutes
-          </Link>
-        </div>
-        {Array.isArray(minutes) && minutes.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            No meeting minutes recorded yet.
-          </p>
+      <AdminSectionCard
+        title="Fundraising progress"
+        description={lastUpdated ? `Last update from GoFundMe: ${lastUpdated}` : undefined}
+        actions={
+          <Button asChild variant="outline" size="row">
+            <Link href="/donate">See the Donate page</Link>
+          </Button>
+        }
+      >
+        {percent !== null ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+              <strong className="font-semibold text-foreground tabular-nums">{money(totalRaised)}</strong> of {money(goal)} raised ({percent}%)
+            </p>
+            <ProgressBar value={totalRaised} max={goal} label={`${money(totalRaised)} of ${money(goal)} raised`} />
+            <StatGrid>
+              <StatTile label="Raised" value={money(totalRaised)} />
+              <StatTile label="Goal" value={money(goal)} />
+              <StatTile label="Still to raise" value={money(Math.max(0, goal - totalRaised))} />
+            </StatGrid>
+          </div>
         ) : (
-          <div className="mt-4 space-y-3">
-            {(Array.isArray(minutes) ? [...minutes] : [])
-              .sort(
-                (a, b) => Number(b.eventDate || 0) - Number(a.eventDate || 0)
-              )
-              .slice(0, 3)
-              .map((entry) => {
-                const attendanceSummary = formatAdminAttendance(
-                  entry.attendance
-                );
-                return (
-                  <div
-                    key={entry.id}
-                    className="rounded-md border border-border bg-background px-4 py-3 text-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-foreground">
-                          {entry.eventTitle}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.meetingType} •{" "}
-                          {entry.eventDate
-                            ? new Date(entry.eventDate).toLocaleString()
-                            : "Date unavailable"}
-                        </p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.decisions.length} decision
-                        {entry.decisions.length === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    {entry.decisions.length ? (
-                      <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-foreground/80">
-                        {entry.decisions.map(
-                          (decision: string, idx: number) => (
-                            <li key={`${entry.id}-decision-${idx}`}>
-                              {decision}
-                            </li>
-                          )
-                        )}
+          <div className="flex flex-col gap-3">
+            {totalRaised > 0 ? (
+              <StatGrid>
+                <StatTile label="Raised so far" value={money(totalRaised)} />
+              </StatGrid>
+            ) : null}
+            {/* One "nothing yet" line; the goal can't be set here, so the next step is the Donate page above. */}
+            <p className="text-sm text-muted-foreground">
+              {totalRaised > 0 ? "No goal yet." : "Nothing from GoFundMe yet."} The goal and a progress bar show here once the site receives the campaign&apos;s
+              totals.
+            </p>
+          </div>
+        )}
+      </AdminSectionCard>
+
+      <AdminSectionCard
+        title="Recent meeting minutes"
+        description="The last three meetings, for the decisions and tasks behind the project."
+        actions={
+          <Button asChild variant="ghost" size="row">
+            <Link href="/admin/minutes?mode=records">All minutes</Link>
+          </Button>
+        }
+      >
+        {recentMinutes.length === 0 ? (
+          <EmptyState
+            icon={<NotebookPen aria-hidden="true" />}
+            title="No meeting minutes yet"
+            description="Minutes are written after a meeting under Meeting minutes. The latest three show here."
+            action={
+              <Button asChild variant="outline" size="row">
+                <Link href="/admin/minutes">Write minutes</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <AdminList bare label="Recent meeting minutes">
+            {recentMinutes.map(entry => {
+              const attendanceSummary = formatAdminAttendance(entry.attendance);
+              const decisions: string[] = Array.isArray(entry.decisions) ? entry.decisions : [];
+              const actionItems: MinutesActionItem[] = Array.isArray(entry.actionItems) ? entry.actionItems : [];
+              const when = formatDate(entry.eventDate, { timeZone: DEFAULT_TIMEZONE });
+              const badge = entry.status ? statusBadge("minutes", entry.status) : null;
+              return (
+                <AdminListRow
+                  key={entry.id}
+                  href={`/admin/minutes?minutesId=${encodeURIComponent(entry.id)}` as Route}
+                  title={entry.eventTitle || "Untitled meeting"}
+                  badges={badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+                  meta={[entry.meetingType, when || "Date not recorded", plural(decisions.length, "decision", "decisions")].filter(Boolean).join(" · ")}
+                >
+                  <div className="mt-2 flex flex-col gap-2 text-sm">
+                    {decisions.length ? (
+                      <ul className="list-disc space-y-1 pl-5 text-foreground">
+                        {decisions.map((decision, idx) => (
+                          <li key={`${entry.id}-decision-${idx}`}>{decision}</li>
+                        ))}
                       </ul>
                     ) : null}
-                    {entry.actionItems.length ? (
-                      <div className="mt-2 text-xs text-foreground/80">
-                        <p className="font-semibold text-muted-foreground">
-                          Action items
-                        </p>
+                    {actionItems.length ? (
+                      <div className="text-foreground">
+                        <p className="font-medium text-muted-foreground">Action items</p>
                         <ul className="list-disc space-y-1 pl-5">
-                          {entry.actionItems.map(
-                            (action: MinutesActionItem, idx: number) => (
-                              <li key={`${entry.id}-action-${idx}`}>
-                                {action.task}
-                                {action.assignedTo
-                                  ? ` — ${action.assignedTo}`
-                                  : ""}
-                                {action.dueDate
-                                  ? ` (due ${new Date(
-                                      action.dueDate
-                                    ).toLocaleDateString()})`
-                                  : ""}
-                              </li>
-                            )
-                          )}
+                          {actionItems.map((action, idx) => (
+                            <li key={`${entry.id}-action-${idx}`}>
+                              {[action.task, action.assignedTo, action.dueDate && formatShortDate(action.dueDate) ? `due ${formatShortDate(action.dueDate)}` : ""]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     ) : null}
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Recorded by {resolveActorLabel(entry.recordedBy)}
-                      {attendanceSummary ? ` • ${attendanceSummary}` : ""}
+                    <p className="text-muted-foreground">
+                      {["Recorded by " + resolveActorLabel(entry.recordedBy), attendanceSummary].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                );
-              })}
-          </div>
+                </AdminListRow>
+              );
+            })}
+          </AdminList>
         )}
-      </div>
+      </AdminSectionCard>
     </div>
   );
 }
@@ -218,5 +219,5 @@ function formatAdminAttendance(
   if (normalized.guests && normalized.guests.length) {
     parts.push(`Guests: ${normalized.guests.join(", ")}`);
   }
-  return parts.length ? parts.join(" • ") : null;
+  return parts.length ? parts.join(" · ") : null;
 }

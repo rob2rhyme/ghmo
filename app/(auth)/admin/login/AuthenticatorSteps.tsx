@@ -146,7 +146,7 @@ export function AuthenticatorSetup({ onDone, onError }: { onDone: () => void; on
             them in a password manager, not in your email.
           </AlertDescription>
         </Alert>
-        <ul aria-label="Recovery codes" className="grid grid-cols-2 gap-2 rounded-md border bg-muted p-3 font-mono text-sm">
+        <ul aria-label="Recovery codes" className="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted p-3 font-mono text-sm text-foreground">
           {recoveryCodes.map(c => (
             <li key={c}>{c}</li>
           ))}
@@ -155,8 +155,8 @@ export function AuthenticatorSetup({ onDone, onError }: { onDone: () => void; on
           <Copy aria-hidden="true" />
           Copy codes
         </Button>
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-1" checked={saved} onChange={e => setSaved(e.target.checked)} />I have saved these codes
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-foreground">
+          <input type="checkbox" className="size-5 shrink-0 accent-primary" checked={saved} onChange={e => setSaved(e.target.checked)} />I have saved these codes
         </label>
         <Button size="lg" onClick={onDone} disabled={!saved}>
           Continue
@@ -176,18 +176,19 @@ export function AuthenticatorSetup({ onDone, onError }: { onDone: () => void; on
 
   return (
     <form onSubmit={confirm} className="flex flex-col gap-4">
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+      <ol className="list-decimal space-y-1 pl-5 text-sm text-foreground">
         <li>Install an authenticator app (Google Authenticator, Microsoft Authenticator, Authy or 1Password).</li>
         <li>In the app choose “Add account” and scan this code.</li>
         <li>Type the 6-digit code the app shows.</li>
       </ol>
       <div className="flex flex-col items-center gap-2">
         {qr ? (
+          // A QR code needs a light background to scan, in both themes.
           // eslint-disable-next-line @next/next/no-img-element -- a data: URL made in this browser
-          <img src={qr} width={220} height={220} alt="QR code to add GHMO Admin to your authenticator app" className="rounded-md border bg-white p-1" />
+          <img src={qr} width={220} height={220} alt="QR code to add GHMO Admin to your authenticator app" className="rounded-md border border-border bg-white p-1" />
         ) : null}
         <details className="text-sm">
-          <summary className="cursor-pointer text-muted-foreground">Can&apos;t scan? Type the key instead</summary>
+          <summary className="cursor-pointer py-3 text-muted-foreground">Can&apos;t scan? Type the key instead</summary>
           <p className="mt-2 break-all rounded-md bg-muted p-2 font-mono" data-testid="totp-secret">
             {setup.secret}
           </p>

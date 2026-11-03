@@ -1,12 +1,24 @@
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import BroadcastsClient, { type BroadcastSummary } from "@/src/components/admin/broadcasts/BroadcastsClient";
+import { emailSetupProblem } from "@/src/components/admin/broadcasts/sendingSetup.server";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
+import { loadRecipients } from "@/src/lib/broadcastSender.server";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { internalFetch } from "@/src/lib/internalFetch";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** How many members a broadcast would reach today; null if it can't be counted (the page still works). */
+async function countRecipients(): Promise<number | null> {
+  try {
+    return (await loadRecipients(getAdminDb())).length;
+  } catch {
+    return null;
+  }
+}
 
 export default async function BroadcastsPage() {
   try {
@@ -20,9 +32,9 @@ export default async function BroadcastsPage() {
   const { broadcasts } = (await res.json()) as { broadcasts?: BroadcastSummary[] };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <AdminPageHeader title="Broadcasts" description="Write one announcement, get a second admin to approve it, then email it to members who agreed and copy it into the Messenger group chats." />
-      <BroadcastsClient initial={broadcasts ?? []} />
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader title="Broadcasts" description="Email announcements to members who agreed, and text for the group chats. Two admins check each one." />
+      <BroadcastsClient initial={broadcasts ?? []} recipientCount={await countRecipients()} emailProblem={emailSetupProblem()} />
     </div>
   );
 }

@@ -1,80 +1,101 @@
-//app/(public)/page.tsx
-import Link from "next/link";
 import Image from "next/image";
-import ThemeLogo from "@/src/components/ThemeLogo";
-import MultimediaHomeContent from "@/src/components/Multimedia/MultimediaHomeContent";
+import Link from "next/link";
+import { CalendarDays, HandHeart } from "lucide-react";
+import HomeMultimediaSection from "@/src/components/HomeMultimediaSection";
+import { DonateAction } from "@/src/components/public/DonateAction";
+import { HOME_HERO_IMAGE } from "@/src/components/public/homeHero";
+import { PublicPage, PublicSectionTitle } from "@/src/components/public/PublicPage";
+import { UpcomingEvents } from "@/src/components/public/UpcomingEvents";
+import { Button } from "@/src/components/ui/button";
+import { getDonateUrl } from "@/src/lib/donateLink";
+
+const AKKHA_ALT = "Greater Harrisburg Magar Organization, written in Akkha script";
 
 export default async function CommunityLanding() {
+  const donateUrl = getDonateUrl();
+
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-5xl flex-col items-center justify-center gap-6 px-1 py-12 text-center md:px-6">
-      <div className="inline-flex items-center justify-center">
-        <ThemeLogo />
-      </div>
-      <div className="space-y-3">
-        <p className="text-sm uppercase tracking-wide text-primary/80">
-          Welcome to
-        </p>
-        <h1 className="text-4xl font-bold sm:text-5xl">
-          Greater Harrisburg Magar Organization
-        </h1>
-        <div className="mx-auto max-w-3xl">
+    <PublicPage className="gap-12 md:gap-16">
+      {/* Hero: who we are on the left, a picture on the right from desktop width (stacked on smaller screens). */}
+      <section aria-labelledby="home-title" className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
+        <div className="flex min-w-0 flex-col gap-5">
+          <p className="text-sm font-semibold text-primary">Harrisburg, PA · since 2017</p>
+          <h1 id="home-title" className="text-4xl font-semibold tracking-tight text-balance md:text-5xl">
+            Greater Harrisburg Magar Organization
+          </h1>
+          <div className="w-full max-w-sm">
+            <Image src="/assets/ghmo-akkha.png" alt={AKKHA_ALT} width={1287} height={126} className="h-auto w-full dark:hidden" priority />
+            <Image src="/assets/ghmo-dark-mode.png" alt={AKKHA_ALT} width={1287} height={126} className="hidden h-auto w-full dark:block" priority />
+          </div>
+          <p className="max-w-xl text-lg text-muted-foreground">
+            We are the Magar community of Greater Harrisburg, keeping our language, culture and traditions alive for the next
+            generation.
+          </p>
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <Link href="/c/ghmo/events">
+                <CalendarDays aria-hidden="true" />
+                Upcoming events
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+              <Link href="/donate">
+                <HandHeart aria-hidden="true" />
+                Support the Gumba
+              </Link>
+            </Button>
+          </div>
+        </div>
+        <div className="relative aspect-3/2 min-w-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs">
           <Image
-            src="/assets/ghmo-akkha.png"
-            alt="Greater Harrisburg Magar Organization emblem"
-            width={800}
-            height={320}
-            className="h-auto w-full object-contain"
+            src={HOME_HERO_IMAGE.src}
+            alt={HOME_HERO_IMAGE.alt}
+            fill
             priority
+            sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
+            className="object-cover"
           />
         </div>
-        <p className="max-w-3xl text-lg text-muted-foreground dark:text-slate-200">
-          Secure, member-first hub with magic-link access, hardened admin controls,
-          fundraising, document generation, and multimedia highlights.
+      </section>
+
+      {/* About */}
+      <section aria-labelledby="home-about" className="flex max-w-3xl flex-col gap-3">
+        <PublicSectionTitle id="home-about">About GHMO</PublicSectionTitle>
+        <p className="text-base">
+          Greater Harrisburg Magar Organization (GHMO) was founded in 2017 to serve the growing Magar community in Harrisburg,
+          Pennsylvania. We bring families together for gatherings, festivals and cultural programs.
         </p>
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/donate"
-          className="rounded-md bg-primary px-5 py-3 text-white shadow-xs hover:bg-primary/90"
-        >
-          Donate
-        </Link>
-        <Link
-          href="/docs/onboarding"
-          className="rounded-md border border-border px-5 py-3 text-foreground hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
-        >
-          Onboarding Guide
-        </Link>
-        <Link
-          href="/c/ghmo/events"
-          className="rounded-md border border-border px-5 py-3 text-foreground hover:border-primary/40 dark:border-slate-700 dark:text-slate-100"
-        >
-          Events
-        </Link>
-      </div>
-      <div className="grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-border bg-card p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase text-muted-foreground">Members</p>
-          <p className="mt-1 text-sm text-foreground/80 dark:text-slate-200">
-            Whitelist-only access with email magic links and audit logging.
+        <p className="text-base text-muted-foreground">Our approved meeting minutes are open for everyone to read.</p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+            <Link href="/minutes">Read meeting minutes</Link>
+          </Button>
+        </div>
+      </section>
+
+      <UpcomingEvents limit={3} />
+
+      {/* Gumba Project */}
+      <section
+        aria-labelledby="home-gumba"
+        className="grid gap-5 rounded-xl border border-primary/20 bg-primary/5 p-6 md:p-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-center lg:gap-8"
+      >
+        <div className="flex min-w-0 flex-col gap-2">
+          <PublicSectionTitle id="home-gumba">Help us build the Gumba</PublicSectionTitle>
+          <p className="text-base text-muted-foreground">
+            The Gumba Project will give our community a permanent home in Harrisburg: a place to teach the Magar language, hold
+            Bhajan and cultural programs, and come together. Every contribution, large or small, brings us closer.
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase text-muted-foreground">Admins</p>
-        <p className="mt-1 text-sm text-foreground/80 dark:text-slate-200">
-          Magic-link login, meeting minutes, document tools, and GoFundMe
-          reconciliation.
-        </p>
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start lg:flex-col lg:items-stretch">
+          <DonateAction donateUrl={donateUrl} label="Donate" alternatives={false} />
+          <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+            <Link href="/donate">Read about the Gumba Project</Link>
+          </Button>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase text-muted-foreground">Docs & Guides</p>
-          <p className="mt-1 text-sm text-foreground/80 dark:text-slate-200">
-            Keep operational instructions in the onboarding guide and expand as
-            you grow.
-          </p>
-        </div>
-      </div>
-      <MultimediaHomeContent />
-    </main>
+      </section>
+
+      <HomeMultimediaSection />
+    </PublicPage>
   );
 }

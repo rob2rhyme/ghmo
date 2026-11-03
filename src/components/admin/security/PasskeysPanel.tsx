@@ -1,16 +1,20 @@
 "use client";
 
 import { startRegistration } from "@simplewebauthn/browser";
-import { CheckCircle2, Clock, KeyRound, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { formatDateTime } from "@/src/lib/format";
 
 type PasskeyView = {
   credentialId: string;
@@ -28,8 +32,11 @@ type PendingView = PasskeyView & { ownerUid: string; ownerName: string };
 
 type PasskeysResponse = { uid: string; mine: PasskeyView[]; pendingApprovals: PendingView[] };
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-const formatDate = (iso: string | null) => (iso ? dateFormat.format(new Date(iso)) : "Never");
+const formatDate = (iso: string | null) => (iso ? formatDateTime(iso) || "Never" : "Never");
+
+/** Fired after a passkey is added or removed, so the sign-in summary at the top of the page can refresh. */
+export const PASSKEYS_CHANGED_EVENT = "ghmo:passkeys-changed";
+const announceChange = () => window.dispatchEvent(new Event(PASSKEYS_CHANGED_EVENT));
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -55,6 +62,7 @@ export default function PasskeysPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<{ ownerUid: string; passkey: PasskeyView } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +102,7 @@ export default function PasskeysPanel() {
       setNewName("");
       toast.success("Passkey added");
       await load();
+      announceChange();
     } catch (err) {
       const name = (err as { name?: string })?.name;
       toast.error(name === "NotAllowedError" ? "Passkey prompt was closed. Nothing was added." : err instanceof Error ? err.message : "Could not add passkey");
@@ -103,12 +112,13 @@ export default function PasskeysPanel() {
   };
 
   const remove = async (ownerUid: string, passkey: PasskeyView) => {
-    if (!window.confirm(`Remove “${passkey.name}”? That device will no longer be able to sign in.`)) return;
+    setRemoveTarget(null);
     setBusyId(passkey.credentialId);
     try {
       await api(`/api/admin/passkeys/${ownerUid}/${passkey.credentialId}`, { method: "DELETE" });
       toast.success("Passkey removed");
       await load();
+      announceChange();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not remove passkey");
     } finally {
@@ -133,7 +143,20 @@ export default function PasskeysPanel() {
   };
 
   if (loadError) {
-    return <EmptyState icon={<ShieldAlert />} title="Could not load your passkeys" description={loadError} action={<Button onClick={load}>Try again</Button>} />;
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Couldn&apos;t load your passkeys</AlertTitle>
+        <AlertDescription>
+          <p>{loadError}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" onClick={load}>
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   if (!data) {
@@ -149,78 +172,98 @@ export default function PasskeysPanel() {
   return (
     <div className="flex flex-col gap-6">
       {data.pendingApprovals.length > 0 ? (
-        <Card className="border-warning/50">
-          <CardHeader>
-            <CardTitle>Waiting for your approval</CardTitle>
-            <CardDescription>
-              Another admin added a passkey using an email link. Only approve it if you have confirmed with them (in person or
-              by phone) that they added it.
-            </CardDescription>
-          </CardHeader>
-          <ul className="flex flex-col divide-y divide-border">
+        <AdminSectionCard
+          as="h3"
+          className="border-warning/50"
+          icon={<Clock aria-hidden="true" />}
+          title="Waiting for your approval"
+          description="Another admin added a passkey using an email link. Only approve it if you have confirmed with them (in person or by phone) that they added it."
+        >
+          <AdminList bare label="Passkeys waiting for your approval">
             {data.pendingApprovals.map(p => (
-              <li key={p.credentialId} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium">
-                    {p.ownerName} · {p.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Added {formatDate(p.createdAt)}</p>
-                </div>
-                <Button onClick={() => approve(p)} loading={busyId === p.credentialId}>
-                  Approve
-                </Button>
-              </li>
+              <AdminListRow
+                key={p.credentialId}
+                title={`${p.ownerName} · ${p.name}`}
+                meta={`Added ${formatDate(p.createdAt)}`}
+                actions={
+                  <Button variant="outline" size="row" onClick={() => approve(p)} loading={busyId === p.credentialId}>
+                    Approve
+                  </Button>
+                }
+              />
             ))}
-          </ul>
-        </Card>
+          </AdminList>
+        </AdminSectionCard>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Your passkeys</CardTitle>
-          <CardDescription>Add a passkey on each device you use, so losing one device never locks you out.</CardDescription>
-        </CardHeader>
+      <AdminSectionCard
+        as="h3"
+        icon={<KeyRound aria-hidden="true" />}
+        title="Passkeys"
+        description="Sign in with your fingerprint, face or phone screen lock. Add one on each device you use, so losing one device never locks you out."
+      >
         {data.mine.length === 0 ? (
-          <EmptyState icon={<KeyRound />} title="No passkeys yet" />
+          <EmptyState
+            icon={<KeyRound />}
+            title="No passkeys yet"
+            description="Optional. Name this device below, then choose “Add passkey” and follow your device's prompt."
+          />
         ) : (
-          <ul className="flex flex-col divide-y divide-border">
+          <AdminList bare label="Your passkeys">
             {data.mine.map(p => (
-              <li key={p.credentialId} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{p.name}</p>
+              <AdminListRow
+                key={p.credentialId}
+                title={<span className="break-words">{p.name}</span>}
+                badges={
+                  <>
                     <StatusBadge passkey={p} />
-                    {p.backedUp ? <Badge variant="secondary">Synced</Badge> : null}
-                    {p.prfEnabled ? <Badge variant="outline">Encryption-ready</Badge> : null}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Added {formatDate(p.createdAt)} · Last used {formatDate(p.lastUsedAt)}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => remove(data.uid, p)}
-                  loading={busyId === p.credentialId}
-                  aria-label={`Remove passkey ${p.name}`}
-                >
-                  <Trash2 aria-hidden="true" />
-                  Remove
-                </Button>
-              </li>
+                    {p.backedUp ? <Badge variant="secondary">Saved to your password manager</Badge> : null}
+                    {p.prfEnabled ? <Badge variant="outline">Can unlock encryption</Badge> : null}
+                  </>
+                }
+                meta={`Added ${formatDate(p.createdAt)} · Last used ${formatDate(p.lastUsedAt)}`}
+                actions={
+                  <Button
+                    variant="ghost"
+                    size="row"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setRemoveTarget({ ownerUid: data.uid, passkey: p })}
+                    loading={busyId === p.credentialId}
+                    aria-label={`Remove passkey ${p.name}`}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    Remove
+                  </Button>
+                }
+              />
             ))}
-          </ul>
+          </AdminList>
         )}
-        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end">
-          <Field label="New passkey name" className="flex-1">
+        <div className="flex flex-col gap-3">
+          <Field
+            label="New passkey name"
+            description="So you can tell your devices apart, e.g. “Work laptop” or “Sita’s phone”."
+            className="max-w-md"
+          >
             <Input value={newName} onChange={e => setNewName(e.target.value)} maxLength={60} placeholder="e.g. Work laptop" />
           </Field>
-          <Button onClick={addPasskey} loading={busyId === "new"}>
-            <Plus aria-hidden="true" />
-            Add passkey
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={addPasskey} loading={busyId === "new"}>
+              <Plus aria-hidden="true" />
+              Add passkey
+            </Button>
+          </div>
         </div>
-      </Card>
+        <ConfirmDialog
+          open={removeTarget !== null}
+          onOpenChange={open => (open ? undefined : setRemoveTarget(null))}
+          title={`Remove “${removeTarget?.passkey.name ?? ""}”?`}
+          description="That device will no longer be able to sign in."
+          confirmLabel="Remove passkey"
+          destructive
+          onConfirm={() => (removeTarget ? remove(removeTarget.ownerUid, removeTarget.passkey) : undefined)}
+        />
+      </AdminSectionCard>
     </div>
   );
 }

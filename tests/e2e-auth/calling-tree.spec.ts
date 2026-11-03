@@ -53,8 +53,8 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   await expect(shown(page, "No Consent")).toBeVisible();
 
   // --- Plan the tree with Alice and Bob as callers ---
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling Tree" }).click();
-  await expect(page.locator("#admin-main").getByText(/5 of 6 members can be called .* Version 0\./)).toBeVisible();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling tree" }).click();
+  await expect(page.locator("#admin-main").getByText(/5 of 6 members can be called\./)).toBeVisible();
   const callers = page.getByRole("list", { name: "Callers" });
   await callers.getByLabel("Alice").check();
   await callers.getByLabel("Bob").check();
@@ -104,7 +104,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   const bobsPeople = bob.getByRole("list", { name: "Your call list" }).getByRole("listitem");
   await expect(bobsPeople).toHaveCount(bobCount);
   await expect(bob.locator("#admin-main").getByText(/•••-•••-01\d\d/).first()).toBeVisible();
-  const firstName = (await bobsPeople.first().locator("p").first().textContent())!.trim();
+  const firstName = (await bobsPeople.first().getByRole("button", { name: /^Show .+'s number$/ }).getAttribute("aria-label"))!.replace(/^Show (.+)'s number$/, "$1");
   await bob.getByRole("button", { name: `Show ${firstName}'s number` }).click();
   await expect(bob.getByRole("link", { name: `Call ${firstName}` })).toHaveAttribute("href", /^tel:\+1717555010\d$/);
 
@@ -145,7 +145,7 @@ test("removing a caller moves only that caller's people, and a call opt-out drop
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Members" }).click();
   for (let i = 1; i <= 4; i += 1) await addMember(page, `Person ${i}`, `p${i}@example.org`, `717-555-02${String(i).padStart(2, "0")}`);
 
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling Tree" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling tree" }).click();
   const callers = page.getByRole("list", { name: "Callers" });
   await callers.getByLabel("Alice").check();
   await callers.getByLabel("Bob").check();
@@ -172,10 +172,10 @@ test("removing a caller moves only that caller's people, and a call opt-out drop
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Members" }).click();
   await page.getByRole("button", { name: "They asked not to be called" }).first().click();
   await expect(shown(page, "Asked not to be called")).toBeVisible();
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "My Calls" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "My calls" }).click();
   await expect(page.getByText(/1 left out \(asked not to be called, or no number\)/)).toBeVisible();
   await expect(page.getByRole("list", { name: "Your call list" }).getByRole("listitem")).toHaveCount(3);
-  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling Tree" }).click();
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Calling tree" }).click();
   await page.getByRole("button", { name: "Plan assignments" }).click();
   await expect(page.getByRole("list", { name: "Planned changes" }).getByRole("listitem")).toHaveCount(1);
   await expect(page.getByText("removed (can no longer be called)")).toBeVisible();

@@ -8,7 +8,7 @@ export type NotificationKind = "chat" | "thread" | "minutes_submitted" | "calls"
 export const CLIENT_NOTIFICATION_KINDS = ["chat", "thread"] as const;
 
 const COPY: Record<NotificationKind, { subject: string; line: string; path: string }> = {
-  chat: { subject: "New activity in Admin Chat", line: "There is new activity in Admin Chat.", path: "/admin/chat" },
+  chat: { subject: "New activity in Admin chat", line: "There is new activity in Admin chat.", path: "/admin/chat" },
   thread: { subject: "New activity in Plans & Issues", line: "There is new activity in Plans & Issues.", path: "/admin/comms" },
   minutes_submitted: { subject: "Minutes are waiting for approval", line: "Meeting minutes were submitted and need an approver.", path: "/admin/minutes?mode=records" },
   calls: { subject: "You have calls to make", line: "A call campaign is open and some of your people have not been reached yet.", path: "/admin/my-calls" }

@@ -1,9 +1,16 @@
 import { headers } from "next/headers";
 import type { Metadata } from "next";
+import { Clock, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
+import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { Card } from "@/src/components/ui/card";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { CERTIFICATES_COLLECTION, VERIFICATION_CODE_PATTERN, publicCertificateView, type CertificateRecord } from "@/src/lib/certificates.server";
+import { formatShortDate } from "@/src/lib/format";
+import { getContactEmail } from "@/src/lib/contact";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { getClientIp } from "@/src/lib/security/clientIp";
+import CheckCodeForm from "./CheckCodeForm";
 import VerifyPdf from "./VerifyPdf";
 
 export const dynamic = "force-dynamic";
@@ -21,37 +28,60 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const { code } = await params;
   const result = await lookup(code);
 
+  const contactEmail = getContactEmail();
+
   return (
-    <main className="mx-auto max-w-xl px-4 py-12">
-      <h1 className="text-2xl font-semibold text-foreground">Certificate verification</h1>
+    <PublicPage width="reading" className="gap-6">
+      <PublicPageHeader title="Certificate verification" description="This page checks a GHMO certificate against our records." />
+
       {result === "rate-limited" ? (
-        <p className="mt-4 text-sm text-muted-foreground">Too many checks from this connection. Please try again in a few minutes.</p>
+        <Alert variant="warning">
+          <Clock />
+          <AlertTitle>Too many checks</AlertTitle>
+          <AlertDescription>Too many checks from this connection. Please try again in a few minutes.</AlertDescription>
+        </Alert>
       ) : !result ? (
-        <div role="status" className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
-          <p className="font-semibold text-destructive">No matching certificate</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <Alert variant="destructive" role="status">
+          <ShieldAlert />
+          <AlertTitle>No matching certificate</AlertTitle>
+          <AlertDescription>
             We have no valid record for this code. The certificate may be a forgery, or the code may have been copied incorrectly.
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       ) : (
         <>
-          <div role="status" className={`mt-4 rounded-xl border p-4 ${result.status === "valid" ? "border-success/40 bg-success/10" : "border-destructive/40 bg-destructive/10"}`}>
-            <p className={`font-semibold ${result.status === "valid" ? "text-success" : "text-destructive"}`}>
-              {result.status === "valid" ? "Genuine certificate" : "This certificate has been revoked"}
-            </p>
-            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              <dt className="text-muted-foreground">Certificate number</dt>
-              <dd className="text-foreground">{result.certificateId}</dd>
-              <dt className="text-muted-foreground">Type</dt>
-              <dd className="text-foreground">{result.templateTitle}</dd>
-              <dt className="text-muted-foreground">Issued</dt>
-              <dd className="text-foreground">{new Date(result.issuedAt).toLocaleDateString("en-US", { dateStyle: "long" })}</dd>
-            </dl>
-            <p className="mt-3 text-xs text-muted-foreground">Compare the certificate number and date with the document you were given.</p>
-          </div>
+          <Alert variant={result.status === "valid" ? "success" : "destructive"} role="status">
+            {result.status === "valid" ? <ShieldCheck /> : <ShieldX />}
+            <AlertTitle>{result.status === "valid" ? "Genuine certificate" : "This certificate has been revoked"}</AlertTitle>
+            <AlertDescription className="flex flex-col gap-3">
+              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+                <dt className="text-muted-foreground">Certificate number</dt>
+                <dd className="break-words font-medium text-foreground">{result.certificateId}</dd>
+                <dt className="text-muted-foreground">Type</dt>
+                <dd className="break-words text-foreground">{result.templateTitle}</dd>
+                <dt className="text-muted-foreground">Issued</dt>
+                <dd className="text-foreground">{formatShortDate(result.issuedAt)}</dd>
+              </dl>
+              <p>Compare the certificate number and date with the document you were given.</p>
+            </AlertDescription>
+          </Alert>
           <VerifyPdf expectedSha256={result.pdfSha256} />
         </>
       )}
-    </main>
+
+      <Card>
+        <CheckCodeForm />
+      </Card>
+
+      {contactEmail ? (
+        <p className="text-sm text-muted-foreground">
+          Questions? Email us at{" "}
+          <a href={`mailto:${contactEmail}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+            {contactEmail}
+          </a>
+          .
+        </p>
+      ) : null}
+    </PublicPage>
   );
 }
