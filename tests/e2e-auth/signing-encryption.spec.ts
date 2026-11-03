@@ -20,7 +20,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
 
   // --- Fill a name, then reach the signature step and request a signature ---
   await page.getByRole("button", { name: "Wedding Certificate" }).first().click();
-  await page.getByPlaceholder("GHMO-2024-001").fill("GHMO-2026-001");
+  await page.getByPlaceholder("GHMO-2026-001").fill("GHMO-2026-001");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("textbox").first().fill(GROOM);
   const request = page.getByRole("button", { name: "Request", exact: true }).first();

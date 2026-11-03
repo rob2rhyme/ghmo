@@ -15,16 +15,16 @@ type TemplateTabsProps = {
 
 const CATEGORY_ICONS: Record<string, ReactNode> = {
   Meeting: <Users />,
-  Governance: <Landmark />,
-  Events: <CalendarDays />,
+  Event: <CalendarDays />,
   Religious: <Flower2 />,
   Certificate: <Award />,
+  Notice: <Ribbon />,
   Letter: <Mail />
 };
 
 /** Templates that share a category but should not share an icon. */
 const TEMPLATE_ICONS: Record<string, ReactNode> = {
-  "death-certificate": <Ribbon />
+  board_meeting_invitation: <Landmark />
 };
 
 const iconFor = (tab: DocTemplateMeta) => TEMPLATE_ICONS[tab.id] ?? CATEGORY_ICONS[tab.category] ?? <FileText />;

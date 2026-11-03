@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import type { Route } from "next";
+import type { Metadata, Route } from "next";
 import { AdminAccessError, getAdminProfile, requireActiveAdmin } from "@/src/lib/admin";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -9,6 +9,8 @@ import { getTotpStatus } from "@/src/lib/totpStore";
 import { isDevLoginAllowed } from "@/src/lib/security/devLogin";
 import { safeRedirectPath } from "@/src/lib/security/redirect";
 import AdminLoginClient, { type LoginStage } from "./AdminLoginClient";
+
+export const metadata: Metadata = { title: "Board member sign in · GHMO", robots: { index: false, follow: false } };
 
 type AdminLoginPageProps = {
   searchParams: Promise<{ next?: string | string[] }>;

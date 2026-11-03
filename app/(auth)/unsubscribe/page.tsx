@@ -10,7 +10,7 @@ import { memberIdFromToken } from "@/src/lib/memberSuppression.server";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Unsubscribe", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Unsubscribe from GHMO emails · GHMO", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 /**
  * Opening this page changes nothing (mail scanners open links). The person presses the button, which

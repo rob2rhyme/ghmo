@@ -23,7 +23,7 @@ async function postSwap(item: MigrationItem, enc: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ area: item.area, id: item.id, parentId: item.parentId, updateTime: item.updateTime, enc })
   });
-  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "Request failed");
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "Something went wrong. Try again.");
 }
 
 /**

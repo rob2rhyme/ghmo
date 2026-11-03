@@ -114,6 +114,14 @@ const LOCKED_FIELD_VALUES: Record<string, string> = {
 const LOCKED_FIELD_IDS = new Set([...Object.keys(LOCKED_FIELD_VALUES), "officialSeal"]);
 const FALLBACK_STEP_TITLES = ["Details", "Recipient", "Event", "More details"];
 
+/** A message for a failed API call: the server's own words for a refusal, never for a server fault (5xx). */
+async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
+  if (response.status >= 500) return fallback;
+  const payload = (await response.json().catch(() => ({}))) as { error?: unknown; message?: unknown };
+  const text = typeof payload.error === "string" ? payload.error : typeof payload.message === "string" ? payload.message : "";
+  return text || fallback;
+}
+
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -467,12 +475,7 @@ export default function DocBuilder({
         })
       });
       if (!response.ok) {
-        const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(
-          errorPayload?.error ??
-            errorPayload?.message ??
-            `Unexpected response (${response.status})`
-        );
+        throw new Error(await apiErrorMessage(response, "Couldn't save the document. Try again."));
       }
       await response.json().catch(() => null);
       toast.success("Saved to the document gallery", {
@@ -493,11 +496,11 @@ export default function DocBuilder({
       const response = await fetch("/api/admin/signing-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, certificateId })
+        // The template's name, so the signer's page can say what they are signing.
+        body: JSON.stringify({ role, certificateId, documentTitle: selectedTemplateMeta.title })
       });
       if (!response.ok) {
-        const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(errorPayload?.error ?? `Unexpected response (${response.status})`);
+        throw new Error(await apiErrorMessage(response, "Couldn't make a signature link. Try again."));
       }
       const payload = await response.json();
       const session: SignatureSession = {
@@ -586,8 +589,7 @@ export default function DocBuilder({
         }
       );
       if (!response.ok) {
-        const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(errorPayload?.error ?? `Unexpected response (${response.status})`);
+        throw new Error(await apiErrorMessage(response, "Couldn't save the signed certificate. Try again."));
       }
       const payload = await response.json();
       // The issued PDF is what the verification page checks, so hand it over now.

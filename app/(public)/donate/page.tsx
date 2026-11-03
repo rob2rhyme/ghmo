@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { Info } from "lucide-react";
 import { GoFundMeProDonationEmbed } from "@/src/components/GoFundMeProDonationEmbed";
@@ -7,6 +8,15 @@ import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { getDonateUrl, getDonationEmbedCampaignId } from "@/src/lib/donateLink";
 import { cachedPageData } from "@/src/lib/publicCache.server";
 import { getDonationStats } from "@/src/lib/publicData.server";
+import { pageOpenGraph } from "@/src/lib/siteMetadata";
+
+const DESCRIPTION = "Help build a Gumba for the Magar community in Harrisburg: a home for our language, culture, and community.";
+
+export const metadata: Metadata = {
+  title: "Support the Gumba Project · GHMO",
+  description: DESCRIPTION,
+  openGraph: pageOpenGraph("Support the Gumba Project", DESCRIPTION)
+};
 
 // Built once and refreshed every 5 minutes, or at once when the totals change (see publicCache.server.ts).
 export const revalidate = 300;
@@ -25,7 +35,7 @@ export default async function DonatePage() {
     donorCount = stats.donorCount;
     endAt = stats.endAt ?? null;
   } else {
-    statsWarning = "Donation totals are temporarily unavailable.";
+    statsWarning = "We couldn't load the donation totals right now. Try again in a moment.";
   }
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -68,6 +78,7 @@ export default async function DonatePage() {
             alt="Artwork of the planned GHMO Gumba building, with children in traditional Magar dress outside"
             fill
             priority
+            fetchPriority="high"
             sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
             className="object-cover object-top"
           />
@@ -142,7 +153,11 @@ export default async function DonatePage() {
           Our community needs a common place where we can come together, learn, and grow. Without a shared space, it becomes
           harder to pass on our language, cultural values, and spiritual traditions to our children and younger generations.
         </p>
-        <p className="text-base">The GHMO Gumba Project is our vision to create that shared space:</p>
+        {/* What a Gumba is, in the site's own words: for the board to confirm. */}
+        <p className="text-base">
+          A Gumba is a community and cultural center: a place to teach the Magar language, hold Bhajan and cultural
+          programs, and come together. The GHMO Gumba Project is our vision to create that shared space:
+        </p>
         <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
           <li>A place to teach the Magar language to people of all ages</li>
           <li>A center to preserve and practice Magar culture and traditions</li>
@@ -153,8 +168,8 @@ export default async function DonatePage() {
 
         <h3 className="pt-4 text-lg font-semibold">Our goal</h3>
         <p className="text-base">
-          GHMO is planning a 6-month fundraising campaign to make the Gumba Project a reality. This is a mass donation effort,
-          and every contribution — large or small — brings us closer to our goal. Your gift supports:
+          We are raising the money for the Gumba Project through a community fundraising campaign, open to everyone who
+          wants to help. Every contribution, large or small, brings us closer to our goal. Your gift supports:
         </p>
         <ul className="flex list-disc flex-col gap-2 pl-5 text-base">
           <li>Planning and development of the Gumba space</li>
