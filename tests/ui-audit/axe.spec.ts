@@ -6,11 +6,11 @@ import { clearEmulators, seedAdmin, signInWithNewPasskey } from "../e2e-auth/hel
 
 /**
  * Accessibility check (WCAG 2.2 A/AA rules in axe-core) of the main pages, light and dark, phone and desktop.
- * Writes axe-report.json next to the screenshots. Fails on serious or critical problems when
- * UI_AXE_STRICT=1; otherwise it reports them (plan §13.4).
+ * Writes axe-report.json next to the screenshots and fails on serious or critical problems
+ * (UI_AXE_STRICT=0 reports them without failing; plan §13.4). Clean since 2026-11-03.
  */
 const OUT = process.env.UI_AUDIT_OUT ?? "ui-audit-screens";
-const STRICT = process.env.UI_AXE_STRICT === "1";
+const STRICT = process.env.UI_AXE_STRICT !== "0";
 const ONLY = (process.env.UI_AUDIT_ONLY ?? "").split(",").filter(Boolean);
 const run = ONLY.length === 0 || ONLY.includes("axe");
 

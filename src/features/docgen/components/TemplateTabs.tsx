@@ -71,14 +71,11 @@ export default function TemplateTabs({ tabs, activeTabId, onTabChange }: Templat
       <div role="group" aria-label="Templates" className="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-3">
         {tabs.map(tab => {
           const active = tab.id === activeTabId;
-          const descriptionId = `template-${tab.id}-description`;
           return (
             <button
               key={tab.id}
               type="button"
               aria-pressed={active}
-              aria-label={tab.title}
-              aria-describedby={descriptionId}
               onClick={() => onTabChange(tab.id)}
               className={cn(
                 "flex min-h-11 min-w-0 cursor-pointer items-start gap-3 rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -87,8 +84,11 @@ export default function TemplateTabs({ tabs, activeTabId, onTabChange }: Templat
             >
               <TemplateIcon tab={tab} active={active} />
               <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-sm font-semibold text-foreground">{tab.title}</span>
-                <span id={descriptionId} className="text-sm text-muted-foreground">
+                {/* The button's name is its visible text (title, then description), so speech users can say what they see. */}
+                <span className="text-sm font-semibold text-foreground">
+                  {tab.title}
+                </span>
+                <span className="text-sm text-muted-foreground">
                   {tab.description}
                 </span>
               </span>

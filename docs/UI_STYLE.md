@@ -41,6 +41,8 @@ Follow these for every new or changed page.
 - No raw palette classes (`slate-`, `gray-`, `emerald-`, `rose-`, `amber-` …), no hex colours, no `dark:` patches.
 - Never `text-white` on `bg-primary`: dark mode's teal needs dark text. `Button` already uses `text-primary-foreground`.
 - One accent (teal `primary`). Orange `highlight` only for rare emphasis, never for a plain number.
+- Text tokens meet 4.5:1 on every surface they're used on (cards, the page, muted tracks, tinted notices). Don't put `text-primary` text on tinted backgrounds; use `text-foreground` with a primary icon or underline. `npm run ui:screens` runs an axe check that fails on contrast problems.
+- An element's accessible name contains its visible text: don't add an `aria-label` to a button that already shows words.
 
 ## Type
 

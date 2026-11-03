@@ -6,8 +6,8 @@ import { cn } from "@/src/lib/utils";
 export function WhatIsThis({ question, children, className }: { question: string; children: ReactNode; className?: string }) {
   return (
     <details className={cn("group text-sm", className)}>
-      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
-        <CircleHelp className="size-4 shrink-0" aria-hidden="true" />
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md font-medium text-foreground underline decoration-primary/50 underline-offset-4 outline-none hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
+        <CircleHelp className="size-4 shrink-0 text-primary" aria-hidden="true" />
         {question}
       </summary>
       <p className="mt-1 max-w-prose text-muted-foreground">{children}</p>

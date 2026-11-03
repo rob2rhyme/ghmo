@@ -134,7 +134,7 @@ function JumpButton({ onClick, mac, className }: { onClick: () => void; mac: boo
     <button
       type="button"
       onClick={onClick}
-      aria-label="Jump to a page"
+      aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
       className={cn(
         "flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground shadow-xs transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
         className
@@ -142,7 +142,8 @@ function JumpButton({ onClick, mac, className }: { onClick: () => void; mac: boo
     >
       <Search className="size-4" aria-hidden="true" />
       <span className="flex-1 text-left">Jump to a page…</span>
-      <kbd className="hidden rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-xs font-medium text-muted-foreground sm:inline">
+      {/* The shortcut is announced through aria-keyshortcuts; the visible hint is decoration. */}
+      <kbd aria-hidden="true" className="hidden rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-xs font-medium text-muted-foreground sm:inline">
         {mac ? "⌘ K" : "Ctrl K"}
       </kbd>
     </button>

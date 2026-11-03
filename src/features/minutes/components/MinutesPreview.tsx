@@ -72,8 +72,12 @@ const MinutesPreview = forwardRef<HTMLDivElement, MinutesPreviewProps>(
     return (
       <div
         ref={viewerRef}
+        // Scrollable, so keyboard users can focus it and scroll with the arrow keys (WCAG 2.1.1).
+        tabIndex={0}
+        role="region"
+        aria-label="Minutes preview"
         className={cn(
-          "w-full min-w-0 rounded-xl border border-border bg-muted/50 p-3",
+          "w-full min-w-0 rounded-xl border border-border bg-muted/50 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring",
           zoomMode === "100" ? "overflow-auto" : "overflow-x-hidden overflow-y-auto",
           className
         )}
