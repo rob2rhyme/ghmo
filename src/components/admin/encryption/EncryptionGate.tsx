@@ -43,34 +43,8 @@ export function EncryptionGate({ children, what = "this page", detail }: { child
     );
   }
 
-  if (!enabled) {
-    return (
-      <div className="flex flex-col gap-4">
-        <div
-          role="note"
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
-        >
-          <ShieldOff className="size-4 shrink-0 text-warning" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <span className="font-medium text-foreground">Encryption is off.</span>{" "}
-            <span className="text-muted-foreground">Records on this page aren&apos;t extra-locked yet.</span>
-          </span>
-          {overview?.me.superAdmin ? (
-            <Link href="/admin/encryption" className="inline-flex min-h-9 items-center font-semibold text-foreground underline underline-offset-2">
-              Turn it on
-            </Link>
-          ) : (
-            <span className="text-muted-foreground">A super admin can turn it on.</span>
-          )}
-          <WhatIsThis question="What's this?" className="open:basis-full">
-            {EXPLAIN.endToEnd}
-          </WhatIsThis>
-        </div>
-        {children}
-      </div>
-    );
-  }
-
+  // Before the "encryption is off" branch: a device that pinned the device list and is now told encryption is
+  // off (or gets an empty list) reports an integrity failure, and must not render the page under the strip.
   if (status === "integrity-error") {
     return (
       <Alert variant="destructive">
@@ -84,6 +58,38 @@ export function EncryptionGate({ children, what = "this page", detail }: { child
           </Link>
         </AlertDescription>
       </Alert>
+    );
+  }
+
+  if (!enabled) {
+    return (
+      <div className="flex flex-col gap-4">
+        {/* Phones: the sentence takes the first line and the links drop under it (indented to the text);
+            from sm up it is one row. */}
+        <div
+          role="note"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+        >
+          <span className="flex min-w-0 basis-full items-start gap-2 sm:flex-1 sm:basis-auto sm:items-center">
+            <ShieldOff className="mt-0.5 size-4 shrink-0 text-warning sm:mt-0" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="font-medium text-foreground">Encryption is off.</span>{" "}
+              <span className="text-muted-foreground">Records on this page aren&apos;t extra-locked yet.</span>
+            </span>
+          </span>
+          {overview?.me.superAdmin ? (
+            <Link href="/admin/encryption" className="inline-flex min-h-9 items-center font-semibold text-foreground underline underline-offset-2 max-sm:ml-6">
+              Turn it on
+            </Link>
+          ) : (
+            <span className="text-muted-foreground max-sm:ml-6">A super admin can turn it on.</span>
+          )}
+          <WhatIsThis question="What's this?" className="open:basis-full">
+            {EXPLAIN.endToEnd}
+          </WhatIsThis>
+        </div>
+        {children}
+      </div>
     );
   }
 

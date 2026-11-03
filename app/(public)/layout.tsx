@@ -8,17 +8,15 @@ import { siteMetadata, siteViewport } from "@/src/lib/siteMetadata";
 export const metadata = siteMetadata;
 export const viewport = siteViewport;
 
-// Public root layout. This is the ONLY layout allowed to load third-party scripts.
+// Public root layout. This is the ONLY layout allowed to load third-party scripts (GoFundMe Pro, on /donate).
 export default async function PublicRootLayout({ children }: { children: ReactNode }) {
   const community = await getCommunity();
   return (
     <SiteShell
       scrollToTop
       bodyStart={
-        <GoFundMeProInstallSnippet
-          enabled={community.gofundmePro?.enabled}
-          installSnippet={process.env.NEXT_PUBLIC_GOFUNDME_PRO_INSTALL_SNIPPET}
-        />
+        // Runs on /donate only (the component checks the path); the snippet text comes from the build, not props.
+        <GoFundMeProInstallSnippet enabled={community.gofundmePro?.enabled} />
       }
     >
       {children}

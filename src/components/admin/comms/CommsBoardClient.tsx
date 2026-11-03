@@ -34,6 +34,7 @@ import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
 import { DraftBanner } from "@/src/components/admin/encryption/DraftBanner";
+import { useReportCommsForm } from "@/src/components/admin/comms/NewTopicButton";
 import { THREADS_PATH, threadLoc, unpackThread, type ThreadView } from "@/src/lib/commsRecords";
 import type {
   CommsActorSnapshot,
@@ -198,6 +199,8 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
 
   // The form is shown when asked for, when there is nothing to list yet, or when a draft is waiting.
   const showForm = formOpen || wantsNew || (!loading && !loadError && threads.length === 0) || Boolean(draft.pending);
+  // The header's "New topic" steps aside while this form is on screen (and while the list loads, so it doesn't flash).
+  useReportCommsForm(loading || showForm);
   const closeForm = () => {
     setFormOpen(false);
     if (wantsNew) router.replace(pathname as Route, { scroll: false });

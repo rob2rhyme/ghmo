@@ -220,7 +220,7 @@ export default function BroadcastDetailClient({
       >
         <div className="flex flex-col gap-4">
           <Field label="Subject">
-            <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} placeholder="Dashain celebration on October 12" />
+            <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} placeholder="A short subject line" />
           </Field>
           <Field label="Message">
             <Textarea id="b-body" rows={10} value={body} onChange={e => setBody(e.target.value)} maxLength={BODY_MAX} readOnly={!editable} />

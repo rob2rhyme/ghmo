@@ -60,10 +60,10 @@ export default function BroadcastsClient({
 
       <AdminSectionCard title="New broadcast" description="Plain text. Saving only creates a draft; nothing is sent.">
         <form onSubmit={create} className="flex flex-col gap-4">
-          <Field label="Subject">
-            <Input id="new-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} required placeholder="Dashain celebration on October 12" />
+          <Field label="Subject" description="For example: Dashain celebration on October 12">
+            <Input id="new-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} required placeholder="A short subject line" />
           </Field>
-          <Field label="Message">
+          <Field label="Message" description="For example: Namaste everyone, join us for Dashain on Saturday, October 12, 5 pm at the community hall. Food and tika for all ages. GHMO board">
             <Textarea
               id="new-body"
               rows={8}
@@ -71,7 +71,7 @@ export default function BroadcastsClient({
               onChange={e => setBody(e.target.value)}
               maxLength={BODY_MAX}
               required
-              placeholder={"Namaste everyone,\n\nJoin us for Dashain on Saturday, October 12, 5 pm at the community hall. Food and tika for all ages.\n\nGHMO board"}
+              placeholder="Write the announcement"
             />
           </Field>
           <div className="flex flex-wrap gap-2">

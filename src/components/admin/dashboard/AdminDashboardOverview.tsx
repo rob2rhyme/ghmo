@@ -215,7 +215,8 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
           description="The latest records, newest meeting first."
           actions={
             recentMinutes.length ? (
-              <Button asChild variant="ghost" className="-mr-3 max-sm:hidden">
+              // One link at every width, in the header, so the list stays the card's last child and runs to its edge.
+              <Button asChild variant="ghost" className="-mr-3 max-sm:-ml-3">
                 <Link href="/admin/minutes?mode=records">All minutes</Link>
               </Button>
             ) : null
@@ -229,25 +230,20 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
               </Link>
             </EmptyNote>
           ) : (
-            <>
-              <AdminList bare label="Recent minutes">
-                {recentMinutes.map(entry => {
-                  const badge = statusBadge("minutes", entry.status);
-                  return (
-                    <AdminListRow
-                      key={entry.id}
-                      href={"/admin/minutes?mode=records" as Route}
-                      title={entry.eventTitle}
-                      meta={<span suppressHydrationWarning>{`${entry.meetingType} · ${formatShortDate(entry.eventDate)}`}</span>}
-                      badges={<Badge variant={badge.variant}>{badge.label}</Badge>}
-                    />
-                  );
-                })}
-              </AdminList>
-              <Button asChild variant="ghost" className="-ml-3 w-fit sm:hidden">
-                <Link href="/admin/minutes?mode=records">All minutes</Link>
-              </Button>
-            </>
+            <AdminList bare label="Recent minutes">
+              {recentMinutes.map(entry => {
+                const badge = statusBadge("minutes", entry.status);
+                return (
+                  <AdminListRow
+                    key={entry.id}
+                    href={`/admin/minutes?minutesId=${encodeURIComponent(entry.id)}` as Route}
+                    title={entry.eventTitle}
+                    meta={<span suppressHydrationWarning>{`${entry.meetingType} · ${formatShortDate(entry.eventDate)}`}</span>}
+                    badges={<Badge variant={badge.variant}>{badge.label}</Badge>}
+                  />
+                );
+              })}
+            </AdminList>
           )}
         </AdminSectionCard>
 

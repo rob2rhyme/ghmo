@@ -23,8 +23,6 @@ export type AdminNavItem = {
   href: Route;
   label: string;
   icon: LucideIcon;
-  /** Heavy client pages: skip prefetching. */
-  noPrefetch?: boolean;
   /** Extra words the jump dialog (Ctrl/⌘ K) matches, so "passkey" finds Security. Comma separated. */
   keywords?: string;
 };
@@ -60,8 +58,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     label: "Documents",
     items: [
-      { href: "/admin/document-generator", label: "Document generator", icon: FileSignature, noPrefetch: true, keywords: "letter, certificate, invitation, make a document, print" },
-      { href: "/admin/document-gallery", label: "Document gallery", icon: FolderOpen, noPrefetch: true, keywords: "saved documents, letters, certificates, signatures" }
+      { href: "/admin/document-generator", label: "Document generator", icon: FileSignature, keywords: "letter, certificate, invitation, make a document, print" },
+      { href: "/admin/document-gallery", label: "Document gallery", icon: FolderOpen, keywords: "saved documents, letters, certificates, signatures" }
     ]
   },
   {

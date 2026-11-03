@@ -23,7 +23,7 @@ const isMacClient = () => /mac|iphone|ipad/i.test(navigator.platform);
 
 function Brand() {
   return (
-    <Link href="/admin" className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <Link href="/admin" prefetch={false} className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <span className="flex size-10 items-center justify-center rounded-xl bg-card shadow-xs ring-1 ring-border">
         <Image src="/assets/logo-light.png" alt="" width={32} height={32} className="h-7 w-auto dark:hidden" />
         <Image src="/assets/logo-dark.png" alt="" width={32} height={32} className="hidden h-7 w-auto dark:block" />
@@ -44,7 +44,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
         <div key={group.label} className="flex flex-col gap-px">
           {/* "Overview" holds only the Dashboard, so its heading is left out to save room. */}
           {group.label === "Overview" ? null : (
-            <p className="px-3 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+            <p className="px-3 pb-0.5 text-xs font-semibold text-muted-foreground">{group.label}</p>
           )}
           {group.items.map(item => {
             const active = isActiveNavItem(pathname, item.href);
@@ -53,7 +53,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch={item.noPrefetch ? false : undefined}
+                // Every admin page renders per request behind the session check, so a prefetch costs a full
+                // server render that is rarely used; pages load on click instead.
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 onClick={onNavigate}
                 className={cn(
@@ -117,7 +119,7 @@ function ShellFooter({ user }: { user: AdminShellUser }) {
       <EncryptionStatusBadge />
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild variant="ghost" className="mr-auto px-2 text-muted-foreground">
-          <Link href="/">
+          <Link href="/" prefetch={false}>
             <ExternalLink aria-hidden="true" />
             Public site
           </Link>
@@ -227,7 +229,7 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
             <div className="ml-auto flex items-center gap-2">
               <EncryptionStatusBadge />
               <Button asChild variant="ghost" className="text-muted-foreground">
-                <Link href="/">
+                <Link href="/" prefetch={false}>
                   <ExternalLink aria-hidden="true" />
                   Public site
                 </Link>
