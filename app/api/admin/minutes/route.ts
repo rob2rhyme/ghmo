@@ -257,7 +257,7 @@ export async function GET(req: NextRequest) {
         .get();
       return NextResponse.json({ ok: true, versions: versions.docs.map(d => toPlain(d.data())) });
     }
-    const items = await listAdminMinutes({ eventId: searchParams.get("eventId") });
+    const items = await listAdminMinutes(guard, { eventId: searchParams.get("eventId") });
     return NextResponse.json({ ok: true, minutes: items });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -362,6 +362,7 @@ export async function POST(req: NextRequest) {
 
     // create() refuses an id that already exists, so a client can't overwrite someone else's minutes.
     await newRef.create(document);
+    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
     const createdDoc = newRef;
 
     await logAuditEvent({
@@ -379,7 +380,6 @@ export async function POST(req: NextRequest) {
     });
 
     const savedDoc = await createdDoc.get();
-    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
     return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id: createdDoc.id, ...savedDoc.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -474,6 +474,8 @@ export async function PATCH(req: NextRequest) {
     if ("error" in outcome) {
       return NextResponse.json({ error: outcome.error, ...("code" in outcome && outcome.code ? { code: outcome.code } : {}) }, { status: outcome.status });
     }
+    // Expire right after the write, so a failed audit write can't leave unpublished minutes showing.
+    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
 
     const afterSnap = await ref.get();
     await logAuditEvent({
@@ -494,7 +496,6 @@ export async function PATCH(req: NextRequest) {
 
     // Tell the other opted-in admins there is something to approve (content-free, best effort).
     if (outcome.audit === "minutes_submitted") void notifyAdmins("minutes_submitted", actor.uid, getAppOrigin(req));
-    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
     return NextResponse.json({ ok: true, minutes: toPlain(adminView({ id, ...afterSnap.data() })) });
   } catch (error) {
     if (error instanceof AdminEnvError) {

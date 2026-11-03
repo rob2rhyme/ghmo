@@ -1,4 +1,5 @@
 //app/(admin)/admin/document-gallery/page.tsx
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Route } from "next";
@@ -14,6 +15,10 @@ import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listDocuments } from "@/src/features/docgen/firestore/docRepo";
 import { resolveActorLabel } from "@/src/lib/actor";
+
+/** Tab title: "Document gallery · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Document gallery" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

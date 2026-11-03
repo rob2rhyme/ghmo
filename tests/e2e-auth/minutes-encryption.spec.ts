@@ -87,13 +87,13 @@ test("minutes are ciphertext while draft, approved by a different admin with the
   expect(version).toMatchObject({ version: 1, approvedByUid: "bob", submittedByUid: "alice", contentHash: approved.contentHash });
   expect(approved.contentHash).toBe(approved.submittedHash);
 
-  // The public endpoint serves the published copy and nothing private.
-  const res = await page.request.get("/api/organizations/ghmo/events/ev1/minutes");
-  const body = await res.json();
-  expect(body.minutes).toMatchObject({ status: "approved", discussionSummary: SUMMARY, decisions: [DECISION] });
-  expect(JSON.stringify(body)).not.toContain("approvalEnc");
-  expect(JSON.stringify(body)).not.toContain("survey");
-  expect(body.minutes).not.toHaveProperty("enc");
+  // The public archive serves the published copy and nothing private.
+  const archived = await page.request.get(`/minutes/${draft.id}`);
+  expect(archived.status()).toBe(200);
+  const archivedHtml = await archived.text();
+  expect(archivedHtml).toContain(SUMMARY);
+  expect(archivedHtml).toContain(DECISION);
+  for (const secret of ["survey", "approvalEnc"]) expect(archivedHtml).not.toContain(secret);
 
   // --- Reopening approved minutes needs a reason, unpublishes, and is audited ---
   await page.goto("/admin/minutes?mode=records");
@@ -109,8 +109,8 @@ test("minutes are ciphertext while draft, approved by a different admin with the
   expect(reopened).toMatchObject({ reopenedByUid: "alice", reopenReason: "Vote count needs a correction" });
   expect(reopened).not.toHaveProperty("published");
   expect(reopened).not.toHaveProperty("approvalEnc");
-  const after = await (await page.request.get("/api/organizations/ghmo/events/ev1/minutes")).json();
-  expect(after.minutes).toBeNull();
+  const afterHtml = await (await page.request.get(`/minutes/${draft.id}`)).text();
+  expect(afterHtml).not.toContain(SUMMARY);
   // The earlier approval is still on record.
   expect((await col.doc(draft.id).collection("versions").doc("1").get()).exists).toBe(true);
   const actions = (await db.collection("organizations/ghmo/auditLogs").get()).docs.map(d => d.data().action);

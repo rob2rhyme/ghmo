@@ -1,4 +1,5 @@
 //app/(admin)/admin/events/page.tsx
+import type { Metadata } from "next";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listAdminEvents } from "@/src/lib/adminData.server";
@@ -15,6 +16,10 @@ import { formatDateTime, toDate, type DateInput } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
 import { redirect } from "next/navigation";
 
+/** Tab title: "Events · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Events" };
+
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -28,7 +33,7 @@ export default async function AdminEventsPage() {
     redirect("/admin/login");
   }
 
-  const events = (await listAdminEvents()) as {
+  const events = (await listAdminEvents(await requireActiveAdmin(undefined, COMMUNITY_SLUG))) as {
       id: string;
       title?: string;
       summary?: string;

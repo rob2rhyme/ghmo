@@ -1,12 +1,17 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import CommsBoardClient from "@/src/components/admin/comms/CommsBoardClient";
-import { NewTopicButton } from "@/src/components/admin/comms/NewTopicButton";
+import { CommsFormProvider, NewTopicButton } from "@/src/components/admin/comms/NewTopicButton";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { toPlain } from "@/src/lib/serialize.server";
+
+/** Tab title: "Plans & Issues · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Plans & Issues" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,17 +32,19 @@ export default async function AdminCommsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <AdminPageHeader
-        title="Plans & Issues"
-        description="Topics the admin team needs to discuss and decide. Each one closes with an agreed conclusion."
-        actions={<NewTopicButton />}
-      />
-      <FirebaseAdminAuthBootstrap>
-        <EncryptionGate what="Plans & Issues">
-          <CommsBoardClient actor={toPlain(actorInfo)} />
-        </EncryptionGate>
-      </FirebaseAdminAuthBootstrap>
-    </div>
+    <CommsFormProvider>
+      <div className="flex flex-col gap-6">
+        <AdminPageHeader
+          title="Plans & Issues"
+          description="Topics the admin team needs to discuss and decide. Each one closes with an agreed conclusion."
+          actions={<NewTopicButton />}
+        />
+        <FirebaseAdminAuthBootstrap>
+          <EncryptionGate what="Plans & Issues">
+            <CommsBoardClient actor={toPlain(actorInfo)} />
+          </EncryptionGate>
+        </FirebaseAdminAuthBootstrap>
+      </div>
+    </CommsFormProvider>
   );
 }

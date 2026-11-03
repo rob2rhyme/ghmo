@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import BroadcastsClient, { type BroadcastSummary } from "@/src/components/admin/broadcasts/BroadcastsClient";
@@ -7,6 +8,10 @@ import { loadRecipients } from "@/src/lib/broadcastSender.server";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { listBroadcasts } from "@/src/lib/adminData.server";
+
+/** Tab title: "Broadcasts · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Broadcasts" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,7 +32,7 @@ export default async function BroadcastsPage() {
     if (error instanceof AdminAccessError) redirect("/admin/login?next=/admin/broadcasts");
     throw error;
   }
-  const broadcasts = (await listBroadcasts()) as BroadcastSummary[];
+  const broadcasts = (await listBroadcasts(await requireActiveAdmin(undefined, COMMUNITY_SLUG))) as BroadcastSummary[];
 
   return (
     <div className="flex flex-col gap-6">

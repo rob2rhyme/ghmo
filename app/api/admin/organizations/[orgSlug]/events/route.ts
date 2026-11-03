@@ -140,6 +140,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     };
 
     const ref = await getAdminDb().collection(primaryEventsPath()).add(payload);
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     const doc = await ref.get();
     await logAuditEvent({
       orgSlug: params.orgSlug,
@@ -159,7 +160,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
         route: "/api/admin/organizations/[orgSlug]/events"
       }
     });
-    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     return NextResponse.json({ ok: true, event: normalizeEvent(doc) });
   } catch (error) {
     if (error instanceof AdminEnvError) {

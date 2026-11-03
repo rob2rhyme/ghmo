@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import BroadcastDetailClient, { type BroadcastDetail } from "@/src/components/admin/broadcasts/BroadcastDetailClient";
@@ -7,6 +8,10 @@ import { loadBroadcastDetail } from "@/src/lib/adminData.server";
 import { footerFromEnv } from "@/src/lib/broadcastMail";
 import { emailSetupProblem } from "@/src/components/admin/broadcasts/sendingSetup.server";
 import type { SendProgress } from "@/src/lib/broadcastSender.server";
+
+/** Tab title: "Broadcast · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Broadcast" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,7 +25,7 @@ export default async function BroadcastPage({ params }: { params: Promise<{ broa
     if (error instanceof AdminAccessError) redirect(`/admin/login?next=/admin/broadcasts/${encodeURIComponent(broadcastId)}`);
     throw error;
   }
-  const detail = await loadBroadcastDetail(broadcastId);
+  const detail = await loadBroadcastDetail(await requireActiveAdmin(undefined, COMMUNITY_SLUG), broadcastId);
   if (!detail) notFound();
   const { broadcast, recipientCount, progress, sendingBlocker } = detail as unknown as {
     broadcast: BroadcastDetail;

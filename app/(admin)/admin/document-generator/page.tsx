@@ -1,4 +1,5 @@
 //app/(admin)/admin/document-generator/page.tsx
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FileText, FileX, FolderOpen } from "lucide-react";
@@ -13,6 +14,10 @@ import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate
 import SavedDocBuilder from "@/src/features/docgen/components/SavedDocBuilder";
 import { TEMPLATE_META } from "@/src/features/docgen/templates";
 import { getDocument } from "@/src/features/docgen/firestore/docRepo";
+
+/** Tab title: "Document generator · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Document generator" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

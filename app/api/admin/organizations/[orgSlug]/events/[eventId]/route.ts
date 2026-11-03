@@ -151,6 +151,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
 
     const ref = existing.ref;
     await ref.set(updates, { merge: true });
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     const doc = await ref.get();
     await logAuditEvent({
       orgSlug: params.orgSlug,
@@ -170,7 +171,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
         route: "/api/admin/organizations/[orgSlug]/events/[eventId]"
       }
     });
-    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     return NextResponse.json({ ok: true, event: normalizeEvent(doc) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -203,6 +203,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
     const existing = await findEventDoc(getAdminDb(), params.eventId);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
     await existing.ref.delete();
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     await logAuditEvent({
       orgSlug: params.orgSlug,
       action: "event_deleted",
@@ -216,7 +217,6 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
       resource: { type: "event", id: params.eventId, summary: `Deleted event: ${params.eventId}` },
       meta: { eventId: params.eventId, route: "/api/admin/organizations/[orgSlug]/events/[eventId]" }
     });
-    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AdminEnvError) {

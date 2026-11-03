@@ -31,7 +31,9 @@ export function calendarResponse(events: EventRecord[], origin: string, fileName
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Content-Disposition": `inline; filename="${fileName}"`,
-      "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600"
+      // Calendar apps poll on their own schedule; the CDN keeps a copy for one minute and never serves it stale,
+      // so an unpublished event leaves the feed quickly.
+      "Cache-Control": "public, max-age=300, s-maxage=60"
     }
   });
 }

@@ -1,6 +1,6 @@
 //app/api/organizations/[orgSlug]/events/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { EventsIndexMissingError, ensureOrgSlug, queryEvents } from "@/src/lib/events";
+import { EventsIndexMissingError, ensureOrgSlug, queryEvents, toPublicEvent } from "@/src/lib/events";
 import type { EventRecord } from "@/src/lib/events.shared";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
@@ -9,10 +9,11 @@ import { toPlain } from "@/src/lib/serialize.server";
 export const dynamic = "force-dynamic";
 
 /**
- * The public list (published events) may be served by the CDN for 5 minutes; next.config.mjs leaves this
+ * The public list (published events) may be served by the CDN for one minute. The CDN copy can't be expired
+ * when an admin unpublishes an event, so it is kept short and never served stale. next.config.mjs leaves this
  * path out of its blanket no-store, so the admin variants (status=all/draft/archived) set no-store here.
  */
-const PUBLIC_API_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
+const PUBLIC_API_CACHE_CONTROL = "public, s-maxage=60";
 
 export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
   const params = await context.params;
@@ -70,7 +71,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
 
     // Firestore timestamps become epoch milliseconds; raw Timestamp objects reach the browser as
     // {_seconds, _nanoseconds}, which `new Date()` cannot read ("Invalid Date", and no upcoming events).
-    const response = NextResponse.json({ ok: true, events: filtered.map(evt => toPlain(evt)) });
+    const shaped = authMode === "public" ? filtered.map(toPublicEvent) : filtered;
+    const response = NextResponse.json({ ok: true, events: shaped.map(evt => toPlain(evt)) });
     response.headers.set("Cache-Control", authMode === "public" ? PUBLIC_API_CACHE_CONTROL : "no-store");
     if (process.env.NODE_ENV !== "production") {
       response.headers.set("x-events-auth", authMode);

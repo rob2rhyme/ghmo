@@ -24,6 +24,18 @@ export async function clearEmulators() {
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, {
     method: "DELETE"
   });
+  await expirePublicCache();
+}
+
+/**
+ * Public pages are cached as in production. Tests that write public data (events, minutes, totals) straight to
+ * Firestore call this before visiting a public page, as the app's own admin writes do.
+ */
+export async function expirePublicCache() {
+  const port = Number(process.env.E2E_AUTH_PORT ?? 3300);
+  const res = await fetch(`http://localhost:${port}/api/test/expire-public-cache`).catch(() => null);
+  // Before the server is up (very first reset) there is nothing cached yet.
+  if (res && !res.ok) throw new Error(`Could not expire the public cache (${res.status})`);
 }
 
 /** Session cookie equivalent to having just clicked an emailed magic link. */

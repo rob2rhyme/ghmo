@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     if (!totals) return NextResponse.json({ error: "Missing GoFundMe credentials" }, { status: 400 });
 
     await reconcileDonationTotals(targetCommunityId, totals);
+    expirePublicCache(PUBLIC_CACHE_TAGS.donations);
     await logAuditEvent({
       orgSlug: COMMUNITY_SLUG,
       action: "reconcile",
@@ -41,7 +42,6 @@ export async function POST(req: NextRequest) {
       meta: { route: "/api/gfmpro/reconcile" }
     });
 
-    expirePublicCache(PUBLIC_CACHE_TAGS.donations);
     return NextResponse.json({ ok: true, totals });
   } catch (error) {
     if (error instanceof AdminEnvError) {

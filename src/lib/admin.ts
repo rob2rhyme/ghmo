@@ -139,7 +139,7 @@ export async function requireActiveAdmin(
     adminDocId: profile.id
   };
 
-  return { actor, admin: profile, authMethod: ctx.authMethod };
+  return { actor, admin: profile, authMethod: ctx.authMethod, sessionExpiresAt: ctx.expiresAt };
 }
 
 export async function getAdminProfile(orgSlug: string, adminId: string) {

@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "The site isn't set up to do this yet. Ask the site administrator." },
       { status: 503 }
     );
   }
@@ -113,7 +113,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
       } else {
         const checker = await envelopeChecker(actor.uid);
         if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
-        if (!checker.ok(body.contact.enc)) return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        if (!checker.ok(body.contact.enc)) return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
         updates.contact = body.contact.enc;
         updates.hasPhone = body.contact.hasPhone;
       }
@@ -159,7 +159,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "The site isn't set up to do this yet. Ask the site administrator." },
         { status: 503 }
       );
     }

@@ -3,15 +3,13 @@ import "server-only";
 import { unstable_rethrow } from "next/navigation";
 
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
-import { findEventDoc, normalizeEvent, queryEvents } from "./events";
+import { findEventDoc, normalizeEvent, queryAllEvents, queryEvents, toPublicEvent } from "./events";
 import type { EventRecord } from "./events.shared";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgDonationsStatsDocPath, orgMinutesCollectionPath } from "./firestorePaths";
 import { toPlainJson } from "./json";
 import { getArchiveEntry as readArchiveEntry, listArchive as readArchive } from "./minutesArchive.server";
 import type { ArchiveEntry } from "./minutesArchive";
-import { publicView } from "./minutesRecords";
-import type { MeetingMinutesRecord } from "./minutes";
 import { PUBLIC_CACHE_TAGS, publicCached } from "./publicCache.server";
 import { toPlain } from "./serialize.server";
 
@@ -35,7 +33,23 @@ async function orNull<T>(label: string, read: () => Promise<T>): Promise<T | nul
 // ---- Events ----
 
 const cachedPublishedEvents = publicCached(
-  async (): Promise<EventRecord[]> => (await queryEvents({ status: "published" })).map(event => toPlain(event) as EventRecord),
+  async (): Promise<EventRecord[]> => {
+    // Upcoming and past separately, so neither crowds out the other as the list grows: every upcoming event
+    // (up to 200), and the 100 most recent past ones. Same index as before (status, startsAt).
+    const now = new Date().toISOString();
+    const [upcoming, past, undated] = await Promise.all([
+      queryEvents({ status: "published", rangeStart: now }),
+      queryEvents({ status: "published", rangeEnd: now, last: 100 }),
+      // Events saved without a date ("to be announced"): range filters skip them, so ask for them by name.
+      queryAllEvents(getAdminDb(), q => q.where("status", "==", "published").where("startsAt", "==", null).limit(50)).then(docs =>
+        docs.map(normalizeEvent)
+      )
+    ]);
+    const seen = new Set<string>();
+    return [...past, ...upcoming, ...undated]
+      .filter(event => (seen.has(event.id) ? false : (seen.add(event.id), true)))
+      .map(event => toPlain(toPublicEvent(event)) as EventRecord);
+  },
   "published-events",
   [PUBLIC_CACHE_TAGS.events]
 );
@@ -45,13 +59,15 @@ export function getPublishedEvents(): Promise<EventRecord[] | null> {
   return orNull("published events", cachedPublishedEvents);
 }
 
+/** Firestore document ids as the app creates them; anything else is answered "not found" before any read or cache entry. */
+const EVENT_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
 const cachedPublishedEvent = publicCached(
   async (eventId: string): Promise<EventRecord | null> => {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(eventId)) return null;
     const snap = await findEventDoc(getAdminDb(), eventId);
     if (!snap) return null;
     const event = normalizeEvent(snap);
-    return event.status === "published" ? (toPlain(event) as EventRecord) : null;
+    return event.status === "published" ? (toPlain(toPublicEvent(event)) as EventRecord) : null;
   },
   "published-event",
   [PUBLIC_CACHE_TAGS.events]
@@ -59,6 +75,7 @@ const cachedPublishedEvent = publicCached(
 
 /** One published event: null when it doesn't exist or isn't published, undefined when it can't be read. */
 export async function getPublishedEvent(eventId: string): Promise<EventRecord | null | undefined> {
+  if (!EVENT_ID.test(eventId)) return null;
   try {
     return await cachedPublishedEvent(eventId);
   } catch (error) {
@@ -68,22 +85,31 @@ export async function getPublishedEvent(eventId: string): Promise<EventRecord | 
   }
 }
 
-const cachedApprovedMinutesForEvent = publicCached(
-  async (eventId: string): Promise<MeetingMinutesRecord | null> => {
+const cachedApprovedMinutesId = publicCached(
+  async (eventId: string): Promise<{ id: string } | null> => {
     const snap = await getAdminDb().collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).where("eventId", "==", eventId).limit(1).get();
     if (snap.empty) return null;
     const doc = snap.docs[0];
-    const data = doc.data() as Record<string, unknown>;
-    if (data.status !== "approved") return null;
-    return toPlain(publicView({ id: doc.id, ...data })) as MeetingMinutesRecord;
+    // Only the id is kept: the page links to the public archive, which shows what may be public.
+    return doc.get("status") === "approved" ? { id: doc.id } : null;
   },
-  "event-approved-minutes",
+  "event-approved-minutes-id",
   [PUBLIC_CACHE_TAGS.minutes]
 );
 
-/** The approved minutes of an event, as the public sees them (null when there are none yet). */
-export async function getApprovedMinutesForEvent(eventId: string): Promise<MeetingMinutesRecord | null> {
-  return (await orNull("event minutes", () => cachedApprovedMinutesForEvent(eventId))) ?? null;
+/**
+ * The id of an event's approved minutes: null when there are none yet, undefined when they can't be read
+ * (so a cached page can keep its last good copy instead of dropping the link).
+ */
+export async function getApprovedMinutesForEvent(eventId: string): Promise<{ id: string } | null | undefined> {
+  if (!EVENT_ID.test(eventId)) return null;
+  try {
+    return await cachedApprovedMinutesId(eventId);
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("Public read failed: event minutes", error instanceof Error ? error.message : String(error));
+    return undefined;
+  }
 }
 
 // ---- Donations ----
@@ -129,6 +155,7 @@ export function listArchive(): Promise<ArchiveEntry[] | null> {
 }
 
 /** One approved record for the public archive, or null. */
-export function getArchiveEntry(id: string): Promise<ArchiveEntry | null> {
+export async function getArchiveEntry(id: string): Promise<ArchiveEntry | null> {
+  if (!EVENT_ID.test(id)) return null;
   return cachedArchiveEntry(id);
 }

@@ -19,12 +19,12 @@ function toDate(value: unknown): Date | undefined {
 export async function GET(_: Request, context: { params: Promise<{ sessionId: string }> }) {
   const params = await context.params;
   if (!isValidSigningSessionId(params.sessionId)) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "This signing link isn't valid." }, { status: 404 });
   }
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "Signing isn't available right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -33,7 +33,7 @@ export async function GET(_: Request, context: { params: Promise<{ sessionId: st
     const sessionRef = getAdminDb().collection("signingSessions").doc(params.sessionId);
     const snapshot = await sessionRef.get();
     if (!snapshot.exists) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return NextResponse.json({ error: "This signing link isn't valid." }, { status: 404 });
     }
     const data = snapshot.data() ?? {};
     const expiresAt = toDate(data.expiresAt);
@@ -46,6 +46,7 @@ export async function GET(_: Request, context: { params: Promise<{ sessionId: st
       sessionId: snapshot.id,
       status: data.status ?? "pending",
       role: data.role ?? null,
+      documentTitle: typeof data.documentTitle === "string" ? data.documentTitle : null,
       expiresAt: expiresAt?.toISOString(),
       // When encryption is on, signers encrypt their signature in the browser to this public key.
       seal: data.status === "pending" ? await currentSealingKey() : null
@@ -53,11 +54,11 @@ export async function GET(_: Request, context: { params: Promise<{ sessionId: st
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "Signing isn't available right now. Try again in a few minutes." },
         { status: 503 }
       );
     }
     console.error("Failed to load public signing session", error);
-    return NextResponse.json({ error: "Failed to load session" }, { status: 500 });
+    return NextResponse.json({ error: "Signing isn't available right now. Try again in a few minutes." }, { status: 500 });
   }
 }

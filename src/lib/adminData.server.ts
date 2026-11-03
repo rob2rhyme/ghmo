@@ -17,14 +17,20 @@ import {
 } from "./firestorePaths";
 import { toPlainJson } from "./json";
 import { isMailConfigured } from "./mailer.server";
+import type { AdminActor } from "./admin";
 import { adminView } from "./minutesRecords";
 import { toPlain } from "./serialize.server";
 
 /**
  * Admin reads shared by the API routes (for the browser) and the admin server pages, so a page reads
  * Firestore directly instead of calling its own API: one function run and one session check per view.
- * Callers check the admin session first. Every result is JSON-safe, exactly what the API sends.
+ * Every result is JSON-safe, exactly what the API sends.
+ *
+ * Each read takes the caller's admin check (the result of requireActiveAdmin or enforceActiveAdmin) as its
+ * first argument, so a caller can't forget the check: without it the code doesn't compile. In a server
+ * page, `await requireActiveAdmin()` again is free (memoized per render).
  */
+export type AdminCheck = { actor: AdminActor };
 
 type JsonRecord = Record<string, unknown>;
 
@@ -35,10 +41,14 @@ function asJson<T>(value: T): T {
 
 // ---- Dashboard ----
 
-export async function loadAdminDashboard() {
+export async function loadAdminDashboard(_check: AdminCheck) {
   const db = getAdminDb();
   const warnings: string[] = [];
-  const note = (label: string, err: unknown) => warnings.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
+  // The browser gets only which part failed; the error text stays in the server log.
+  const note = (label: string, err: unknown) => {
+    console.error(`Dashboard read failed: ${label}`, err instanceof Error ? err.message : String(err));
+    warnings.push(label);
+  };
 
   const [stats, webhookEvents, auditLogs, blocks, minutes] = await Promise.all([
     db
@@ -106,14 +116,14 @@ export async function loadAdminDashboard() {
 // ---- Events ----
 
 /** Every event in every status, newest first (the admin Events page). */
-export async function listAdminEvents() {
+export async function listAdminEvents(_check: AdminCheck) {
   const docs = await queryAllEvents(getAdminDb(), q => q.orderBy("startsAt", "desc").limit(200));
   return asJson(toPlainJson(docs.map(normalizeEvent))) as JsonRecord[];
 }
 
 // ---- Members ----
 
-export async function listMembers() {
+export async function listMembers(_check: AdminCheck) {
   const snapshot = await getAdminDb().collection(orgMembersCollectionPath(COMMUNITY_SLUG)).orderBy("emailLower").get();
   return asJson(snapshot.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }))) as JsonRecord[];
 }
@@ -121,7 +131,7 @@ export async function listMembers() {
 // ---- Minutes ----
 
 /** The admin view of minutes records, newest meeting first; `eventId` narrows to one event. */
-export async function listAdminMinutes({ eventId }: { eventId?: string | null } = {}) {
+export async function listAdminMinutes(_check: AdminCheck, { eventId }: { eventId?: string | null } = {}) {
   let query: FirebaseFirestore.Query = getAdminDb().collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
   if (eventId) query = query.where("eventId", "==", eventId);
   const snap = await query.orderBy("eventDate", "desc").limit(100).get();
@@ -130,7 +140,7 @@ export async function listAdminMinutes({ eventId }: { eventId?: string | null } 
 
 // ---- Broadcasts ----
 
-export async function listBroadcasts() {
+export async function listBroadcasts(_check: AdminCheck) {
   const snap = await getAdminDb().collection(orgBroadcastsCollectionPath(COMMUNITY_SLUG)).orderBy("updatedAt", "desc").limit(100).get();
   return asJson(snap.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }))) as JsonRecord[];
 }
@@ -138,7 +148,7 @@ export async function listBroadcasts() {
 const BROADCAST_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** A broadcast document, or null for a bad or unknown id. */
-export async function loadBroadcastDoc(broadcastId: string) {
+export async function loadBroadcastDoc(_check: AdminCheck, broadcastId: string) {
   if (!BROADCAST_ID.test(broadcastId)) return null;
   const ref = getAdminDb().doc(`${orgBroadcastsCollectionPath(COMMUNITY_SLUG)}/${broadcastId}`);
   const snap = await ref.get();
@@ -146,18 +156,18 @@ export async function loadBroadcastDoc(broadcastId: string) {
 }
 
 /** How many members a broadcast would reach now. */
-export async function broadcastRecipientCount(): Promise<number> {
+export async function broadcastRecipientCount(_check: AdminCheck): Promise<number> {
   const snap = await getAdminDb().collection(orgMembersCollectionPath(COMMUNITY_SLUG)).get();
   return selectRecipients(snap.docs.map(doc => doc.data() as Parameters<typeof selectRecipients>[0][number])).length;
 }
 
 /** Everything the broadcast detail page shows, or null when the broadcast doesn't exist. */
-export async function loadBroadcastDetail(broadcastId: string) {
-  const found = await loadBroadcastDoc(broadcastId);
+export async function loadBroadcastDetail(check: AdminCheck, broadcastId: string) {
+  const found = await loadBroadcastDoc(check, broadcastId);
   if (!found) return null;
   const sendingState = found.data.status === "sending" || found.data.status === "sent";
   const [recipientCount, progress] = await Promise.all([
-    broadcastRecipientCount(),
+    broadcastRecipientCount(check),
     sendingState ? broadcastProgress(found.ref) : Promise.resolve(null)
   ]);
   return asJson({

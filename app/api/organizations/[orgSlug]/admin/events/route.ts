@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     if (params.orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const guard = await enforceActiveAdmin(req, params.orgSlug);
     if ("response" in guard) return guard.response;
-    return NextResponse.json({ ok: true, events: await listAdminEvents() });
+    return NextResponse.json({ ok: true, events: await listAdminEvents(guard) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(

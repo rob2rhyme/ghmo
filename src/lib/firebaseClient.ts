@@ -3,7 +3,7 @@
 // Firebase app + Auth only. Firestore lives in ./firebaseFirestore so that pages which only need Auth
 // (sign-in, sign-out) never download the Firestore SDK; public pages import neither at module level.
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import { connectAuthEmulator, getAuth, inMemoryPersistence, initializeAuth, type Auth } from "firebase/auth";
 import { getClientEnv } from "./env.client";
 
 let firebaseInitError: string | null = null;
@@ -17,6 +17,19 @@ export function shouldUseFirebaseEmulators(): boolean {
   // Ignored on any non-localhost origin, so a mis-set flag can never redirect a deployed site's traffic.
   const onLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
   return onLocalhost && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+}
+
+/**
+ * Auth that keeps its sign-in in memory only, so it ends with the tab. The site's sessions are the server's
+ * 8-hour cookie; a sign-in saved in the browser could otherwise keep minting tokens long after that.
+ */
+function memoryOnlyAuth(app: FirebaseApp): Auth {
+  try {
+    return initializeAuth(app, { persistence: inMemoryPersistence });
+  } catch {
+    // Already initialized (for example after a hot reload): reuse it.
+    return getAuth(app);
+  }
 }
 
 function initFirebaseClients() {
@@ -37,7 +50,7 @@ function initFirebaseClients() {
 
   firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   const isFirstInit = !firebaseAuth;
-  firebaseAuth = firebaseAuth ?? getAuth(firebaseApp);
+  firebaseAuth = firebaseAuth ?? memoryOnlyAuth(firebaseApp);
 
   if (isFirstInit && shouldUseFirebaseEmulators()) {
     connectAuthEmulator(firebaseAuth, "http://127.0.0.1:9099", { disableWarnings: true });

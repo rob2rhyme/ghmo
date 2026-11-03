@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     const guard = await enforceActiveAdmin(req, orgSlug);
     if ("response" in guard) return guard.response;
 
-    return NextResponse.json(await loadAdminDashboard());
+    return NextResponse.json(await loadAdminDashboard(guard));
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(

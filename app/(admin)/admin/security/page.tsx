@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import NotificationsPanel from "@/src/components/admin/security/NotificationsPanel";
@@ -5,6 +6,10 @@ import AuthenticatorPanel from "@/src/components/admin/security/AuthenticatorPan
 import PasskeysPanel from "@/src/components/admin/security/PasskeysPanel";
 import { AdminAccessError, isSuperAdmin, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
+
+/** Tab title: "Security · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Security" };
+
 
 export const dynamic = "force-dynamic";
 

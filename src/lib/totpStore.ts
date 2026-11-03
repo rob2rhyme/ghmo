@@ -33,6 +33,8 @@ type StoredTotp = {
   lastStep: number;
   /** SHA-256 hashes of the unused recovery codes. */
   recovery: string[];
+  /** Set after too many wrong codes in a day; sign-in with codes stays refused until a super admin resets it. */
+  lockedAt?: unknown;
 };
 
 const totpRef = (uid: string) => getAdminDb().doc(`${orgAdminDocPath(COMMUNITY_SLUG, uid)}/totp/main`);
@@ -98,7 +100,7 @@ export async function confirmTotpEnrollment(uid: string, code: string, now = Dat
   });
 }
 
-export type TotpLoginResult = { ok: true; method: "totp" | "recovery"; recoveryCodesLeft: number } | { ok: false };
+export type TotpLoginResult = { ok: true; method: "totp" | "recovery"; recoveryCodesLeft: number } | { ok: false; locked?: true };
 
 /** Checks an authenticator code, or a recovery code. A code works once. */
 export async function verifyTotpLogin(uid: string, input: string, now = Date.now()): Promise<TotpLoginResult> {
@@ -106,6 +108,7 @@ export async function verifyTotpLogin(uid: string, input: string, now = Date.now
     const snap = await tx.get(totpRef(uid));
     const data = snap.exists ? (snap.data() as StoredTotp) : null;
     if (!data || data.status !== "active") return { ok: false };
+    if (data.lockedAt) return { ok: false, locked: true };
 
     const secret = decryptTotpSecret(data.secret, serverEncryptionKeys(), uid);
     const step = verifyTotp(secret, input, now, data.lastStep);
@@ -122,6 +125,11 @@ export async function verifyTotpLogin(uid: string, input: string, now = Date.now
     }
     return { ok: false };
   });
+}
+
+/** Locks code sign-in for this admin (too many wrong codes). A super admin's reset removes the record and the lock. */
+export async function lockTotp(uid: string): Promise<void> {
+  await totpRef(uid).update({ lockedAt: FieldValue.serverTimestamp() });
 }
 
 /** Replaces the recovery codes (the old ones stop working). */

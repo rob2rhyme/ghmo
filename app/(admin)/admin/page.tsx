@@ -1,10 +1,15 @@
 //app/(admin)/admin/page.tsx
+import type { Metadata } from "next";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG, getCommunity } from "@/src/lib/community";
 import { redirect } from "next/navigation";
 import AdminDashboardOverview from "@/src/components/admin/dashboard/AdminDashboardOverview";
 import { loadAdminDashboard } from "@/src/lib/adminData.server";
 import { toPlain } from "@/src/lib/serialize.server";
+
+/** Tab title: "Dashboard · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Dashboard" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,7 +32,7 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const { stats, webhookEvents, auditLogs, blocks, minutes } = await loadAdminDashboard();
+  const { stats, webhookEvents, auditLogs, blocks, minutes } = await loadAdminDashboard(await requireActiveAdmin(undefined, COMMUNITY_SLUG));
 
   if (process.env.NODE_ENV !== "production") {
     const payload = {

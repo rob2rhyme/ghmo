@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { base32Decode, totpCode } from "../../src/lib/totp";
 import { admin, clearEmulators, magicLinkSession, seedAdmin, setSession, signInWithNewPasskey, turnOnEncryption } from "./helpers";
@@ -126,6 +127,34 @@ test("an email link alone cannot add a passkey to an admin who uses an authentic
   expect(((await options.json()) as { code?: string }).code).toBe("TOTP_REQUIRED");
   const passkeys = await admin().db.collection("organizations/ghmo/admins/bob/passkeys").get();
   expect(passkeys.empty).toBe(true);
+  await inbox.close();
+});
+
+test("twenty wrong codes in a day lock the authenticator until a super admin resets it", async ({ browser }) => {
+  const bobContext = await browser.newContext();
+  await setSession(bobContext, await magicLinkSession("bob"));
+  const begun = (await (await bobContext.request.post("/api/auth/totp/setup", { data: {} })).json()) as { secret: string };
+  const secret = secretBytes(begun.secret);
+  expect((await bobContext.request.post("/api/auth/totp/confirm", { data: { code: totpCode(secret, Date.now()) } })).status()).toBe(200);
+
+  // Someone with Bob's inbox has already spent 20 wrong codes today (the 10-minute limit only slows them down).
+  const { db } = admin();
+  const key = createHash("sha256").update("totp-fail-day:bob", "utf8").digest("hex");
+  await db.doc(`organizations/ghmo/rateLimits/${key}`).set({ count: 20, resetAt: Date.now() + 3_600_000, expiresAt: new Date(Date.now() + 3_600_000) });
+
+  const inbox = await browser.newContext();
+  await setSession(inbox, await magicLinkSession("bob"));
+  const wrong = await inbox.request.post("/api/auth/totp/verify", { data: { code: "000000" } });
+  expect(wrong.status()).toBe(423);
+  expect(((await wrong.json()) as { code?: string }).code).toBe("TOTP_LOCKED");
+
+  // Now even the right code is refused, and the lock is recorded.
+  const right = await inbox.request.post("/api/auth/totp/verify", { data: { code: totpCode(secret, Date.now() + 30_000) } });
+  expect(right.status()).toBe(423);
+  expect((await db.doc("organizations/ghmo/admins/bob/totp/main").get()).get("lockedAt")).toBeTruthy();
+  const audit = await db.collection("organizations/ghmo/auditLogs").where("action", "==", "totp_locked").get();
+  expect(audit.size).toBe(1);
+  await bobContext.close();
   await inbox.close();
 });
 

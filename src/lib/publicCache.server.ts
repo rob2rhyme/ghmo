@@ -1,7 +1,7 @@
 import "server-only";
 
 import { revalidateTag, unstable_cache } from "next/cache";
-import { connection } from "next/server";
+import { getAdminEnvStatus } from "./env.server";
 
 /**
  * How long public pages and their data may be served from the cache before they are rebuilt in the
@@ -20,31 +20,16 @@ export const PUBLIC_CACHE_TAGS = {
 export type PublicCacheTag = (typeof PUBLIC_CACHE_TAGS)[keyof typeof PUBLIC_CACHE_TAGS];
 
 /**
- * Against the Firebase emulators (the browser test suites) nothing is cached: tests write to Firestore
- * directly between steps, and a cached page would show the previous test's data.
- */
-function publicCachingOff(): boolean {
-  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
-}
-
-/**
- * Wraps a public read in the shared data cache, keyed by `key` and the call's arguments. A read that
- * throws is not cached. With caching off it runs on every request, and `connection()` keeps the page
- * that called it from being built once and frozen.
+ * Wraps a public read in the shared data cache, keyed by `key` and the call's arguments. A read that throws is
+ * not cached. The browser test suites use the same cache as production; they expire it whenever they reset the
+ * emulators (app/api/test/expire-public-cache, which exists only in emulator builds).
  */
 export function publicCached<A extends unknown[], R>(
   read: (...args: A) => Promise<R>,
   key: string,
   tags: PublicCacheTag[]
 ): (...args: A) => Promise<R> {
-  const cached = unstable_cache(read, [key], { revalidate: PUBLIC_CACHE_SECONDS, tags });
-  return async (...args: A) => {
-    if (publicCachingOff()) {
-      await connection();
-      return read(...args);
-    }
-    return cached(...args);
-  };
+  return unstable_cache(read, [key], { revalidate: PUBLIC_CACHE_SECONDS, tags });
 }
 
 /** Expires cached public data at once, after an admin change to it. Safe to call when nothing is cached. */
@@ -65,12 +50,13 @@ export function isBuildingPages(): boolean {
 }
 
 /**
- * For pages served from the cache. At request time a failed read throws, so Next keeps serving the last
- * good copy of the page (and retries on the next visit) instead of caching an error message for minutes.
- * While the build prerenders, it returns null so the build still finishes; the page then shows its
- * "can't be read" state until its first refresh.
+ * For pages served from the cache. A failed read throws, so a page is never published with an error message
+ * in it: at request time Next keeps serving the last good copy (and retries on the next visit), and a deploy
+ * whose build can't read the data fails instead of going live. The one exception is a build with no Firebase
+ * settings at all (CI, which never deploys): there the page is built with its "can't be read" state.
  */
 export function cachedPageData<T>(value: T | null, what: string): T | null {
-  if (value !== null || isBuildingPages()) return value;
+  if (value !== null) return value;
+  if (isBuildingPages() && !getAdminEnvStatus().ok) return null;
   throw new Error(`${what} could not be read`);
 }

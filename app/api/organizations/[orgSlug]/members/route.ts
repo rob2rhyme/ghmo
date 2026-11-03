@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "The site isn't set up to do this yet. Ask the site administrator." },
       { status: 503 }
     );
   }
@@ -41,11 +41,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     const guard = await enforceActiveAdmin(req, params.orgSlug);
     if ("response" in guard) return guard.response;
 
-    return NextResponse.json({ members: await listMembers() });
+    return NextResponse.json({ members: await listMembers(guard) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "The site isn't set up to do this yet. Ask the site administrator." },
         { status: 503 }
       );
     }
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "The site isn't set up to do this yet. Ask the site administrator." },
       { status: 503 }
     );
   }
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     if (body.contact) {
       const checker = await envelopeChecker(actor.uid);
       if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
-      if (!checker.ok(body.contact.enc)) return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+      if (!checker.ok(body.contact.enc)) return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       payload.contact = body.contact.enc;
       payload.hasPhone = body.contact.hasPhone;
     }
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "The site isn't set up to do this yet. Ask the site administrator." },
         { status: 503 }
       );
     }

@@ -13,13 +13,11 @@ import { broadcastRecipientCount, loadBroadcastDetail, loadBroadcastDoc } from "
 export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/admin/broadcasts/[broadcastId]";
-const load = loadBroadcastDoc;
-const recipientCount = broadcastRecipientCount;
 
 export async function GET(req: NextRequest, context: { params: Promise<{ broadcastId: string }> }) {
   const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
   if ("response" in guard) return guard.response;
-  const detail = await loadBroadcastDetail((await context.params).broadcastId);
+  const detail = await loadBroadcastDetail(guard, (await context.params).broadcastId);
   if (!detail) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
   return NextResponse.json(detail);
 }
@@ -35,7 +33,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ broad
   if ("response" in guard) return guard.response;
   const { actor, admin } = guard;
 
-  const found = await load((await context.params).broadcastId);
+  const found = await loadBroadcastDoc(guard, (await context.params).broadcastId);
   if (!found) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
   const parsed = await parseJsonBody(req, patchSchema, { maxBytes: 200 * 1024 });
   if (!parsed.ok) return parsed.response;
@@ -80,5 +78,5 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ broad
     after: { status: after.status, contentHash: after.contentHash },
     meta: { ip: getClientIp(req.headers), userAgent: req.headers.get("user-agent") ?? null, route: ROUTE }
   });
-  return NextResponse.json({ ok: true, broadcast: toPlain({ id: found.ref.id, ...after }), recipientCount: await recipientCount() });
+  return NextResponse.json({ ok: true, broadcast: toPlain({ id: found.ref.id, ...after }), recipientCount: await broadcastRecipientCount(guard) });
 }

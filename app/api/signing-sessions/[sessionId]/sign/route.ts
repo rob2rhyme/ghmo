@@ -38,12 +38,12 @@ function toDate(value: unknown): Date | undefined {
 export async function POST(req: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await context.params;
   if (!isValidSigningSessionId(sessionId)) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "This signing link isn't valid." }, { status: 404 });
   }
 
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json({ error: "Signing is temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "Signing isn't available right now. Try again in a few minutes." }, { status: 503 });
   }
 
   const ipLimit = await checkRateLimit(`sign:ip:${getClientIp(req.headers)}`, 20, 10 * 60 * 1000);
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
+    return NextResponse.json({ error: "Your signature couldn't be read. Sign again and submit." }, { status: 400 });
   }
 
   // With encryption on, only a signature sealed in the signer's browser is accepted:
@@ -62,13 +62,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   const sealKey = await currentSealingKey();
   if (sealKey) {
     if (!parsed.data.signatureSealed || parsed.data.dataUrl) {
-      return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
+      return NextResponse.json({ error: "Your signature couldn't be read. Sign again and submit." }, { status: 400 });
     }
     if (parsed.data.signatureSealed.epoch !== sealKey.epoch) {
       return NextResponse.json({ error: "Signing keys changed. Reload this page and sign again." }, { status: 409 });
     }
   } else if (!parsed.data.dataUrl || parsed.data.signatureSealed) {
-    return NextResponse.json({ error: "Missing or invalid signature data" }, { status: 400 });
+    return NextResponse.json({ error: "Your signature couldn't be read. Sign again and submit." }, { status: 400 });
   }
 
   let signatureField: Record<string, unknown>;
@@ -76,8 +76,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     signatureField = sealKey
       ? { signatureSealed: parsed.data.signatureSealed }
       : { signatureEnc: encryptSignature(parsePngDataUrl(parsed.data.dataUrl!), sessionId) };
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid signature" }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Your signature couldn't be read. Sign again and submit." }, { status: 400 });
   }
 
   try {
@@ -87,13 +87,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     // Return outcomes instead of throwing: a throw would roll back the "expired" write.
     const outcome = await db.runTransaction(async tx => {
       const snapshot = await tx.get(sessionRef);
-      if (!snapshot.exists) return { status: 404, error: "Session not found" } as const;
+      if (!snapshot.exists) return { status: 404, error: "This signing link isn't valid." } as const;
       const data = snapshot.data() ?? {};
-      if (data.status !== "pending") return { status: 409, error: "Session not pending" } as const;
+      if (data.status !== "pending") return { status: 409, error: "This link has already been used." } as const;
       const expiresAt = toDate(data.expiresAt);
       if (expiresAt && new Date() > expiresAt) {
         tx.update(sessionRef, { status: "expired", updatedAt: FieldValue.serverTimestamp() });
-        return { status: 410, error: "Session expired" } as const;
+        return { status: 410, error: "This link has expired." } as const;
       }
       tx.update(sessionRef, {
         status: "signed",
@@ -111,9 +111,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Signing is temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: "Signing isn't available right now. Try again in a few minutes." }, { status: 503 });
     }
     console.error("Failed to sign session", error instanceof Error ? error.message : "unknown error");
-    return NextResponse.json({ error: "Failed to submit signature" }, { status: 500 });
+    return NextResponse.json({ error: "Your signature couldn't be saved. Try again in a few minutes." }, { status: 500 });
   }
 }

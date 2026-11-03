@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "Signing can't be set up right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -124,12 +124,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
 
     for (const { sessionId, snapshot } of sessions) {
       if (!snapshot.exists) {
-        return NextResponse.json({ error: `Session not found (${sessionId})` }, { status: 404 });
+        return NextResponse.json({ error: "One of the signature requests no longer exists. Request that signature again." }, { status: 404 });
       }
       const data = snapshot.data() ?? {};
       const expiresAt = toDate(data.expiresAt);
       if (data.status === "pending" && expiresAt && new Date() > expiresAt) {
-        return NextResponse.json({ error: `Session expired (${sessionId})` }, { status: 410 });
+        return NextResponse.json({ error: "One of the signature links has expired. Request that signature again." }, { status: 410 });
       }
       if (data.status !== "signed" || !(data.signatureEnc || data.signatureSealed)) {
         return NextResponse.json({ error: `Session not signed (${sessionId})` }, { status: 409 });
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "Signing can't be set up right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

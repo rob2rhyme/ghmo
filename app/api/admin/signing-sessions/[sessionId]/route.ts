@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "Signing can't be set up right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -30,12 +30,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
   try {
     await requireActiveAdmin(req, COMMUNITY_SLUG);
     if (!isValidSigningSessionId(params.sessionId)) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return NextResponse.json({ error: "That signature request no longer exists. Request the signature again." }, { status: 404 });
     }
     const sessionRef = getAdminDb().collection("signingSessions").doc(params.sessionId);
     const snapshot = await sessionRef.get();
     if (!snapshot.exists) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return NextResponse.json({ error: "That signature request no longer exists. Request the signature again." }, { status: 404 });
     }
     const data = snapshot.data() ?? {};
     const expiresAt = toDate(data.expiresAt);
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "Signing can't be set up right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

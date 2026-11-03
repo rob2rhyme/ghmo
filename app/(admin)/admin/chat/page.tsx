@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import FirebaseAdminAuthBootstrap from "@/src/components/admin/FirebaseAdminAuthBootstrap";
@@ -6,6 +7,10 @@ import AdminChatClient from "@/src/components/admin/chat/AdminChatClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { toPlain } from "@/src/lib/serialize.server";
+
+/** Tab title: "Admin chat · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Admin chat" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

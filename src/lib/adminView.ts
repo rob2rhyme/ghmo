@@ -71,6 +71,7 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   totp_enrolled: { verb: "set up an authenticator app" },
   totp_reset: { verb: "reset an admin's authenticator app" },
   totp_login_failed: { verb: "entered a wrong authenticator code" },
+  totp_locked: { verb: "had their authenticator locked after too many wrong codes" },
   totp_recovery_codes_regenerated: { verb: "made new recovery codes" },
   admin_bootstrap: { verb: "set up the first super admin account" },
   minutes_created: { verb: "saved new minutes", detail: true },

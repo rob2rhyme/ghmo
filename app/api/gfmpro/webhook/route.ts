@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
 
   if (payload.type?.startsWith("transaction") && typeof payload.data?.amount === "number") {
     await applyDonationStatsUpdate(orgSlug, payload.data.amount, { source: "webhook" });
+    expirePublicCache(PUBLIC_CACHE_TAGS.donations);
   }
 
   await logWebhookAudit(orgSlug, payload, true);
-  expirePublicCache(PUBLIC_CACHE_TAGS.donations);
   return NextResponse.json({ ok: true });
 }

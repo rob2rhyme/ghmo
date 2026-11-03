@@ -3,6 +3,23 @@ import { buildPublicCsp, buildSecureCsp, createNonce, isSecurePath } from "@/src
 
 // Fast checks only. Full session verification happens server-side in requireActiveAdmin.
 const SESSION_COOKIE = "__session";
+// Readable "signed in" flag (see src/lib/sessionCookies.ts). Sessions made before it existed get it here, so
+// the header still asks /api/auth/me for them; visitors without a session never send that request.
+const SIGNED_IN_HINT = "ghmo_signed_in";
+const HINT_MAX_AGE_SECONDS = 8 * 60 * 60;
+
+function withSignedInHint(req: NextRequest, response: NextResponse): NextResponse {
+  if (req.cookies.has(SESSION_COOKIE) && !req.cookies.has(SIGNED_IN_HINT)) {
+    response.cookies.set(SIGNED_IN_HINT, "1", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: HINT_MAX_AGE_SECONDS
+    });
+  }
+  return response;
+}
 
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
@@ -24,7 +41,7 @@ export function proxy(req: NextRequest) {
   if (!isSecurePath(pathname)) {
     const response = NextResponse.next();
     response.headers.set("Content-Security-Policy", buildPublicCsp({ upgradeInsecure }));
-    return response;
+    return withSignedInHint(req, response);
   }
 
   const nonce = createNonce();
@@ -47,7 +64,7 @@ export function proxy(req: NextRequest) {
   response.headers.set("Content-Security-Policy", csp);
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
   response.headers.set("Cache-Control", "private, no-store");
-  return response;
+  return withSignedInHint(req, response);
 }
 
 export const config = {

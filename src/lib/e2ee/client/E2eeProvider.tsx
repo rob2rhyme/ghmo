@@ -58,6 +58,7 @@ import {
 import { clearLocalDrafts } from "@/src/lib/localDrafts";
 import { deleteIdentity, loadIdentity, saveIdentity, type StoredDeviceIdentity } from "./deviceStore";
 import { evaluatePrf } from "./prf";
+import { rollbackVerdict } from "../rollback";
 
 export type DeviceView = DevicePublicRecord & {
   createdAt: string;
@@ -161,12 +162,33 @@ async function api<T>(url: string, body?: unknown): Promise<T> {
     cache: "no-store"
   });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
   return data;
 }
 
 function newDeviceId() {
   return toBase64Url(randomBytes(18));
+}
+
+/**
+ * A per-tab hint of whether encryption was on at the last check, only to decide whether to request the device
+ * list alongside the overview. It never affects a security decision: the overview is always checked.
+ */
+const ENABLED_HINT_KEY = "ghmo-e2ee-enabled";
+function readEnabledHint(): boolean | null {
+  try {
+    const value = sessionStorage.getItem(ENABLED_HINT_KEY);
+    return value === null ? null : value === "1";
+  } catch {
+    return null;
+  }
+}
+function writeEnabledHint(enabled: boolean) {
+  try {
+    sessionStorage.setItem(ENABLED_HINT_KEY, enabled ? "1" : "0");
+  } catch {
+    // storage unavailable: the next load simply requests both together
+  }
 }
 
 type RosterFetch = Promise<{ ok: true; entries: RosterEntry[] } | { ok: false; error: unknown }>;
@@ -183,13 +205,20 @@ function fetchRoster(): RosterFetch {
 async function checkIntegrity(
   overview: { state: Overview["state"]; epochs: EpochRecord[]; devices: unknown[]; me: Overview["me"] },
   stored: StoredDeviceIdentity | null,
-  rosterFetch: RosterFetch
+  rosterFetch: RosterFetch | null
 ): Promise<{ roster: RosterState | null; integrity: Integrity; entries: RosterEntry[] }> {
-  if (!overview.state.enabled) return { roster: null, integrity: { status: "none" }, entries: [] };
-  const fetched = await rosterFetch;
+  // A device that has pinned the signed log has seen encryption on. Encryption can't be switched off from
+  // the app, so "off" or an empty log afterwards means someone changed the database: fail closed (threat T4).
+  const pinned = Boolean(stored?.rosterPin);
+  const before = rollbackVerdict({ enabled: overview.state.enabled, logEntries: null, pinned });
+  if (before.kind === "failed") return { roster: null, integrity: { status: "failed", reason: before.reason }, entries: [] };
+  if (before.kind === "off") return { roster: null, integrity: { status: "none" }, entries: [] };
+  const fetched = await (rosterFetch ?? fetchRoster());
   if (!fetched.ok) throw fetched.error;
   const { entries } = fetched;
-  if (entries.length === 0) return { roster: null, integrity: { status: "unsealed" }, entries };
+  const verdict = rollbackVerdict({ enabled: true, logEntries: entries.length, pinned });
+  if (verdict.kind === "failed") return { roster: null, integrity: { status: "failed", reason: verdict.reason }, entries };
+  if (verdict.kind === "unsealed") return { roster: null, integrity: { status: "unsealed" }, entries };
   try {
     const roster = await verifyRoster(entries);
     await checkPin(entries, stored?.rosterPin);
@@ -234,7 +263,8 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     try {
       // The device log is only used when encryption is on; it is requested alongside the overview, and its
       // answer is ignored when the overview says encryption is off.
-      const rosterFetch = fetchRoster();
+      // Skipped when this tab last saw encryption off (it is then fetched after the overview if needed).
+      const rosterFetch = readEnabledHint() === false ? null : fetchRoster();
       const data = await api<Omit<Overview, "devices"> & { devices: Omit<DeviceView, "safetyCode">[] }>("/api/admin/e2ee");
       const devices = await Promise.all(
         data.devices.map(async d => ({ ...d, safetyCode: await deviceSafetyCode(d.ecdhPublic, d.ecdsaPublic) }))
@@ -242,6 +272,7 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       const stored = (await loadIdentity(data.me.uid)) ?? null;
       // Check the server's key records against the signed device log before anything uses them.
       const checked = await checkIntegrity(data, stored, rosterFetch);
+      writeEnabledHint(data.state.enabled);
       rosterRef.current = checked.roster;
       integrityRef.current = checked.integrity;
       setIntegrity(checked.integrity);
@@ -660,6 +691,9 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
 
   const packPrivate = useCallback<E2eeContextValue["packPrivate"]>(
     async (location, privateFields) => {
+      // Never write in plaintext when the device list failed its check (for example encryption reported "off"
+      // on a device that has seen it on).
+      if (integrityRef.current.status === "failed") throw new Error("The device list failed its integrity check. Don't use encryption until an admin looks into it.");
       if (!overviewRef.current?.state.enabled) return privateFields;
       return { enc: await encrypt(location, privateFields) };
     },

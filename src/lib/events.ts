@@ -30,6 +30,12 @@ export function normalizeEvent(doc: FirebaseFirestore.DocumentSnapshot): EventRe
   };
 }
 
+/** What visitors may see of an event: no creator uid, no internal flyer settings. */
+export function toPublicEvent(event: EventRecord): EventRecord {
+  const { id, title, summary, body, status, startsAt, endsAt, timezone, location, featured } = event;
+  return { id, title, summary, body, status, startsAt, endsAt, timezone, location, featured };
+}
+
 export function ensureOrgSlug(slug: string) {
   return slug === COMMUNITY_SLUG;
 }
@@ -103,11 +109,14 @@ function startMillis(value: unknown): number {
 export async function queryEvents({
   status,
   rangeStart,
-  rangeEnd
+  rangeEnd,
+  last
 }: {
   status: string | null;
   rangeStart?: string | null;
   rangeEnd?: string | null;
+  /** Keep the latest `last` events of the range (soonest-first order), instead of the earliest 200. */
+  last?: number;
 }): Promise<EventRecord[]> {
   const { getAdminDb } = await import("./firebaseAdmin");
   const db = getAdminDb();
@@ -116,8 +125,12 @@ export async function queryEvents({
     if (status) q = q.where("status", "==", status);
     if (rangeStart) q = q.where("startsAt", ">=", new Date(rangeStart));
     if (rangeEnd) q = q.where("startsAt", "<=", new Date(rangeEnd));
-    if (withOrderBy) q = q.orderBy("startsAt", "asc");
-    return q.limit(200);
+    if (withOrderBy) {
+      q = q.orderBy("startsAt", "asc");
+      // limitToLast keeps the newest ones with the same (status, startsAt) index as the ascending query.
+      return last ? q.limitToLast(last) : q.limit(200);
+    }
+    return q.limit(last ?? 200);
   };
   const sorted = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) =>
     docs.map(normalizeEvent).sort((a, b) => startMillis(a.startsAt) - startMillis(b.startsAt));

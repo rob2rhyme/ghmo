@@ -18,7 +18,7 @@ const ROUTE = "/api/admin/broadcasts";
 export async function GET(req: NextRequest) {
   const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
   if ("response" in guard) return guard.response;
-  return NextResponse.json({ broadcasts: await listBroadcasts() });
+  return NextResponse.json({ broadcasts: await listBroadcasts(guard) });
 }
 
 const createSchema = z.object({ subject: z.string().max(1000), body: z.string().max(100_000) });

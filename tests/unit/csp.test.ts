@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { buildPublicCsp, buildSecureCsp, createNonce, isSecurePath } from "@/src/lib/security/csp";
 
 describe("isSecurePath", () => {
-  it.each(["/admin", "/admin/login", "/admin/minutes", "/login", "/sign/abc", "/c/ghmo/events", "/docs/onboarding", "/unsubscribe"])(
+  it.each(["/admin", "/admin/login", "/admin/minutes", "/login", "/sign/abc", "/docs/onboarding", "/unsubscribe"])(
     "treats %s as secure",
     path => expect(isSecurePath(path)).toBe(true)
   );
 
-  it.each(["/", "/donate", "/multimedia", "/gumba-project", "/administrator", "/signup", "/loginx", "/c"])(
+  it.each(["/", "/donate", "/multimedia", "/gumba-project", "/administrator", "/signup", "/loginx", "/c", "/c/ghmo/events", "/c/ghmo/events/ev1"])(
     "treats %s as public",
     path => expect(isSecurePath(path)).toBe(false)
   );

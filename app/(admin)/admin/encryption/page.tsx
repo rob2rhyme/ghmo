@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import EncryptionPanel from "@/src/components/admin/encryption/EncryptionPanel";
+
+/** Tab title: "Encryption · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Encryption" };
+
 
 export const dynamic = "force-dynamic";
 
