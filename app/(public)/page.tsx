@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, HandHeart } from "lucide-react";
@@ -7,6 +8,7 @@ import { HOME_HERO_IMAGE } from "@/src/components/public/homeHero";
 import { PublicPage, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { UpcomingEvents } from "@/src/components/public/UpcomingEvents";
 import { Button } from "@/src/components/ui/button";
+import { Skeleton } from "@/src/components/ui/skeleton";
 import { getDonateUrl } from "@/src/lib/donateLink";
 
 const AKKHA_ALT = "Greater Harrisburg Magar Organization, written in Akkha script";
@@ -74,7 +76,11 @@ export default async function CommunityLanding() {
         </div>
       </section>
 
-      <UpcomingEvents limit={3} />
+      {/* The events and feeds come from the network, so they stream in behind placeholders of about their own
+          height; the hero and the text above paint at once and nothing below jumps when they arrive. */}
+      <Suspense fallback={<SectionPlaceholder title="Next events" cards={3} />}>
+        <UpcomingEvents limit={3} />
+      </Suspense>
 
       {/* Gumba Project */}
       <section
@@ -96,7 +102,27 @@ export default async function CommunityLanding() {
         </div>
       </section>
 
-      <HomeMultimediaSection />
+      <Suspense fallback={<SectionPlaceholder title="Follow us" cards={3} />}>
+        <HomeMultimediaSection />
+      </Suspense>
     </PublicPage>
+  );
+}
+
+function SectionPlaceholder({ title, cards }: { title: string; cards: number }) {
+  return (
+    <section aria-busy="true" className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <PublicSectionTitle>{title}</PublicSectionTitle>
+        <Skeleton className="h-5 w-56 max-w-full" />
+      </div>
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3" aria-hidden="true">
+        {Array.from({ length: cards }).map((_, i) => (
+          <li key={i}>
+            <Skeleton className="h-44 rounded-xl" />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
