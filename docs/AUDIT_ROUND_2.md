@@ -117,7 +117,9 @@ WebP, preloaded). Phones are not at 90 yet: the rest is P2–P4 (server renderin
   event's minutes.
 - Also: creating an event through the API without a summary no longer fails with a 500. Lint warnings 75 → 67.
 
-Lighthouse, phone (same method as §2a):
+Lighthouse, phone (same method as §2a). **Correction (round 3):** Home, Donate and Minutes below were measured on the
+"can't be read" pages the build had prebuilt without Firebase settings; `docs/AUDIT_ROUND_3.md` §2a re-measures them
+on real data (Home 94, Donate 98, Minutes 99).
 
 | Page | Audit | Round 2 | Speed pass | Phone LCP | Phone blocking |
 |---|---|---|---|---|---|
