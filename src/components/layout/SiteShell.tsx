@@ -34,28 +34,15 @@ type SiteShellProps = {
  * navigating between root layouts, so third-party scripts loaded on public pages
  * can never stay alive in the browser after the user moves into the admin area.
  */
-export async function SiteShell({
-  children,
-  bodyStart,
-  chrome = true,
-  secure = false,
-  scrollToTop = false,
-}: SiteShellProps) {
+export async function SiteShell({ children, bodyStart, chrome = true, secure = false, scrollToTop = false }: SiteShellProps) {
   const community = await getCommunity();
-  const nonce = secure
-    ? ((await headers()).get("x-nonce") ?? undefined)
-    : undefined;
+  const nonce = secure ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
   const contactEmail = getContactEmail();
 
   // With the header and footer, body is a flex column so the footer sits at the bottom of short pages.
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <body
-        className={cn(
-          "min-h-screen bg-background text-foreground antialiased",
-          chrome && "flex flex-col",
-        )}
-      >
+      <body className={cn("min-h-screen bg-background text-foreground antialiased", chrome && "flex flex-col")}>
         <Providers nonce={nonce}>
           <ContactEmailProvider value={contactEmail}>
             {bodyStart}
@@ -67,15 +54,8 @@ export async function SiteShell({
                 >
                   Skip to content
                 </a>
-                <CommunityHeader
-                  name={community.name}
-                  donateOpen={Boolean(getDonateUrl())}
-                />
-                <main
-                  id="main-content"
-                  tabIndex={-1}
-                  className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10"
-                >
+                <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} />
+                <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10">
                   {children}
                 </main>
                 <SiteFooter name={community.name} contactEmail={contactEmail} />

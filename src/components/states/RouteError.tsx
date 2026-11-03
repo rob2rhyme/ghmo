@@ -18,16 +18,9 @@ type RouteErrorProps = {
 };
 
 /** Shared body for error.tsx files, in the same message-page look as the 404. Never shows the raw error message. */
-export function RouteError({
-  error,
-  reset,
-  homeHref,
-  homeLabel = "Go to the home page",
-  contactEmail: contactEmailProp,
-}: RouteErrorProps) {
+export function RouteError({ error, reset, homeHref, homeLabel = "Go to the home page", contactEmail: contactEmailProp }: RouteErrorProps) {
   const shellContactEmail = useContactEmail();
-  const contactEmail =
-    contactEmailProp === undefined ? shellContactEmail : contactEmailProp;
+  const contactEmail = contactEmailProp === undefined ? shellContactEmail : contactEmailProp;
   return (
     <div role="alert">
       <MessagePage
@@ -37,12 +30,8 @@ export function RouteError({
           error.digest ? (
             contactEmail ? (
               <>
-                This page could not be loaded. Try again. If it keeps happening,
-                email us at{" "}
-                <a
-                  href={`mailto:${contactEmail}`}
-                  className="font-semibold text-primary underline-offset-4 hover:underline"
-                >
+                This page could not be loaded. Try again. If it keeps happening, email us at{" "}
+                <a href={`mailto:${contactEmail}`} className="font-semibold text-primary underline-offset-4 hover:underline">
                   {contactEmail}
                 </a>{" "}
                 and include the code below.
@@ -67,11 +56,7 @@ export function RouteError({
           </>
         }
       >
-        {error.digest ? (
-          <code className="rounded-md bg-muted px-2 py-1 text-sm text-muted-foreground">
-            Ref: {error.digest}
-          </code>
-        ) : null}
+        {error.digest ? <code className="rounded-md bg-muted px-2 py-1 text-sm text-muted-foreground">Ref: {error.digest}</code> : null}
       </MessagePage>
     </div>
   );
