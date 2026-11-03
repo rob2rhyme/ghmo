@@ -42,20 +42,23 @@ type AdminListRowProps = {
 export function AdminListRow({ title, meta, badges, leading, actions, href, children, className }: AdminListRowProps) {
   return (
     <li className={cn("relative flex min-h-14 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center md:px-5", href && "transition-colors hover:bg-accent/50", className)}>
-      {leading ? <div className="shrink-0">{leading}</div> : null}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {href ? (
-            <Link href={href} className="font-medium text-foreground outline-none after:absolute after:inset-0 focus-visible:underline">
-              {title}
-            </Link>
-          ) : (
-            <span className="font-medium text-foreground">{title}</span>
-          )}
-          {badges}
+      {/* The leading tile stays beside the text at every width. */}
+      <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+        {leading ? <div className="shrink-0">{leading}</div> : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {href ? (
+              <Link href={href} className="font-medium text-foreground outline-none after:absolute after:inset-0 focus-visible:underline">
+                {title}
+              </Link>
+            ) : (
+              <span className="font-medium text-foreground">{title}</span>
+            )}
+            {badges}
+          </div>
+          {meta ? <div className="mt-0.5 text-sm text-muted-foreground">{meta}</div> : null}
+          {children}
         </div>
-        {meta ? <div className="mt-0.5 text-sm text-muted-foreground">{meta}</div> : null}
-        {children}
       </div>
       {actions ? <div className="relative z-10 flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:justify-end">{actions}</div> : null}
     </li>

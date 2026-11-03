@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { Timestamp } from "firebase-admin/firestore";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "./helpers";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent } from "./helpers";
 
 const DAY = 24 * 3600 * 1000;
 
@@ -38,6 +38,7 @@ test("editing an event loads it, missing events say so, and delete asks first", 
   await signInWithNewPasskey(page, "alice", "/admin");
 
   await page.goto("/admin/events/ev1/edit");
+  await waitForStreamedContent(page);
   await expect(page.getByLabel("Event name")).toHaveValue("Dashain celebration");
   await expect(page.getByLabel("Place")).toHaveValue("Community hall");
 
@@ -61,6 +62,7 @@ test("editing an event loads it, missing events say so, and delete asks first", 
     startsAt: Timestamp.fromMillis(Date.now() + 20 * DAY)
   });
   await page.goto("/admin/events");
+  await waitForStreamedContent(page);
   await expect(page.getByText("Older event")).toBeVisible();
   await page.goto("/admin/events/old1/edit");
   await expect(page.getByLabel("Event name")).toHaveValue("Older event");
@@ -107,4 +109,14 @@ test.describe("event times follow the event's time zone, not the admin's compute
     await page.goto("/c/ghmo/events/ev1");
     await expect(page.getByText(/7:00\s?PM/).first()).toBeVisible();
   });
+});
+
+test("a missing record gets the site's styled 404, not the framework default", async ({ page }) => {
+  // The page streams (loading.tsx), so the status is already sent when the record turns out to be
+  // missing; Next.js then marks the page noindex. What visitors see is what matters here.
+  await page.goto("/minutes/does-not-exist");
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+  expect(await page.locator('meta[name="robots"][content*="noindex"]').count()).toBeGreaterThan(0);
+  await expect(page.getByRole("link", { name: "Go to the home page" })).toBeVisible();
+  await expect(page.getByText("This page could not be found")).toHaveCount(0);
 });

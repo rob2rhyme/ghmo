@@ -512,17 +512,17 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ---
 
-## 9. What is next (updated 2026-10-27)
+## 9. What is next (updated 2026-11-03)
 
-Phases 0–9 and decision D6 are built and merged. The one planned code item is Phase 10, a two-pass UI layout audit and upgrade (§13); it can run alongside the steps below. Everything else needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 2 of 29 items were ticked on 2026-10-31 (the Dependabot line was unticked while one dev-only alert waits on upstream)):
+Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77). Nothing in the codebase is waiting; what is left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 2 of 29 items were ticked on 2026-10-31 (the Dependabot line was unticked while one dev-only alert waits on upstream)):
 
-1. **Make the repository public, or fix GitHub Actions billing.** CI cannot run while the repo is private (jobs fail in about 2 seconds with no runner), so every change has been verified by the local gate only.
+1. ~~Make the repository public, or fix GitHub Actions billing.~~ Done: CI runs again (PR #77's checks ran on GitHub).
 2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
 3. **Firestore:** deploy the rules, set the `expiresAt` TTL policies (`rateLimits`, `webauthnChallenges`), delete backups made before encryption was on.
 4. **People and keys:** at least two active admins, each with an authenticator app and recovery codes kept outside email; encryption set up with both trustees; every admin device approved; seal the device list; run "Encrypt existing records".
 5. **Assurance (outside the codebase):** external cryptography review, penetration test, key-rotation drill and recovery-key test, fill in `docs/RUNBOOK_INCIDENT.md`.
 6. **After going live:** open the main pages with the console open and confirm there are no red errors.
-7. **Phase 10 (code, can start any time):** two layout-only UI audits, each followed by fixes, so the site is beginner friendly with a premium, modern look (§13).
+7. **Site settings for Phase 10's slots (owner):** `GOFUNDME_PUBLIC_URL` (Donate buttons), `CONTACT_EMAIL` (contact line), social profile links, and optionally community photos for the home and Donate pages (`src/components/public/homeHero.ts`).
 
 **Weekly progress check.** A scheduled routine ("Weekly go-live checklist progress", Mondays 08:41 UTC) is meant to report checklist progress. As of 2026-10-27 its sessions start without the repository attached, so it fails; the same report was produced by hand from a normal session. Fix it in claude.ai (select `rob2rhyme/ghmo` on the routine) or recreate the routine there.
 
@@ -794,7 +794,7 @@ Unit: split rule (equal counts, household grouping, stability, add and remove ca
 
 ---
 
-## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, not started)
+## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, built 2026-11-03)
 
 **Goal.** Make the whole site **beginner friendly** (a first-time member or a new BOD admin can find what they need and finish a task without help) with a **premium, modern look**. The work is **layout only**: how pages look and read, not what they do.
 
@@ -845,27 +845,27 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 
 ### 13.6 Progress
 
-**10-A · Audit 1 · done 2026-11-02 (local, not yet pushed)**
+**10-A · Audit 1 · done 2026-11-02 (PR #77)**
 - New screenshot run: `npm run ui:screens` (`playwright.ui-audit.config.ts`, `tests/ui-audit/screenshots.spec.ts`) seeds sample data in the emulators, signs in as a super admin, and saves 33 pages at 375/768/1280 px in light and dark (198 images in the git-ignored `ui-audit-screens/`). A size check flags sideways scrolling.
 - Findings, causes and fixes: **`docs/UI_AUDIT_1.md`**. About 100 problems merged into 8 bugs and 53 layout rows (17 High, 30 Medium, 6 Low).
 - The worst: developer text and placeholder media (including a Rick-roll video and stock photos) on the public home page; a Donate button to a GoFundMe page that doesn't exist; public events show "Invalid Date" / "No events yet"; white-on-teal buttons fail contrast in dark mode; three pages scroll sideways (Meeting Minutes and event detail on phones, Encryption on tablets); the admin Events table breaks on phones; the document generator is unreadable in dark mode; the Calling Tree pages give a new admin no order of steps; admin sign-in leads with passkeys although most admins use the authenticator app.
 - Owner approved fixing the 8 bugs inside Phase 10 (2026-11-02). No GoFundMe link yet, so Donate buttons stay hidden until `GOFUNDME_PUBLIC_URL` is set.
 
-**10-B · Upgrade 1 · built 2026-11-02 (local, not yet pushed)**
+**10-B · Upgrade 1 · built 2026-11-02 (PR #77)**
 - **Bugs (UI_AUDIT_1 §1), all fixed:** public event dates sent as epoch milliseconds; the edit-event blank form traced to events being stored in two places (admin writes went to `organizations/ghmo-site/events`, lists read `organizations/ghmo/events`): every list now merges all known locations, single-event routes find the event wherever it is, new events go to `organizations/ghmo/events`, no data moved; a new `GET` for one event, a "couldn't load" state and a confirmed delete; `GOFUNDME_PUBLIC_URL` (`src/lib/donateLink.ts`) instead of the placeholder link; no stand-in media (`src/lib/media.ts`); `/gumba-project` → `/donate`; public `/document-generator` explains it's a board tool; onboarding rewritten as a board member guide; sample-threads button removed; calling-tree status line.
 - **Foundations:** rules in **`docs/UI_STYLE.md`**; new `Select`, `Segmented`, `ConfirmDialog`; `src/lib/format.ts` (no seconds, no "Invalid Date"); destructive and disabled button styles readable in both themes; admin sidebar from laptop width with encryption status, public-site link and theme in the top bar; one admin content width; 44 px theme and sign-out buttons.
 - **Public:** new header menu (Events, Gumba Project, Minutes, Media, Donate) and themed footer; home rebuilt for the community (hero, About, next events, Gumba strip, Follow us); one media style; Donate restructured around its ask; events list/detail with labelled filters, friendly dates and no sideways scroll; minutes, certificate check, member and admin sign-in (email + authenticator first, passkey as the faster option, every step kept), unsubscribe, signing page and 404 on shared components.
 - **Admin:** Meeting Minutes (no sideways scroll, one tab bar, sticky save, plain fields), dashboard activity in plain sentences, Plans & Issues list-first, Chat fills the screen, Action Items, Events list as cards on phones, Members, Broadcasts (Write → Approve → Send), guided Calling Tree / Campaigns / My Calls, GUMBA progress, Document generator usable in dark mode with a template grid and stepper, Gallery, Encryption (no tablet overflow, 3-step progress, "What is this?" lines, styled confirmations with the same wording), Security (sign-in summary, plain badges).
 - **Measures:** raw palette classes 189 → 4 (paper previews only); `text-white` on primary 23+ → 0; lint warnings 110 cap → 93. Tests: unit `format`, `media`, `donateLink`, `adminView`; browser `events.spec.ts`; three browser tests updated (calling-tree sentence, two confirmations now dialogs), two public footer-link tests.
 
-**10-C · Audit 2 · done 2026-11-02 (local, not yet pushed)**
+**10-C · Audit 2 · done 2026-11-02 (PR #77)**
 - Screenshot run extended: open phone menus, and the encryption-on admin pages both locked and unlocked (268 images; `UI_AUDIT_ONLY=page,…` targets pages). None scrolls sideways.
 - Findings: **`docs/UI_AUDIT_2.md`**. Audit 1: all 8 bugs fixed, most rows resolved, the rest partly. New: 69 findings (5 High, 41 Medium, 23 Low) and 1 bug: event times ignore the event's time zone (B9).
 - Main themes: a phone admin-menu regression; five builders' differing patterns (lists, back links, steps, cards, badges, title case); the Encryption page and locked states after launch; three remaining day-one dead ends; the public home and closed-Donate states not yet premium; no contact route.
 - **Waiting on the owner:** go-ahead for B9; a contact email; community photos (optional). Upgrade 2 then follows `docs/UI_AUDIT_2.md` "Upgrade 2 plan".
 - Owner approved B9 and Upgrade 2 (2026-11-02). No contact email or photos yet: the contact slots stay hidden and the home hero uses the building artwork.
 
-**10-D · Upgrade 2 · built 2026-11-02 (local, not yet pushed)**
+**10-D · Upgrade 2 · built 2026-11-02 (PR #77)**
 - **B9 fixed:** `src/lib/zonedTime.ts` reads and writes wall-clock times in a named zone (daylight-saving safe, no library). The event API reads zone-less form dates in the event's own zone (PATCH falls back to the stored zone) and rejects unknown zones; the form shows stored times in that zone; the flyer PDF prints friendly times in it. Unit tests run under three machine zones; a browser test runs as an admin in Tokyo.
 - **Regression fixed:** the phone admin menu scrolls as one, so every page is reachable (A1).
 - **Shared building blocks** (listed in `docs/UI_STYLE.md`): `back` and `badge` on `AdminPageHeader`; `AdminSectionCard` aligned with `Card`; `AdminList`/`AdminListRow`; `size="row"` buttons; `statusBadge()`; `Steps`; `StatGrid`/`StatTile`/`ProgressBar`; `SegmentedNav` and a selected state that reads in dark mode; Alert `success`; one locked-state card and a one-line "Encryption is off" note; e2ee activity sentences; skeleton + "Couldn't connect / Try again" for the live connection; `PublicPage`/`PublicPageHeader`/`PublicSectionTitle`, `MessagePage`, a styled 404 in every route group; `getContactEmail()` (`CONTACT_EMAIL`).
@@ -873,7 +873,7 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 - **Accessibility check:** `tests/ui-audit/axe.spec.ts` (axe-core, WCAG 2.2 A/AA) runs with `npm run ui:screens`; `@axe-core/playwright` 4.14.0 added as a dev dependency.
 - **Measures:** lint warning cap 93 → 77; no raw palette classes outside the paper previews; no `text-white` on primary, arbitrary text sizes or `size="sm"` buttons. Tests updated for deliberate wording changes (listed in the commits).
 
-**Accessibility pass · 2026-11-03 (local, not yet pushed)**
+**Accessibility pass · 2026-11-03 (PR #77)**
 - The first axe-core run (WCAG 2.2 A/AA) found 75 serious problems across 3 rules; now **0** on 26 pages, light and dark, at 375 and 1280 px. The check fails on any serious or critical problem from now on (`UI_AXE_STRICT=0` to report only).
 - Contrast: light-mode text tokens darkened so each passes 4.5:1 on every surface it sits on, tinted notices included (`--muted-foreground` #64748b → #4b5868, `--destructive` #dc2626 → #b91c1c, `--success` #15803d → #166534, `--warning` #b45309 → #92400e); "What is this?" links are body-coloured with an accent underline. Dark mode already passed.
 - Names: the "Jump to a page… Ctrl K" button is named by its visible text (shortcut via `aria-keyshortcuts`); document template cards are named by their visible title and description.
