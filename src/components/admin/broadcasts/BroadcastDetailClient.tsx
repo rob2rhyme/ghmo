@@ -23,7 +23,7 @@ import {
   type BroadcastAction,
   type BroadcastStatus,
   type ManualChannel
-} from "@/src/lib/broadcast";
+} from "@/src/lib/broadcast.shared";
 import { formatDateTime } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
 import { BroadcastSteps } from "./BroadcastSteps";
@@ -220,7 +220,7 @@ export default function BroadcastDetailClient({
       >
         <div className="flex flex-col gap-4">
           <Field label="Subject">
-            <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} placeholder="Dashain celebration on 12 October" />
+            <Input id="b-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} readOnly={!editable} placeholder="Dashain celebration on October 12" />
           </Field>
           <Field label="Message">
             <Textarea id="b-body" rows={10} value={body} onChange={e => setBody(e.target.value)} maxLength={BODY_MAX} readOnly={!editable} />
@@ -268,7 +268,7 @@ export default function BroadcastDetailClient({
               (sendingBlocker ? `Approved by a second admin. It can't be sent yet. ${sendingBlocker}` : `Approved by a second admin. Ready to send to ${members(count)}.`)}
             {broadcast.status === "sending" && "Sending in small batches. Keep this page open; if you close it, sending pauses and you (or another admin) can resume here."}
             {broadcast.status === "sent" && "Sent. Each member got their own copy with a personal unsubscribe link."}
-            {broadcast.status === "cancelled" && "This broadcast was cancelled and can't be used."}
+            {broadcast.status === "cancelled" && "This broadcast was canceled and can't be used."}
           </>
         }
       >
@@ -363,7 +363,7 @@ export default function BroadcastDetailClient({
         cancelLabel="Keep it"
         busy={busy === "cancel"}
         onConfirm={async () => {
-          await act("cancel", "Cancelled");
+          await act("cancel", "Canceled");
           setCancelling(false);
         }}
       />

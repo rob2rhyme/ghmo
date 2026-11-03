@@ -30,7 +30,7 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { toast } from "sonner";
 import { formatDateTime } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
-import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
+import { firestore, firebaseInitError } from "@/src/lib/firebaseFirestore";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import {
@@ -56,6 +56,13 @@ const PRIORITY_LABELS: Record<string, string> = {
   high: "High"
 };
 
+/** Shown when the browser can't reach the database; the technical cause stays in the console. */
+const CONNECT_ERROR = "This page can't connect right now. Try again in a moment; if it keeps happening, tell whoever manages the website.";
+const connectError = () => {
+  console.error("Database connection unavailable:", firebaseInitError);
+  return CONNECT_ERROR;
+};
+
 export default function CommsThreadDetailClient({ threadId, actor }: CommsThreadDetailClientProps) {
   const { packPrivate, unpackPrivate } = useE2ee();
   const [thread, setThread] = useState<ThreadView | null>(null);
@@ -66,7 +73,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     mine: null
   });
   const [loading, setLoading] = useState(() => Boolean(firestore));
-  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : connectError()));
   const [missing, setMissing] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -147,29 +154,50 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
     };
   }, [threadId, unpackPrivate]);
 
+  // One likes listener per comment, kept across comment updates: only comments that appear or disappear
+  // (re)subscribe, instead of every listener restarting on each change to the comment list.
+  const likeListeners = useRef(new Map<string, () => void>());
+  const commentIdKey = comments.map(comment => comment.id).join(",");
   useEffect(() => {
     if (!firestore || !actor.uid) return;
-    setLikedComments({});
-    setLikeCounts({});
+    const listeners = likeListeners.current;
+    const ids = new Set(commentIdKey ? commentIdKey.split(",") : []);
+    for (const [id, unsubscribe] of listeners) {
+      if (!ids.has(id)) {
+        unsubscribe();
+        listeners.delete(id);
+      }
+    }
     const threadRef = doc(firestore, "organizations", "ghmo", "commsThreads", threadId);
-    const unsubscribes = comments.map(comment => {
-      const likesRef = collection(threadRef, "comments", comment.id, "likes");
-      return onSnapshot(
-        likesRef,
-        snapshot => {
-          setLikeCounts(prev => ({ ...prev, [comment.id]: snapshot.size }));
-          const iLiked = snapshot.docs.some(docSnap => docSnap.id === actor.uid);
-          setLikedComments(prev => ({ ...prev, [comment.id]: iLiked }));
-        },
-        error => {
-          setLikeStatus(`Couldn't load the likes. ${error.message || ""}`.trim());
-        }
+    for (const id of ids) {
+      if (listeners.has(id)) continue;
+      const likesRef = collection(threadRef, "comments", id, "likes");
+      listeners.set(
+        id,
+        onSnapshot(
+          likesRef,
+          snapshot => {
+            setLikeCounts(prev => ({ ...prev, [id]: snapshot.size }));
+            const iLiked = snapshot.docs.some(docSnap => docSnap.id === actor.uid);
+            setLikedComments(prev => ({ ...prev, [id]: iLiked }));
+          },
+          error => {
+            setLikeStatus(`Couldn't load the likes. ${error.message || ""}`.trim());
+          }
+        )
       );
-    });
+    }
+  }, [commentIdKey, threadId, actor.uid]);
+  useEffect(() => {
+    // Another thread or viewer: every likes listener and the counts shown belong to the old one.
+    const listeners = likeListeners.current;
     return () => {
-      unsubscribes.forEach(unsub => unsub());
+      listeners.forEach(unsubscribe => unsubscribe());
+      listeners.clear();
+      setLikedComments({});
+      setLikeCounts({});
     };
-  }, [comments, threadId, actor.uid]);
+  }, [threadId, actor.uid]);
 
   const threadStatus = thread?.status;
   useEffect(() => {
@@ -515,7 +543,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
             className="max-sm:hidden"
             steps={[
               { title: "Discuss", description: "Admins comment and reply.", state: isOpen ? "current" : "done" },
-              { title: "Agree a conclusion", description: "Someone proposes it; admins vote.", state: isClosing ? "current" : isClosed ? "done" : "todo" },
+              { title: "Agree on a conclusion", description: "Someone proposes it; admins vote.", state: isClosing ? "current" : isClosed ? "done" : "todo" },
               { title: "Closed", description: "The conclusion is final.", state: isClosed ? "done" : "todo" }
             ]}
           />

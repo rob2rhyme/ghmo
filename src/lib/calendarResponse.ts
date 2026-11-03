@@ -31,7 +31,7 @@ export function calendarResponse(events: EventRecord[], origin: string, fileName
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Content-Disposition": `inline; filename="${fileName}"`,
-      "Cache-Control": "public, max-age=300"
+      "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600"
     }
   });
 }

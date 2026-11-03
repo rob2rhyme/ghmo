@@ -1,5 +1,8 @@
-import crypto from "node:crypto";
+import "server-only";
+
 import { memberEmailState } from "./members";
+import { BODY_MAX, MANUAL_CHANNELS, SUBJECT_MAX, type BroadcastAction, type BroadcastContent, type BroadcastStatus, type ManualChannel } from "./broadcast.shared";
+import { hashBroadcast } from "./broadcastHash";
 
 /**
  * Broadcast emails to members (plan §10). Pure rules: the routes load the stored record and get back
@@ -12,12 +15,9 @@ import { memberEmailState } from "./members";
  *  - Editing a submitted or approved broadcast sends it back to draft, so what goes out is always
  *    exactly what was approved.
  */
-export type BroadcastStatus = "draft" | "pending_approval" | "approved" | "sending" | "sent" | "cancelled";
-
-export const SUBJECT_MAX = 150;
-export const BODY_MAX = 20_000;
-
-export type BroadcastContent = { subject: string; body: string };
+export type { BroadcastAction, BroadcastContent, BroadcastStatus, ManualChannel } from "./broadcast.shared";
+export { BODY_MAX, MANUAL_CHANNELS, MANUAL_CHANNEL_LABELS, SUBJECT_MAX, messengerText } from "./broadcast.shared";
+export { hashBroadcast } from "./broadcastHash";
 
 export function normalizeBroadcastContent(input: { subject?: unknown; body?: unknown }): { ok: true; content: BroadcastContent } | { ok: false; error: string } {
   const subject = typeof input.subject === "string" ? input.subject.replace(/\s+/g, " ").trim() : "";
@@ -27,11 +27,6 @@ export function normalizeBroadcastContent(input: { subject?: unknown; body?: unk
   if (!body) return { ok: false, error: "Write the message." };
   if (body.length > BODY_MAX) return { ok: false, error: `The message is longer than ${BODY_MAX.toLocaleString("en-US")} characters.` };
   return { ok: true, content: { subject, body } };
-}
-
-/** The audience is everyone who can be emailed; roles are not offered yet (members only have the "member" role). */
-export function hashBroadcast(content: BroadcastContent): string {
-  return crypto.createHash("sha256").update(JSON.stringify({ v: 1, audience: "all", subject: content.subject, body: content.body })).digest("hex");
 }
 
 /** Members who may be emailed right now (active, consent recorded, no opt-out, no bounce). */
@@ -48,8 +43,6 @@ type Stored = {
   submittedHash?: string | null;
 };
 
-export type BroadcastAction = "submit" | "approve" | "withdraw" | "cancel";
-
 export type BroadcastPlan =
   | { ok: true; updates: Record<string, unknown>; audit: string }
   | { ok: false; status: number; error: string; code?: string };
@@ -61,7 +54,7 @@ const RESET = { submittedAt: null, submittedByUid: null, submittedHash: null, ap
 /** Saving new content: only drafts keep their status; submitted or approved broadcasts go back to draft. */
 export function planContentEdit(before: Stored, content: BroadcastContent, now: Date): BroadcastPlan {
   const status = before.status ?? "draft";
-  if (status === "cancelled") return refuse(409, "This broadcast was cancelled.");
+  if (status === "cancelled") return refuse(409, "This broadcast was canceled.");
   if (status === "sending" || status === "sent") return refuse(409, "This broadcast is being sent or was sent, so it can't be changed.");
   const updates: Record<string, unknown> = { subject: content.subject, body: content.body, contentHash: hashBroadcast(content), updatedAt: now };
   if (status !== "draft") Object.assign(updates, { status: "draft", ...RESET });
@@ -125,18 +118,6 @@ export function planStartSending(before: Stored & { approvedHash?: string | null
 // There is no Messenger integration: an admin copies the approved text and pastes it into the group
 // chat themselves. The site only formats the text and records who said they posted it, where and when,
 // so the audit trail covers the group chats too. Only approved text can be copied and recorded.
-
-export const MANUAL_CHANNELS = ["messenger_bod", "messenger_community"] as const;
-export type ManualChannel = (typeof MANUAL_CHANNELS)[number];
-export const MANUAL_CHANNEL_LABELS: Record<ManualChannel, string> = {
-  messenger_bod: "BOD group chat",
-  messenger_community: "Community group chat"
-};
-
-/** The text to paste into a chat: the subject as its own first line, a blank line, then the message. No email footer. */
-export function messengerText(content: BroadcastContent): string {
-  return `${content.subject}\n\n${content.body}`;
-}
 
 export type ManualPost = { channel: ManualChannel; at: Date; byUid: string; byName: string };
 

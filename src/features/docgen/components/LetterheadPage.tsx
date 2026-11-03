@@ -25,6 +25,8 @@ const LetterheadPage = forwardRef<HTMLDivElement, LetterheadPageProps>(
     onBackgroundLoad?.();
   };
 
+  // The letterhead and seal are WebP copies of the PNGs next to them (about 1/8 of the bytes). The export
+  // draws this DOM with html-to-image, so the downloaded PDF/JPEG uses the same files.
   return (
     <div
       ref={ref}
@@ -32,7 +34,7 @@ const LetterheadPage = forwardRef<HTMLDivElement, LetterheadPageProps>(
       style={{ width: LETTER_WIDTH_PX, height: LETTER_HEIGHT_PX }}
     >
       <img
-        src="/assets/docgen/ghmo-letterhead.png"
+        src="/assets/docgen/ghmo-letterhead.webp"
         alt=""
         aria-hidden="true"
         onLoad={handleLoad}
@@ -40,7 +42,7 @@ const LetterheadPage = forwardRef<HTMLDivElement, LetterheadPageProps>(
         className="pointer-events-none absolute inset-0 h-full w-full object-contain object-top"
       />
       <img
-        src="/assets/docgen/ghmo-seal.png"
+        src="/assets/docgen/ghmo-seal.webp"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute z-10"

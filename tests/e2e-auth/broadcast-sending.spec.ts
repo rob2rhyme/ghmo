@@ -35,7 +35,7 @@ test.beforeEach(async () => {
     await db.doc(`${ORG}/members/m${i}`).set({ email: `m${i}@example.org`, emailLower: `m${i}@example.org`, status: "active", roles: ["member"], emailConsent: { source: "imported" } });
   }
   await db.doc(`${ORG}/members/out`).set({ emailLower: "out@example.org", status: "active", emailConsent: { source: "imported" }, emailOptOutAt: new Date() });
-  const { hashBroadcast } = await import("../../src/lib/broadcast");
+  const { hashBroadcast } = await import("../../src/lib/broadcastHash");
   const content = { subject: "Annual meeting", body: "Join us on Saturday." };
   await db.doc(`${ORG}/broadcasts/b1`).set({
     ...content,

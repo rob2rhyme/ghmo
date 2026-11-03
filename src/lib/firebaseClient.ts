@@ -1,13 +1,23 @@
 //src/lib/firebaseClient.ts
-import { getApp, getApps, initializeApp } from "firebase/app";
+//
+// Firebase app + Auth only. Firestore lives in ./firebaseFirestore so that pages which only need Auth
+// (sign-in, sign-out) never download the Firestore SDK; public pages import neither at module level.
+import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { getClientEnv } from "./env.client";
 
 let firebaseInitError: string | null = null;
 let missingEnvKeys: string[] = [];
-let firebaseAuth: ReturnType<typeof getAuth> | null = null;
-let firestore: ReturnType<typeof getFirestore> | null = null;
+let firebaseApp: FirebaseApp | null = null;
+let firebaseAuth: Auth | null = null;
+
+/** True on localhost with NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true: talk to the local Firebase emulators. */
+export function shouldUseFirebaseEmulators(): boolean {
+  if (typeof window === "undefined") return false;
+  // Ignored on any non-localhost origin, so a mis-set flag can never redirect a deployed site's traffic.
+  const onLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  return onLocalhost && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+}
 
 function initFirebaseClients() {
   const { ok, env, missing } = getClientEnv();
@@ -25,17 +35,12 @@ function initFirebaseClients() {
     appId: env.NEXT_PUBLIC_FIREBASE_APP_ID
   };
 
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  const isFirstInit = !firebaseAuth || !firestore;
-  firebaseAuth = firebaseAuth ?? getAuth(app);
-  firestore = firestore ?? getFirestore(app);
+  firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const isFirstInit = !firebaseAuth;
+  firebaseAuth = firebaseAuth ?? getAuth(firebaseApp);
 
-  // Test-only: talk to the local Firebase emulators. Ignored on any non-localhost origin,
-  // so a mis-set flag can never redirect a deployed site's traffic.
-  const onLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-  if (isFirstInit && onLocalhost && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") {
+  if (isFirstInit && shouldUseFirebaseEmulators()) {
     connectAuthEmulator(firebaseAuth, "http://127.0.0.1:9099", { disableWarnings: true });
-    connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
   }
 }
 
@@ -45,30 +50,41 @@ try {
   }
 } catch (err: any) {
   firebaseInitError = err?.message || "Missing Firebase web config";
+  firebaseApp = null;
   firebaseAuth = null;
-  firestore = null;
 }
 
-export function getFirebaseAuth(): Auth {
+function ensureInit() {
   if (typeof window === "undefined") {
-    throw new Error("Firebase Auth is client-only");
+    throw new Error("Firebase client is client-only");
   }
-  if (firebaseAuth) return firebaseAuth;
+  if (firebaseApp && firebaseAuth) return;
   if (firebaseInitError) {
     throw new Error(firebaseInitError || "Firebase init error");
   }
-
   try {
     initFirebaseClients();
   } catch (err: any) {
     firebaseInitError = err?.message || "Missing Firebase web config";
     throw new Error(firebaseInitError || "Firebase init error");
   }
+}
 
+/** The initialised Firebase app (browser only); other SDK modules (Firestore) are created from it. */
+export function getFirebaseApp(): FirebaseApp {
+  ensureInit();
+  if (!firebaseApp) {
+    throw new Error("Firebase app is unavailable");
+  }
+  return firebaseApp;
+}
+
+export function getFirebaseAuth(): Auth {
+  ensureInit();
   if (!firebaseAuth) {
     throw new Error("Firebase Auth is unavailable");
   }
   return firebaseAuth;
 }
 
-export { firestore, firebaseInitError, missingEnvKeys };
+export { firebaseInitError, missingEnvKeys };

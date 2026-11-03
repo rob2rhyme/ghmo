@@ -8,12 +8,18 @@ import { toPlain } from "@/src/lib/serialize.server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The public list (published events) may be served by the CDN for 5 minutes; next.config.mjs leaves this
+ * path out of its blanket no-store, so the admin variants (status=all/draft/archived) set no-store here.
+ */
+const PUBLIC_API_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
+
 export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
   const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -84,10 +90,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
         message.includes("FAILED_PRECONDITION") ||
         message.includes("requires an index");
       if (!missingIndex) {
-        return NextResponse.json(
-          { ok: false, error: "EVENTS_QUERY_FAILED", message },
-          { status: 500 }
-        );
+        console.error("Events query failed", message);
+        return NextResponse.json({ ok: false, error: "EVENTS_QUERY_FAILED" }, { status: 500 });
       }
       if (process.env.NODE_ENV === "production") {
         return NextResponse.json(
@@ -116,6 +120,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     // Firestore timestamps become epoch milliseconds; raw Timestamp objects reach the browser as
     // {_seconds, _nanoseconds}, which `new Date()` cannot read ("Invalid Date", and no upcoming events).
     const response = NextResponse.json({ ok: true, events: filtered.map(evt => toPlain(evt)) });
+    response.headers.set("Cache-Control", authMode === "public" ? PUBLIC_API_CACHE_CONTROL : "no-store");
     if (process.env.NODE_ENV !== "production") {
       response.headers.set("x-events-auth", authMode);
     }
@@ -123,7 +128,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }
