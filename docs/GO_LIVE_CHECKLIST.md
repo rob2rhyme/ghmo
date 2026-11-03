@@ -17,6 +17,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] **Donate button:** set `GOFUNDME_PUBLIC_URL` to the real Gumba Project campaign page (`https://www.gofundme.com/f/…`). Until it is set, the Donate buttons are hidden and the site says "Donations open soon". Optional: `GOFUNDME_PRO_CAMPAIGN_ID` for the embedded donation form.
 - [ ] **Contact email:** set `CONTACT_EMAIL` (for example `info@…`). The footer's Contact line and the "email us" links on help messages appear once it is set.
 - Changing any of the settings above takes a **redeploy** in Vercel (public pages are built once and cached).
+- [ ] **Board review (round 3):** a Nepali-literate board member proofreads the wedding certificate's Nepali text; the board reviews the certificate's community list with elders; the board confirms the Donate page's line on what a Gumba is.
 - [ ] **Social links (optional):** `FACEBOOK_PAGE_URL`, `INSTAGRAM_PROFILE_URL`, `TIKTOK_PROFILE_URL`, `YOUTUBE_CHANNEL_URL`. Sections without a link are hidden; YouTube defaults to GHMO's channel.
 - [ ] Optional: Resend account, verified sending domain, `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL`. Each admin then opts in under Admin → Security.
 - [ ] **Before the first broadcast to members (Phase 8):** in Resend add a webhook to `https://<your domain>/api/resend/webhook` for `email.bounced` and `email.complained`, and set its signing secret as `RESEND_WEBHOOK_SECRET`; set `BROADCAST_ORG_NAME` and `BROADCAST_POSTAL_ADDRESS` (the footer of every broadcast); verify the sending domain (SPF, DKIM, DMARC). Test one-click unsubscribe from a real mail app. Then set `FEATURE_BROADCASTS=true` (and `BROADCAST_DAILY_LIMIT` to your Resend plan's daily allowance), and send a first broadcast to a small test list of members before the real one.
@@ -24,6 +25,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 ## 2. Firestore
 
 - [ ] Deploy the rules: `npx firebase deploy --only firestore:rules` (or paste `firestore.rules` into the console). Redeploy after every release that changes them.
+  **Order matters for the round-3 release:** deploy the site first, then the rules. The new rules end an admin's database access when their 8-hour session ends, using a claim only the new site adds; rules deployed before the site would lock admins out of chat, Plans & Issues and action items until the site update is live.
 - [ ] TTL policies on the field `expiresAt` for the collection groups `rateLimits` and `webauthnChallenges`.
 - [ ] Delete Firestore backups and exports made **before** encryption was turned on (they contain plaintext), and review who can still read the Firebase console.
 

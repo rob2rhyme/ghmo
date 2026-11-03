@@ -514,7 +514,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ## 9. What is next (updated 2026-11-03)
 
-Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77), and the round-2 audit fixes and speed pass are done (§14). In the codebase, the round-3 fix plan (`docs/AUDIT_ROUND_3.md`) and the round-2 security lows (S7 per-email sign-in limit, S10 `__Host-` cookie, S15 Firestore rule shape checks, S16 SHA pinning, S18 permission matrix) are waiting; everything else left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
+Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77), and the round-2 audit fixes and speed pass are done (§14). In the codebase, the round-3 leftovers (L8 artwork, the sign-in page's intermittent layout shift to watch) and the round-2 security lows (S7 per-email sign-in limit, S10 `__Host-` cookie, S15 Firestore rule shape checks, S16 SHA pinning, S18 permission matrix) are waiting; everything else left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
 
 1. ~~Make the repository public, or fix GitHub Actions billing.~~ Done: CI runs again (PR #77's checks ran on GitHub).
 2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
@@ -820,6 +820,12 @@ sizes, four code reviewers). 72 findings: 6 High, 27 Medium, 39 Low.
   couple, its "lawful" wording, and a flyer button that fails for visitors), 21 Medium, 33 Low. The speed pass's cache
   holds up under review; its Lighthouse table was re-measured on real data (phones 94–99). Fix plan at the top of the
   document; needs the owner for the flyer audience, the certificate's community list and one line on the Gumba.
+- **Round 3 fixes (same day):** 55 of 58 rows fixed (L17 and P9 in part, L8 waits for photos), in four commits
+  (security and data layer, content, public pages, admin layout). Highlights: the wedding certificate's version 2, a
+  public flyer, the events pages in the cached public layout, sessions that can't outlive 8 hours (cookie, Bearer,
+  browser sign-in and Firestore rules), encryption that fails closed, an authenticator lockout. Every suite passes; the
+  browser suites now run with the public cache on. Deploy the site before the rules. Status and numbers: "Status after
+  the fix pass" in `docs/AUDIT_ROUND_3.md`.
 
 ## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, built 2026-11-03)
 
@@ -830,7 +836,7 @@ sizes, four code reviewers). 72 findings: 6 High, 27 Medium, 39 Low.
 
 **Out of scope:** features, data, API routes, Firestore rules, sign-in and encryption logic. Security screens (encryption setup, device approval, safety codes, recovery key) may be restyled and reworded, but their steps, confirmations and warnings stay exactly as they are; their browser tests must keep passing unchanged.
 
-**Pages:** every route group: public (`app/(public)`), member (`app/(member)`), sign-in (`app/(auth)`), signing (`app/(sign)`), documents (`app/(docs)`) and admin (`app/(admin)`), plus the offline page.
+**Pages:** every route group: public (`app/(public)`), member (`app/(member)`; since round 3 the events pages live in `(public)` and the group is gone), sign-in (`app/(auth)`), signing (`app/(sign)`), documents (`app/(docs)`) and admin (`app/(admin)`), plus the offline page.
 
 ### 13.2 Method
 Two audit passes, each followed by fixes. Each pass ends deployable (lint, tests, build green).

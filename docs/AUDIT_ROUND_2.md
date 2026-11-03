@@ -103,8 +103,8 @@ WebP, preloaded). Phones are not at 90 yet: the rest is P2–P4 (server renderin
   (`s-maxage=300` on the CDN). Every admin write expires its tag at once: event create, update and delete, every
   minutes change, the encryption migration, the GoFundMe webhook and reconcile. A change made outside the app (the
   Firebase console) shows within 5 minutes. A failed read at request time throws, so the last good page keeps being
-  served; during the build (CI has no Firebase settings) it shows a "can't be read" state instead of failing. Against
-  the emulators nothing is cached, because the browser suites write to Firestore directly; a separate check on a
+  served; during the build (CI has no Firebase settings) it shows a "can't be read" state instead of failing. (Round 3: the browser suites now
+  use the cache too and expire it on each reset.) Previously, against the emulators nothing was cached; a separate check on a
   normal build confirmed that an admin write shows at once and a direct database write stays hidden until the refresh.
 - **P3:** admin pages call shared read functions (`src/lib/adminData.server.ts`) instead of their own API, and the API
   routes call the same functions, so their answers are unchanged. `internalFetch` and its URL helper are deleted, which

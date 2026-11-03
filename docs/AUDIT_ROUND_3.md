@@ -53,6 +53,74 @@ Donate page (C9). Still open from before: the GoFundMe link, the contact email, 
 4. **Layout regressions and states:** L1, L2, L3, then the Lows.
 5. **Wording pass:** C7–C12, then the Lows; re-run screenshots, axe and Lighthouse.
 
+## Status after the fix pass (2026-11-03)
+
+The owner said "fix all". Defaults taken where the owner had not answered: the event flyer is public (C4); the wedding
+certificate's community list gains "Magar" and "Other", loses "जात", fixes two labels and becomes optional, while the
+list itself waits for the board and elders (C5); the Donate page's line on what a Gumba is reuses the site's own words
+and is marked for the board to confirm (C9).
+
+**Fixed: 55 of 58.** Partly: L17 (past events are now seeded and captured; empty and failed lists still can't be),
+P9 (ids are checked before the cache; "not found" is still cached, because the page cache would store it anyway).
+Deferred: L8 (the Donate artwork waits for the owner's photos).
+
+- **Security (all 11):** S1 `post-auth` links a member record only after the same verified-email and same-account
+  check as the session route. S2 a session cookie is minted only from a sign-in under 5 minutes old; Bearer tokens are
+  no longer accepted; the browser's Firebase sign-in lives in memory only; the custom token carries the session's expiry
+  (`sessionExp`) and the Firestore rules end database access with it (with a rules test). S3 a device that has pinned
+  the device list treats "encryption off" or an empty list as an integrity failure, and never writes plaintext after one
+  (unit tests; the gate shows the failure first). S4 20 wrong authenticator codes in a day lock code sign-in until a
+  super admin resets it, with an audit entry and a notice to opted-in admins (browser test). S5 the public
+  event-minutes API is deleted (its test moved to the archive page) and the event page caches only the minutes' id.
+  S6 cache expiry right after each data write; the public events API and calendar feed keep a CDN copy for one minute,
+  never stale. S7 visitors get a public event shape (no creator uid, no flyer settings). S8 emailed and signing links
+  use only the configured address in production. S9 no env names or raw database text in responses. S10 every shared
+  admin read takes the caller's admin check as a required argument. S11 `img-src` no longer allows googleusercontent.
+- **Performance:** P1 a build with Firebase settings fails instead of publishing an error page. P2 `expireTime: 3600`.
+  P3 the logo is fetched at its drawn size. P4 the events list and event page live in the public layout, cached for 5
+  minutes like Home, with the admin-only minutes controls loaded in the browser; Home → Events is no longer a full
+  reload. P5 no prefetch across root layouts or on the admin sidebar. P6 `fetchPriority="high"` on both heroes,
+  `sizes` on the Akkha images. P7 a readable sign-in hint cookie (no secret) lets visitors skip `/api/auth/me`; the
+  route verifies once and reuses the guard's profile. P8 minutes detail is cached on first visit; `/gumba-project` is a
+  config redirect; the document-generator message is static. P10 the calendar and flyer use the cached loaders; the
+  flyer is CDN-cacheable for a minute. P11 upcoming and past events are read separately (the 100 most recent past
+  events), undated ones by name, and the archive reads every approved record. P12 the GoFundMe Pro snippet loads on
+  Donate only, lazily. P13 the device-list request is skipped when this tab last saw encryption off.
+- **Layout:** all but L8, as in the table (L17 partly).
+- **Content:** all 17. Still for the board: proofread the certificate's Nepali text and review its community list.
+
+**Testing change.** The browser suites now run with the public cache on, exactly as production does; the shared
+reset (`clearEmulators`) also expires it through `/api/test/expire-public-cache`, a route that exists only in emulator
+builds and answers 404 in every real build. Before, the cache was off in the test build, which also hid a real
+problem: a cached page with an id in its URL can't switch to per-request rendering at runtime.
+
+**Release note.** Deploy the site before the Firestore rules: the new rules need the `sessionExp` claim that only the
+new site adds (`docs/GO_LIVE_CHECKLIST.md`). Changing `CONTACT_EMAIL` or the GoFundMe link now takes a redeploy, since
+more pages are built ahead of time.
+
+**Rerun after the fixes** (every suite on the final code): typecheck clean; lint 62 warnings (cap lowered to 62); 346
+unit tests; 98 emulator tests (rules, auth integration); 224 browser tests; 370 screenshots and the axe scan at 0; the
+production build and its 43 browser tests; the cache check on a normal build (an admin write shows at once, a direct
+database write stays hidden, the events list and event page are CDN-cacheable, visitors get no sign-in hint cookie,
+the flyer downloads for visitors and an unknown one is a plain 404): 15 of 16 pass, and the one miss was the check
+script still looking for the old "couldn't be loaded" wording. Lighthouse on a build that read real data, phone:
+
+| Page | Round 2 audit | Round 3 audit (real data) | After round 3 fixes |
+|---|---|---|---|
+| Home | 50 | 94 | **90** |
+| Donate | 59 | 98 | **84–94** (three runs; the hero picture on a slow connection) |
+| Events | 58 | 95 | **99** |
+| Minutes | 51 | 99 | **100** |
+| Media | 80 | 94 | **94** |
+| Board guide | 78 | 99 | **97** |
+| Admin sign-in | 72 | 94 | **99** |
+| Member sign-in | 78 | 97 | **97–100** (see below) |
+
+Desktop is 100 on every page; page weight is down another 30–70 KB on each (the logo). SEO on the two sign-in pages is
+63 by design: they are now marked "don't index". **Open item:** the member sign-in page showed a 0.29 layout shift (the
+footer moving) in 2 of 9 phone runs, with no cause recorded and no late request; a focused probe with a throttled phone
+saw none. Worth watching in production (Vercel Speed Insights) before chasing further.
+
 ---
 
 ## 1. Layout (fresh eyes)
