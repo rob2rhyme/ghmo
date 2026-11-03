@@ -794,6 +794,20 @@ Unit: split rule (equal counts, household grouping, stability, add and remove ca
 
 ---
 
+## 14. Audit round 2 — layout, performance, security, content (2026-11-03)
+
+After Phase 10 merged, the owner asked for a fresh round of four audits. Method and findings: **`docs/AUDIT_ROUND_2.md`**
+(production build, 334 screenshots, axe at 0, Lighthouse on 8 pages at phone and desktop, `npm audit`, bundle and asset
+sizes, four code reviewers). 72 findings: 6 High, 27 Medium, 39 Low.
+
+- **Highs:** an email link alone can add an active passkey to an admin who uses the authenticator app (S1); blank
+  document fields print "TBD" and invented contacts into real letters (C1); the shared `Steps` list squeezes its text on
+  phones, a regression from Upgrade 2 (L1); phones score 50–59 on the main public pages because the Firebase SDK ships to
+  every visitor, pages render per request and call their own API, and admin pages verify the session three times (P1–P4).
+- **Sound:** accessibility 100 and SEO 100 on every page; production dependencies at 0 vulnerabilities; session,
+  input, CSP and rate-limit design hold up; desktop performance 69–100.
+- **Next:** the fix plan at the end of `docs/AUDIT_ROUND_2.md` (security Highs first, then content, layout, performance).
+
 ## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, built 2026-11-03)
 
 **Goal.** Make the whole site **beginner friendly** (a first-time member or a new BOD admin can find what they need and finish a task without help) with a **premium, modern look**. The work is **layout only**: how pages look and read, not what they do.
