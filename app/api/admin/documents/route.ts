@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     if (payload.enc) {
       if (!e2eeOn || !payload.docId) return NextResponse.json({ error: "Invalid encrypted document" }, { status: 400 });
       if (!(await deviceBelongsTo(payload.enc as EnvelopeInput, actor.uid))) {
-        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       }
     }
     const saved = await createDocument({

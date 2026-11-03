@@ -1,20 +1,14 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { GHMO_YOUTUBE_CHANNEL_URL, SOCIAL_ORDER, type SocialProfile } from "@/src/components/public/socialMeta";
-import { internalFetch } from "@/src/lib/internalFetch";
 import { loadFacebookMedia, loadInstagramFeature, loadTikTokFeature, loadYouTubeMedia, type MediaFeed } from "@/src/lib/media";
 
-async function fetchYouTubeFeed(): Promise<MediaFeed> {
-  try {
-    const res = await internalFetch("/api/media/youtube");
-    if (!res.ok) {
-      return loadYouTubeMedia();
-    }
-    return (await res.json()) as MediaFeed;
-  } catch {
-    return loadYouTubeMedia();
-  }
-}
+/**
+ * The YouTube feed, called directly (no hop through /api/media/youtube, which stays for the browser) and
+ * kept in the shared data cache for 15 minutes, so a cold server function does not call YouTube again.
+ */
+const fetchYouTubeFeed = unstable_cache(() => loadYouTubeMedia(), ["youtube-feed"], { revalidate: 900 });
 
 /** All four social feeds for the public pages, in display order. YouTube always links to GHMO's channel. */
 export async function loadPublicFeeds(): Promise<MediaFeed[]> {

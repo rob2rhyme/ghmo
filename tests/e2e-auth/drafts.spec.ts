@@ -23,7 +23,7 @@ const draftDump = (page: Page) =>
 
 test("nothing is saved locally until encryption is on and the device is unlocked", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/comms");
-  await page.getByPlaceholder("e.g., Approve community outreach plan").fill(TITLE);
+  await page.getByPlaceholder("e.g. Approve community outreach plan").fill(TITLE);
   await page.getByPlaceholder("Summarize the plan, proposal, or issue.").fill(BODY);
   await page.waitForTimeout(2000);
   expect(await draftKeys(page)).toEqual([]);
@@ -37,7 +37,7 @@ test("unsent drafts are kept encrypted on this device, offered after a reload, a
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Plans & Issues" }).click();
 
   // --- A new topic draft ---
-  await page.getByPlaceholder("e.g., Approve community outreach plan").fill(TITLE);
+  await page.getByPlaceholder("e.g. Approve community outreach plan").fill(TITLE);
   await page.getByPlaceholder("Summarize the plan, proposal, or issue.").fill(BODY);
   await expect.poll(() => draftKeys(page)).toHaveLength(1);
   const stored = await draftDump(page);
@@ -48,7 +48,7 @@ test("unsent drafts are kept encrypted on this device, offered after a reload, a
   await page.getByRole("button", { name: "Unlock with passkey" }).click();
   await expect(page.getByText(/You have an unsaved draft/)).toBeVisible();
   await page.getByRole("button", { name: "Restore draft" }).click();
-  await expect(page.getByPlaceholder("e.g., Approve community outreach plan")).toHaveValue(TITLE);
+  await expect(page.getByPlaceholder("e.g. Approve community outreach plan")).toHaveValue(TITLE);
   await expect(page.getByPlaceholder("Summarize the plan, proposal, or issue.")).toHaveValue(BODY);
 
   // Starting the topic clears the draft.

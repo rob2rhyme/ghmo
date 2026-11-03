@@ -34,7 +34,7 @@ test.beforeEach(async () => {
 test("opted-in admins get one content-free email per half hour; nobody else does", async ({ page }) => {
   const SECRET = "Quietly buy the old hall on Friday";
   await signInWithNewPasskey(page, "alice", "/admin/chat");
-  const box = page.getByPlaceholder("Share an update or ask for help...");
+  const box = page.getByPlaceholder("Share an update or ask for help…");
   const bubble = page.locator("p", { hasText: SECRET });
 
   await box.fill(SECRET);

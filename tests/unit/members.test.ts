@@ -137,7 +137,7 @@ describe("parseMemberCsv with a phone column", () => {
     ]);
   });
 
-  it("imports the person without the number when it is not recognised, and says so", () => {
+  it("imports the person without the number when it is not recognized, and says so", () => {
     const result = parseMemberCsv("email,phone\nsam@example.org,555-01\n");
     expect(result.rows).toEqual([{ email: "sam@example.org" }]);
     expect(result.problems).toHaveLength(1);

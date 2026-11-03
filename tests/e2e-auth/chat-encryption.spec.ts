@@ -16,10 +16,10 @@ type Page = import("@playwright/test").Page;
 const bubble = (page: Page, text: string) => page.locator("p", { hasText: text });
 
 async function send(page: Page, text: string) {
-  await page.getByPlaceholder("Share an update or ask for help...").fill(text);
+  await page.getByPlaceholder("Share an update or ask for help…").fill(text);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(bubble(page, text)).toBeVisible();
-  await expect(page.getByPlaceholder("Share an update or ask for help...")).toHaveValue("");
+  await expect(page.getByPlaceholder("Share an update or ask for help…")).toHaveValue("");
 }
 
 test("chat is plaintext until encryption is on, then stored as ciphertext and readable only after unlock", async ({ browser }) => {

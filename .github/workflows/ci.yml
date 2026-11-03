@@ -98,4 +98,4 @@ jobs:
           node-version: 22
       # Blocks on critical advisories in production dependencies.
       # Known high/moderate residuals are tracked in docs/PROJECT_PLAN.md (Phase 0 notes).
-      - run: npm audit --omit=dev --audit-level=critical
+      - run: npm audit --omit=dev --audit-level=high

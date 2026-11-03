@@ -166,7 +166,7 @@ function MyCalls() {
         title="You are not on the caller list"
         description={
           superAdmin
-            ? "Add yourself as a caller: tick your name under Calling tree, plan assignments and save. Your people then show up here."
+            ? "Add yourself as a caller: check your name under Calling tree, plan assignments and save. Your people then show up here."
             : "Ask a super admin to add you under Calling tree."
         }
         action={

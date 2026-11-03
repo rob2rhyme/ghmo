@@ -62,7 +62,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   await expect(page.getByRole("list", { name: "Planned changes" }).getByRole("listitem")).toHaveCount(5);
   await expect(shown(page, "Everyone callable has a caller.")).toBeVisible();
   await page.getByRole("button", { name: "Save calling tree" }).click();
-  await expect(page.getByText(/Calling tree saved \(v1\): 5 added, 0 moved, 0 removed/)).toBeVisible();
+  await expect(page.getByText(/Calling tree saved: 5 added, 0 moved, 0 removed/)).toBeVisible();
 
   const { db } = admin();
   const tree = (await db.doc(`${ORG}/callingTree/current`).get()).data()!;
@@ -85,7 +85,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   const bobList = page.getByRole("list", { name: "People assigned to Bob" });
   await bobList.getByRole("combobox", { name: /^Caller for / }).first().selectOption("alice");
   await page.getByRole("button", { name: "Save calling tree" }).click();
-  await expect(page.getByText(/Calling tree saved \(v2\): 0 added, 1 moved, 0 removed/)).toBeVisible();
+  await expect(page.getByText(/Calling tree saved: 0 added, 1 moved, 0 removed/)).toBeVisible();
   const movedDocs = (await db.collection(`${ORG}/callingTree/current/assignments`).where("assignedBy", "==", "alice").get()).docs;
   expect(movedDocs).toHaveLength(1);
   expect(movedDocs[0].get("callerUid")).toBe("alice");
@@ -163,7 +163,7 @@ test("removing a caller moves only that caller's people, and a call opt-out drop
   await page.getByRole("button", { name: "Plan assignments" }).click();
   await expect(page.getByRole("list", { name: "Planned changes" }).getByRole("listitem")).toHaveCount(4);
   await page.getByRole("button", { name: "Save calling tree" }).click();
-  await expect(page.getByText(/Calling tree saved \(v2\): 0 added, 2 moved, 0 removed/)).toBeVisible();
+  await expect(page.getByText(/Calling tree saved: 0 added, 2 moved, 0 removed/)).toBeVisible();
   const after = Object.fromEntries((await col.get()).docs.map(d => [d.id, d.get("callerUid") as string]));
   expect(Object.values(after).every(uid => uid === "alice")).toBe(true);
   for (const [id, uid] of Object.entries(before)) if (uid === "alice") expect(after[id]).toBe("alice");
@@ -180,7 +180,7 @@ test("removing a caller moves only that caller's people, and a call opt-out drop
   await expect(page.getByRole("list", { name: "Planned changes" }).getByRole("listitem")).toHaveCount(1);
   await expect(page.getByText("removed (can no longer be called)")).toBeVisible();
   await page.getByRole("button", { name: "Save calling tree" }).click();
-  await expect(page.getByText(/Calling tree saved \(v3\): 0 added, 0 moved, 1 removed/)).toBeVisible();
+  await expect(page.getByText(/Calling tree saved: 0 added, 0 moved, 1 removed/)).toBeVisible();
   expect((await col.get()).size).toBe(3);
   await context.close();
 });

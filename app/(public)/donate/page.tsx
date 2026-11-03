@@ -70,87 +70,79 @@ export default async function DonatePage() {
             title="A home for our language, culture, and community"
             description="Help us build a Gumba for the Magar community in Harrisburg. Every contribution, large or small, brings us closer."
           />
-          <DonateAction donateUrl={donateUrl} />
+          <DonateAction
+            donateUrl={donateUrl}
+            detail="When the campaign opens, every gift goes toward planning and building the Gumba, our community's permanent home in Harrisburg."
+          />
         </div>
-        <div className="relative aspect-3/2 min-w-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs">
+        {/* The same artwork as the home page, cropped to the building (the home page shows the whole scene). */}
+        <div className="relative aspect-video min-w-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs">
           <Image
-            src="/assets/Ghmo-building.png"
+            src="/assets/ghmo-building.webp"
             alt="Artwork of the planned GHMO Gumba building, with children in traditional Magar dress outside"
             fill
             priority
             sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
-            className="object-cover object-center"
+            className="object-cover object-top"
           />
         </div>
       </section>
 
-      {/* Campaign and progress */}
-      <section aria-labelledby="donate-progress" className="flex flex-col gap-5 rounded-xl border border-primary/20 bg-primary/5 p-5 md:p-6">
-        {notStarted ? (
+      {/* Campaign and progress (nothing to show until the campaign opens: the notice above says so) */}
+      {notStarted ? null : (
+        <section aria-labelledby="donate-progress" className="flex max-w-3xl flex-col gap-5 rounded-xl border border-primary/20 bg-primary/5 p-5 md:p-6">
           <div className="flex flex-col gap-1">
             <h2 id="donate-progress" className="text-lg font-semibold">
-              Fundraising starts soon
+              Building a Gumba for the Magar community in Harrisburg
             </h2>
             <p className="text-base text-muted-foreground">
-              When the campaign opens, every gift goes toward planning and building the Gumba, our community&apos;s permanent
-              home in Harrisburg.
+              A community fundraising campaign for a permanent home for unity, learning, and faith.
             </p>
           </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-1">
-              <h2 id="donate-progress" className="text-lg font-semibold">
-                Building a Gumba for the Magar community in Harrisburg
-              </h2>
-              <p className="text-base text-muted-foreground">
-                A community fundraising campaign for a permanent home for unity, learning, and faith.
-              </p>
+
+          {statsWarning ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Info className="size-4 shrink-0" aria-hidden="true" />
+              {statsWarning}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {totalRaised > 0 ? (
+                <p className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-3xl font-semibold tracking-tight">{currencyFormatter.format(totalRaised)}</span>
+                  <span className="text-base text-muted-foreground">
+                    raised{hasGoal ? ` of ${currencyFormatter.format(goal as number)} goal` : ""}
+                  </span>
+                </p>
+              ) : (
+                <p className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-2xl font-semibold tracking-tight">Be the first to give</span>
+                  {hasGoal ? (
+                    <span className="text-base text-muted-foreground">Goal: {currencyFormatter.format(goal as number)}</span>
+                  ) : null}
+                </p>
+              )}
+
+              {hasGoal ? (
+                <ProgressBar
+                  value={totalRaised}
+                  max={goal as number}
+                  label={`${currencyFormatter.format(totalRaised)} of ${currencyFormatter.format(goal as number)} raised`}
+                  className="h-3"
+                />
+              ) : null}
+
+              {hasGoal || showDonors || timeLeftLabel ? (
+                <StatGrid>
+                  {hasGoal ? <StatTile label="Progress" value={`${percent}%`} hint="of the goal" /> : null}
+                  {showDonors ? <StatTile label="Donors" value={numberFormatter.format(donorCount as number)} /> : null}
+                  {timeLeftLabel ? <StatTile label="Time left" value={timeLeftLabel} /> : null}
+                </StatGrid>
+              ) : null}
             </div>
-
-            {statsWarning ? (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Info className="size-4 shrink-0" aria-hidden="true" />
-                {statsWarning}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {totalRaised > 0 ? (
-                  <p className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="text-3xl font-semibold tracking-tight">{currencyFormatter.format(totalRaised)}</span>
-                    <span className="text-base text-muted-foreground">
-                      raised{hasGoal ? ` of ${currencyFormatter.format(goal as number)} goal` : ""}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="text-2xl font-semibold tracking-tight">Be the first to give</span>
-                    {hasGoal ? (
-                      <span className="text-base text-muted-foreground">Goal: {currencyFormatter.format(goal as number)}</span>
-                    ) : null}
-                  </p>
-                )}
-
-                {hasGoal ? (
-                  <ProgressBar
-                    value={totalRaised}
-                    max={goal as number}
-                    label={`${currencyFormatter.format(totalRaised)} of ${currencyFormatter.format(goal as number)} raised`}
-                    className="h-3"
-                  />
-                ) : null}
-
-                {hasGoal || showDonors || timeLeftLabel ? (
-                  <StatGrid>
-                    {hasGoal ? <StatTile label="Progress" value={`${percent}%`} hint="of the goal" /> : null}
-                    {showDonors ? <StatTile label="Donors" value={numberFormatter.format(donorCount as number)} /> : null}
-                    {timeLeftLabel ? <StatTile label="Time left" value={timeLeftLabel} /> : null}
-                  </StatGrid>
-                ) : null}
-              </div>
-            )}
-          </>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
       {/* The story, grouped */}
       <section aria-labelledby="donate-why" className="flex max-w-3xl flex-col gap-4">
@@ -205,7 +197,7 @@ export default async function DonatePage() {
       {/* How to give, with the action repeated once the campaign link is set */}
       <section
         aria-labelledby="donate-how"
-        className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xs md:p-8"
+        className="flex max-w-3xl flex-col gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xs md:p-8"
       >
         <PublicSectionTitle id="donate-how">How to contribute</PublicSectionTitle>
         <p className="max-w-3xl text-base">

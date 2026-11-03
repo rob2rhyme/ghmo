@@ -45,7 +45,7 @@ type MemberLite = {
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: "no-store", headers: { "Content-Type": "application/json" }, ...init });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
   return data;
 }
 
@@ -144,7 +144,7 @@ function CallingTree() {
         method: "PUT",
         body: JSON.stringify({ callers, assignments: draft.map(a => ({ ...a, manual: manual.has(a.memberId) })) })
       });
-      toast.success(`Calling tree saved (v${result.version}): ${result.added} added, ${result.moved} moved, ${result.removed} removed`);
+      toast.success(`Calling tree saved: ${result.added} added, ${result.moved} moved, ${result.removed} removed`);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save");
@@ -182,7 +182,7 @@ function CallingTree() {
   const encryptionOn = e2ee.enabled;
   const planBlocker =
     callers.length === 0
-      ? "Tick at least one caller first."
+      ? "Check at least one caller first."
       : !encryptionOn
         ? "Turn on encryption first: households and numbers are read from encrypted contacts."
         : !ready
@@ -211,11 +211,11 @@ function CallingTree() {
     {
       done: eligibleCount > 0,
       title: "Add phone numbers and call consent",
-      detail: "On Members, add each person's number and tick that they gave it for community calls.",
+      detail: "On Members, add each person's number and check that they gave it for community calls.",
       href: "/admin/members",
       linkLabel: "Open Members"
     },
-    { done: callers.length > 0, title: "Choose callers", detail: "Tick the admins who will phone people, in Callers below." },
+    { done: callers.length > 0, title: "Choose callers", detail: "Check the admins who will phone people, in Callers below." },
     {
       done: false,
       title: "Open a campaign",
@@ -237,7 +237,7 @@ function CallingTree() {
       ) : null}
 
       {eligibleCount === 0 ? (
-        <AdminSectionCard title="Get the calling tree ready" description="Nobody can be called yet. Work through these steps in order; each one ticks itself once it is done.">
+        <AdminSectionCard title="Get the calling tree ready" description="Nobody can be called yet. Work through these steps in order; each one is checked off once it is done.">
           <Steps
             layout="list"
             label="Steps to get the calling tree ready"
@@ -384,7 +384,7 @@ function CallingTree() {
         <EmptyState
           icon={<Network aria-hidden="true" />}
           title="No callers yet"
-          description={superAdmin ? "Tick the admins who will phone people, then press Plan assignments." : "A super admin chooses the callers."}
+          description={superAdmin ? "Check the admins who will phone people, then press Plan assignments." : "A super admin chooses the callers."}
         />
       ) : null}
     </div>

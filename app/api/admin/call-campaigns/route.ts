@@ -30,13 +30,13 @@ const createSchema = z.object({
 
 function errorResponse(error: unknown) {
   if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-  if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (error instanceof AdminEnvError) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   throw error;
 }
 
 /** Every campaign with its counts; with `?mine=1`, also the caller's own rows and members for each open campaign. */
 export async function GET(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const campaigns = await listCampaigns();
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
 /** Opens a campaign from the current calling tree (any active admin); emails the callers who have people in it. */
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const parsed = await parseJsonBody(req, createSchema);
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     if (body.script) {
       const checker = await envelopeChecker(actor.uid);
       if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
-      if (!checker.ok(body.script as EnvelopeInput)) return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+      if (!checker.ok(body.script as EnvelopeInput)) return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
     }
     const now = new Date();
     const result = await createCampaign({

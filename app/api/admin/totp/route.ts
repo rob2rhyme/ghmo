@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** Super admins: which other admins have an authenticator app set up (for the reset list). */
 export async function GET(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor } = await requireSuperAdmin(req, COMMUNITY_SLUG);
     const admins = (await listAdmins(COMMUNITY_SLUG)).filter(a => a.status === "active" && a.id !== actor.uid);

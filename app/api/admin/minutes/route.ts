@@ -233,7 +233,7 @@ export async function GET(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -270,7 +270,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }
@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -309,7 +309,7 @@ export async function POST(req: NextRequest) {
       if (!e2eeOn) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
       if (!payload.id) return NextResponse.json({ error: "id is required for encrypted minutes" }, { status: 400 });
       if (!(await deviceBelongsTo(payload.enc as EnvelopeInput, actor.uid))) {
-        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       }
     }
 
@@ -391,7 +391,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }
@@ -405,7 +405,7 @@ export async function PATCH(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -438,7 +438,7 @@ export async function PATCH(req: NextRequest) {
     }
     for (const envelope of [payload.enc, payload.approvalEnc]) {
       if (envelope && !(await deviceBelongsTo(envelope as EnvelopeInput, actor.uid))) {
-        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       }
     }
 
@@ -505,7 +505,7 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

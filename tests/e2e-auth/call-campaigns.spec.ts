@@ -49,7 +49,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   await callers.getByLabel("Bob").check();
   await page.getByRole("button", { name: "Plan assignments" }).click();
   await page.getByRole("button", { name: "Save calling tree" }).click();
-  await expect(page.getByText(/Calling tree saved \(v1\)/)).toBeVisible();
+  await expect(page.getByText(/Calling tree saved/)).toBeVisible();
 
   // --- Open the campaign from the event, with an encrypted script ---
   await nav(page, "Call campaigns");

@@ -167,7 +167,7 @@ export async function sendNextChunk(deps: SenderDeps, broadcastId: string): Prom
   if (!snap.exists) return fail(404, "Broadcast not found");
   const data = snap.data() as Record<string, unknown>;
   if (data.status === "sent") return { ok: true, progress: await progressOf(ref) };
-  if (data.status !== "sending") return fail(409, data.status === "cancelled" ? "This broadcast was cancelled." : "This broadcast is not being sent.");
+  if (data.status !== "sending") return fail(409, data.status === "cancelled" ? "This broadcast was canceled." : "This broadcast is not being sent.");
   if (!deps.config.enabled) return fail(409, "Sending is switched off on this site. Ask whoever manages the website to turn it on.");
   if (!approvedTextMatches(data)) return fail(409, "The text no longer matches what was approved.", "CONTENT_CHANGED");
   const footer = footerFromEnv();

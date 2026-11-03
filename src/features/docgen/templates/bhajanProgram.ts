@@ -3,7 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const bhajanProgram: DocTemplate = {
   id: "bhajan_program",
-  version: 1,
+  version: 2,
   title: "Bhajan Program",
   category: "Religious",
   description: "Invite the community to a bhajan program and prayers at a family's home.",
@@ -14,35 +14,40 @@ export const bhajanProgram: DocTemplate = {
     { id: "programTime", label: "Time", type: "text", placeholder: "6:30 PM", required: true },
     { id: "location", label: "Address", type: "textarea", rows: 3, placeholder: "123 Harmony Lane, Harrisburg", required: true },
     { id: "occasion", label: "Occasion", type: "textarea", rows: 3, placeholder: "Blessing for the new home" },
-    { id: "contact", label: "Contact person or phone", type: "text", placeholder: "bhajan@ghmo.org" }
+    { id: "contact", label: "Contact person or phone", type: "text", placeholder: "A name and phone number" }
   ],
+  // Empty fields leave their sentence out; the letter never prints "TBD" or a made-up contact.
   renderHtml(inputs) {
     const organizationName =
       escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
-    const hostName = escapeHtml(inputs.hostName) || "GHMO Family";
+    const hostName = escapeHtml(inputs.hostName);
     const programTitle = escapeHtml(inputs.programTitle) || "Bhajan Program";
-    const programDate = formatDate(inputs.programDate) || "TBD";
-    const programTime = escapeHtml(inputs.programTime) || "TBD";
-    const location = escapeHtml(inputs.location) || "TBD location";
-    const occasion = escapeHtml(inputs.occasion) || "Join us for reflective bhajans and prayers.";
-    const contact = escapeHtml(inputs.contact) || "executive@ghmo.org";
+    const programDate = formatDate(inputs.programDate);
+    const programTime = escapeHtml(inputs.programTime);
+    const location = escapeHtml(inputs.location);
+    const occasion = escapeHtml(inputs.occasion);
+    const contact = escapeHtml(inputs.contact);
+
+    const meta = [programDate, programTime, location].filter(Boolean).join(" · ");
+    const when = [programTime ? ` at ${programTime}` : "", programDate ? ` on ${programDate}` : "", location ? ` at ${location}` : ""].join("");
 
     return `
       <div>
         <p class="ghmo-letter-headline">${programTitle}</p>
-        <p class="ghmo-letter-meta">${programDate} · ${programTime} · ${location}</p>
+        <p class="ghmo-letter-meta">${meta}</p>
         <div class="ghmo-letter-body">
-          <p>Dear Community,</p>
+          <p>Dear community,</p>
           <p>
-            The ${hostName} warmly invites you to a sacred evening of ${occasion} at ${location}. 
-            We will gather in prayer, bhajan, and reflection beginning at ${programTime} on ${programDate}.
+            ${hostName ? `The ${hostName} warmly invites` : "We warmly invite"} you to an evening of bhajan and prayer. 
+            We will gather${when}.
           </p>
+          ${occasion ? `<p>${occasion}</p>` : ""}
           <p>
             Please join us with your family and friends as we sing together, share prasadam, and 
             draw strength from our heritage.
           </p>
-          <p class="ghmo-letter-footer">With reverence,<br/>${hostName} · ${organizationName}</p>
-          <p class="ghmo-letter-footer" style="margin-top:0.5rem;">Contact: ${contact}</p>
+          <p class="ghmo-letter-footer">With reverence,<br/>${[hostName, organizationName].filter(Boolean).join(" · ")}</p>
+          ${contact ? `<p class="ghmo-letter-footer" style="margin-top:0.5rem;">Contact: ${contact}</p>` : ""}
         </div>
       </div>
     `;

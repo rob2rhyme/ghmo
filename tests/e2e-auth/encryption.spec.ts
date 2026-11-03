@@ -16,7 +16,7 @@ test("super admin turns on E2EE, locks/unlocks with passkey PRF, approves a seco
   await signInWithNewPasskey(alice, "alice");
 
   // --- Setup wizard ---
-  await expect(alice.getByText("End-to-end encryption is not on yet")).toBeVisible();
+  await expect(alice.getByRole("alert").getByText("Encryption is off", { exact: true })).toBeVisible();
   const groups = await turnOnEncryption(alice, "Alice laptop");
   await expect(alice.getByText("Encryption unlocked").first()).toBeVisible();
 

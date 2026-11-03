@@ -57,7 +57,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json({ error: "Admin env not configured", missing: adminEnvStatus.missing }, { status: 503 });
+    return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
   }
 
   try {
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
     return NextResponse.json({ ok: true, event: toPlain(normalizeEvent(snap)) });
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Admin env not configured", missing: error.issues }, { status: 503 });
+      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
     }
     throw error;
   }
@@ -82,7 +82,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -173,7 +173,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }
@@ -186,7 +186,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -218,7 +218,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

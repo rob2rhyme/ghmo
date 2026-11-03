@@ -15,11 +15,11 @@ export const dynamic = "force-dynamic";
  * passkey must be signed in with it: an email link alone must not be able to add a second way in.
  */
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor, authMethod } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
     const rate = await checkRateLimit(`totp-setup:${actor.uid}`, 10, 10 * 60 * 1000);
-    if (!rate.success) return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+    if (!rate.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
 
     if (!isStrongAdminAuth(authMethod) && (await listPasskeys(actor.uid)).some(p => p.status === "active")) {
       throw new AdminAccessError(403, "Sign in with your passkey to add an authenticator app", "PASSKEY_REQUIRED");

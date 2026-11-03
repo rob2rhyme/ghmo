@@ -150,7 +150,7 @@ export const weddingCertificate: DocTemplate = {
     },
     {
       id: "maitiWitnessNote",
-      label: "Maiti acknowledgement (optional) / माईती स्वीकृति (वैकल्पिक)",
+      label: "Maiti acknowledgment (optional) / माईती स्वीकृति (वैकल्पिक)",
       type: "textarea",
       rows: 3
     },

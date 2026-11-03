@@ -29,7 +29,7 @@ import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
 import { formatDateTime } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
-import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
+import { firestore, firebaseInitError } from "@/src/lib/firebaseFirestore";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
@@ -53,11 +53,18 @@ const PRIORITY_LABELS: Record<CommsThreadPriority, string> = {
   high: "High"
 };
 
+/** Shown when the browser can't reach the database; the technical cause stays in the console. */
+const CONNECT_ERROR = "This page can't connect right now. Try again in a moment; if it keeps happening, tell whoever manages the website.";
+const connectError = () => {
+  console.error("Database connection unavailable:", firebaseInitError);
+  return CONNECT_ERROR;
+};
+
 export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
   const { unpackPrivate, packPrivate } = useE2ee();
   const [threads, setThreads] = useState<ThreadView[]>([]);
   const [loading, setLoading] = useState(() => Boolean(firestore));
-  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : connectError()));
   const [attempt, setAttempt] = useState(0);
   const [queryText, setQueryText] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -245,7 +252,7 @@ export default function CommsBoardClient({ actor }: CommsBoardClientProps) {
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <div className="flex flex-col gap-4">
               <Field label="Title">
-                <Input ref={titleInputRef} value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g., Approve community outreach plan" />
+                <Input ref={titleInputRef} value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. Approve community outreach plan" />
               </Field>
               <Field label="Details">
                 <Textarea value={body} onChange={event => setBody(event.target.value)} rows={5} placeholder="Summarize the plan, proposal, or issue." />

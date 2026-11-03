@@ -63,7 +63,7 @@ export function DeviceSetupForm({ onDone }: { onDone?: () => void }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Field label="Name this device" description="So other admins can recognise it, e.g. “Sita’s laptop”.">
+      <Field label="Name this device" description="So other admins can recognize it, e.g. “Sita’s laptop”.">
         <Input value={name} onChange={e => setName(e.target.value)} maxLength={60} placeholder="My laptop" />
       </Field>
       {usePassphrase ? (

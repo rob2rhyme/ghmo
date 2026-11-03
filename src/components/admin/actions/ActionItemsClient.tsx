@@ -12,7 +12,7 @@ import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Segmented } from "@/src/components/ui/segmented";
 import { formatShortDate } from "@/src/lib/format";
-import { firestore } from "@/src/lib/firebaseClient";
+import { firestore } from "@/src/lib/firebaseFirestore";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { statusBadge } from "@/src/lib/statusBadges";
 import {

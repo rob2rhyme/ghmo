@@ -108,21 +108,25 @@ export async function getAuthContextFromRequest(req?: NextRequest): Promise<Auth
   return decoded ? toAuthContext(decoded) : null;
 }
 
-export async function assertCommunityRole(requiredRole: Role) {
-  const ctx = await getAuthContextFromRequest();
-  if (!ctx) return null;
-  if (requiredRole === "admin" && ctx.role !== "admin") return null;
-  return ctx;
-}
-
-export async function assertAuthenticated(req?: NextRequest): Promise<MemberAuthContext | AuthContext | null> {
-  const member = await assertMember(req);
-  if (member) return member;
-  return assertCommunityRole("admin");
-}
-
 /** Returns the active member record for a verified Firebase user, or null. */
-export async function findActiveMember(decoded: Pick<DecodedIdToken, "uid" | "email">): Promise<MemberAuthContext | null> {
+/** Sign-in methods that prove the person controls the email address (the email link, or a token we minted). */
+const MEMBER_SIGN_IN_PROVIDERS = new Set(["emailLink", "custom"]);
+
+/**
+ * True when a token's email can be trusted for member access: verified, and obtained through the email
+ * link or a token minted by this server. A password account created with someone else's address has an
+ * unverified email and the "password" provider, so it never matches a member.
+ */
+export function hasTrustedMemberEmail(decoded: Pick<DecodedIdToken, "email_verified" | "firebase">): boolean {
+  if (decoded.email_verified !== true) return false;
+  const provider = decoded.firebase?.sign_in_provider;
+  return typeof provider === "string" && MEMBER_SIGN_IN_PROVIDERS.has(provider);
+}
+
+export async function findActiveMember(
+  decoded: Pick<DecodedIdToken, "uid" | "email" | "email_verified" | "firebase">
+): Promise<MemberAuthContext | null> {
+  if (!hasTrustedMemberEmail(decoded)) return null;
   const emailLower = normalizeMemberEmail(decoded.email);
   if (!emailLower) return null;
   const memberSnap = await getAdminDb()

@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
         return NextResponse.json({ error: "Encryption is on: send the finalized document encrypted.", code: "E2EE_REQUIRED" }, { status: 400 });
       }
       if (!(await deviceBelongsTo(certificatePayload.enc as EnvelopeInput, actor.uid))) {
-        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       }
     } else if (certificatePayload.enc || !certificatePayload.pngDataUrl) {
       return NextResponse.json({ error: "Invalid certificate payload" }, { status: 400 });
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

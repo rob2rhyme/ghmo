@@ -14,7 +14,7 @@ import CheckCodeForm from "./CheckCodeForm";
 import VerifyPdf from "./VerifyPdf";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Verify a certificate", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Verify a certificate · GHMO", robots: { index: false, follow: false } };
 
 async function lookup(code: string) {
   if (!VERIFICATION_CODE_PATTERN.test(code)) return null;

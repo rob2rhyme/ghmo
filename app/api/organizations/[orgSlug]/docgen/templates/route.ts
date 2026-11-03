@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -70,15 +70,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
       return NextResponse.json({ templates: toPlainJson(templates) });
     } catch (error) {
       console.error("Failed to load docgen templates", error);
-      return NextResponse.json(
-        { error: "Failed to load templates", detail: error instanceof Error ? error.message : String(error) },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to load templates" }, { status: 500 });
     }
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

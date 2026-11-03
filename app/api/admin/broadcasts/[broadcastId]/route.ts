@@ -61,26 +61,42 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ broad
   if (!parsed.ok) return parsed.response;
 
   const now = new Date();
-  const before = found.data as Parameters<typeof planContentEdit>[0];
-  let plan;
-  if ("action" in parsed.data) {
-    plan = planBroadcastTransition({ before, action: parsed.data.action, actorUid: actor.uid, now, contentHash: parsed.data.contentHash });
-  } else {
-    const checked = normalizeBroadcastContent(parsed.data);
-    if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
-    plan = planContentEdit(before, checked.content, now);
+  let checkedContent: ReturnType<typeof normalizeBroadcastContent> | null = null;
+  if (!("action" in parsed.data)) {
+    checkedContent = normalizeBroadcastContent(parsed.data);
+    if (!checkedContent.ok) return NextResponse.json({ error: checkedContent.error }, { status: 400 });
   }
-  if (!plan.ok) return NextResponse.json({ error: plan.error, code: plan.code }, { status: plan.status });
 
-  await found.ref.set(plan.updates, { merge: true });
-  const after = (await found.ref.get()).data() as Record<string, unknown>;
+  // Plan and write inside one transaction, so a concurrent edit and approval can't interleave
+  // (for example, approving text that changed a moment earlier).
+  type Plan = ReturnType<typeof planContentEdit> | ReturnType<typeof planBroadcastTransition>;
+  const outcome = await getAdminDb().runTransaction(async tx => {
+    const snap = await tx.get(found.ref);
+    if (!snap.exists) return { plan: null as Plan | null, after: null as Record<string, unknown> | null };
+    const before = snap.data() as Parameters<typeof planContentEdit>[0];
+    const plan: Plan =
+      "action" in parsed.data
+        ? planBroadcastTransition({ before, action: parsed.data.action, actorUid: actor.uid, now, contentHash: parsed.data.contentHash })
+        : planContentEdit(before, (checkedContent as Extract<typeof checkedContent, { ok: true }>).content, now);
+    if (!plan.ok) return { plan, after: null, beforeStatus: null as string | null };
+    tx.set(found.ref, plan.updates, { merge: true });
+    return {
+      plan,
+      after: { ...(before as Record<string, unknown>), ...plan.updates } as Record<string, unknown>,
+      beforeStatus: ((before as { status?: string }).status ?? "draft") as string | null
+    };
+  });
+  if (!outcome.plan) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
+  const plan = outcome.plan;
+  if (!plan.ok) return NextResponse.json({ error: plan.error, code: plan.code }, { status: plan.status });
+  const after = outcome.after as Record<string, unknown>;
   await logAuditEvent({
     orgSlug: COMMUNITY_SLUG,
     action: plan.audit,
     actor: { uid: actor.uid, adminId: admin.id, role: actor.roles[0] ?? "admin", name: admin.name, email: admin.email },
     resource: { type: "broadcast", id: found.ref.id, path: found.ref.path },
     // Status and fingerprint only: the audit log does not need a second copy of the message.
-    before: { status: before.status ?? "draft" },
+    before: { status: outcome.beforeStatus },
     after: { status: after.status, contentHash: after.contentHash },
     meta: { ip: getClientIp(req.headers), userAgent: req.headers.get("user-agent") ?? null, route: ROUTE }
   });

@@ -7,6 +7,7 @@ import { COMMUNITY_SLUG } from "./community";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgAdminDocPath, orgAdminsCollectionPath, orgDocPath } from "./firestorePaths";
 import { wrongAddressMessage } from "./security/appHost";
+import { hasActiveTotp } from "./totpStore";
 
 /**
  * Passkey (WebAuthn) storage for admins (plan Phase 2, decision D2).
@@ -48,6 +49,13 @@ export function passkeyAddressError(req: NextRequest): string | null {
 }
 
 export function getWebAuthnConfig(req: NextRequest): WebAuthnConfig {
+  const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_PUBLIC_URL;
+  const emulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+  if (process.env.NODE_ENV === "production" && !configured && !emulators) {
+    // Passkeys are bound to the site address; guessing it from the request would bind them to whatever Host was sent.
+    // (The browser suite runs a production build against the emulators on a local port, so it keeps the Host fallback.)
+    throw new Error("NEXT_PUBLIC_APP_URL must be set before passkeys can be used");
+  }
   const origin = getAppOrigin(req);
   return { rpID: new URL(origin).hostname, rpName: RP_NAME, origin };
 }
@@ -109,16 +117,17 @@ export async function findPasskey(credentialId: string): Promise<{ uid: string; 
 
 /**
  * Decides whether a newly registered passkey is active immediately.
- * - Registered from a passkey session: the admin already proved possession of a passkey.
- * - The admin's first passkey (first-time setup by magic link).
+ * - Registered from a strong session (passkey or authenticator app): the admin already proved a second factor.
+ * - The admin's first sign-in method (first-time setup by magic link, with no passkey and no authenticator app).
  * - Recovery when no OTHER active admin with a passkey exists (nobody could approve).
- * Otherwise it stays pending until another admin approves it, so a stolen email
- * inbox alone cannot add a passkey to an existing admin.
+ * Otherwise it stays pending until another admin approves it, so a stolen email inbox alone cannot add a
+ * passkey to an existing admin: an active authenticator app counts like an existing passkey here, or the
+ * passkey would be a way around the 6-digit code.
  */
 export async function decideNewPasskeyStatus(uid: string, via: "passkey" | "magic_link"): Promise<PasskeyStatus> {
   if (via === "passkey") return "active";
-  const existing = await listPasskeys(uid);
-  if (!existing.some(p => p.status === "active")) return "active";
+  const [existing, totpActive] = await Promise.all([listPasskeys(uid), hasActiveTotp(uid)]);
+  if (!existing.some(p => p.status === "active") && !totpActive) return "active";
   return (await otherAdminCanApprove(uid)) ? "pending" : "active";
 }
 

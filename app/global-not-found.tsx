@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import Providers from "@/src/components/Providers";
 import ThemeLogo from "@/src/components/ThemeLogo";
 import { NotFoundBody } from "@/src/components/public/NotFoundBody";
+import { inter } from "@/src/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export default async function GlobalNotFound() {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <Providers nonce={nonce}>
           <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center px-4 py-12">

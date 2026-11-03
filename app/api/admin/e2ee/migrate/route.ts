@@ -113,7 +113,7 @@ export const POST = e2eeRoute(async (req: NextRequest, guard) => {
   }
   if (!(await getState()).enabled) return NextResponse.json({ error: "Encryption is not on yet." }, { status: 409 });
   if (!(await deviceBelongsTo(enc as EnvelopeInput, guard.actor.uid))) {
-    return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+    return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
   }
 
   const ref = getAdminDb().doc(docPath(area, id, parentId));

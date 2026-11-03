@@ -62,7 +62,7 @@ export function EncryptionGate({ children, what = "this page", detail }: { child
           ) : (
             <span className="text-muted-foreground">A super admin can turn it on.</span>
           )}
-          <WhatIsThis question="What's this?" className="w-full">
+          <WhatIsThis question="What's this?" className="open:basis-full">
             {EXPLAIN.endToEnd}
           </WhatIsThis>
         </div>
@@ -97,7 +97,7 @@ export function EncryptionGate({ children, what = "this page", detail }: { child
     status === "pending"
       ? "This device is waiting for another admin to approve it."
       : status === "revoked"
-        ? "This device was revoked. Set it up again to continue."
+        ? "This device was removed. Set it up again to continue."
         : "This device has no encryption keys yet.";
 
   return (

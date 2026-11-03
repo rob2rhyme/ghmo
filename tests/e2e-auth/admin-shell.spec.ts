@@ -29,6 +29,9 @@ test("the dashboard greets the admin, lists real activity with titles, and shows
   await expect(sidebar.getByRole("button", { name: "Sign out" })).toBeVisible();
   await expect(sidebar.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
 
+  // On desktop the sidebar is the way to each page; the quick-action tiles only show where there is no sidebar.
+  await expect(page.locator("#admin-main").getByRole("link", { name: /Meeting minutes.*Draft, approve/ })).toBeHidden();
+  await page.setViewportSize({ width: 820, height: 900 });
   await expect(page.locator("#admin-main").getByRole("link", { name: /Meeting minutes.*Draft, approve/ })).toBeVisible();
 });
 
@@ -78,7 +81,7 @@ test("on a phone the dashboard goes from the figures straight to the recent list
   await expect(main.getByRole("heading", { name: "Recent minutes" })).toBeVisible();
   // Quick actions are for wider screens; on a phone the menu and Ctrl/⌘ K cover them.
   await expect(main.getByRole("heading", { name: "Quick actions" })).toBeHidden();
-  await expect(main.getByRole("link", { name: /GUMBA project/ })).toBeHidden();
+  await expect(main.getByRole("link", { name: /Gumba Project/ })).toBeHidden();
   // The dashboard has no second search box; the page search is the one in the top bar.
   await expect(page.getByRole("searchbox", { name: "Filter the dashboard" })).toHaveCount(0);
   await context.close();

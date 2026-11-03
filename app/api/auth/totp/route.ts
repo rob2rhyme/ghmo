@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Whether the signed-in admin has an authenticator app (and passkeys) set up. */
 export async function GET(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
     const [totp, passkeys] = await Promise.all([getTotpStatus(actor.uid), listPasskeys(actor.uid)]);

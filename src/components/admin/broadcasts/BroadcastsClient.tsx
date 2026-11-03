@@ -15,7 +15,7 @@ import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Textarea } from "@/src/components/ui/textarea";
-import { BODY_MAX, SUBJECT_MAX, type BroadcastStatus } from "@/src/lib/broadcast";
+import { BODY_MAX, SUBJECT_MAX, type BroadcastStatus } from "@/src/lib/broadcast.shared";
 import { formatShortDate } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
 import { BroadcastSteps } from "./BroadcastSteps";
@@ -61,7 +61,7 @@ export default function BroadcastsClient({
       <AdminSectionCard title="New broadcast" description="Plain text. Saving only creates a draft; nothing is sent.">
         <form onSubmit={create} className="flex flex-col gap-4">
           <Field label="Subject">
-            <Input id="new-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} required placeholder="Dashain celebration on 12 October" />
+            <Input id="new-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} required placeholder="Dashain celebration on October 12" />
           </Field>
           <Field label="Message">
             <Textarea
@@ -71,7 +71,7 @@ export default function BroadcastsClient({
               onChange={e => setBody(e.target.value)}
               maxLength={BODY_MAX}
               required
-              placeholder={"Namaste everyone,\n\nJoin us for Dashain on Saturday 12 October, 5 pm at the community hall. Food and tika for all ages.\n\nGHMO board"}
+              placeholder={"Namaste everyone,\n\nJoin us for Dashain on Saturday, October 12, 5 pm at the community hall. Food and tika for all ages.\n\nGHMO board"}
             />
           </Field>
           <div className="flex flex-wrap gap-2">

@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 /** Starts a usernameless passkey sign-in (discoverable credentials). */
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   const rate = await checkRateLimit(`passkey-login-options:${getClientIp(req.headers)}`, 30, 10 * 60 * 1000);
-  if (!rate.success) return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  if (!rate.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
 
   const wrongAddress = passkeyAddressError(req);
   if (wrongAddress) return NextResponse.json({ error: wrongAddress, code: "wrong_address" }, { status: 409 });

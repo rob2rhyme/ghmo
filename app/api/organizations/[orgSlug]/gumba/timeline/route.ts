@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertMember, assertCommunityRole } from "@/src/lib/auth";
+import { assertMember } from "@/src/lib/auth";
+import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgTimelineCollectionPath } from "@/src/lib/firestorePaths";
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured", missing: adminEnvStatus.missing },
+      { error: "Admin env not configured" },
       { status: 503 }
     );
   }
@@ -21,9 +22,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   try {
     if (params.orgSlug !== COMMUNITY_SLUG) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // Members may read; otherwise the caller must be an active admin with a strong session
+    // (a token claim alone would still work for a disabled or magic-link-only admin).
     const member = await assertMember(req);
-    const admin = member ? null : await assertCommunityRole("admin");
-    if (!member && !admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!member) {
+      const guard = await enforceActiveAdmin(req, params.orgSlug);
+      if ("response" in guard) return guard.response;
+    }
 
     const snap = await getAdminDb()
       .collection(orgTimelineCollectionPath(params.orgSlug))
@@ -50,7 +55,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: error.issues },
+        { error: "Admin env not configured" },
         { status: 503 }
       );
     }

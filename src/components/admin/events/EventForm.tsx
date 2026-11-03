@@ -19,6 +19,7 @@ export type EventFormValues = {
   location: string;
   timezone: string;
   featured: boolean;
+  /** Kept from older events; nothing reads it and the form no longer shows it. */
   announcementDocTemplate: string;
 };
 
@@ -71,7 +72,7 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
         <Field label="Short summary" description="One line shown in event lists and on the home page.">
           <Input value={form.summary} onChange={e => update("summary", e.target.value)} placeholder="e.g. Food, music and tika for the whole community." maxLength={500} />
         </Field>
-        <Field label="Full details" description="Shown on the event page: programme, what to bring, who to contact." error={errors.body}>
+        <Field label="Full details" description="Shown on the event page: program, what to bring, who to contact." error={errors.body}>
           <Textarea value={form.body} onChange={e => update("body", e.target.value)} className="min-h-40" required />
         </Field>
       </AdminSectionCard>
@@ -121,14 +122,6 @@ export function EventForm({ form, update, errors = {} }: EventFormProps) {
             <span className="block text-muted-foreground">Adds a Featured badge to the event on the public Events and home pages.</span>
           </span>
         </label>
-        <details className="rounded-lg border border-border p-3 text-sm">
-          <summary className="cursor-pointer font-medium">Advanced</summary>
-          <div className="mt-3">
-            <Field label="Flyer template name (optional)" description="Only needed if a custom flyer template was set up for this event.">
-              <Input value={form.announcementDocTemplate} onChange={e => update("announcementDocTemplate", e.target.value)} maxLength={200} />
-            </Field>
-          </div>
-        </details>
       </AdminSectionCard>
     </div>
   );

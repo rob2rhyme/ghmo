@@ -1,6 +1,5 @@
 "use client";
 
-import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 
 type LocalQrCodeProps = {
@@ -19,7 +18,9 @@ export default function LocalQrCode({ value, size = 220, className, alt }: Local
 
   useEffect(() => {
     let active = true;
-    QRCode.toDataURL(value, { width: size, margin: 1, errorCorrectionLevel: "M" })
+    // The QR library is loaded when a code is first drawn, not with the page.
+    import("qrcode")
+      .then(({ default: QRCode }) => QRCode.toDataURL(value, { width: size, margin: 1, errorCorrectionLevel: "M" }))
       .then(url => {
         if (active) setDataUrl(url);
       })

@@ -62,7 +62,7 @@ function StatusBadge({ device }: { device: DeviceView }) {
         <Clock aria-hidden="true" /> Waiting for approval
       </Badge>
     );
-  return <Badge variant="destructive">Revoked</Badge>;
+  return <Badge variant="destructive">Removed</Badge>;
 }
 
 function RecoverWithKey() {
@@ -223,16 +223,16 @@ function UnsealedAlert() {
   return (
     <Alert variant="warning">
       <ShieldAlert />
-      <AlertTitle>The device list isn&apos;t sealed yet</AlertTitle>
+      <AlertTitle>One more step: seal the device list</AlertTitle>
       <AlertDescription>
         <p>
-          This workspace was set up before devices were recorded in a signed history, so someone with access to the database could swap in keys
-          without being noticed.
+          Sealing records today&apos;s list of approved devices in a signed history. From then on, every device added or removed is signed by an
+          existing device, so a device added behind your back gets noticed.
         </p>
         {overview?.me.superAdmin && status === "unlocked" ? (
           <>
             <p className="mt-2">
-              Check the device list below with each owner (their safety codes must match), then seal it. From then on, every change is signed.
+              Check the device list below with each owner (their safety codes must match), then seal it.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button loading={busy} onClick={() => setConfirmOpen(true)}>
@@ -351,7 +351,7 @@ function DevicesSection() {
     try {
       await rotate(ids);
       setSelected([]);
-      toast.success(ids.length ? "Devices revoked and keys rotated" : "Keys rotated");
+      toast.success(ids.length ? "Devices removed and new keys made" : "New keys made");
     } catch (err) {
       toast.error(errorText(err));
     } finally {
@@ -362,7 +362,7 @@ function DevicesSection() {
   return (
     <AdminSectionCard
       title="Devices with encryption keys"
-      description="Revoke a lost device or one belonging to an admin who left. Keys are rotated so it can't read anything new."
+      description="Remove a lost device or one belonging to an admin who left. New keys are made so it can't read anything new."
     >
       <WhatIsThis question="What is this list?">{EXPLAIN.deviceList}</WhatIsThis>
       <AdminList bare label="Devices with encryption keys">
@@ -392,7 +392,7 @@ function DevicesSection() {
                 <label className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-medium shadow-xs hover:bg-accent sm:h-10">
                   <input
                     type="checkbox"
-                    aria-label={`Select ${d.name} to revoke`}
+                    aria-label={`Select ${d.name} to remove`}
                     className="size-4 shrink-0 accent-destructive"
                     checked={selected.includes(d.deviceId)}
                     onChange={e => setSelected(s => (e.target.checked ? [...s, d.deviceId] : s.filter(x => x !== d.deviceId)))}
@@ -408,7 +408,7 @@ function DevicesSection() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button variant="outline" loading={busy && selected.length === 0} onClick={() => setRotateIds([])}>
             <RefreshCw aria-hidden="true" />
-            Rotate keys now
+            Make new keys now
           </Button>
           {anyRevocable ? (
             <Button
@@ -419,25 +419,25 @@ function DevicesSection() {
               onClick={() => setRotateIds(selected)}
             >
               <Trash2 aria-hidden="true" />
-              Revoke selected and rotate keys
+              Remove selected and make new keys
             </Button>
           ) : null}
         </div>
         <p className="text-sm text-muted-foreground">
           {anyRevocable
-            ? "Select the devices to revoke first. You can't revoke the device you're using now."
+            ? "Select the devices to remove first. You can't remove the device you're using now."
             : onlyOwn
               ? "Only your own device is listed."
-              : "Only a super admin can revoke other admins' devices. You can't revoke the device you're using now."}
+              : "Only a super admin can remove other admins' devices. You can't remove the device you're using now."}
         </p>
-        <WhatIsThis question="What does rotating keys do?">{EXPLAIN.rotation}</WhatIsThis>
+        <WhatIsThis question="What does making new keys do?">{EXPLAIN.rotation}</WhatIsThis>
       </div>
       <ConfirmDialog
         open={rotateIds !== null}
         onOpenChange={open => (open ? undefined : setRotateIds(null))}
-        title={rotateIds?.length ? `Revoke ${plural(rotateIds.length, "device", "devices")} and create new keys?` : "Create new encryption keys now?"}
+        title={rotateIds?.length ? `Remove ${plural(rotateIds.length, "device", "devices")} and make new keys?` : "Make new encryption keys now?"}
         description={rotateIds?.length ? "Those devices won't be able to read anything new." : "Everyone's active devices get them automatically."}
-        confirmLabel={rotateIds?.length ? "Revoke and rotate keys" : "Rotate keys"}
+        confirmLabel={rotateIds?.length ? "Remove and make new keys" : "Make new keys"}
         destructive={Boolean(rotateIds?.length)}
         onConfirm={() => revokeAndRotate(rotateIds ?? [])}
       />
@@ -539,7 +539,7 @@ function RecoverySection() {
   );
 }
 
-/** Admin → Encryption: device keys, approvals, rotation and recovery (plan Phase 3). */
+/** Admin → Encryption: device keys, approvals, new keys and recovery (plan Phase 3). */
 export default function EncryptionPanel() {
   const { status, error, overview, thisDevice, refresh, forgetThisDevice, lock, integrity } = useE2ee();
 
@@ -600,7 +600,7 @@ export default function EncryptionPanel() {
       <div className="flex flex-col gap-4">
         <Alert variant="warning">
           <ShieldOff />
-          <AlertTitle>End-to-end encryption is not on yet</AlertTitle>
+          <AlertTitle>Encryption is off</AlertTitle>
           <AlertDescription>
             Once on, admin chat and other private records are encrypted on admins&apos; devices. Not even the server or Google can read them.
             Setting it up takes about 10 minutes and three steps.
@@ -667,8 +667,8 @@ export default function EncryptionPanel() {
   if (status === "revoked") {
     return (
       <AdminSectionCard
-        title="This device was revoked"
-        description="Its keys no longer receive new data. Remove them from this browser and set the device up again if needed."
+        title="This device was removed"
+        description="It no longer gets new keys, so nothing written since then opens here. Clear its keys from this browser, then set the device up again if you still use it."
       >
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={forgetThisDevice}>

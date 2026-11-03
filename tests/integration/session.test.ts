@@ -17,9 +17,9 @@ async function clearEmulators() {
 }
 
 /** Signs a user in against the emulator and returns a fresh ID token. */
-async function idTokenFor(uid: string, claims: Record<string, unknown> = {}, email?: string) {
+async function idTokenFor(uid: string, claims: Record<string, unknown> = {}, email?: string, emailVerified = true) {
   await getAdminAuth()
-    .createUser({ uid, email })
+    .createUser({ uid, email, emailVerified })
     .catch(() => undefined);
   const customToken = await getAdminAuth().createCustomToken(uid, claims);
   const res = await fetch(
@@ -95,6 +95,11 @@ describe("POST /api/auth/session", () => {
   it("accepts an allowlisted member", async () => {
     const res = await postSession(await idTokenFor("member-uid", {}, "member@example.org"));
     expect(res.status).toBe(200);
+  });
+
+  it("refuses a member whose email address is not verified", async () => {
+    const res = await postSession(await idTokenFor("member-unverified", {}, "member@example.org", false));
+    expect(res.status).toBe(403);
   });
 
   it("rejects garbage tokens", async () => {

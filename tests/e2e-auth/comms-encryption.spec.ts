@@ -22,7 +22,7 @@ test("threads, comments, conclusions and votes are ciphertext at rest and decryp
   await alice.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Plans & Issues" }).click();
 
   // --- Start a topic, discuss, propose a conclusion, vote ---
-  await alice.getByPlaceholder("e.g., Approve community outreach plan").fill(TITLE);
+  await alice.getByPlaceholder("e.g. Approve community outreach plan").fill(TITLE);
   await alice.getByPlaceholder("Summarize the plan, proposal, or issue.").fill(BODY);
   await alice.getByRole("button", { name: "Start topic" }).click();
   await alice.getByRole("link", { name: new RegExp(TITLE) }).click();

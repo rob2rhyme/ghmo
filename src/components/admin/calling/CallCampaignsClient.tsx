@@ -174,7 +174,7 @@ function Campaigns() {
               </Field>
             </div>
             <Field label="Title">
-              <Input id="campaign-title" value={title} onChange={e => setTitle(e.target.value)} maxLength={150} required placeholder="General meeting, 15 November" />
+              <Input id="campaign-title" value={title} onChange={e => setTitle(e.target.value)} maxLength={150} required placeholder="General meeting, November 15" />
             </Field>
             <Field
               label="Script and agenda (optional, encrypted)"

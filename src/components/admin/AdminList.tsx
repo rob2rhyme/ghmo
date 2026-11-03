@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { Route } from "next";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
 /**
  * The one list style for rows of things (events, broadcasts, documents, members, action items…):
  * one bordered card with dividers. Put it inside an AdminSectionCard with `bare`, or on its own.
+ * A bare list that ends its section card runs to the card's bottom edge, so there is no empty band under it.
  */
 export function AdminList({ children, label, bare, className }: { children: ReactNode; label?: string; bare?: boolean; className?: string }) {
   return (
@@ -13,7 +15,7 @@ export function AdminList({ children, label, bare, className }: { children: Reac
       aria-label={label}
       className={cn(
         "divide-y divide-border",
-        bare ? "-mx-4 border-y border-border md:-mx-6" : "overflow-hidden rounded-xl border border-border bg-card shadow-xs",
+        bare ? "-mx-4 border-y border-border last:-mb-4 last:rounded-b-xl last:border-b-0 md:-mx-6 md:last:-mb-6" : "overflow-hidden rounded-xl border border-border bg-card shadow-xs",
         className
       )}
     >
@@ -33,15 +35,25 @@ type AdminListRowProps = {
   leading?: ReactNode;
   /** Buttons at the end (outline, size="row"). */
   actions?: ReactNode;
-  /** Makes the whole row a link (the title becomes the link; actions stay clickable). */
+  /** Makes the whole row a link (the title becomes the link; actions stay clickable). Rows without actions show a chevron. */
   href?: Route;
+  /** Actions sit under the title at every width, left-aligned and uncapped (rows with several buttons). */
+  stacked?: boolean;
   children?: ReactNode;
   className?: string;
 };
 
-export function AdminListRow({ title, meta, badges, leading, actions, href, children, className }: AdminListRowProps) {
+export function AdminListRow({ title, meta, badges, leading, actions, href, stacked, children, className }: AdminListRowProps) {
   return (
-    <li className={cn("relative flex min-h-14 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center md:px-5", href && "transition-colors hover:bg-accent/50", className)}>
+    <li
+      className={cn(
+        "relative flex min-h-14 flex-col gap-3 px-4 py-3 md:px-5",
+        !stacked && "sm:flex-row sm:items-center",
+        href && "transition-colors hover:bg-accent/50",
+        href && !actions && "pr-10 md:pr-11",
+        className
+      )}
+    >
       {/* The leading tile stays beside the text at every width. */}
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
         {leading ? <div className="shrink-0">{leading}</div> : null}
@@ -60,7 +72,11 @@ export function AdminListRow({ title, meta, badges, leading, actions, href, chil
           {children}
         </div>
       </div>
-      {actions ? <div className="relative z-10 flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:justify-end">{actions}</div> : null}
+      {actions ? (
+        <div className={cn("relative z-10 flex flex-wrap items-center gap-2", !stacked && "sm:max-w-[60%] sm:justify-end")}>{actions}</div>
+      ) : href ? (
+        <ChevronRight className="absolute top-1/2 right-4 size-4 -translate-y-1/2 text-muted-foreground md:right-5" aria-hidden="true" />
+      ) : null}
     </li>
   );
 }

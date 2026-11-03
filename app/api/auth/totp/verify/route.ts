@@ -17,7 +17,7 @@ const FAILED = "That code is not right";
 
 /** Second step after the email link: an authenticator code (or a recovery code) completes the sign-in. */
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor, admin, authMethod } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
     if (isStrongAdminAuth(authMethod)) return NextResponse.json({ ok: true });
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const ip = getClientIp(req.headers);
     const perAdmin = await checkRateLimit(`totp-verify:${actor.uid}`, 6, 10 * 60 * 1000);
     const perIp = await checkRateLimit(`totp-verify-ip:${ip}`, 30, 10 * 60 * 1000);
-    if (!perAdmin.success || !perIp.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes." }, { status: 429 });
+    if (!perAdmin.success || !perIp.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
 
     const parsed = await parseJsonBody(req, bodySchema);
     if (!parsed.ok) return parsed.response;

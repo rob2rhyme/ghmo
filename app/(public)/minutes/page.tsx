@@ -4,7 +4,7 @@ import { ChevronRight, FileText } from "lucide-react";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
-import { formatShortDate } from "@/src/lib/format";
+import { formatDate } from "@/src/lib/format";
 import { listArchive } from "@/src/lib/minutesArchive.server";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ export default async function MinutesArchivePage() {
                       <span className="font-medium break-words text-foreground">{entry.eventTitle}</span>
                       <span className="text-sm text-muted-foreground">
                         {entry.meetingType}
-                        {entry.eventDate ? ` · ${formatShortDate(entry.eventDate)}` : ""}
+                        {entry.eventDate ? ` · ${formatDate(entry.eventDate)}` : ""}
                       </span>
                     </span>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

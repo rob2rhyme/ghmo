@@ -23,11 +23,13 @@ export function NotFoundBody() {
           <Button asChild size="lg">
             <Link href="/">Go to the home page</Link>
           </Button>
-          {LINKS.map(link => (
-            <Button key={link.href} asChild size="lg" variant="outline">
-              <Link href={link.href}>{link.label}</Link>
-            </Button>
-          ))}
+          <span className="flex flex-wrap items-center justify-center gap-x-1 gap-y-2">
+            {LINKS.map(link => (
+              <Button key={link.href} asChild size="lg" variant="link" className="text-foreground">
+                <Link href={link.href}>{link.label}</Link>
+              </Button>
+            ))}
+          </span>
         </>
       }
     />

@@ -372,6 +372,31 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
 
   const lock = useCallback(() => setUnlocked(null), []);
 
+  // Idle lock: keys are forgotten after 15 minutes without a keypress, tap or scroll, so an unlocked
+  // device left open doesn't stay readable. Passphrase devices (no biometric step) also lock as soon
+  // as the tab is hidden.
+  const unlockedNow = isUnlocked;
+  useEffect(() => {
+    if (!unlockedNow) return;
+    const IDLE_MS = 15 * 60_000;
+    let timer = window.setTimeout(lock, IDLE_MS);
+    const bump = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(lock, IDLE_MS);
+    };
+    const events: (keyof WindowEventMap)[] = ["pointerdown", "keydown", "scroll", "touchstart"];
+    for (const name of events) window.addEventListener(name, bump, { passive: true });
+    const onHidden = () => {
+      if (document.visibilityState === "hidden" && identity?.unlock.method === "passphrase") lock();
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.clearTimeout(timer);
+      for (const name of events) window.removeEventListener(name, bump);
+      document.removeEventListener("visibilitychange", onHidden);
+    };
+  }, [unlockedNow, lock, identity?.unlock.method]);
+
   const requireUnlocked = () => {
     if (integrityRef.current.status === "failed") throw new Error("The device list failed its integrity check. Don't use encryption until an admin looks into it.");
     if (!unlockedRef.current) throw new Error("Unlock encryption on this device first");

@@ -20,7 +20,7 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
   const chat = (page: typeof alice, text: string) => page.locator("p", { hasText: text });
   const nav = (page: typeof alice, name: string) => page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name }).click();
   const send = async (page: typeof alice, text: string) => {
-    await page.getByPlaceholder("Share an update or ask for help...").fill(text);
+    await page.getByPlaceholder("Share an update or ask for help…").fill(text);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(chat(page, text)).toBeVisible();
   };
@@ -40,10 +40,10 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
 
   // --- Bob's phone is "lost": Alice revokes it and rotates ---
   await nav(alice, "Encryption");
-  await alice.getByLabel("Select Bob phone to revoke").check();
-  await alice.getByRole("button", { name: "Revoke selected and rotate keys" }).click();
-  await alice.getByRole("dialog", { name: "Revoke 1 device and create new keys?" }).getByRole("button", { name: "Revoke and rotate keys" }).click();
-  await expect(alice.getByText("Devices revoked and keys rotated")).toBeVisible({ timeout: 20_000 });
+  await alice.getByLabel("Select Bob phone to remove").check();
+  await alice.getByRole("button", { name: "Remove selected and make new keys" }).click();
+  await alice.getByRole("dialog", { name: "Remove 1 device and make new keys?" }).getByRole("button", { name: "Remove and make new keys" }).click();
+  await expect(alice.getByText("Devices removed and new keys made")).toBeVisible({ timeout: 20_000 });
 
   const { db } = admin();
   const state = (await db.doc("organizations/ghmo/e2ee/state").get()).data()!;
@@ -66,7 +66,7 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
 
   // --- The revoked device is locked out ---
   await bob.goto("/admin/chat");
-  await expect(bob.getByText(/This device was revoked/)).toBeVisible();
+  await expect(bob.getByText(/This device was removed/)).toBeVisible();
   await expect(chat(bob, "After rotation")).toHaveCount(0);
   await expect(chat(bob, "Before rotation")).toHaveCount(0);
 

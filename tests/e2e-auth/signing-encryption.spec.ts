@@ -59,7 +59,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
   expect(JSON.stringify(stored)).not.toContain("iVBOR");
 
   // --- The unlocked admin page opens it ---
-  await expect(page.getByText("Signed ✓").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Signed", { exact: true }).first()).toBeVisible({ timeout: 20_000 });
 
   // Close the signing-link dialog that opened with the request.
   await page.getByRole("button", { name: "Close", exact: true }).click();

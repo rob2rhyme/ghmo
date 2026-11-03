@@ -28,6 +28,11 @@ function MemberLoginInner() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // The sign-in link was opened in a browser that doesn't remember the email: ask for it in the card, not a browser prompt.
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmedEmail, setConfirmedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.authenticated || !session?.isAdmin) return;
@@ -55,19 +60,11 @@ function MemberLoginInner() {
 
     if (!isSignInWithEmailLink(auth, window.location.href)) return;
 
-    const complete = async () => {
+    const complete = async (emailForLink: string) => {
       setLoading(true);
-      setStatus("Completing sign-in...");
+      setStatus("Completing sign-in…");
       setError(null);
       try {
-        const storedEmail = localStorage.getItem("magiclink-email") || "";
-        const emailForLink = storedEmail || window.prompt("Confirm your email to finish signing in") || "";
-        if (!emailForLink) {
-          setError("Your email is needed to finish signing in. Open the link from your email again.");
-          setStatus(null);
-          return;
-        }
-
         const cred = await signInWithEmailLink(auth, emailForLink, window.location.href);
         localStorage.setItem("magiclink-email", emailForLink);
         const idToken = await cred.user.getIdToken();
@@ -104,8 +101,34 @@ function MemberLoginInner() {
       }
     };
 
-    void complete();
-  }, [router, searchParams]);
+    let storedEmail = "";
+    try {
+      storedEmail = localStorage.getItem("magiclink-email") || "";
+    } catch {
+      storedEmail = "";
+    }
+    if (storedEmail) {
+      void complete(storedEmail);
+      return;
+    }
+    if (!confirmedEmail) {
+      setNeedsEmail(true);
+      return;
+    }
+    void complete(confirmedEmail);
+  }, [router, searchParams, confirmedEmail]);
+
+  const handleConfirmEmail = (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = confirmEmail.trim();
+    if (!value) {
+      setConfirmError("Enter the email address the link was sent to");
+      return;
+    }
+    setConfirmError(null);
+    setNeedsEmail(false);
+    setConfirmedEmail(value);
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -149,6 +172,31 @@ function MemberLoginInner() {
               <AlertTriangle />
               <AlertDescription className="text-foreground">Sign-in is temporarily unavailable. Please try again later.</AlertDescription>
             </Alert>
+          ) : needsEmail ? (
+            <form onSubmit={handleConfirmEmail} noValidate className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                This browser doesn&apos;t remember which email the link was sent to. Confirm it to finish signing in.
+              </p>
+              <Field label="Confirm your email" error={confirmError}>
+                <Input
+                  id="confirm-email"
+                  name="confirmEmail"
+                  type="email"
+                  inputMode="email"
+                  value={confirmEmail}
+                  onChange={e => {
+                    setConfirmEmail(e.target.value);
+                    if (confirmError) setConfirmError(null);
+                  }}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  autoFocus
+                />
+              </Field>
+              <Button type="submit" size="lg" className="w-full">
+                Finish signing in
+              </Button>
+            </form>
           ) : (
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
               <Field label="Email" error={emailError}>
@@ -178,7 +226,7 @@ function MemberLoginInner() {
                 </Alert>
               ) : null}
               <Button type="submit" size="lg" className="w-full" loading={loading}>
-                {loading ? "Sending link..." : "Send sign-in link"}
+                {loading ? "Sending link…" : "Send sign-in link"}
               </Button>
             </form>
           )}

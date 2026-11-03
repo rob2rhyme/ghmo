@@ -22,7 +22,7 @@ function toPublic(p: StoredPasskey) {
 
 /** The signed-in admin's passkeys, plus other admins' passkeys waiting for approval. */
 export async function GET(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const [mine, pending] = await Promise.all([listPasskeys(actor.uid), listPendingPasskeysForApproval(actor.uid)]);
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
     throw error;
   }
 }

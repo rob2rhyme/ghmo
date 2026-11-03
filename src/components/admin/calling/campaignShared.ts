@@ -45,7 +45,7 @@ export const memberLabel = (m: MemberLite | undefined, fallback: string) => (m ?
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: "no-store", headers: { "Content-Type": "application/json" }, ...init });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
   return data;
 }
 

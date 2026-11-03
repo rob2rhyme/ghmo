@@ -1,8 +1,5 @@
 "use client";
 
-import { jsPDF } from "jspdf";
-import QRCode from "qrcode";
-import * as htmlToImage from "html-to-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -69,6 +66,9 @@ type SignatureSession = {
 };
 
 const PIXEL_RATIO = 2;
+/** Signature status polling: start at 2 s and back off to 5 s between rounds. */
+const POLL_START_MS = 2000;
+const POLL_MAX_MS = 5000;
 const SIGNATURE_ROLES: Array<{ role: SignatureRole; label: string; inputKey: string }> = [
   { role: "witness1", label: "Witness 1", inputKey: "witness1SignatureImage" },
   { role: "witness2", label: "Witness 2", inputKey: "witness2SignatureImage" },
@@ -218,7 +218,7 @@ export default function DocBuilder({
     }),
     [currentInputs]
   );
-  /** Live preview only: empty text fields show as grey "[label]" hints instead of "TBD". The exported copy uses mergedInputs. */
+  /** Live preview only: empty text fields show as gray "[label]" hints (the exported copy, from mergedInputs, leaves their sentence out). */
   const hintedInputs = useMemo(() => {
     if (!selectedTemplateMeta || selectedTemplateMeta.id === "wedding-certificate") return mergedInputs;
     const hinted: Record<string, string> = { ...mergedInputs };
@@ -261,13 +261,16 @@ export default function DocBuilder({
     let cancelled = false;
     const code = newVerificationCode();
     const url = `${window.location.origin}/verify/${code}`;
-    QRCode.toDataURL(url, { width: 160, margin: 1, errorCorrectionLevel: "M" }).then(image => {
-      if (cancelled) return;
-      setInputsByTemplate(prev => ({
-        ...prev,
-        "wedding-certificate": { ...(prev["wedding-certificate"] ?? {}), verificationCode: code, verificationUrl: url, verificationQrImage: image }
-      }));
-    });
+    // The QR library is loaded only for certificates, which are the only template that prints one.
+    import("qrcode")
+      .then(({ default: QRCode }) => QRCode.toDataURL(url, { width: 160, margin: 1, errorCorrectionLevel: "M" }))
+      .then(image => {
+        if (cancelled) return;
+        setInputsByTemplate(prev => ({
+          ...prev,
+          "wedding-certificate": { ...(prev["wedding-certificate"] ?? {}), verificationCode: code, verificationUrl: url, verificationQrImage: image }
+        }));
+      });
     return () => {
       cancelled = true;
     };
@@ -312,14 +315,27 @@ export default function DocBuilder({
     }
   }, [isReviewStep]);
 
+  // Signature polling: one timer for every pending signer, keyed on the pending session ids (so typing in
+  // the form does not restart it), backing off from 2 s to 5 s and paused while the tab is hidden.
+  const pendingSessionKey = Object.values(signatureSessions)
+    .filter((session): session is SignatureSession => Boolean(session && session.status === "pending"))
+    .map(session => `${session.role}:${session.sessionId}`)
+    .join(",");
+  const pollDeps = useRef({ signatureSessions, currentInputs, handleFieldChange, openSealedSignature });
   useEffect(() => {
-    const pendingSessions = Object.values(signatureSessions).filter(
-      session => session && session.status === "pending"
-    ) as SignatureSession[];
-    if (pendingSessions.length === 0) return undefined;
+    pollDeps.current = { signatureSessions, currentInputs, handleFieldChange, openSealedSignature };
+  });
+  useEffect(() => {
+    if (!pendingSessionKey) return undefined;
 
     let cancelled = false;
+    let timer: number | undefined;
+    let delay = POLL_START_MS;
     const poll = async () => {
+      const deps = pollDeps.current;
+      const pendingSessions = Object.values(deps.signatureSessions).filter(
+        (session): session is SignatureSession => Boolean(session && session.status === "pending")
+      );
       await Promise.all(
         pendingSessions.map(async session => {
           try {
@@ -327,15 +343,16 @@ export default function DocBuilder({
             if (!response.ok) return;
             const payload = await response.json();
             if (cancelled) return;
-            setSignatureSessions(prev => ({
-              ...prev,
-              [session.role]: {
-                ...session,
-                status: payload.status ?? session.status,
-                expiresAt: payload.expiresAt ?? session.expiresAt
-              }
-            }));
-            if (payload.status === "signed" && !currentInputs[SIGNATURE_IMAGE_BY_ROLE[session.role]]) {
+            const nextStatus: SignatureSession["status"] = payload.status ?? session.status;
+            const nextExpiresAt: string | undefined = payload.expiresAt ?? session.expiresAt;
+            if (nextStatus !== session.status || nextExpiresAt !== session.expiresAt) {
+              setSignatureSessions(prev => {
+                const current = prev[session.role];
+                if (!current || current.sessionId !== session.sessionId) return prev;
+                return { ...prev, [session.role]: { ...current, status: nextStatus, expiresAt: nextExpiresAt } };
+              });
+            }
+            if (payload.status === "signed" && !deps.currentInputs[SIGNATURE_IMAGE_BY_ROLE[session.role]]) {
               const signedResponse = await fetch(
                 `/api/admin/signing-sessions/${session.sessionId}?includeSignature=1`
               );
@@ -344,11 +361,11 @@ export default function DocBuilder({
               let signatureDataUrl = signedPayload.signatureDataUrl as string | undefined;
               if (!signatureDataUrl && signedPayload.signatureSealed) {
                 // Sealed by the signer: only an unlocked admin device can open it.
-                const bytes = await openSealedSignature(signedPayload.signatureSealed, session.sessionId);
+                const bytes = await deps.openSealedSignature(signedPayload.signatureSealed, session.sessionId);
                 signatureDataUrl = pngDataUrl(bytes);
               }
               if (signatureDataUrl) {
-                handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[session.role], signatureDataUrl);
+                deps.handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[session.role], signatureDataUrl);
               }
             }
           } catch (error) {
@@ -357,14 +374,27 @@ export default function DocBuilder({
         })
       );
     };
-
-    const interval = window.setInterval(poll, 2000);
-    poll();
+    const tick = async () => {
+      if (cancelled || document.hidden) return; // a hidden tab resumes on visibilitychange
+      await poll();
+      if (cancelled) return;
+      delay = Math.min(Math.round(delay * 1.5), POLL_MAX_MS);
+      timer = window.setTimeout(tick, delay);
+    };
+    const onVisibilityChange = () => {
+      if (cancelled || document.hidden) return;
+      window.clearTimeout(timer);
+      delay = POLL_START_MS;
+      void tick();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    void tick();
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [signatureSessions, currentInputs, openSealedSignature]);
+  }, [pendingSessionKey]);
 
   const handleExport = async (format: ExportFormat) => {
     if (!letterheadReady) return;
@@ -378,7 +408,9 @@ export default function DocBuilder({
     try {
       const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
       const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
-      const dataUrl = await htmlToImage.toPng(previewRef.current, {
+      // Loaded on demand: the export libraries are only needed when someone downloads.
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(previewRef.current, {
         width: exportWidth,
         height: exportHeight,
         pixelRatio: PIXEL_RATIO,
@@ -389,6 +421,7 @@ export default function DocBuilder({
         downloadDataUrl(dataUrl, `${selectedTemplateMeta?.title.replace(/\s+/g, "-") ?? "document"}.jpg`);
         toast.success("Image (JPEG) downloaded");
       } else {
+        const { jsPDF } = await import("jspdf");
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
@@ -496,7 +529,8 @@ export default function DocBuilder({
     try {
       const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
       const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
-      const dataUrl = await htmlToImage.toPng(previewRef.current, {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(previewRef.current, {
         width: exportWidth,
         height: exportHeight,
         pixelRatio: PIXEL_RATIO,
@@ -518,6 +552,7 @@ export default function DocBuilder({
       if (encrypted) {
         // The PDF is built and encrypted here, so the server never sees the signed certificate.
         // JPEG keeps the encrypted PDF under the 1 MiB document limit.
+        const { jsPDF } = await import("jspdf");
         const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
         pdf.addImage(await toJpegDataUrl(dataUrl), "JPEG", 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
         const pdfBytes = new Uint8Array(pdf.output("arraybuffer"));
@@ -583,17 +618,17 @@ export default function DocBuilder({
         (acc, roleConfig) => {
           const session = signatureSessions[roleConfig.role];
           const status = session?.status;
-          let statusLabel = "No session";
+          let statusLabel = "Not requested yet";
           if (status === "pending") statusLabel = "Pending";
           if (status === "signed") statusLabel = "Signed";
           if (status === "expired") statusLabel = "Expired";
-          if (status === "cancelled") statusLabel = "Cancelled";
+          if (status === "cancelled") statusLabel = "Canceled";
           const hasImage = Boolean(currentInputs[SIGNATURE_IMAGE_BY_ROLE[roleConfig.role]]);
           acc[SIGNATURE_FIELDS[roleConfig.role]] = {
-            label: status === "signed" || hasImage ? "Re-request" : "Request",
+            label: status === "signed" || hasImage ? "Request again" : "Request",
             onClick: () => handleRequestSignature(roleConfig.role),
             status: statusLabel,
-            badge: status === "signed" || hasImage ? "Signed ✓" : undefined
+            badge: status === "signed" || hasImage ? "Signed" : undefined
           };
           return acc;
         },
@@ -655,7 +690,7 @@ export default function DocBuilder({
             />
           </nav>
 
-          <div className={cn("grid gap-6", !isReviewStep && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+          <div className={cn("grid items-start gap-6", !isReviewStep && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
             <AdminSectionCard className="min-w-0" title={selectedTemplateMeta.title} description={selectedTemplateMeta.description}>
               {!isReviewStep ? (
                 <>
@@ -804,7 +839,7 @@ export default function DocBuilder({
 
             {!isReviewStep && selectedTemplate ? (
               <aside aria-label="Live preview" className="hidden min-w-0 lg:block">
-                <AdminSectionCard className="sticky top-20" title="Live preview" description="Updates as you type. Grey [hints] show what still needs filling in.">
+                <AdminSectionCard className="sticky top-20" title="Live preview" description="Updates as you type. Gray [hints] show what still needs filling in.">
                   <div className="rounded-xl border border-border bg-muted/50">
                     <DocPreview template={selectedTemplate} inputs={hintedInputs} hints />
                   </div>

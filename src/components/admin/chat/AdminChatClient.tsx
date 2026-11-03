@@ -2,7 +2,7 @@
 
 import { notifyActivity } from "@/src/lib/notifyClient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, limitToLast, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 import { MessageCircle, SendHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
@@ -11,7 +11,7 @@ import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
 import { formatDateTime } from "@/src/lib/format";
 import { cn } from "@/src/lib/utils";
-import { firestore, firebaseInitError } from "@/src/lib/firebaseClient";
+import { firestore, firebaseInitError } from "@/src/lib/firebaseFirestore";
 import { resolveActorName } from "@/src/lib/actor";
 import { useE2ee, type Unpacked } from "@/src/lib/e2ee/client/E2eeProvider";
 import type { CommsActorSnapshot } from "@/src/lib/comms";
@@ -28,11 +28,19 @@ type AdminChatMessage = Unpacked<{
 }>;
 
 const CHAT_PATH = "organizations/ghmo/adminChatMessages";
+const CHAT_MESSAGE_LIMIT = 100;
+
+/** Shown when the browser can't reach the database; the technical cause stays in the console. */
+const CONNECT_ERROR = "This page can't connect right now. Try again in a moment; if it keeps happening, tell whoever manages the website.";
+const connectError = () => {
+  console.error("Database connection unavailable:", firebaseInitError);
+  return CONNECT_ERROR;
+};
 
 export default function AdminChatClient({ actor }: AdminChatClientProps) {
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
   const [loading, setLoading] = useState(() => Boolean(firestore));
-  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : firebaseInitError || "Firebase is not configured."));
+  const [loadError, setLoadError] = useState<string | null>(() => (firestore ? null : connectError()));
   const [body, setBody] = useState("");
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -59,9 +67,11 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
 
   useEffect(() => {
     if (!firestore) return;
+    // The newest messages only (each one is decrypted in the browser); older history is not loaded here.
     const chatQuery = query(
       collection(firestore, "organizations", "ghmo", "adminChatMessages"),
-      orderBy("createdAt", "asc")
+      orderBy("createdAt", "asc"),
+      limitToLast(CHAT_MESSAGE_LIMIT)
     );
     const unsubscribe = onSnapshot(
       chatQuery,
@@ -188,7 +198,7 @@ export default function AdminChatClient({ actor }: AdminChatClientProps) {
             onChange={event => setBody(event.target.value)}
             rows={2}
             className="min-h-11 min-w-0 flex-1 resize-none"
-            placeholder="Share an update or ask for help..."
+            placeholder="Share an update or ask for help…"
           />
           <Button type="button" size="lg" onClick={handleSend} disabled={isSending} className="px-4">
             <SendHorizontal aria-hidden="true" />

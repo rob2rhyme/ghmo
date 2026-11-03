@@ -7,7 +7,9 @@ import { ServiceWorkerRegistration } from "@/src/components/ServiceWorkerRegistr
 import { SiteFooter } from "@/src/components/public/SiteFooter";
 import { getCommunity } from "@/src/lib/community";
 import { getContactEmail } from "@/src/lib/contact";
+import { ContactEmailProvider } from "@/src/lib/contactContext";
 import { getDonateUrl } from "@/src/lib/donateLink";
+import { inter } from "@/src/lib/fonts";
 import { cn } from "@/src/lib/utils";
 
 type SiteShellProps = {
@@ -35,32 +37,35 @@ type SiteShellProps = {
 export async function SiteShell({ children, bodyStart, chrome = true, secure = false, scrollToTop = false }: SiteShellProps) {
   const community = await getCommunity();
   const nonce = secure ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
+  const contactEmail = getContactEmail();
 
   // With the header and footer, body is a flex column so the footer sits at the bottom of short pages.
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className={cn("min-h-screen bg-background text-foreground antialiased", chrome && "flex flex-col")}>
         <Providers nonce={nonce}>
-          {bodyStart}
-          {chrome ? (
-            <>
-              <a
-                href="#main-content"
-                className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
-              >
-                Skip to content
-              </a>
-              <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} />
-              <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10">
-                {children}
-              </main>
-              <SiteFooter name={community.name} contactEmail={getContactEmail()} />
-            </>
-          ) : (
-            children
-          )}
-          {scrollToTop ? <ScrollToTopButton /> : null}
-          <ServiceWorkerRegistration />
+          <ContactEmailProvider value={contactEmail}>
+            {bodyStart}
+            {chrome ? (
+              <>
+                <a
+                  href="#main-content"
+                  className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+                >
+                  Skip to content
+                </a>
+                <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} />
+                <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10">
+                  {children}
+                </main>
+                <SiteFooter name={community.name} contactEmail={contactEmail} />
+              </>
+            ) : (
+              children
+            )}
+            {scrollToTop ? <ScrollToTopButton /> : null}
+            <ServiceWorkerRegistration />
+          </ContactEmailProvider>
         </Providers>
       </body>
     </html>

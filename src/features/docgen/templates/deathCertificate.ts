@@ -3,7 +3,7 @@ import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
 
 export const deathCertificate: DocTemplate = {
   id: "death-certificate",
-  version: 1,
+  version: 2,
   title: "Memorial Notice",
   category: "Certificate",
   description: "Share news of a member's passing, with the memorial service details and a family contact.",
@@ -21,15 +21,17 @@ export const deathCertificate: DocTemplate = {
       placeholder: "We honor their service to GHMO and commit to continuing the legacy."
     }
   ],
+  // Empty fields leave their line out; the notice never prints "TBD" or a made-up contact.
   renderHtml(inputs) {
     const organizationName =
       escapeHtml(inputs.organizationName) || "Greater Harrisburg Magar Organization";
-    const deceasedName = escapeHtml(inputs.deceasedName) || "Beloved Member";
-    const dateOfPassing = formatDate(inputs.dateOfPassing) || "TBD";
-    const serviceDate = formatDate(inputs.serviceDate) || "TBD";
-    const serviceLocation = escapeHtml(inputs.serviceLocation) || "TBD";
-    const contactPerson = escapeHtml(inputs.contactPerson) || "Family Contact";
-    const remarks = escapeHtml(inputs.remarks) || "In memory of a life that blessed our community.";
+    const deceasedName = escapeHtml(inputs.deceasedName);
+    const dateOfPassing = formatDate(inputs.dateOfPassing);
+    const serviceDate = formatDate(inputs.serviceDate);
+    const serviceLocation = escapeHtml(inputs.serviceLocation);
+    const contactPerson = escapeHtml(inputs.contactPerson);
+    const remarks = escapeHtml(inputs.remarks);
+    const service = [serviceDate, serviceLocation].filter(Boolean).join(" at ");
 
     return `
       <div>
@@ -37,11 +39,11 @@ export const deathCertificate: DocTemplate = {
         <p class="ghmo-letter-meta" style="text-align:center;">${organizationName}</p>
         <div class="ghmo-letter-body" style="text-align:center;">
           <p>We honor the passing of</p>
-          <p style="font-size:1.4rem; font-weight:600;">${deceasedName}</p>
-          <p>who passed on ${dateOfPassing}</p>
-          <p>Service: ${serviceDate} at ${serviceLocation}</p>
-          <p style="margin-top:1rem;">${remarks}</p>
-          <p class="ghmo-letter-footer" style="text-align:center;">Available contact: ${contactPerson}</p>
+          ${deceasedName ? `<p style="font-size:1.4rem; font-weight:600;">${deceasedName}</p>` : ""}
+          ${dateOfPassing ? `<p>who passed on ${dateOfPassing}</p>` : ""}
+          ${service ? `<p>Service: ${service}</p>` : ""}
+          ${remarks ? `<p style="margin-top:1rem;">${remarks}</p>` : ""}
+          ${contactPerson ? `<p class="ghmo-letter-footer" style="text-align:center;">Family contact: ${contactPerson}</p>` : ""}
         </div>
       </div>
     `;

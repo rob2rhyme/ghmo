@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * their encrypted contact envelopes. The server filters by uid; nobody can ask for someone else's list.
  */
 export async function GET(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
   try {
     const { actor } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const [tree, assignments] = await Promise.all([readTree(), readAssignments(actor.uid)]);
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    if (error instanceof AdminEnvError) return NextResponse.json({ error: "This can't be loaded right now. Try again in a moment; if it keeps happening, tell whoever manages the website." }, { status: 503 });
     throw error;
   }
 }

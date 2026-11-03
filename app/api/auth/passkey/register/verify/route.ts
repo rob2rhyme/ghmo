@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hasActiveTotp } from "@/src/lib/totpStore";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { z } from "zod";
@@ -28,7 +29,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
   try {
     const { actor, admin, authMethod } = await requireActiveAdmin(req, COMMUNITY_SLUG, { allowMagicLink: true });
     const parsed = await parseJsonBody(req, bodySchema, { maxBytes: 32 * 1024 });
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest) {
 
     const info = verification.registrationInfo;
     const via = isStrongAdminAuth(authMethod) ? "passkey" : "magic_link";
+    if (via === "magic_link" && (await hasActiveTotp(actor.uid))) {
+      return NextResponse.json({ error: "Sign in with your authenticator app first to add a passkey", code: "TOTP_REQUIRED" }, { status: 403 });
+    }
     const status = await decideNewPasskeyStatus(actor.uid, via);
     const prf = (response.clientExtensionResults as { prf?: { enabled?: boolean } }).prf;
 
@@ -84,8 +88,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, status, prfEnabled: prf?.enabled === true });
   } catch (error) {
-    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
-    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message, code: error.reason }, { status: error.status });
+    if (error instanceof AdminEnvError) return NextResponse.json({ error: "Sign-in settings can't be loaded right now." }, { status: 503 });
     throw error;
   }
 }
