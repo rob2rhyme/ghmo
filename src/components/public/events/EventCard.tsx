@@ -4,7 +4,7 @@ import { ArrowRight, Clock, FileText, History, MapPin, Star } from "lucide-react
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Skeleton } from "@/src/components/ui/skeleton";
-import type { EventRecord } from "@/src/lib/events.shared";
+import type { EventCardRecord } from "@/src/lib/events";
 import { cn } from "@/src/lib/utils";
 import { dateTile, eventStart, eventTimeZone, eventWhenParts } from "./eventDates";
 
@@ -21,7 +21,7 @@ export function eventFlyerHref(orgSlug: string, id: string) {
 }
 
 type EventCardProps = {
-  evt: EventRecord;
+  evt: EventCardRecord;
   orgSlug: string;
   /** Shorter summary (grid view, home page). */
   compact?: boolean;
@@ -75,15 +75,15 @@ export function EventCard({ evt, orgSlug, compact = false, flyer = true, heading
           </Heading>
           <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0">
-              {when ? (
-                <>
-                  {when.date} <span className="whitespace-nowrap">· {when.time}</span>
-                </>
-              ) : (
-                "Date to be announced"
-              )}
-            </span>
+            {/* Date and time wrap as two pieces with a gap, no separator that could start the second line (R4 L7). */}
+            {when ? (
+              <span className="flex min-w-0 flex-wrap gap-x-3">
+                <span>{when.date}</span>{" "}
+                <span className="whitespace-nowrap">{when.time}</span>
+              </span>
+            ) : (
+              <span className="min-w-0">Date to be announced</span>
+            )}
           </p>
           {evt.location ? (
             <p className="flex items-start gap-1.5 text-sm text-muted-foreground">

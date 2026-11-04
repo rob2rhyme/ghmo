@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
-import { formatDate, formatShortDate } from "@/src/lib/format";
+import { DUE_DATE, formatDate, formatShortDate } from "@/src/lib/format";
 import { getArchiveEntry } from "@/src/lib/publicData.server";
 
 // Built on first visit and refreshed every 5 minutes, or at once when minutes are approved (publicCache.server.ts).
@@ -51,17 +51,18 @@ export default async function MinutesDetailPage({ params }: { params: Promise<{ 
         title={<span className="break-words">{entry.eventTitle}</span>}
         description={`${entry.meetingType}${date ? ` · ${date}` : ""}`}
       />
+      {/* The order of the meeting and of the admin preview: Agenda, Discussion, Decisions, Action items (R4 C15). */}
+      <List title="Agenda" items={entry.agenda} />
       {entry.discussionSummary ? (
         <section className="flex flex-col gap-2">
           <PublicSectionTitle>Discussion</PublicSectionTitle>
           <p className="whitespace-pre-line text-base text-foreground/90">{entry.discussionSummary}</p>
         </section>
       ) : null}
-      <List title="Agenda" items={entry.agenda} />
       <List title="Decisions" items={entry.decisions} />
       <List
         title="Action items"
-        items={entry.actionItems.map(item => `${item.task}${item.dueDate ? ` (due ${formatShortDate(item.dueDate)})` : ""}`)}
+        items={entry.actionItems.map(item => `${item.task}${item.dueDate ? ` (due ${formatShortDate(item.dueDate, DUE_DATE)})` : ""}`)}
       />
       {entry.attendance || entry.signatures?.chairName || entry.signatures?.secretaryName || entry.approvedAt ? (
         <footer className="flex flex-col gap-1 border-t border-border pt-4">

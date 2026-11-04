@@ -11,7 +11,6 @@ import {
   orgBroadcastsCollectionPath,
   orgDonationsStatsDocPath,
   orgDonationsWebhookEventsCollectionPath,
-  orgHomeBlocksDocPath,
   orgMembersCollectionPath,
   orgMinutesCollectionPath
 } from "./firestorePaths";
@@ -41,6 +40,10 @@ function asJson<T>(value: T): T {
 
 // ---- Dashboard ----
 
+/** The dashboard's "Recent minutes": how many rows, and the only fields a row shows. */
+const DASHBOARD_RECENT_MINUTES = 5;
+const DASHBOARD_MINUTES_FIELDS = ["eventTitle", "eventDate", "meetingType", "status"] as const;
+
 export async function loadAdminDashboard(_check: AdminCheck) {
   const db = getAdminDb();
   const warnings: string[] = [];
@@ -50,7 +53,16 @@ export async function loadAdminDashboard(_check: AdminCheck) {
     warnings.push(label);
   };
 
-  const [stats, webhookEvents, auditLogs, blocks, minutes] = await Promise.all([
+  const minutesCollection = db.collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
+  // Only what the dashboard shows: the five latest records' list fields (no content or ciphertext) and two counts.
+  const countStatus = (status: string) =>
+    minutesCollection
+      .where("status", "==", status)
+      .count()
+      .get()
+      .then(snap => snap.data().count);
+
+  const [stats, webhookEvents, auditLogs, minutes, minutesCounts] = await Promise.all([
     db
       .doc(orgDonationsStatsDocPath(COMMUNITY_SLUG))
       .get()
@@ -78,18 +90,16 @@ export async function loadAdminDashboard(_check: AdminCheck) {
         })
       )
       .catch(err => (note("auditLogs", err), [] as unknown[])),
-    db
-      .doc(orgHomeBlocksDocPath(COMMUNITY_SLUG))
-      .get()
-      .then(snap => (snap.exists ? snap.data()?.blocks || [] : []))
-      .catch(err => (note("blocks", err), [] as unknown[])),
-    db
-      .collection(orgMinutesCollectionPath(COMMUNITY_SLUG))
+    minutesCollection
       .orderBy("eventDate", "desc")
-      .limit(50)
+      .limit(DASHBOARD_RECENT_MINUTES)
+      .select(...DASHBOARD_MINUTES_FIELDS)
       .get()
       .then(snap => snap.docs.map(doc => toPlain({ id: doc.id, ...doc.data() })))
-      .catch(err => (note("minutes", err), [] as unknown[]))
+      .catch(err => (note("minutes", err), [] as unknown[])),
+    Promise.all([countStatus("submitted"), countStatus("draft")])
+      .then(([submitted, draft]) => ({ submitted, draft }))
+      .catch(err => (note("minutesCounts", err), { submitted: 0, draft: 0 }))
   ]);
 
   return asJson(
@@ -98,8 +108,8 @@ export async function loadAdminDashboard(_check: AdminCheck) {
       stats: stats ?? { totalRaised: 0, goal: 0, donorCount: 0 },
       webhookEvents,
       auditLogs,
-      blocks,
       minutes,
+      minutesCounts,
       warnings
     })
   ) as {
@@ -107,8 +117,8 @@ export async function loadAdminDashboard(_check: AdminCheck) {
     stats: JsonRecord;
     webhookEvents: JsonRecord[];
     auditLogs: JsonRecord[];
-    blocks: unknown[];
     minutes: JsonRecord[];
+    minutesCounts: { submitted: number; draft: number };
     warnings: string[];
   };
 }

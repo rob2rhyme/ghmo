@@ -23,6 +23,11 @@ type SiteShellProps = {
    * the page render per request, which nonces require.
    */
   secure?: boolean;
+  /**
+   * Header and footer links lead into another root layout (a full page load), so they aren't prefetched.
+   * Secure layouts imply it; the docs layout sets it on its own.
+   */
+  crossRootLinks?: boolean;
   /** Floating back-to-top button with a scroll-progress ring (public pages). */
   scrollToTop?: boolean;
 };
@@ -34,7 +39,7 @@ type SiteShellProps = {
  * navigating between root layouts, so third-party scripts loaded on public pages
  * can never stay alive in the browser after the user moves into the admin area.
  */
-export async function SiteShell({ children, bodyStart, chrome = true, secure = false, scrollToTop = false }: SiteShellProps) {
+export async function SiteShell({ children, bodyStart, chrome = true, secure = false, crossRootLinks = false, scrollToTop = false }: SiteShellProps) {
   const community = await getCommunity();
   const nonce = secure ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
   const contactEmail = getContactEmail();
@@ -54,11 +59,11 @@ export async function SiteShell({ children, bodyStart, chrome = true, secure = f
                 >
                   Skip to content
                 </a>
-                <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} />
+                <CommunityHeader name={community.name} donateOpen={Boolean(getDonateUrl())} secure={secure || crossRootLinks} />
                 <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none md:px-6 md:py-10">
                   {children}
                 </main>
-                <SiteFooter name={community.name} contactEmail={contactEmail} />
+                <SiteFooter name={community.name} contactEmail={contactEmail} secure={secure || crossRootLinks} />
               </>
             ) : (
               children

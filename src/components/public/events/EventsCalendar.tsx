@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/src/components/ui/button";
-import type { EventRecord } from "@/src/lib/events.shared";
+import type { EventCardRecord } from "@/src/lib/events";
 import { formatTime } from "@/src/lib/format";
 import { cn } from "@/src/lib/utils";
 import { dayKey, eventStart, eventTimeZone, timeZoneLabel } from "./eventDates";
@@ -13,7 +13,7 @@ import { eventHref } from "./EventCard";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-type Dated = { evt: EventRecord; start: Date; key: string };
+type Dated = { evt: EventCardRecord; start: Date; key: string };
 
 function timeLine(item: Dated) {
   const timeZone = eventTimeZone(item.evt);
@@ -24,7 +24,7 @@ function timeLine(item: Dated) {
  * Month calendar. From tablet width up it is a 7-column grid; on phones the same month is an
  * agenda list (a 7-column grid is unreadable at 375 px).
  */
-export function EventsCalendar({ events, orgSlug }: { events: EventRecord[]; orgSlug: string }) {
+export function EventsCalendar({ events, orgSlug }: { events: EventCardRecord[]; orgSlug: string }) {
   const [offset, setOffset] = useState(0);
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);

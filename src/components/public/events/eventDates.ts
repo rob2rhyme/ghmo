@@ -85,3 +85,11 @@ export function eventIsOver(evt: Pick<EventRecord, "startsAt" | "endsAt">, now: 
   const last = eventEnd(evt) ?? eventStart(evt);
   return last ? last.getTime() < now : false;
 }
+
+/**
+ * The next `limit` events that aren't over at `now`, in the order given (soonest first). Cached pages send a few
+ * spare events and call this with the browser's clock, so an event that ended after the copy was built drops off.
+ */
+export function nextEvents<T extends Pick<EventRecord, "startsAt" | "endsAt">>(events: readonly T[], now: number, limit: number): T[] {
+  return events.filter(evt => !eventIsOver(evt, now)).slice(0, Math.max(0, limit));
+}

@@ -7,5 +7,6 @@ export const metadata = siteMetadata;
 export const viewport = siteViewport;
 
 export default function DocsRootLayout({ children }: { children: ReactNode }) {
-  return <SiteShell secure>{children}</SiteShell>;
+  // Fixed text with no admin data: public CSP and no per-request nonce, so it can be served from the cache.
+  return <SiteShell crossRootLinks>{children}</SiteShell>;
 }

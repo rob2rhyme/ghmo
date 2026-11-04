@@ -13,6 +13,7 @@ test.beforeEach(async () => {
     approvedAt: now,
     decisions: ["Buy the hall"],
     agenda: ["The hall"],
+    discussionSummary: "We talked about the hall.",
     actionItems: [{ task: "Call the bank" }],
     attendance: { present: ["Ann Private", "Bo Secret"], absent: ["Cy Hidden"] },
     approvalNotes: "internal only"
@@ -31,6 +32,9 @@ test("the public archive shows approved minutes only, with attendance as counts"
   await page.getByRole("link", { name: /Spring board meeting/ }).click();
   await expect(page.getByText("Buy the hall")).toBeVisible();
   await expect(page.getByText("Attendance: 2 present, 1 absent.")).toBeVisible();
+  // The order of the meeting: Agenda, Discussion, Decisions, Action items.
+  const sections = await page.getByRole("main").getByRole("heading", { level: 2 }).allTextContents();
+  expect(sections).toEqual(["Agenda", "Discussion", "Decisions", "Action items"]);
   const html = await page.content();
   for (const hidden of ["Ann Private", "Bo Secret", "Cy Hidden", "internal only", "Alice", "Sell everything"]) expect(html).not.toContain(hidden);
 
@@ -55,4 +59,20 @@ test("calendar feed lists published events only, as a valid .ics", async ({ requ
   expect(single.status()).toBe(200);
   expect((await single.text()).match(/BEGIN:VEVENT/g)).toHaveLength(1);
   expect((await request.get("/api/calendar/ev2")).status()).toBe(404);
+});
+
+test("the flyer downloads for any title, and the events API answers a bad date with 400", async ({ request }) => {
+  const title = "दशैं – Children’s day";
+  await admin().db.doc("organizations/ghmo/events/ev3").set({ title, status: "published", startsAt: Timestamp.fromMillis(Date.UTC(2026, 9, 1, 22)) });
+  const pdf = await request.get("/api/organizations/ghmo/events/ev3/announcement.pdf");
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()["content-type"]).toBe("application/pdf");
+  const disposition = pdf.headers()["content-disposition"];
+  expect(disposition).toMatch(/^attachment; filename="[\x20-\x7e]+"; filename\*=UTF-8''/);
+  expect(decodeURIComponent(disposition.split("filename*=UTF-8''")[1])).toBe(`${title} flyer.pdf`);
+
+  expect((await request.get("/api/organizations/ghmo/events?rangeStart=soon")).status()).toBe(400);
+  const ranged = await request.get("/api/organizations/ghmo/events?rangeStart=2026-06-01&rangeEnd=2026-06-30");
+  expect(ranged.status()).toBe(200);
+  expect(((await ranged.json()) as { events: { id: string }[] }).events.map(event => event.id)).toEqual(["ev1"]);
 });
