@@ -84,7 +84,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 ## Data Model (single community)
 - `organizations/ghmo` document: metadata, theme, GoFundMe config.
 - Subcollections under `organizations/ghmo`:
-  - `members/{memberId}`: `emailLower`, optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
+  - `members/{memberId}`: `emailLower` (`""` for a member who doesn't use email; such a member has a `name` and an encrypted phone number, and is called but never emailed), optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
     Email consent (Phase 8): optional `emailConsent` {`at`, `source` (`admin_on_request` / `signed_up` / `imported`), `byUid`}, `emailOptOutAt`, `emailBounced`. Only members who are active, have a recorded consent and have not opted out or bounced can be emailed. Members are written only by the server (`/api/organizations/ghmo/members`, `/members/[id]`, `/members/import`); Firestore rules let admins read the list but never write it.
     Phone and call contact (Phase 9-A, plan §12): `contact` is one end-to-end encrypted envelope (phone, second phone, language, household, notes) made in the admin's browser and bound to the member id, so the server never sees a number; beside it `hasPhone`, `phoneConsent` {`at`, `source`, `byUid`} and `callOptOutAt` are plaintext flags for filtering. Numbers can only be stored once encryption is on and are shown masked until tapped.
   - `content/pages/home`: `{ blocks[] }`.

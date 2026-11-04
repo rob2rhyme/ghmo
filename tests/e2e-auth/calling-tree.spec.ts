@@ -13,7 +13,7 @@ const shown = (page: Page, text: string) => page.locator("#admin-main").getByTex
 /** Adds a member with a number and call consent through the Members page (encrypted in the browser). */
 async function addMember(page: Page, name: string, email: string, phone: string) {
   await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByLabel("Name (optional)").fill(name);
+  await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Phone (optional)").fill(phone);
   await page.getByLabel("This person gave their number for community calls.").check();
   await page.getByRole("button", { name: "Add member" }).click();
@@ -47,7 +47,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   ] as const;
   for (const [name, email, phone] of people) await addMember(page, name, email, phone);
   await page.getByLabel("Email", { exact: true }).fill("noconsent@example.org");
-  await page.getByLabel("Name (optional)").fill("No Consent");
+  await page.getByLabel("Name", { exact: true }).fill("No Consent");
   await page.getByLabel("Phone (optional)").fill("717-555-0199");
   await page.getByRole("button", { name: "Add member" }).click();
   await expect(shown(page, "No Consent")).toBeVisible();

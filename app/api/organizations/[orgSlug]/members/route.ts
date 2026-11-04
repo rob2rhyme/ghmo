@@ -60,7 +60,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
 const MEMBER_ROLES = ["member"] as const;
 
 const createMemberSchema = z.object({
-  email: z.string().trim().email().max(320),
+  /** Optional when the member is saved with a phone number and a name (many members don't use email). */
+  email: z.union([z.literal(""), z.string().trim().email().max(320)]).optional(),
   name: z.string().max(120).nullable().optional(),
   status: z.enum(["active", "disabled"]).optional(),
   roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional(),
@@ -92,11 +93,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const parsed = await parseJsonBody(req, createMemberSchema);
     if (!parsed.ok) return parsed.response;
     const body = parsed.data;
-    const emailInput = body.email;
+    const emailInput = body.email?.trim() || undefined;
     const emailLower = normalizeMemberEmail(emailInput);
-    if (!emailLower) return NextResponse.json({ error: "Email is required" }, { status: 400 });
-
     const name = normalizeMemberName(body.name);
+    // A member needs an email, or a phone number and a name. The server can't read the number (it is
+    // encrypted), so it relies on the hasPhone flag the browser sets beside the envelope.
+    if (!emailLower) {
+      if (!body.contact?.hasPhone) return NextResponse.json({ error: "Add an email address or a phone number." }, { status: 400 });
+      if (!name) return NextResponse.json({ error: "Add a name for someone without an email." }, { status: 400 });
+      if (body.emailConsent) return NextResponse.json({ error: "Email consent needs an email address." }, { status: 400 });
+    }
+
     const status = body.status ?? "active";
     const sanitizedRoles = sanitizeMemberRoles(body.roles);
     const roles = sanitizedRoles.length > 0 ? sanitizedRoles : ["member"];
@@ -106,7 +113,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     if (body.contact && !body.id) return NextResponse.json({ error: "id is required with an encrypted contact" }, { status: 400 });
     const docRef = body.id ? collection.doc(body.id) : collection.doc();
     const payload: Record<string, unknown> = {
-      email: emailInput,
+      ...(emailInput ? { email: emailInput } : {}),
+      // "" rather than missing, so the member list (ordered by this field) still includes phone-only members.
       emailLower,
       status,
       uid: null,

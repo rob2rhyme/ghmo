@@ -17,10 +17,11 @@ describe("memberEmailState", () => {
     expect(memberEmailState({ ...consented, emailOptOutAt: new Date(), emailBounced: true })).toBe("opted_out");
   });
 
-  it("disabled members and members without an address are inactive, whatever else is set", () => {
+  it("disabled members are inactive, and active members without an address are phone-only, whatever else is set", () => {
     expect(memberEmailState({ ...consented, status: "disabled" })).toBe("inactive");
-    expect(memberEmailState({ ...consented, emailLower: "" })).toBe("inactive");
-    expect(memberEmailState({ ...consented, emailLower: undefined })).toBe("inactive");
+    expect(memberEmailState({ ...consented, emailLower: "" })).toBe("no_email");
+    expect(memberEmailState({ ...consented, emailLower: undefined })).toBe("no_email");
+    expect(memberEmailState({ status: "disabled", emailLower: "" })).toBe("inactive");
     expect(memberEmailState({ status: "disabled", emailLower: "a@example.org", emailOptOutAt: new Date() })).toBe("inactive");
   });
 
@@ -143,5 +144,65 @@ describe("parseMemberCsv with a phone column", () => {
     expect(result.problems).toHaveLength(1);
     expect(result.problems[0]).toContain("Line 2");
     expect(result.problems[0]).toContain("imported without one");
+  });
+});
+
+describe("members without an email (phone only)", () => {
+  it("names and identifies them", async () => {
+    const { hasEmail, memberDisplayName, phoneOnlyKey } = await import("@/src/lib/members");
+    expect(hasEmail({ emailLower: "a@example.org" })).toBe(true);
+    expect(hasEmail({ emailLower: "" })).toBe(false);
+    expect(memberDisplayName({ name: "Maya Gurung", emailLower: "" })).toBe("Maya Gurung");
+    expect(memberDisplayName({ name: null, emailLower: "a@example.org" })).toBe("a@example.org");
+    expect(memberDisplayName({ emailLower: "" })).toBe("Unnamed member");
+    // Same person: same number and the same name, however it is typed.
+    expect(phoneOnlyKey("+17175550102", " Maya  GURUNG ")).toBe(phoneOnlyKey("+17175550102", "maya gurung"));
+    // A shared household phone: different names are different people.
+    expect(phoneOnlyKey("+17175550102", "Maya Gurung")).not.toBe(phoneOnlyKey("+17175550102", "Hari Gurung"));
+  });
+
+  it("imports rows with an empty email when they have a name and a phone", () => {
+    const result = parseMemberCsv("email,name,phone\nsam@example.org,Sam Lee,717-555-0100\n,Maya Gurung,717-555-0102\n");
+    expect(result.rows).toEqual([
+      { email: "sam@example.org", name: "Sam Lee", phone: "+17175550100" },
+      { name: "Maya Gurung", phone: "+17175550102" }
+    ]);
+    expect(result.problems).toEqual([]);
+  });
+
+  it("accepts a list with no email column at all, and headerless name and phone lines", () => {
+    expect(parseMemberCsv("Name,Phone\nMaya Gurung,717-555-0102\nHari Gurung,(717) 555-0103\n").rows).toEqual([
+      { name: "Maya Gurung", phone: "+17175550102" },
+      { name: "Hari Gurung", phone: "+17175550103" }
+    ]);
+    expect(parseMemberCsv("Maya Gurung,717-555-0102\n717-555-0103,Hari Gurung\n").rows).toEqual([
+      { name: "Maya Gurung", phone: "+17175550102" },
+      { name: "Hari Gurung", phone: "+17175550103" }
+    ]);
+  });
+
+  it("refuses a row with neither an email nor a usable phone, or with no name, and says why", () => {
+    const result = parseMemberCsv("email,name,phone\n,Maya Gurung,\n,Hari Gurung,555-01\n,,717-555-0104\n");
+    expect(result.rows).toEqual([]);
+    expect(result.problems).toHaveLength(3);
+    expect(result.problems[0]).toContain("needs an email address or a phone number");
+    expect(result.problems[1]).toContain("is not a phone number, and there is no email");
+    expect(result.problems[2]).toContain("needs a name");
+  });
+
+  it("still refuses a mistyped email rather than importing the person as phone-only", () => {
+    const result = parseMemberCsv("email,name,phone\nmaya@,Maya Gurung,717-555-0102\n");
+    expect(result.rows).toEqual([]);
+    expect(result.problems[0]).toContain("is not a valid email address");
+  });
+
+  it("drops a repeated name and number, but keeps a household sharing one phone", () => {
+    const result = parseMemberCsv("name,phone\nMaya Gurung,717-555-0102\nmaya gurung,7175550102\nHari Gurung,717-555-0102\n");
+    expect(result.rows).toEqual([
+      { name: "Maya Gurung", phone: "+17175550102" },
+      { name: "Hari Gurung", phone: "+17175550102" }
+    ]);
+    expect(result.problems).toHaveLength(1);
+    expect(result.problems[0]).toContain("Line 3");
   });
 });
