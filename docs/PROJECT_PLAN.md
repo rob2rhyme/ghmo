@@ -514,7 +514,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ## 9. What is next (updated 2026-11-03)
 
-Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77), and the round-2 audit fixes and speed pass are done (§14). In the codebase, the round-4 fix plan (`docs/AUDIT_ROUND_4.md`), the round-3 leftover (L8 artwork) and the round-2 security lows (S7 per-email sign-in limit, S10 `__Host-` cookie, S15 Firestore rule shape checks, S16 SHA pinning, S18 permission matrix) are waiting; everything else left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
+Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77), and the round-2 audit fixes and speed pass are done (§14). In the codebase, the round-3 leftover (L8 artwork) and the round-2 security lows (S7 per-email sign-in limit, S10 `__Host-` cookie, S15 Firestore rule shape checks, S16 SHA pinning, S18 permission matrix) are waiting; everything else left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
 
 1. ~~Make the repository public, or fix GitHub Actions billing.~~ Done: CI runs again (PR #77's checks ran on GitHub).
 2. **Branch protection on `main`**, requiring the CI, CodeQL and secret-scan checks. Needs step 1 first.
@@ -831,6 +831,10 @@ sizes, four code reviewers). 72 findings: 6 High, 27 Medium, 39 Low.
   renewed forever through the custom-token endpoint, a gap in round 3's session fix), 15 Medium, 30 Low. Fix plan at
   the top of the document; needs the owner for how GoFundMe Pro donations are taken and whether certificates are
   numbered automatically.
+- **Round 4 fixes (2026-11-04):** all 48 fixed (status section in `docs/AUDIT_ROUND_4.md`). Donations go through
+  GoFundMe's own page (no GoFundMe script on the site); certificates are numbered "GHMO-<year>-<NNN>" automatically;
+  multi-page certificates and minutes export and sign every page. The board still confirms the wedding certificate's
+  Maiti wording (C5); a Devanagari font for the flyer PDF is optional.
 
 ## 13. Phase 10 — UI layout audit, twice, and upgrade (requested 2026-11-01, built 2026-11-03)
 

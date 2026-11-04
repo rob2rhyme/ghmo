@@ -47,6 +47,51 @@ the board to confirm the certificate's wording for a Magar bride with a non-Maga
 5. **Wording and layout Lows**, then the full re-check with new screenshots of the certificate Review step and the
    signing page (L11).
 
+## Status: fixed (2026-11-04)
+
+All 48 rows are fixed in the codebase. Owner decisions taken: donations go through GoFundMe's own page (no GoFundMe
+script or embed on this site); certificates are numbered automatically, "GHMO-<year>-<NNN>"; the Maiti wording prints
+only for a Magar groom with a bride from another community, and a neutral welcome line otherwise (**the board still
+confirms this wording**).
+
+- **Highs.** C1: a typed `YYYY-MM-DD` prints as that calendar day in every template and the minutes preview (tests run
+  under `TZ=America/New_York`). The same bug in minutes due dates (public minutes, Gumba page, action items) is fixed
+  too, with `DUE_DATE` in `src/lib/format.ts`. L1: `PagedLetter` lays the document out once and breaks pages only at
+  block boundaries (`render/pagination.ts`); PDF downloads, JPEG downloads (pages stacked) and finalize capture every
+  page. Without encryption, finalize sends `pageImages` (up to 6 JPEG pages) and the server builds and hashes one PDF
+  page per image; the encrypted path builds the multi-page PDF in the browser. Exports now pass the page's own size to
+  html-to-image (816×1056) with pixel ratio 2; before, the 2× size was applied as CSS and the layout doubled. S1: the
+  session route makes member sessions only, and refuses the browser's Firestore token (it carries `sessionExp`).
+- **Certificates.** `POST /api/admin/certificates/number` (strong admin session, 30 per hour) allocates the next
+  number in a transaction on `organizations/ghmo/counters/certificates-<year>` (New York year; Admin SDK only, so no
+  client rule), skipping numbers already used. Signing sessions require a number; finalize refuses the template id.
+  Signatures are dark ink on a transparent, trimmed PNG (L2). Signing page: loading state, pad only while pending, a
+  resize clears the box and says so (L4).
+- **Security.** S3: the GoFundMe snippet and embed are removed; public pages get a static CSP
+  (`script-src 'self' 'unsafe-inline'`, `object-src 'none'`, `frame-ancestors 'none'`) from `next.config.mjs`, and the
+  proxy runs only for `/admin`, `/login`, `/sign`, `/unsubscribe` (P2, P11). S4: wrong codes are also counted per day
+  (20 lock code sign-in, recovery codes included); the Security page shows "Locked"; a reset needs the super admin to
+  confirm they spoke with the person. S5: sealing checks the server's list against the one the admin reviewed. S6: the
+  rollback pin and "has seen encryption on" survive re-setup and "forget this device". S2: the flyer's file name uses
+  RFC 5987. S7–S10 as planned (`jsonwebtoken` removed; the test route also refuses on Vercel).
+- **Speed.** Member sign-in has no Suspense fallback, so no layout jump (P1); service-worker navigation preload (P3);
+  no `loading.tsx` over cached public pages (P4); no prefetch across root layouts (P5); the dashboard reads 5 rows and
+  two counts (P6); event cards carry no body (P7); Home filters upcoming events by the browser's clock (P8); the public
+  events API reads the cache (P10); the hero image at quality 60 (P12).
+- **Wording.** Admin refusals, email sign-in, lockout, encryption "paused" (one message, raw reason under "Details"),
+  broadcast refusals, flyer, verify page, signing labels and examples, in plain words (C3–C15).
+- **Found while checking.** The proxy's `config.matcher` used a shared constant; Next reads that config without
+  running the file, so the build refused it ("Invalid segment configuration export"). It is now written out in full.
+  The new certificate screenshots ran after the step that turns encryption on, so the newly signed-in device was locked
+  out of the generator and the test waited forever; they now run before it, and every wait in that flow is capped.
+- **Rerun after the fixes:** typecheck clean; lint 60 warnings (cap 62); 381 unit tests; 100 emulator tests; 227
+  browser tests; the production build and its 53 browser tests; the cache check 16 of 16 (with `.next/cache` cleared
+  first: a build otherwise reuses event data saved by an earlier run); 413 screenshots and the axe scan at 0. Lighthouse on a build that read
+  real data, phone: Home 92, Donate 94, Events 100, Minutes 100, Media 97, Board guide 100, Admin sign-in 99, Member
+  sign-in 100 (desktop 100 everywhere); accessibility 100 on every page.
+- **Left open.** Nepali letters don't show in the flyer PDF (it uses Helvetica; showing them needs a bundled Devanagari
+  font). The board confirms C5's wording.
+
 ---
 
 ## 1. Layout
