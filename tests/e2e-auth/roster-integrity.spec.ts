@@ -25,6 +25,6 @@ test("a device slipped into the database without a signed entry is refused", asy
   await devices.doc("rogue_device_0000000000").set({ ...existing.data(), deviceId: "rogue_device_0000000000", uid: "alice", name: "Rogue", status: "active" });
 
   await page.reload();
-  await expect(page.getByText("The device list failed its integrity check")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Encryption is paused: the device list failed its check").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: "Unlock with passkey" })).toHaveCount(0);
 });

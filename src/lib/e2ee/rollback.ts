@@ -7,11 +7,25 @@
 export type RollbackVerdict = { kind: "off" } | { kind: "unsealed" } | { kind: "verify" } | { kind: "failed"; reason: string };
 
 export const ROLLED_BACK_OFF =
-  "The server says encryption is off, but this device has seen it on. Encryption can't be switched off, so the database was changed.";
-export const ROLLED_BACK_EMPTY = "The device list is missing, but this device has seen it before. The database was changed.";
+  "The server now says encryption is off, but this device saw it switched on before. Encryption can't be switched off in the app, so the stored settings were changed outside it.";
+export const ROLLED_BACK_EMPTY = "The signed device list is now missing, but this device saw it before. It was removed outside the app.";
 
-export function rollbackVerdict({ enabled, logEntries, pinned }: { enabled: boolean; logEntries: number | null; pinned: boolean }): RollbackVerdict {
-  if (!enabled) return pinned ? { kind: "failed", reason: ROLLED_BACK_OFF } : { kind: "off" };
+/**
+ * `pinned`: this browser has pinned the signed device log. `sawEnabled`: it has seen encryption on (also true when
+ * pinned), which is enough to refuse "encryption off" even on a workspace whose list was never sealed.
+ */
+export function rollbackVerdict({
+  enabled,
+  logEntries,
+  pinned,
+  sawEnabled = pinned
+}: {
+  enabled: boolean;
+  logEntries: number | null;
+  pinned: boolean;
+  sawEnabled?: boolean;
+}): RollbackVerdict {
+  if (!enabled) return pinned || sawEnabled ? { kind: "failed", reason: ROLLED_BACK_OFF } : { kind: "off" };
   if (logEntries === 0) return pinned ? { kind: "failed", reason: ROLLED_BACK_EMPTY } : { kind: "unsealed" };
   return { kind: "verify" };
 }

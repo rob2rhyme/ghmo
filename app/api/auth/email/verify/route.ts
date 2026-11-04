@@ -16,7 +16,7 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-const INVALID_LINK = "Invalid or expired link";
+const INVALID_LINK = "This sign-in link has expired or was already used. Request a new one below; only the newest link works.";
 
 const bodySchema = z.object({
   orgSlug: z.string().max(100).optional(),
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "This can't be loaded right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -83,17 +83,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (!emailLower) {
-      return NextResponse.json({ error: "Email required for verification" }, { status: 400 });
+      return NextResponse.json({ error: "Type the email address the link was sent to, then try again." }, { status: 400 });
     }
 
     if (!resolvedOobCode) {
-      return NextResponse.json({ error: "Missing oobCode" }, { status: 400 });
+      return NextResponse.json({ error: "This sign-in link is incomplete. Open the newest link from your email, or request a new one below." }, { status: 400 });
     }
 
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey) {
       console.warn("Missing NEXT_PUBLIC_FIREBASE_API_KEY; cannot verify email login");
-      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+      return NextResponse.json({ error: "Email sign-in isn't available right now. Try again in a few minutes." }, { status: 500 });
     }
 
     const verifyPayload: Record<string, unknown> = {
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     // A magic link alone only allows setting up or recovering a passkey (plan D2).
     const customToken = await issueCustomToken(adminDoc.id, "admin", "magic_link");
     const idToken = await exchangeCustomTokenForIdToken(customToken);
-    if (!idToken) return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
+    if (!idToken) return NextResponse.json({ error: "Signing in didn't finish. Try again in a few minutes." }, { status: 500 });
 
     const decoded = await verifyIdToken(idToken);
     await getAdminDb().doc(orgAdminDocPath(orgSlug, adminDoc.id)).set(
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "This can't be loaded right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

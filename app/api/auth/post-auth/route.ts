@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "This can't be loaded right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+      return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
     }
     return NextResponse.json({ ok: false });
   }

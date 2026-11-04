@@ -92,7 +92,7 @@ export function planBroadcastTransition(params: { before: Stored; action: Broadc
       return { ok: true, audit: "broadcast_withdrawn", updates: { status: "draft", ...RESET, updatedAt: now } };
     }
     case "cancel": {
-      if (status === "cancelled") return refuse(400, "Already cancelled.");
+      if (status === "cancelled") return refuse(400, "This broadcast was already canceled.");
       if (status === "sent") return refuse(400, "This broadcast was already sent.");
       return { ok: true, audit: "broadcast_cancelled", updates: { status: "cancelled", cancelledAt: now, cancelledByUid: actorUid, updatedAt: now } };
     }

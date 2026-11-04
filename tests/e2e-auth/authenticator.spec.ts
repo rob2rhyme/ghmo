@@ -63,12 +63,12 @@ test("a wrong code is refused, a used code cannot be replayed, and the next code
   const input = page.getByLabel("6-digit code");
   await input.fill("000000");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("That code is not right")).toBeVisible();
+  await expect(page.getByText(/That code didn't match/)).toBeVisible();
 
   // The code that finished setup was already used.
   await input.fill(totpCode(secret, usedAt));
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("That code is not right")).toBeVisible();
+  await expect(page.getByText(/That code didn't match/)).toBeVisible();
 
   // The next one is accepted.
   await input.fill(totpCode(secret, usedAt + 30_000));
@@ -95,7 +95,7 @@ test("a recovery code signs in once and then stops working", async ({ page, cont
   await page.getByRole("button", { name: "I lost my phone: use a recovery code" }).click();
   await page.getByLabel("Recovery code").fill(recoveryCodes[0]);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("That code is not right")).toBeVisible();
+  await expect(page.getByText(/That code didn't match/)).toBeVisible();
 });
 
 test("an email link alone cannot add an authenticator app to an admin who already has a passkey", async ({ page, browser }) => {
@@ -137,10 +137,11 @@ test("twenty wrong codes in a day lock the authenticator until a super admin res
   const secret = secretBytes(begun.secret);
   expect((await bobContext.request.post("/api/auth/totp/confirm", { data: { code: totpCode(secret, Date.now()) } })).status()).toBe(200);
 
-  // Someone with Bob's inbox has already spent 20 wrong codes today (the 10-minute limit only slows them down).
+  // Someone with Bob's inbox has already spent 19 wrong codes today (the 10-minute limit only slows them down);
+  // the 20th locks code sign-in.
   const { db } = admin();
   const key = createHash("sha256").update("totp-fail-day:bob", "utf8").digest("hex");
-  await db.doc(`organizations/ghmo/rateLimits/${key}`).set({ count: 20, resetAt: Date.now() + 3_600_000, expiresAt: new Date(Date.now() + 3_600_000) });
+  await db.doc(`organizations/ghmo/rateLimits/${key}`).set({ count: 19, resetAt: Date.now() + 3_600_000, expiresAt: new Date(Date.now() + 3_600_000) });
 
   const inbox = await browser.newContext();
   await setSession(inbox, await magicLinkSession("bob"));
@@ -154,6 +155,8 @@ test("twenty wrong codes in a day lock the authenticator until a super admin res
   expect((await db.doc("organizations/ghmo/admins/bob/totp/main").get()).get("lockedAt")).toBeTruthy();
   const audit = await db.collection("organizations/ghmo/auditLogs").where("action", "==", "totp_locked").get();
   expect(audit.size).toBe(1);
+  // A super admin sees who is locked.
+  expect((await db.doc("organizations/ghmo/admins/bob/totp/main").get()).get("lockedAt")).toBeTruthy();
   await bobContext.close();
   await inbox.close();
 });
@@ -173,8 +176,15 @@ test("a super admin can reset another admin's authenticator, which signs that ad
   await signInWithNewPasskey(page, "alice", "/admin/security");
   await expect(page.getByText("Reset another admin's authenticator")).toBeVisible();
   await page.getByRole("button", { name: "Reset" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Reset authenticator" }).click();
+  // The reset stays off until Alice confirms she spoke with Bob (an inbox alone could set up a new app after it).
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Reset authenticator" })).toBeDisabled();
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Reset authenticator" }).click();
   await expect(page.getByText("Authenticator reset for Bob")).toBeVisible();
+  // Without that confirmation the API refuses too.
+  const unconfirmed = await page.request.delete("/api/admin/totp/bob", { data: {} });
+  expect(unconfirmed.status()).toBe(400);
   expect((await admin().db.doc("organizations/ghmo/admins/bob/totp/main").get()).exists).toBe(false);
 
   // Bob's session no longer works.

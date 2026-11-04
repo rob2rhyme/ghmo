@@ -41,7 +41,12 @@ const MAX_SIGN_IN_AGE_SECONDS = 5 * 60;
 export async function createSessionResponse(idToken: string, payload: Record<string, unknown> = { ok: true }) {
   let authTime: number;
   try {
-    authTime = (await getAdminAuth().verifyIdToken(idToken, true)).auth_time;
+    const decoded = await getAdminAuth().verifyIdToken(idToken, true);
+    // The browser's Firestore token carries `sessionExp`; it must never become (or extend) a session.
+    if ((decoded as { sessionExp?: unknown }).sessionExp !== undefined) {
+      return NextResponse.json({ error: "Sign in again to continue." }, { status: 401 });
+    }
+    authTime = decoded.auth_time;
   } catch {
     return NextResponse.json({ error: "Sign in again to continue." }, { status: 401 });
   }

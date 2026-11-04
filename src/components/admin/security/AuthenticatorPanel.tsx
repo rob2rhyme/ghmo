@@ -14,7 +14,7 @@ import { Skeleton } from "@/src/components/ui/skeleton";
 import { PASSKEYS_CHANGED_EVENT } from "./PasskeysPanel";
 
 type Status = { totp: { state: "none" | "pending" | "active"; recoveryCodesLeft: number }; hasActivePasskey: boolean };
-type OtherAdmin = { uid: string; name: string; email: string | null };
+type OtherAdmin = { uid: string; name: string; email: string | null; locked?: boolean };
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -50,6 +50,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
   const [setupOpen, setSetupOpen] = useState(false);
   const [confirmCodes, setConfirmCodes] = useState(false);
   const [resetTarget, setResetTarget] = useState<OtherAdmin | null>(null);
+  const [confirmedWithAdmin, setConfirmedWithAdmin] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -100,9 +101,10 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
 
   const reset = async (admin: OtherAdmin) => {
     setResetTarget(null);
+    setConfirmedWithAdmin(false);
     setBusy(admin.uid);
     try {
-      await api(`/api/admin/totp/${encodeURIComponent(admin.uid)}`, { method: "DELETE" });
+      await api(`/api/admin/totp/${encodeURIComponent(admin.uid)}`, { method: "DELETE", body: JSON.stringify({ confirmedWithAdmin: true }) });
       toast.success(`Authenticator reset for ${admin.name}`);
       await load();
     } catch (err) {
@@ -252,13 +254,15 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
           <div className="flex flex-col gap-2 border-t border-border pt-4">
             <h3 className="text-sm font-semibold">Reset another admin&apos;s authenticator</h3>
             <p className="text-sm text-muted-foreground">
-              For an admin who lost their phone and recovery codes. Check it really is them first (a call is best).
+              For an admin who lost their phone and recovery codes, or whose code sign-in locked after too many wrong codes. A lock
+              can mean someone else has their email, so call them first and make sure they asked for this.
             </p>
             <AdminList label="Other admins">
               {others.map(a => (
                 <AdminListRow
                   key={a.uid}
                   title={a.name}
+                  badges={a.locked ? <Badge variant="destructive">Locked</Badge> : undefined}
                   meta={a.email ? <span className="break-words">{a.email}</span> : undefined}
                   actions={
                     <Button
@@ -277,13 +281,29 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
             </AdminList>
             <ConfirmDialog
               open={resetTarget !== null}
-              onOpenChange={open => (open ? undefined : setResetTarget(null))}
+              onOpenChange={open => {
+                if (!open) {
+                  setResetTarget(null);
+                  setConfirmedWithAdmin(false);
+                }
+              }}
               title={`Reset the authenticator app for ${resetTarget?.name ?? ""}?`}
-              description="They will be signed out and must set up a new app after their next email-link sign-in."
+              description="They will be signed out and set up a new app after their next email-link sign-in. Anyone with their email could do that, so only reset it for them in person or after a phone call."
               confirmLabel="Reset authenticator"
               destructive
+              confirmDisabled={!confirmedWithAdmin}
               onConfirm={() => (resetTarget ? reset(resetTarget) : undefined)}
-            />
+            >
+              <label className="flex items-start gap-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                  checked={confirmedWithAdmin}
+                  onChange={e => setConfirmedWithAdmin(e.target.checked)}
+                />
+                <span>I spoke with {resetTarget?.name ?? "this admin"} by phone or in person, and they asked for this reset.</span>
+              </label>
+            </ConfirmDialog>
           </div>
         ) : null}
       </div>

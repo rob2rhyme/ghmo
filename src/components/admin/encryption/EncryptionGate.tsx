@@ -8,6 +8,7 @@ import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
+import { PAUSED_BODY, PAUSED_NEXT_STEP, PAUSED_TITLE, PausedDetails } from "./PausedNotice";
 import { UnlockCard } from "./UnlockCard";
 import { EXPLAIN, WhatIsThis } from "./WhatIsThis";
 
@@ -49,13 +50,16 @@ export function EncryptionGate({ children, what = "this page", detail }: { child
     return (
       <Alert variant="destructive">
         <ShieldOff />
-        <AlertTitle>Paused: the device list failed its check</AlertTitle>
+        <AlertTitle>{PAUSED_TITLE}</AlertTitle>
         <AlertDescription>
-          {integrity.status === "failed" ? integrity.reason : "The device list could not be verified."} Don&apos;t approve devices or share anything until an
-          admin you trust confirms what changed.{" "}
-          <Link href="/admin/encryption" className="font-semibold underline">
-            Open Encryption
-          </Link>
+          <p>{PAUSED_BODY}</p>
+          <p className="mt-2 font-medium text-foreground">
+            {PAUSED_NEXT_STEP}{" "}
+            <Link href="/admin/encryption" className="font-semibold underline">
+              Open Encryption
+            </Link>
+          </p>
+          <PausedDetails reason={integrity.status === "failed" ? integrity.reason : null} />
         </AlertDescription>
       </Alert>
     );

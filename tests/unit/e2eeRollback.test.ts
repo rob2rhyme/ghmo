@@ -10,6 +10,12 @@ describe("encryption rollback check (fail closed)", () => {
     expect(rollbackVerdict({ enabled: true, logEntries: 0, pinned: true })).toEqual({ kind: "failed", reason: ROLLED_BACK_EMPTY });
   });
 
+  it("refuses 'off' on a browser that has seen encryption on, even before the list was sealed", () => {
+    expect(rollbackVerdict({ enabled: false, logEntries: null, pinned: false, sawEnabled: true })).toEqual({ kind: "failed", reason: ROLLED_BACK_OFF });
+    // An unsealed workspace still has an empty list: that alone is not a rollback.
+    expect(rollbackVerdict({ enabled: true, logEntries: 0, pinned: false, sawEnabled: true })).toEqual({ kind: "unsealed" });
+  });
+
   it("leaves new workspaces alone: off before setup, unsealed before the first seal", () => {
     expect(rollbackVerdict({ enabled: false, logEntries: null, pinned: false })).toEqual({ kind: "off" });
     expect(rollbackVerdict({ enabled: true, logEntries: 0, pinned: false })).toEqual({ kind: "unsealed" });

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "This can't be loaded right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     if (err instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured", missing: err.issues },
+        { error: "Sign-in settings can't be loaded right now." },
         { status: 503 }
       );
     }

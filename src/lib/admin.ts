@@ -114,20 +114,20 @@ export async function requireActiveAdmin(
   if (isNextRequest(input) && !["GET", "HEAD", "OPTIONS"].includes(input.method)) {
     const site = input.headers.get("sec-fetch-site");
     if (site && site !== "same-origin" && site !== "none") {
-      throw new AdminAccessError(403, "Cross-site request refused", "CROSS_SITE");
+      throw new AdminAccessError(403, "This request came from another website, so it was refused. Open the page from the GHMO site and try again.", "CROSS_SITE");
     }
   }
 
-  if (!ctx) throw new AdminAccessError(401, "Unauthorized", "NO_CONTEXT");
-  if (!ctx.orgSlug) throw new AdminAccessError(403, "Organization missing", "ORGSLUG_MISSING");
-  if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "Organization mismatch", "ORGSLUG_MISMATCH");
+  if (!ctx) throw new AdminAccessError(401, "Your sign-in has ended. Sign in again, then try once more.", "NO_CONTEXT");
+  if (!ctx.orgSlug) throw new AdminAccessError(403, "This sign-in isn't for the GHMO admin area. Sign in again.", "ORGSLUG_MISSING");
+  if (ctx.orgSlug !== orgSlug) throw new AdminAccessError(403, "This sign-in isn't for the GHMO admin area. Sign in again.", "ORGSLUG_MISMATCH");
   const adminDoc = render?.adminDoc !== undefined ? render.adminDoc : await readAdminDoc(orgSlug, ctx.uid);
-  if (!adminDoc) throw new AdminAccessError(403, "Admin profile not found", "ADMIN_DOC_NOT_FOUND");
+  if (!adminDoc) throw new AdminAccessError(403, "This account isn't on the admin list. Ask a super admin to add you.", "ADMIN_DOC_NOT_FOUND");
   const profile = mapAdminDoc(adminDoc.id, adminDoc.data);
   if (profile.status !== "active")
-    throw new AdminAccessError(403, "Admin is disabled", "ADMIN_INACTIVE");
+    throw new AdminAccessError(403, "This admin account is turned off. Ask a super admin if you need access again.", "ADMIN_INACTIVE");
   if (!isStrongAdminAuth(ctx.authMethod) && !options.allowMagicLink) {
-    throw new AdminAccessError(403, "Finish signing in to continue", "PASSKEY_REQUIRED");
+    throw new AdminAccessError(403, "Finish signing in with your authenticator app or passkey to continue.", "PASSKEY_REQUIRED");
   }
 
   const actor: AdminActor = {
@@ -164,7 +164,7 @@ export function isSuperAdmin(admin: AdminProfile) {
 export async function requireSuperAdmin(req?: NextRequest, orgSlug: string = COMMUNITY_SLUG) {
   const { actor, admin } = await requireActiveAdmin(req, orgSlug);
   if (!isSuperAdmin(admin)) {
-    throw new AdminAccessError(403, "Super admin required", "NOT_SUPER_ADMIN");
+    throw new AdminAccessError(403, "Only a super admin can do this.", "NOT_SUPER_ADMIN");
   }
   return { actor, admin };
 }

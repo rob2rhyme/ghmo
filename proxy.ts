@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildPublicCsp, buildSecureCsp, createNonce, isSecurePath } from "@/src/lib/security/csp";
+import { buildSecureCsp, createNonce } from "@/src/lib/security/csp";
 
-// Fast checks only. Full session verification happens server-side in requireActiveAdmin.
+// Runs only on the secure prefixes (see `config` below): public pages get a fixed CSP header from
+// next.config.mjs, so cached pages are served without a function run. Fast checks only here; full session
+// verification happens server-side in requireActiveAdmin.
 const SESSION_COOKIE = "__session";
-// Readable "signed in" flag (see src/lib/sessionCookies.ts). Sessions made before it existed get it here, so
-// the header still asks /api/auth/me for them; visitors without a session never send that request.
-const SIGNED_IN_HINT = "ghmo_signed_in";
-const HINT_MAX_AGE_SECONDS = 8 * 60 * 60;
-
-function withSignedInHint(req: NextRequest, response: NextResponse): NextResponse {
-  if (req.cookies.has(SESSION_COOKIE) && !req.cookies.has(SIGNED_IN_HINT)) {
-    response.cookies.set(SIGNED_IN_HINT, "1", {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: HINT_MAX_AGE_SECONDS
-    });
-  }
-  return response;
-}
 
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
@@ -37,12 +22,6 @@ export function proxy(req: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const upgradeInsecure = !isDev && (forwardedProto === "https" || req.nextUrl.protocol === "https:");
-
-  if (!isSecurePath(pathname)) {
-    const response = NextResponse.next();
-    response.headers.set("Content-Security-Policy", buildPublicCsp({ upgradeInsecure }));
-    return withSignedInHint(req, response);
-  }
 
   const nonce = createNonce();
   const csp = buildSecureCsp({
@@ -64,13 +43,44 @@ export function proxy(req: NextRequest) {
   response.headers.set("Content-Security-Policy", csp);
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
   response.headers.set("Cache-Control", "private, no-store");
-  return withSignedInHint(req, response);
+  return response;
 }
 
+// The secure prefixes (SECURE_PREFIXES in src/lib/security/csp.ts). Prefetch requests are left alone.
+// Next reads this config at build time without running the file, so every value must be written out in full
+// (no shared constants). Prefetches skip the proxy: the page itself checks the session.
 export const config = {
   matcher: [
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|assets/).*)",
+      source: "/admin",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" }
+      ]
+    },
+    {
+      source: "/admin/:path*",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" }
+      ]
+    },
+    {
+      source: "/login",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" }
+      ]
+    },
+    {
+      source: "/sign/:path*",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" }
+      ]
+    },
+    {
+      source: "/unsubscribe",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" }

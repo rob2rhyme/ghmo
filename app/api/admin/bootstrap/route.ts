@@ -28,7 +28,7 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+    return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
   }
 
   const bootstrapSecret = process.env.BOOTSTRAP_ADMIN_SECRET;
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, adminId: adminRef.id }, { status: 201 });
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+      return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
     }
     throw error;
   }

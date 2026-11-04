@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const customToken = await issueCustomToken(found.uid, "admin", "passkey");
     const idToken = await exchangeCustomTokenForIdToken(customToken);
-    if (!idToken) return NextResponse.json({ error: "Unable to create session" }, { status: 500 });
+    if (!idToken) return NextResponse.json({ error: "Signing in didn't finish. Try again in a few minutes." }, { status: 500 });
 
     await getAdminDb().doc(orgAdminDocPath(COMMUNITY_SLUG, found.uid)).set({ lastLoginAt: Timestamp.now() }, { merge: true });
     await logAuditEvent({

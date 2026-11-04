@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "This can't be loaded right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "This can't be loaded right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

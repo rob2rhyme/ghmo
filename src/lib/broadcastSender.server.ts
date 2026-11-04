@@ -64,7 +64,7 @@ export function sendingBlocker(config: SendingConfig, mailConfigured: boolean): 
   if (!config.enabled) return "Sending is switched off on this site. Ask whoever manages the website to turn it on.";
   if (!mailConfigured) return "Email sending isn't set up on this site yet.";
   if (!footerFromEnv()) return "Every broadcast needs the organization's name and postal address in its footer. Ask whoever manages the website to add them.";
-  if (config.dailyLimit <= 0) return "The daily sending limit is 0.";
+  if (config.dailyLimit <= 0) return "The daily sending limit is set to zero, so nothing can be sent. Ask whoever manages the website to raise it.";
   return null;
 }
 
@@ -88,7 +88,7 @@ export async function startSending(deps: SenderDeps, broadcastId: string, recipi
   const ref = broadcastRef(deps.db, broadcastId);
   if (recipients.length === 0) return fail(400, "Nobody can be emailed: no member has agreed to email (or all opted out).");
   if (recipients.length > deps.config.maxRecipients) {
-    return fail(400, `This would go to ${recipients.length} members, more than the limit of ${deps.config.maxRecipients} (BROADCAST_MAX_RECIPIENTS).`);
+    return fail(400, `This would go to ${recipients.length} members, more than this site allows in one broadcast (${deps.config.maxRecipients}). Ask whoever manages the website to raise the limit.`);
   }
   const now = deps.now();
   // Mark the broadcast first (in a transaction, so two clicks can't both start it), then add the rows.
@@ -216,7 +216,7 @@ export async function sendNextChunk(deps: SenderDeps, broadcastId: string): Prom
       ready.forEach((member, index) => write.update(deliveries.doc(member.id), { state: "sent", sentAt: now, providerId: result.ids[index] ?? null, claimId: FieldValue.delete() }));
       write.update(ref, { sentCount: FieldValue.increment(ready.length), updatedAt: now });
     } else {
-      error = "The email provider did not accept this chunk. It will be retried.";
+      error = "The email service didn't accept the last batch of emails. They will be tried again.";
       let failedNow = 0;
       for (const member of ready) {
         const attempts = Number((await deliveries.doc(member.id).get()).get("attempts") ?? 0) + 1;

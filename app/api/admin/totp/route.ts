@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
     const { actor } = await requireSuperAdmin(req, COMMUNITY_SLUG);
     const admins = (await listAdmins(COMMUNITY_SLUG)).filter(a => a.status === "active" && a.id !== actor.uid);
     const withStatus = await Promise.all(
-      admins.map(async a => ({ uid: a.id, name: a.name, email: a.email ?? null, totp: (await getTotpStatus(a.id)).state }))
+      admins.map(async a => {
+        const status = await getTotpStatus(a.id);
+        return { uid: a.id, name: a.name, email: a.email ?? null, totp: status.state, locked: status.locked };
+      })
     );
     return NextResponse.json({ admins: withStatus.filter(a => a.totp === "active") }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

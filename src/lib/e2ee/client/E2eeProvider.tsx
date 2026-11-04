@@ -56,7 +56,7 @@ import {
   type RosterState
 } from "../roster";
 import { clearLocalDrafts } from "@/src/lib/localDrafts";
-import { deleteIdentity, loadIdentity, saveIdentity, type StoredDeviceIdentity } from "./deviceStore";
+import { deleteIdentity, loadIdentity, loadPins, saveIdentity, savePins, type StoredDeviceIdentity } from "./deviceStore";
 import { evaluatePrf } from "./prf";
 import { rollbackVerdict } from "../rollback";
 
@@ -210,7 +210,7 @@ async function checkIntegrity(
   // A device that has pinned the signed log has seen encryption on. Encryption can't be switched off from
   // the app, so "off" or an empty log afterwards means someone changed the database: fail closed (threat T4).
   const pinned = Boolean(stored?.rosterPin);
-  const before = rollbackVerdict({ enabled: overview.state.enabled, logEntries: null, pinned });
+  const before = rollbackVerdict({ enabled: overview.state.enabled, logEntries: null, pinned, sawEnabled: pinned || Boolean(stored?.seenEnabled) });
   if (before.kind === "failed") return { roster: null, integrity: { status: "failed", reason: before.reason }, entries: [] };
   if (before.kind === "off") return { roster: null, integrity: { status: "none" }, entries: [] };
   const fetched = await (rosterFetch ?? fetchRoster());
@@ -273,6 +273,11 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
       // Check the server's key records against the signed device log before anything uses them.
       const checked = await checkIntegrity(data, stored, rosterFetch);
       writeEnabledHint(data.state.enabled);
+      // Remember that this browser has seen encryption on; from then on "off" is refused (see rollback.ts).
+      if (stored && data.state.enabled && !stored.seenEnabled && checked.integrity.status !== "failed") {
+        stored.seenEnabled = true;
+        await saveIdentity(stored);
+      }
       rosterRef.current = checked.roster;
       integrityRef.current = checked.integrity;
       setIntegrity(checked.integrity);
@@ -364,7 +369,12 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
         kek = await kekFromPassphrase(passphrase ?? "", salt);
         unlock = { method: "passphrase", salt: toBase64Url(salt), iterations: PBKDF2_ITERATIONS };
       }
+      // Setting a device up again (after a removal, or a record the server dropped) keeps what this browser has
+      // already verified, so a rollback can't be hidden behind a fresh setup.
+      const previous = (await loadIdentity(overview.me.uid).catch(() => undefined)) ?? (await loadPins(overview.me.uid).catch(() => undefined));
       const identityRecord: StoredDeviceIdentity = {
+        ...(previous?.rosterPin ? { rosterPin: previous.rosterPin } : {}),
+        ...(previous?.seenEnabled || overview.state.enabled ? { seenEnabled: true } : {}),
         uid: overview.me.uid,
         deviceId,
         name,
@@ -394,6 +404,10 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
     const stored = await loadIdentity(overview.me.uid);
     if (stored && thisDevice?.status === "pending") {
       await fetch(`/api/admin/e2ee/devices/${stored.deviceId}`, { method: "DELETE" });
+    }
+    // Keep what this browser has verified, so a device set up here later still refuses a rollback.
+    if (stored?.rosterPin || stored?.seenEnabled) {
+      await savePins({ uid: overview.me.uid, rosterPin: stored.rosterPin, seenEnabled: stored.seenEnabled }).catch(() => undefined);
     }
     await deleteIdentity(overview.me.uid);
     clearLocalDrafts();
@@ -641,11 +655,22 @@ export function E2eeProvider({ children }: { children: ReactNode }) {
 
   const sealRoster = useCallback<E2eeContextValue["sealRoster"]>(async () => {
     const session = requireUnlocked();
+    // The super admin checked the device list shown on the Encryption page (overviewRef, with its safety codes).
+    // Sign the server's candidate only if it is exactly that list, so nothing can be slipped into the first entry
+    // between the check and the click.
+    const reviewed = overviewRef.current;
+    if (!reviewed) throw new Error("Reload the Encryption page and check the device list again.");
     const { candidate } = await api<{ candidate: GenesisBody }>("/api/admin/e2ee/roster?candidate=1");
     const entry = await signEntry(
       { v: 1, seq: 1, prev: "", type: "genesis", by: session.identity.deviceId, at: new Date().toISOString(), body: candidate },
       session.keys.ecdsaPrivate
     );
+    try {
+      checkServerAgainstRoster(await verifyRoster([entry]), keyringFromOverview(reviewed as Parameters<typeof keyringFromOverview>[0]));
+    } catch (error) {
+      if (!(error instanceof RosterError)) throw error;
+      throw new Error("The device list changed since you checked it. Reload the Encryption page, check every device with its owner again, then seal.");
+    }
     await api("/api/admin/e2ee/roster", { deviceId: session.identity.deviceId, entry });
     await refresh();
   }, [refresh]);

@@ -44,6 +44,7 @@ const SECTIONS: Section[] = [
     title: "If you lose your phone or leave the board",
     steps: [
       "Lost your phone: sign in with one of your recovery codes, or ask a super admin to reset your authenticator app.",
+      "Too many wrong codes lock code sign-in, and your recovery codes stop working too, until a super admin resets it. Sign in with your passkey, or call a super admin.",
       "Lost a device that was set up for encryption: tell a super admin right away so they can remove it.",
       "Leaving the board: a super admin turns off your access and removes your devices."
     ]
@@ -59,7 +60,8 @@ export default function OnboardingDocPage() {
         description="How to sign in to the GHMO admin console, keep your account safe, and set up encryption on your devices."
         actions={
           <Button asChild size="lg" className="w-full sm:w-auto">
-            <Link href="/admin/login">
+            {/* The sign-in page is another root layout that renders per request: a prefetch is never used (R4 P5). */}
+            <Link href="/admin/login" prefetch={false}>
               <KeyRound aria-hidden="true" />
               Board member sign in
             </Link>

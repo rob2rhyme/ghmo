@@ -1,37 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-// The e2e build sets NEXT_PUBLIC_GOFUNDME_PRO_INSTALL_SNIPPET to a marker script
-// (see playwright.config.ts). It runs on the Donate page only (after the page loads),
-// and must never survive into the admin area, even through a client-side link click.
+// No third-party script runs anywhere on this site (decision 2026-11-04): donations go through GoFundMe's own
+// page, because a script here would run on the same address as the admin area. The public pages' HTML must carry
+// no external <script src> and no GoFundMe Pro snippet.
 
-declare global {
-  interface Window {
-    __THIRD_PARTY_MARKER__?: number;
-  }
+const PAGES = ["/", "/donate", "/minutes", "/multimedia", "/c/ghmo/events", "/admin/login", "/login"];
+
+for (const path of PAGES) {
+  test(`${path} loads no third-party script`, async ({ request }) => {
+    const html = await (await request.get(path)).text();
+    expect(html).not.toContain("gofundme-pro-install-snippet");
+    expect(html).not.toContain("__THIRD_PARTY_MARKER__");
+    const external = [...html.matchAll(/<script[^>]+src="(https?:)?\/\/[^"]+"/g)].map(m => m[0]);
+    expect(external).toEqual([]);
+  });
 }
-
-test("third-party script runs on the Donate page only", async ({ page }) => {
-  // Other public pages don't load it.
-  await page.goto("/");
-  await page.waitForLoadState("load");
-  expect(await page.evaluate(() => window.__THIRD_PARTY_MARKER__)).toBeUndefined();
-
-  await page.goto("/donate");
-  await expect.poll(() => page.evaluate(() => window.__THIRD_PARTY_MARKER__)).toBe(1);
-
-  await page.getByRole("link", { name: "Board member sign in" }).click();
-  await expect(page).toHaveURL(/\/admin\/login/);
-  expect(await page.evaluate(() => window.__THIRD_PARTY_MARKER__)).toBeUndefined();
-});
-
-test("the home page HTML carries no third-party snippet", async ({ request }) => {
-  const html = await (await request.get("/")).text();
-  expect(html).not.toContain("__THIRD_PARTY_MARKER__");
-  expect(html).not.toContain("gofundme-pro-install-snippet");
-});
-
-test("admin login HTML contains no third-party snippet", async ({ request }) => {
-  const html = await (await request.get("/admin/login")).text();
-  expect(html).not.toContain("__THIRD_PARTY_MARKER__");
-  expect(html).not.toContain("gofundme-pro-install-snippet");
-});

@@ -103,7 +103,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 Legacy community paths are no longer supported; please migrate any old data into `organizations/{orgSlug}`.
 
 ## GoFundMe Pro
-- Set `NEXT_PUBLIC_GOFUNDME_PRO_INSTALL_SNIPPET` to inject the install script when enabled.
+- Donations go through GoFundMe's own campaign page (`GOFUNDME_PUBLIC_URL`); no GoFundMe script runs on this site.
 - Configure campaign IDs under `community.gofundmePro.campaignIds[]`; `/donate` and `/` render the embed.
 - Webhook: point GoFundMe Pro to `/api/gfmpro/webhook` with `GOFUNDME_PRO_WEBHOOK_SECRET`.
 - Reconcile: call `/api/gfmpro/reconcile` (admin-only) manually or via scheduler.
