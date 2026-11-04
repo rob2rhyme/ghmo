@@ -24,7 +24,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 
 ## 2. Firestore
 
-- [ ] Deploy the rules: `npx firebase deploy --only firestore:rules` (or paste `firestore.rules` into the console). Redeploy after every release that changes them.
+- [ ] Deploy the rules **and indexes**: `npx firebase deploy --only firestore --project <your-project-id>` (rules from `firestore.rules`, indexes from `firestore.indexes.json`). Redeploy after every release that changes either. **Without the events index (`status` + `startsAt`), production builds fail** while prerendering the home page ("Upcoming events could not be read"), because public pages read events at build time and refuse to go live without them. A new index takes a few minutes to build; Firestore → Indexes shows when it is Enabled.
   **Order matters for the round-3 release:** deploy the site first, then the rules. The new rules end an admin's database access when their 8-hour session ends, using a claim only the new site adds; rules deployed before the site would lock admins out of chat, Plans & Issues and action items until the site update is live.
 - [ ] TTL policies on the field `expiresAt` for the collection groups `rateLimits` and `webauthnChallenges`.
 - [ ] Delete Firestore backups and exports made **before** encryption was turned on (they contain plaintext), and review who can still read the Firebase console.
