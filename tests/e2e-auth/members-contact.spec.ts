@@ -30,7 +30,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
   // --- Add a member with a number and call consent ---
   await page.getByLabel("Email", { exact: true }).fill("sam@example.org");
   await page.getByLabel("Name", { exact: true }).fill("Sam Lee");
-  await page.getByLabel("Phone (optional)").fill("(717) 555-0100");
+  await page.locator("#member-phone").fill("(717) 555-0100");
   await page.getByLabel("This person gave their number for community calls.").check();
   await page.getByRole("button", { name: "Add member" }).click();
   await expect(shown(page, "Can be called")).toBeVisible();
@@ -55,7 +55,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
 
   // --- Edit the contact: a language is added, the number stays ---
   await page.getByRole("button", { name: "Edit contact for Sam Lee" }).click();
-  await expect(page.getByLabel("Phone", { exact: true })).toHaveValue("+17175550100");
+  await expect(page.getByRole("dialog").getByLabel("Phone", { exact: true })).toHaveValue("+17175550100");
   await page.getByLabel("Preferred language (optional)").fill("Nepali");
   await page.getByRole("button", { name: "Save contact" }).click();
   await expect(page.getByText("Contact saved")).toBeVisible();
@@ -110,7 +110,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
 test("without encryption on, numbers cannot be added and a plaintext phone is never stored", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/members");
   await expect(page.getByText("Encryption is off, so phone numbers can't be added yet")).toBeVisible();
-  await expect(page.getByLabel("Phone (optional)")).toBeDisabled();
+  await expect(page.locator("#member-phone")).toBeDisabled();
 
   const results = await page.evaluate(async () => {
     const post = async (body: unknown) => {
@@ -146,7 +146,14 @@ test("a member without an email is saved with a name and phone, keeps their numb
 
   // Without an email, a name is needed, and email consent can't be ticked.
   await expect(page.getByLabel("This person asked to receive email from us.")).toBeDisabled();
-  await page.getByLabel("Phone (optional)").fill("717-555-0102");
+  // The Phone field says whether it is needed: required without an email, optional with one.
+  await expect(page.getByLabel("Phone", { exact: true })).toBeVisible();
+  const phoneHint = page.locator("#member-phone-description");
+  await expect(phoneHint).toContainText("Needed when there is no email.");
+  await page.getByLabel("Email", { exact: true }).fill("someone@example.org");
+  await expect(phoneHint).toContainText("Optional when they have an email.");
+  await page.getByLabel("Email", { exact: true }).fill("");
+  await page.locator("#member-phone").fill("717-555-0102");
   await page.getByRole("button", { name: "Add member" }).click();
   await expect(page.getByText("Add a name for someone without an email.")).toBeVisible();
   expect((await members().get()).size).toBe(0);
@@ -166,11 +173,11 @@ test("a member without an email is saved with a name and phone, keeps their numb
 
   // The same name and number again is refused in the browser (only it can read the numbers).
   await page.getByLabel("Name", { exact: true }).fill("maya gurung");
-  await page.getByLabel("Phone (optional)").fill("(717) 555-0102");
+  await page.locator("#member-phone").fill("(717) 555-0102");
   await page.getByRole("button", { name: "Add member" }).click();
   await expect(page.getByText("maya gurung with this number is already on the list.")).toBeVisible();
   await page.getByLabel("Name", { exact: true }).fill("");
-  await page.getByLabel("Phone (optional)").fill("");
+  await page.locator("#member-phone").fill("");
 
   // The server enforces the same rules: no member with neither email nor phone, no email consent
   // without an address, and a phone-only member keeps their number.
@@ -188,7 +195,7 @@ test("a member without an email is saved with a name and phone, keeps their numb
 
   // Clearing the number in the dialog is refused too.
   await page.getByRole("button", { name: "Edit contact for Maya Gurung" }).click();
-  await page.getByLabel("Phone", { exact: true }).fill("");
+  await page.getByRole("dialog").getByLabel("Phone", { exact: true }).fill("");
   await page.getByRole("button", { name: "Save contact" }).click();
   await expect(page.getByText(/Someone without an email needs a phone number/)).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();

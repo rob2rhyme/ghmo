@@ -345,8 +345,13 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 <Input id="member-name" value={name} onChange={e => setName(e.target.value)} maxLength={120} autoComplete="off" />
               </Field>
               <Field
-                label="Phone (optional)"
-                description={<PhoneFieldHint status={e2ee.status} enabled={e2ee.enabled} ready={phonesReady} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />}
+                label="Phone"
+                description={
+                  <>
+                    {email.trim() ? "Optional when they have an email." : "Needed when there is no email."}{" "}
+                    <PhoneFieldHint status={e2ee.status} enabled={e2ee.enabled} ready={phonesReady} superAdmin={Boolean(e2ee.overview?.me.superAdmin)} />
+                  </>
+                }
               >
                 <Input
                   id="member-phone"

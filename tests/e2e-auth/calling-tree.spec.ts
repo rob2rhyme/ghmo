@@ -14,7 +14,7 @@ const shown = (page: Page, text: string) => page.locator("#admin-main").getByTex
 async function addMember(page: Page, name: string, email: string, phone: string) {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Name", { exact: true }).fill(name);
-  await page.getByLabel("Phone (optional)").fill(phone);
+  await page.locator("#member-phone").fill(phone);
   await page.getByLabel("This person gave their number for community calls.").check();
   await page.getByRole("button", { name: "Add member" }).click();
   // Toasts stack up, so wait for the person to appear in the list and the form to clear.
@@ -48,7 +48,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   for (const [name, email, phone] of people) await addMember(page, name, email, phone);
   await page.getByLabel("Email", { exact: true }).fill("noconsent@example.org");
   await page.getByLabel("Name", { exact: true }).fill("No Consent");
-  await page.getByLabel("Phone (optional)").fill("717-555-0199");
+  await page.locator("#member-phone").fill("717-555-0199");
   await page.getByRole("button", { name: "Add member" }).click();
   await expect(shown(page, "No Consent")).toBeVisible();
 
