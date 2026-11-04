@@ -15,6 +15,9 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 
 ## 1b. Phone numbers (Admin → Members)
 
+- **Members without email.** Leave the email empty and enter a name and phone number instead. They show as *No email (phone only)*: they get calls, never email. In an import, leave the email cell empty on their row (or use a list with just `name` and `phone` columns). Someone with the same name and number is already on the list and is skipped; people sharing one household phone are added as long as their names differ. Their number can't be removed, because it is the only way to reach them; disable them instead.
+
+
 - Numbers are end-to-end encrypted in your browser before they are saved, so you need **encryption turned on and this device unlocked** to add, see or change them. Without that, the page still works for email.
 - Add a number when you add a member, or press **Add phone** / **Edit contact** on someone in the list (second number, preferred language, household and notes go in the same place).
 - Tick "This person gave their number for community calls" only if they did. Importing a list with a `phone` column asks you to confirm the same thing for everyone on it.

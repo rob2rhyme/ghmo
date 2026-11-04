@@ -23,7 +23,8 @@ const importSchema = z.object({
   rows: z
     .array(
       z.object({
-        email: z.string().trim().email().max(320),
+        /** Optional for a phone-only member, who then needs a name and an encrypted contact with a phone. */
+        email: z.union([z.literal(""), z.string().trim().email().max(320)]).optional(),
         name: z.string().max(120).nullable().optional(),
         /** Browser-chosen id, required with an encrypted contact (the envelope is bound to it; plan §12). */
         id: z.string().regex(MEMBER_ID_PATTERN).optional(),
@@ -32,16 +33,18 @@ const importSchema = z.object({
     )
     .min(1)
     .max(MAX_IMPORT_ROWS),
-  /** The admin ticked "these people agreed to receive email from us". Without it nothing is imported (plan §10.2, D7). */
-  attested: z.literal(true),
+  /** The admin ticked "these people agreed to receive email from us". Required when any row has an email (plan §10.2, D7). */
+  attested: z.literal(true).optional(),
   /** The admin ticked "these people gave their number for community calls". Required when any row has a contact. */
   phoneAttested: z.literal(true).optional()
 });
 
 /**
- * Adds many members at once. Every new member is recorded as having agreed to email (source "imported"),
- * which is why the request must carry the admin's attestation. Addresses that already exist are left
- * untouched, so an import can never re-subscribe someone who opted out.
+ * Adds many members at once. Every new member with an email is recorded as having agreed to email
+ * (source "imported"), which is why such a request must carry the admin's attestation. Addresses that
+ * already exist are left untouched, so an import can never re-subscribe someone who opted out. Rows
+ * without an email are phone-only members: they need a name and an encrypted contact with a phone; the
+ * browser drops ones already on the list (same name and number), since only it can read the numbers.
  */
 export async function POST(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
   const params = await context.params;
@@ -68,6 +71,14 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const parsed = await parseJsonBody(req, importSchema, { maxBytes: 1024 * 1024 });
     if (!parsed.ok) return parsed.response;
 
+    const withEmail = parsed.data.rows.filter(row => normalizeMemberEmail(row.email));
+    if (withEmail.length > 0 && !parsed.data.attested) {
+      return NextResponse.json({ error: "Confirm that the people with an email agreed to receive email from us." }, { status: 400 });
+    }
+    const phoneOnly = parsed.data.rows.filter(row => !normalizeMemberEmail(row.email));
+    if (phoneOnly.some(row => !row.contact?.hasPhone)) return NextResponse.json({ error: "Every row needs an email address or a phone number." }, { status: 400 });
+    if (phoneOnly.some(row => !normalizeMemberName(row.name))) return NextResponse.json({ error: "Every row without an email needs a name." }, { status: 400 });
+
     const withContact = parsed.data.rows.filter(row => row.contact);
     if (withContact.length > 0) {
       if (!parsed.data.phoneAttested) return NextResponse.json({ error: "Confirm that these people gave their number for community calls." }, { status: 400 });
@@ -89,24 +100,26 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     let created = 0;
     let skipped = 0;
     let withPhone = 0;
+    let phoneOnlyCount = 0;
     for (const row of parsed.data.rows) {
       const emailLower = normalizeMemberEmail(row.email);
-      if (!emailLower || existing.has(emailLower) || seen.has(emailLower)) {
+      if (emailLower && (existing.has(emailLower) || seen.has(emailLower))) {
         skipped += 1;
         continue;
       }
-      seen.add(emailLower);
+      if (emailLower) seen.add(emailLower);
+      else phoneOnlyCount += 1;
       const name = normalizeMemberName(row.name);
       const ref = row.id ? collection.doc(row.id) : collection.doc();
       // create(), not set(): a browser-chosen id must never overwrite an existing member.
       batch.create(ref, {
-        email: row.email,
+        ...(emailLower ? { email: row.email } : {}),
         emailLower,
         ...(name ? { name } : {}),
         status: "active",
         uid: null,
         roles: ["member"],
-        emailConsent: { at: now, source: "imported", byUid: actor.uid },
+        ...(emailLower ? { emailConsent: { at: now, source: "imported", byUid: actor.uid } } : {}),
         hasPhone: row.contact?.hasPhone ?? false,
         ...(row.contact ? { contact: row.contact.enc, phoneConsent: { at: now, source: "imported", byUid: actor.uid } } : {}),
         createdAt: now,
@@ -129,9 +142,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       orgSlug: COMMUNITY_SLUG,
       action: "members_imported",
       actor: { uid: actor.uid, adminId: admin.id, role: actor.roles[0] ?? "admin", name: admin.name, email: admin.email },
-      resource: { type: "member", summary: `Imported ${created} members (${skipped} skipped, ${withPhone} with a phone number)` },
+      resource: { type: "member", summary: `Imported ${created} members (${skipped} skipped, ${withPhone} with a phone number, ${phoneOnlyCount} without an email)` },
       // Counts only: the audit log should not become a second copy of the member list.
-      after: { created, skipped, withPhone, attested: true, phoneAttested: withPhone > 0, source: "imported" },
+      after: { created, skipped, withPhone, phoneOnly: phoneOnlyCount, attested: withEmail.length > 0, phoneAttested: withPhone > 0, source: "imported" },
       meta: { ip: getClientIp(req.headers), userAgent: req.headers.get("user-agent") ?? null, route: IMPORT_ROUTE_PATH }
     });
 

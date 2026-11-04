@@ -25,14 +25,17 @@ import {
   EMAIL_CONSENT_LABELS,
   MAX_IMPORT_ROWS,
   formatPhone,
+  hasEmail,
   isEmailConsentSource,
   maskPhone,
   memberCallState,
   memberContactLoc,
+  memberDisplayName,
   memberEmailState,
   newMemberId,
   normalizeContact,
   parseMemberCsv,
+  phoneOnlyKey,
   type MemberCallState,
   type MemberContact,
   type MemberEmailState
@@ -61,6 +64,8 @@ const STATE_LABEL: Record<MemberEmailState, { label: string; variant: "success" 
   no_consent: { label: "No consent recorded", variant: "secondary" },
   opted_out: { label: "Opted out", variant: "destructive" },
   bounced: { label: "Address bounced", variant: "destructive" },
+  // Many members don't use email; they are reached by phone and never emailed.
+  no_email: { label: "No email (phone only)", variant: "secondary" },
   inactive: { label: "Disabled", variant: "secondary" }
 };
 
@@ -72,7 +77,7 @@ const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "suc
 
 type Filter = "all" | MemberEmailState | "has_phone";
 
-const SAMPLE_CSV = "email,name,phone\nsam@example.org,Sam Lee,717-555-0100\npat@example.org,Pat Rai,";
+const SAMPLE_CSV = "email,name,phone\nsam@example.org,Sam Lee,717-555-0100\npat@example.org,Pat Rai,\n,Maya Gurung,717-555-0102";
 
 async function call<T>(url: string, method: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -109,6 +114,22 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   const [importing, setImporting] = useState(false);
   const preview = useMemo(() => (csv.trim() ? parseMemberCsv(csv) : null), [csv]);
   const previewPhones = preview?.rows.filter(row => row.phone).length ?? 0;
+  const previewEmails = preview?.rows.filter(row => row.email).length ?? 0;
+  const previewPhoneOnly = preview?.rows.filter(row => !row.email).length ?? 0;
+
+  /**
+   * Phone-only people already on the list, by name and number. Only this browser can read the numbers,
+   * so this is where duplicates without an email are caught (the server catches repeated emails).
+   */
+  const numbersOpened = !members.some(member => member.contact && !contacts.has(member.id));
+  const knownPhoneOnly = useMemo(() => {
+    const keys = new Set<string>();
+    for (const member of members) {
+      const view = contacts.get(member.id);
+      if (view?.ok && view.contact.phone) keys.add(phoneOnlyKey(view.contact.phone, member.name));
+    }
+    return keys;
+  }, [members, contacts]);
 
   // Lock or sign-out: the hook forgets the plaintext; the revealed set goes with it.
   const [wasReady, setWasReady] = useState(phonesReady);
@@ -118,7 +139,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
   }
 
   const counts = useMemo(() => {
-    const result: Record<MemberEmailState, number> & { has_phone: number } = { ready: 0, no_consent: 0, opted_out: 0, bounced: 0, inactive: 0, has_phone: 0 };
+    const result: Record<MemberEmailState, number> & { has_phone: number } = { ready: 0, no_consent: 0, opted_out: 0, bounced: 0, no_email: 0, inactive: 0, has_phone: 0 };
     for (const member of members) {
       result[memberEmailState(member)] += 1;
       if (member.hasPhone) result.has_phone += 1;
@@ -128,12 +149,14 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return members.filter(member => {
-      if (filter === "has_phone" && !member.hasPhone) return false;
-      if (filter !== "all" && filter !== "has_phone" && memberEmailState(member) !== filter) return false;
-      if (!needle) return true;
-      return member.emailLower.includes(needle) || (member.name ?? "").toLowerCase().includes(needle);
-    });
+    return members
+      .filter(member => {
+        if (filter === "has_phone" && !member.hasPhone) return false;
+        if (filter !== "all" && filter !== "has_phone" && memberEmailState(member) !== filter) return false;
+        if (!needle) return true;
+        return (member.emailLower ?? "").includes(needle) || (member.name ?? "").toLowerCase().includes(needle);
+      })
+      .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
   }, [members, query, filter]);
 
   const replace = (updated: MemberRow) => setMembers(list => list.map(m => (m.id === updated.id ? updated : m)));
@@ -153,13 +176,22 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
     event.preventDefault();
     setAdding(true);
     try {
-      const body: Record<string, unknown> = { email, name: name || null };
-      if (agreed) body.emailConsent = { source: "admin_on_request" };
+      const cleanEmail = email.trim();
+      // An email, or a name and a phone number: many members don't use email.
+      if (!cleanEmail && !phone.trim()) throw new Error("Add an email address or a phone number.");
+      if (!cleanEmail && !name.trim()) throw new Error("Add a name for someone without an email.");
+      const body: Record<string, unknown> = { name: name || null };
+      if (cleanEmail) body.email = cleanEmail;
+      if (agreed && cleanEmail) body.emailConsent = { source: "admin_on_request" };
       let sealed: MemberContact | null = null;
       if (phone.trim()) {
         if (!phonesReady) throw new Error("Unlock this device before adding a phone number.");
         const { contact, hasPhone, problems } = normalizeContact({ phone });
         if (problems.length) throw new Error(problems[0]);
+        if (!cleanEmail) {
+          if (!numbersOpened) throw new Error("Still opening the saved numbers. Try again in a moment.");
+          if (knownPhoneOnly.has(phoneOnlyKey(contact.phone!, name))) throw new Error(`${name.trim()} with this number is already on the list.`);
+        }
         const id = newMemberId();
         body.id = id;
         body.contact = await sealContact(id, contact, hasPhone);
@@ -167,7 +199,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
         sealed = contact;
       }
       const { member } = await call<{ member: MemberRow }>("/api/organizations/ghmo/members", "POST", body);
-      setMembers(list => [...list, member].sort((a, b) => a.emailLower.localeCompare(b.emailLower)));
+      setMembers(list => [...list, member]);
       if (sealed) rememberContact(member.id, sealed);
       setEmail("");
       setName("");
@@ -203,6 +235,10 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
       toast.error(problems[0]);
       return false;
     }
+    if (!hasEmail(member) && !hasPhone) {
+      toast.error("Someone without an email needs a phone number. Disable them instead if they should no longer be contacted.");
+      return false;
+    }
     const empty = Object.keys(contact).length === 0;
     const patch = empty ? { contact: null } : { contact: await sealContact(member.id, contact, hasPhone) };
     const saved = await update(member, patch, empty ? "Contact removed" : "Contact saved");
@@ -215,19 +251,30 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
     setImporting(true);
     try {
       if (previewPhones > 0 && !phonesReady) throw new Error("Unlock this device before importing phone numbers.");
+      if (previewPhoneOnly > 0 && !numbersOpened) throw new Error("Still opening the saved numbers. Try again in a moment.");
+      // Phone-only people already on the list (same name and number) are left out here; repeated emails
+      // are left out by the server.
+      const fresh = preview.rows.filter(row => row.email || !knownPhoneOnly.has(phoneOnlyKey(row.phone!, row.name)));
+      const alreadyThere = preview.rows.length - fresh.length;
+      if (fresh.length === 0) {
+        toast.info(`Everyone on this list is already on the member list (${alreadyThere}).`);
+        return;
+      }
       const rows = await Promise.all(
-        preview.rows.map(async row => {
-          if (!row.phone) return { email: row.email, name: row.name };
+        fresh.map(async row => {
+          const base = { ...(row.email ? { email: row.email } : {}), name: row.name };
+          if (!row.phone) return base;
           const id = newMemberId();
-          return { email: row.email, name: row.name, id, contact: await sealContact(id, { phone: row.phone }, true) };
+          return { ...base, id, contact: await sealContact(id, { phone: row.phone }, true) };
         })
       );
       const { created, skipped, withPhone } = await call<{ created: number; skipped: number; withPhone: number }>("/api/organizations/ghmo/members/import", "POST", {
         rows,
-        attested: true,
-        ...(previewPhones > 0 ? { phoneAttested: true } : {})
+        ...(fresh.some(row => row.email) ? { attested: true } : {}),
+        ...(fresh.some(row => row.phone) ? { phoneAttested: true } : {})
       });
-      toast.success(`${created} added${withPhone ? ` (${withPhone} with a phone number)` : ""}${skipped ? `, ${skipped} already on the list` : ""}`);
+      const onList = skipped + alreadyThere;
+      toast.success(`${created} added${withPhone ? ` (${withPhone} with a phone number)` : ""}${onList ? `, ${onList} already on the list` : ""}`);
       setCsv("");
       setAttested(false);
       setPhoneAttested(false);
@@ -253,11 +300,13 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
     { key: "no_consent", label: "No consent", count: counts.no_consent },
     { key: "opted_out", label: "Opted out", count: counts.opted_out },
     { key: "bounced", label: "Bounced", count: counts.bounced },
+    { key: "no_email", label: "Phone only", count: counts.no_email },
     { key: "inactive", label: "Disabled", count: counts.inactive },
     { key: "has_phone", label: "With phone", count: counts.has_phone }
   ];
 
   const importBlocked = previewPhones > 0 && !phonesReady;
+  const needsEmailAttest = previewEmails > 0;
   const togglePanel = (which: "add" | "import") => setPanel(current => (current === which ? null : which));
   const phoneSentence = phonesReady
     ? "Phone numbers are encrypted in this browser before they are saved."
@@ -289,10 +338,10 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
         <div id="member-add-panel" className="min-w-0">
           <AdminSectionCard title="Add a member" description={`Only check a box if this person told you so. ${phoneSentence}`}>
             <form onSubmit={addMember} className="flex flex-col gap-4">
-              <Field label="Email">
-                <Input id="member-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" placeholder="name@example.org" />
+              <Field label="Email" description="Leave empty if they don't use email. Then a name and a phone number are needed.">
+                <Input id="member-email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" placeholder="name@example.org" />
               </Field>
-              <Field label="Name (optional)">
+              <Field label="Name" description="Needed when there is no email.">
                 <Input id="member-name" value={name} onChange={e => setName(e.target.value)} maxLength={120} autoComplete="off" />
               </Field>
               <Field
@@ -311,8 +360,14 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 />
               </Field>
               <div className="flex flex-col gap-1">
-                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-primary"
+                    checked={agreed && Boolean(email.trim())}
+                    disabled={!email.trim()}
+                    onChange={e => setAgreed(e.target.checked)}
+                  />
                   <span>This person asked to receive email from us.</span>
                 </label>
                 <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm has-[:disabled]:cursor-not-allowed has-[:disabled]:text-muted-foreground">
@@ -341,10 +396,13 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
           <AdminSectionCard title="Import a list" description="Add many people at once from a spreadsheet or an email list.">
             <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               <li>
-                Paste one email per line, or comma-separated rows (CSV) with the columns email, name and phone. Name and phone are optional. Up to {MAX_IMPORT_ROWS} at a
-                time.
+                Paste comma-separated rows (CSV) with the columns email, name and phone, or one email per line. Leave the email empty for someone who doesn&apos;t
+                use email: they then need a name and a phone number. Up to {MAX_IMPORT_ROWS} at a time.
               </li>
-              <li>People already on the list are left alone, so an import never signs up again someone who opted out.</li>
+              <li>
+                People already on the list are left alone, so an import never signs up again someone who opted out. Without an email, the same name and number counts as
+                the same person.
+              </li>
               <li>{phonesReady ? "Phone numbers are encrypted on this device before anything is sent." : !e2ee.enabled ? "Phone numbers can be imported once encryption is on." : "Unlock this device to import phone numbers."}</li>
             </ul>
             <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -365,11 +423,18 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
               {preview ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3 text-sm" aria-live="polite">
                   <p className="font-medium">
-                    {preview.rows.length} valid {preview.rows.length === 1 ? "address" : "addresses"} found.
+                    {preview.rows.length} {preview.rows.length === 1 ? "person" : "people"} found.
                     {previewPhones > 0 ? ` ${previewPhones} with a phone number.` : ""}
+                    {previewPhoneOnly > 0 ? ` ${previewPhoneOnly} without an email.` : ""}
                   </p>
                   {preview.truncated ? <p className="text-warning">Only the first {MAX_IMPORT_ROWS} will be imported.</p> : null}
-                  {importBlocked ? <p className="text-warning">Unlock this device to import the phone numbers, or remove the phone column.</p> : null}
+                  {importBlocked ? (
+                    <p className="text-warning">
+                      {previewPhoneOnly > 0
+                        ? "Unlock this device to import phone numbers. People without an email can only be added with their number."
+                        : "Unlock this device to import the phone numbers, or remove the phone column."}
+                    </p>
+                  ) : null}
                   {preview.problems.length > 0 ? (
                     <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
                       {preview.problems.slice(0, 5).map(problem => (
@@ -380,10 +445,15 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                   ) : null}
                 </div>
               ) : null}
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={attested} onChange={e => setAttested(e.target.checked)} />
-                <span>These people agreed to receive email from us. (This is recorded with your name.)</span>
-              </label>
+              {needsEmailAttest || !preview ? (
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={attested} onChange={e => setAttested(e.target.checked)} />
+                  <span>
+                    {previewPhoneOnly > 0 ? "The people with an email agreed to receive email from us." : "These people agreed to receive email from us."} (This is recorded with
+                    your name.)
+                  </span>
+                </label>
+              ) : null}
               {previewPhones > 0 ? (
                 <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
                   <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={phoneAttested} onChange={e => setPhoneAttested(e.target.checked)} />
@@ -395,7 +465,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                   <Button
                     onClick={runImport}
                     loading={importing}
-                    disabled={!attested || !preview || preview.rows.length === 0 || importBlocked || (previewPhones > 0 && !phoneAttested)}
+                    disabled={(needsEmailAttest && !attested) || !preview || preview.rows.length === 0 || importBlocked || (previewPhones > 0 && !phoneAttested)}
                     className="max-sm:h-11"
                   >
                     Import {preview?.rows.length ? `${preview.rows.length} ` : ""}members
@@ -403,7 +473,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                 </div>
                 {!preview || preview.rows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Paste a list above to see how many people will be added.</p>
-                ) : !attested ? (
+                ) : needsEmailAttest && !attested ? (
                   <p className="text-sm text-muted-foreground">Check the box above to confirm these people agreed.</p>
                 ) : previewPhones > 0 && !phoneAttested && !importBlocked ? (
                   <p className="text-sm text-muted-foreground">Check the call box too, or remove the phone column.</p>
@@ -416,7 +486,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
 
       <AdminSectionCard
         title="Member list"
-        description={`${counts.ready} of ${members.length} can be emailed. ${counts.has_phone} ${counts.has_phone === 1 ? "has" : "have"} a phone number.`}
+        description={`${counts.ready} of ${members.length} can be emailed. ${counts.has_phone} ${counts.has_phone === 1 ? "has" : "have"} a phone number${counts.no_email ? `, ${counts.no_email} of them with no email` : ""}.`}
       >
         <div className="flex flex-col gap-3">
           <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} className="max-lg:h-11 md:max-w-xs" />
@@ -473,12 +543,12 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
               const callState = memberCallState(member);
               const callMeta = CALL_LABEL[callState];
               const view = contacts.get(member.id);
-              const displayName = member.name || member.emailLower;
+              const displayName = memberDisplayName(member);
               return (
                 <AdminListRow
                   key={member.id}
                   title={<span className="break-all">{displayName}</span>}
-                  meta={member.name ? <span className="break-all">{member.emailLower}</span> : undefined}
+                  meta={member.name && hasEmail(member) ? <span className="break-all">{member.emailLower}</span> : undefined}
                   badges={
                     <>
                       <Badge variant={meta.variant}>{meta.label}</Badge>
@@ -569,7 +639,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
         open={disabling !== null}
         onOpenChange={open => (!open ? setDisabling(null) : null)}
         destructive
-        title={`Disable ${disabling ? disabling.name || disabling.emailLower : "this member"}?`}
+        title={`Disable ${disabling ? memberDisplayName(disabling) : "this member"}?`}
         description="They stay on the list but get no broadcasts and are left out of calls until you enable them again."
         confirmLabel="Disable member"
         busy={disabling !== null && busyId === disabling.id}
@@ -717,7 +787,7 @@ function ContactDialog({
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Contact for {member.name || member.emailLower}</DialogTitle>
+            <DialogTitle>Contact for {memberDisplayName(member)}</DialogTitle>
             <DialogDescription>Encrypted in this browser. Only approved admin devices can read it; the server never can.</DialogDescription>
           </DialogHeader>
           {unreadable ? (

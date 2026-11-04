@@ -47,7 +47,11 @@ export const EMAIL_CONSENT_LABELS: Record<EmailConsentSource, string> = {
   imported: "Imported with consent"
 };
 
-export type MemberEmailState = "ready" | "no_consent" | "opted_out" | "bounced" | "inactive";
+/**
+ * `no_email`: an active member saved with a name and phone number only (many members don't use email).
+ * Such a member is called, never emailed; `emailLower` is stored as "" so list queries still find them.
+ */
+export type MemberEmailState = "ready" | "no_consent" | "opted_out" | "bounced" | "no_email" | "inactive";
 
 type EmailFields = {
   status?: string;
@@ -62,7 +66,8 @@ type EmailFields = {
  * shown to admins. Only "ready" members are ever emailed (plan §10.3).
  */
 export function memberEmailState(member: EmailFields): MemberEmailState {
-  if (member.status !== "active" || !member.emailLower?.includes("@")) return "inactive";
+  if (member.status !== "active") return "inactive";
+  if (!member.emailLower?.includes("@")) return "no_email";
   if (member.emailOptOutAt) return "opted_out";
   if (member.emailBounced === true) return "bounced";
   if (!member.emailConsent || !isEmailConsentSource(member.emailConsent.source)) return "no_consent";
@@ -169,9 +174,26 @@ export function memberCallState(member: CallFields): MemberCallState {
   return "ready";
 }
 
+/** True when the member has an email address on file. */
+export const hasEmail = (member: { emailLower?: string | null }) => Boolean(member.emailLower?.includes("@"));
+
+/** How lists name a member: their name, else their email (a member without an email always has a name). */
+export function memberDisplayName(member: { name?: string | null; emailLower?: string | null }): string {
+  return member.name || member.emailLower || "Unnamed member";
+}
+
+/**
+ * Identifies a phone-only person for duplicate checks: the number plus the name. People in one household
+ * may share a phone, so the number alone is not enough; the same name and number is the same person.
+ */
+export function phoneOnlyKey(phone: string, name?: string | null): string {
+  return `${phone}|${(name ?? "").trim().toLowerCase().replace(/\s+/g, " ")}`;
+}
+
 export const MAX_IMPORT_ROWS = 500;
 
-export type ParsedMemberRow = { email: string; name?: string; phone?: string };
+/** One person from an import. Either `email` is set, or both `name` and `phone` are (a phone-only member). */
+export type ParsedMemberRow = { email?: string; name?: string; phone?: string };
 export type MemberCsvResult = {
   rows: ParsedMemberRow[];
   /** Human-readable problems, one per skipped line (1-based line numbers). */
@@ -215,9 +237,10 @@ function splitCsvLine(line: string): string[] {
 }
 
 /**
- * Reads a pasted or uploaded member list. Accepts a header row with `email` (and optionally `name`)
- * columns, or plain "email" / "name,email" / "email,name" lines without a header. Duplicate addresses
- * inside the file are dropped. Nothing here touches the database.
+ * Reads a pasted or uploaded member list. Accepts a header row naming `email`, `name` and `phone` columns
+ * (an email or a phone column is enough), or lines without a header where the email and phone are found
+ * by their shape. A row needs an email, or a name and a phone number (a member who doesn't use email).
+ * Duplicates inside the file are dropped. Nothing here touches the database.
  */
 export function parseMemberCsv(text: string): MemberCsvResult {
   const lines = text.replace(/^﻿/, "").split(/\r?\n/);
@@ -228,6 +251,7 @@ export function parseMemberCsv(text: string): MemberCsvResult {
   let emailCol = -1;
   let nameCol = -1;
   let phoneCol = -1;
+  let headered = false;
   let headerChecked = false;
 
   lines.forEach((raw, index) => {
@@ -239,10 +263,12 @@ export function parseMemberCsv(text: string): MemberCsvResult {
       headerChecked = true;
       const lower = cells.map(cell => cell.toLowerCase());
       const headerEmail = lower.findIndex(cell => cell === "email" || cell === "e-mail" || cell === "email address");
-      if (headerEmail >= 0) {
+      const headerPhone = lower.findIndex(cell => PHONE_HEADERS.includes(cell));
+      if (headerEmail >= 0 || headerPhone >= 0) {
+        headered = true;
         emailCol = headerEmail;
         nameCol = lower.findIndex(cell => cell === "name" || cell === "full name");
-        phoneCol = lower.findIndex(cell => PHONE_HEADERS.includes(cell));
+        phoneCol = headerPhone;
         return;
       }
     }
@@ -250,40 +276,68 @@ export function parseMemberCsv(text: string): MemberCsvResult {
     let email = "";
     let name: string | undefined;
     let phoneCell: string | undefined;
-    if (emailCol >= 0) {
-      email = cells[emailCol] ?? "";
+    if (headered) {
+      email = emailCol >= 0 ? (cells[emailCol] ?? "") : "";
       name = nameCol >= 0 ? cells[nameCol] : undefined;
       phoneCell = phoneCol >= 0 ? cells[phoneCol] : undefined;
     } else {
-      const emailIndex = cells.findIndex(cell => EMAIL_PATTERN.test(cell));
-      email = emailIndex >= 0 ? cells[emailIndex] : (cells[0] ?? "");
+      // No header: find the email (or an attempt at one) and the phone by their shape; the rest is the name.
+      let emailIndex = cells.findIndex(cell => EMAIL_PATTERN.test(cell));
+      if (emailIndex < 0) emailIndex = cells.findIndex(cell => cell.includes("@"));
+      email = emailIndex >= 0 ? cells[emailIndex] : "";
       const phoneIndex = cells.findIndex((cell, i) => i !== emailIndex && looksLikePhone(cell));
       phoneCell = phoneIndex >= 0 ? cells[phoneIndex] : undefined;
       name = cells.find((cell, i) => i !== emailIndex && i !== phoneIndex && cell) || undefined;
     }
 
     const emailLower = normalizeMemberEmail(email);
-    if (!EMAIL_PATTERN.test(emailLower) || emailLower.length > 320) {
-      problems.push(`Line ${lineNumber}: "${email.slice(0, 40)}" is not a valid email address.`);
-      return;
-    }
-    if (seen.has(emailLower)) {
-      problems.push(`Line ${lineNumber}: ${emailLower} appears more than once; kept the first.`);
-      return;
+    const cleanName = normalizeMemberName(name)?.slice(0, 120);
+    const phone = phoneCell?.trim() ? normalizePhone(phoneCell) : null;
+
+    if (emailLower) {
+      if (!EMAIL_PATTERN.test(emailLower) || emailLower.length > 320) {
+        problems.push(`Line ${lineNumber}: "${email.slice(0, 40)}" is not a valid email address. Fix it, or leave the email empty if they don't use one.`);
+        return;
+      }
+      if (seen.has(emailLower)) {
+        problems.push(`Line ${lineNumber}: ${emailLower} appears more than once; kept the first.`);
+        return;
+      }
+    } else {
+      // A phone-only member: needs a number we recognise and a name to show on the list.
+      if (!phone) {
+        problems.push(
+          phoneCell?.trim()
+            ? `Line ${lineNumber}: "${phoneCell.slice(0, 24)}" is not a phone number, and there is no email.`
+            : `Line ${lineNumber}: needs an email address or a phone number.`
+        );
+        return;
+      }
+      if (!cleanName) {
+        problems.push(`Line ${lineNumber}: someone without an email needs a name.`);
+        return;
+      }
+      const key = phoneOnlyKey(phone, cleanName);
+      if (seen.has(key)) {
+        problems.push(`Line ${lineNumber}: ${cleanName} with this number appears more than once; kept the first.`);
+        return;
+      }
     }
     if (rows.length >= MAX_IMPORT_ROWS) {
       truncated = true;
       return;
     }
-    seen.add(emailLower);
-    const cleanName = normalizeMemberName(name)?.slice(0, 120);
-    const row: ParsedMemberRow = { email: emailLower };
-    if (cleanName) row.name = cleanName;
-    if (phoneCell?.trim()) {
-      const phone = normalizePhone(phoneCell);
-      if (phone) row.phone = phone;
-      else problems.push(`Line ${lineNumber}: "${phoneCell.slice(0, 24)}" is not a phone number; ${emailLower} is imported without one.`);
+
+    const row: ParsedMemberRow = {};
+    if (emailLower) {
+      seen.add(emailLower);
+      row.email = emailLower;
+    } else {
+      seen.add(phoneOnlyKey(phone!, cleanName));
     }
+    if (cleanName) row.name = cleanName;
+    if (phone) row.phone = phone;
+    else if (phoneCell?.trim()) problems.push(`Line ${lineNumber}: "${phoneCell.slice(0, 24)}" is not a phone number; ${emailLower} is imported without one.`);
     rows.push(row);
   });
 
