@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import MyCallsClient from "@/src/components/admin/calling/MyCallsClient";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
+
+/** Tab title: "My calls · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "My calls" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

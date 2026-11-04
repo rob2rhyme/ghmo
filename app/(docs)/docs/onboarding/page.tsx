@@ -14,7 +14,7 @@ const SECTIONS: Section[] = [
     icon: LogIn,
     title: "Signing in for the first time",
     steps: [
-      "Ask a super admin to add your email address to the board list.",
+      "Ask a super admin to add your email address to the admin list.",
       "Open Board member sign in, type your email and press “Email me a sign-in link”.",
       "Open the link from your email on the same device.",
       "Install an authenticator app on your phone (Google Authenticator, Microsoft Authenticator or similar) and scan the QR code shown on screen.",
@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
       "Another admin approves your device. Before they do, compare the safety code on both screens by phone or in person.",
       "After that, private records (chat, minutes, phone numbers) open on this device. Lock it when you step away."
     ],
-    note: "A super admin turns encryption on once, with two trusted people present. Each of them keeps a paper copy of the recovery key."
+    note: "A super admin turns encryption on once, with two trustees present: two people you trust who each keep a paper copy of the recovery key."
   },
   {
     icon: LifeBuoy,

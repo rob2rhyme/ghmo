@@ -7,12 +7,15 @@ import { FieldValue } from "firebase-admin/firestore";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
 import { z } from "zod";
+import { getAppOrigin } from "@/src/lib/appUrl";
 
 export const dynamic = "force-dynamic";
 
 const signingSessionSchema = z.object({
   role: z.enum(["witness1", "witness2", "officiant", "issuingAuthority"]),
   certificateId: z.string().trim().max(200).optional(),
+  /** What is being signed ("Wedding certificate"), shown to the signer. Plain text, no personal details. */
+  documentTitle: z.string().trim().max(80).optional(),
   expiresInMinutes: z.number().int().min(1).max(60).optional()
 });
 
@@ -20,7 +23,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "Signing can't be set up right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -41,23 +44,14 @@ export async function POST(req: NextRequest) {
         status: "pending",
         role: payload.role,
         certificateId: payload.certificateId ?? null,
+        documentTitle: payload.documentTitle || null,
         createdAt: FieldValue.serverTimestamp(),
         expiresAt,
         createdByUid: actor.uid,
         createdByEmail: actor.email ?? null
       });
-    const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_PUBLIC_URL || "";
-    let baseUrl = envBaseUrl.trim().replace(/\/+$/, "");
-    if (!baseUrl) {
-      const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
-      const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
-      baseUrl = `${proto}://${host}`;
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          "NEXT_PUBLIC_APP_URL is not set. Signing links may not work on mobile during local dev."
-        );
-      }
-    }
+    // The configured site address, never a Host header (getAppOrigin refuses to guess in production).
+    const baseUrl = getAppOrigin(req);
     const signUrl = `${baseUrl}/sign/${sessionId}`;
     return NextResponse.json({
       sessionId,
@@ -67,7 +61,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "Signing can't be set up right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

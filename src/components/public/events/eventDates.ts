@@ -76,3 +76,12 @@ export function eventWhenLong(evt: Pick<EventRecord, "startsAt" | "endsAt" | "ti
     time: `${formatTime(start, { timeZone })} – ${formatTime(end, { timeZone })} ${zone}`.trim()
   };
 }
+
+/**
+ * True once an event is over: after its end time, or after its start when it has no end. An event with no
+ * date yet is never over. Pass "now" in (see useNow) so cached pages don't freeze the answer.
+ */
+export function eventIsOver(evt: Pick<EventRecord, "startsAt" | "endsAt">, now: number): boolean {
+  const last = eventEnd(evt) ?? eventStart(evt);
+  return last ? last.getTime() < now : false;
+}

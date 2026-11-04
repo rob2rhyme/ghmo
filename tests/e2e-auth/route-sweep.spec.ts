@@ -47,7 +47,8 @@ const PUBLIC_PREFIXES = [
   "/api/organizations/ghmo/events",
   "/api/organizations/ghmo/donations/stats",
   "/api/unsubscribe", // signed-link credential, POST only
-  "/api/resend/webhook" // signature-checked webhook
+  "/api/resend/webhook", // signature-checked webhook
+  "/api/test/" // emulator builds only (cache reset for these suites); 404 in every real build
 ];
 const isPublic = (path: string) => PUBLIC_PREFIXES.some(prefix => path.startsWith(prefix));
 

@@ -14,6 +14,7 @@ import {
   type MigrationItem
 } from "@/src/lib/e2eeMigration";
 import { parseJsonBody } from "@/src/lib/validation";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -131,5 +132,6 @@ export const POST = e2eeRoute(async (req: NextRequest, guard) => {
   for (const field of plaintextFieldsToDelete(area)) updates[field] = FieldValue.delete();
   await ref.update(updates, { lastUpdateTime: current });
   await auditKeyring(req, guard, "e2ee_record_migrated", `Encrypted existing ${area} record`, id);
+  expirePublicCache(PUBLIC_CACHE_TAGS.minutes, PUBLIC_CACHE_TAGS.events);
   return NextResponse.json({ ok: true });
 });

@@ -6,7 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "Greater Harrisburg Magar Organization",
     short_name: "GHMO",
-    description: "Community hub for the Greater Harrisburg Magar Organization.",
+    description:
+      "The Magar community of Greater Harrisburg, Pennsylvania: events, meeting minutes, videos and the Gumba Project.",
     start_url: "/",
     scope: "/",
     display: "standalone",
@@ -17,6 +18,9 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
     ],
-    shortcuts: [{ name: "Admin", url: "/admin", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] }]
+    shortcuts: [
+      { name: "Events", url: "/c/ghmo/events", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Board member sign in", short_name: "Sign in", url: "/admin/login", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] }
+    ]
   };
 }

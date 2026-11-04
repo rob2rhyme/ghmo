@@ -1,35 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
-import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { orgAdminsCollectionPath } from "@/src/lib/firestorePaths";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
-
-async function loadActorSnapshot(orgSlug: string, authUid?: string | null, emailLower?: string | null) {
-  const collection = getAdminDb().collection(orgAdminsCollectionPath(orgSlug));
-  if (authUid) {
-    const authSnap = await collection.where("authUid", "==", authUid).limit(1).get();
-    if (!authSnap.empty) {
-      const data = authSnap.docs[0].data() as Record<string, any>;
-      return { name: data.name as string | undefined, roles: Array.isArray(data.roles) ? (data.roles as string[]) : [] };
-    }
-    const directDoc = await collection.doc(authUid).get();
-    if (directDoc.exists) {
-      const data = directDoc.data() as Record<string, any>;
-      return { name: data.name as string | undefined, roles: Array.isArray(data.roles) ? (data.roles as string[]) : [] };
-    }
-  }
-  if (emailLower) {
-    const emailSnap = await collection.where("emailLower", "==", emailLower).limit(1).get();
-    if (!emailSnap.empty) {
-      const data = emailSnap.docs[0].data() as Record<string, any>;
-      return { name: data.name as string | undefined, roles: Array.isArray(data.roles) ? (data.roles as string[]) : [] };
-    }
-  }
-  return null;
-}
 
 export async function GET(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
@@ -54,12 +28,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { actor } = await requireActiveAdmin(req, ctx.orgSlug);
-    const actorSnapshot =
-      (await loadActorSnapshot(ctx.orgSlug, ctx.uid, ctx.emailLower)) ?? {
-        name: actor.name,
-        roles: actor.roles
-      };
+    // Pass the context already verified above, so the cookie is checked once; the guard's own admin record
+    // read supplies the name and roles (no second lookup).
+    const { actor, admin } = await requireActiveAdmin(ctx, ctx.orgSlug);
+    const actorSnapshot = { name: admin.name, roles: admin.roles };
     return NextResponse.json({
       authenticated: true,
       isAdmin: true,
@@ -68,7 +40,7 @@ export async function GET(req: NextRequest) {
       orgSlug: ctx.orgSlug,
       adminId: actor.adminDocId,
       roles: actor.roles,
-      actor: actorSnapshot ?? { roles: ["admin"] }
+      actor: actorSnapshot
     });
   } catch (err) {
     if (err instanceof AdminEnvError) {

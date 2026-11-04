@@ -1,4 +1,4 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { getAdminAuth, getAdminDb } from "./firebaseAdmin";
@@ -42,6 +42,8 @@ export type AuthContext = {
   authMethod: AuthMethod | null;
   email?: string;
   emailLower?: string;
+  /** When the session cookie (or token) stops being valid, in epoch seconds. */
+  expiresAt?: number;
 };
 
 export type MemberAuthContext = {
@@ -53,30 +55,27 @@ export type MemberAuthContext = {
   roles?: string[];
 };
 
-type RequestCredential = { kind: "bearer" | "cookie"; token: string };
+type RequestCredential = { kind: "cookie"; token: string };
 
+/**
+ * The request's session cookie. Bearer ID tokens are not accepted: a browser's Firebase sign-in can keep
+ * minting ID tokens long after the 8-hour session ends, so only the revocable cookie counts.
+ */
 async function extractCredential(req?: NextRequest): Promise<RequestCredential | null> {
-  const authHeader = req ? req.headers.get("authorization") : (await headers()).get("authorization");
-  const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-  if (bearer) return { kind: "bearer", token: bearer };
   const cookie = req ? req.cookies.get(SESSION_COOKIE_NAME)?.value : (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (cookie) return { kind: "cookie", token: cookie };
   return null;
 }
 
 /**
- * Decodes the request's credential. Session cookies and bearer ID tokens are both
- * checked for revocation, so logout and admin removal take effect immediately.
- * Returns null on any failure.
+ * Decodes the request's session cookie, checked for revocation, so logout and admin removal take effect
+ * immediately. Returns null on any failure.
  */
 export async function decodeRequestCredential(req?: NextRequest): Promise<DecodedIdToken | null> {
   const credential = await extractCredential(req);
   if (!credential) return null;
   try {
-    const auth = getAdminAuth();
-    return credential.kind === "cookie"
-      ? await auth.verifySessionCookie(credential.token, true)
-      : await auth.verifyIdToken(credential.token, true);
+    return await getAdminAuth().verifySessionCookie(credential.token, true);
   } catch {
     return null;
   }
@@ -99,7 +98,8 @@ function toAuthContext(decoded: DecodedIdToken): AuthContext | null {
         ? claims.authMethod
         : null,
     email: decoded.email,
-    emailLower: normalizeMemberEmail(decoded.email)
+    emailLower: normalizeMemberEmail(decoded.email),
+    expiresAt: decoded.exp
   };
 }
 

@@ -14,6 +14,8 @@ const EXPLORE_LINKS: { href: Route; label: string }[] = [
   { href: "/multimedia", label: "Media" }
 ];
 
+// The sign-in page and the guide sit in other root layouts and render per request, so prefetching them from
+// the public pages is wasted work: these links load on click.
 const BOARD_LINKS: { href: Route; label: string }[] = [
   { href: "/admin/login", label: "Board member sign in" },
   { href: "/docs/onboarding", label: "Board member guide" }
@@ -41,7 +43,7 @@ export function SiteFooter({ name, contactEmail = null }: { name: string; contac
       >
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex items-center gap-3">
-            <ThemeLogo alt="" className="size-12" />
+            <ThemeLogo alt="" className="size-12" sizes="48px" />
             <div className="min-w-0">
               <p className="text-base font-semibold">{name}</p>
               <p className="text-sm text-muted-foreground">Harrisburg, Pennsylvania · since 2017</p>
@@ -84,7 +86,7 @@ export function SiteFooter({ name, contactEmail = null }: { name: string; contac
             <ul className="flex flex-col">
               {BOARD_LINKS.map(link => (
                 <li key={link.href}>
-                  <Link href={link.href} className={linkClass}>
+                  <Link href={link.href} prefetch={false} className={linkClass}>
                     {link.label}
                   </Link>
                 </li>

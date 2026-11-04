@@ -89,6 +89,11 @@ export function formatDate(value?: string) {
   }
 }
 
+/** " on <date> at <time>" (either part may be empty). Letters put the place in its own sentence, so "at" never repeats. */
+export function onDateAtTime(date: string, time: string) {
+  return `${date ? ` on ${date}` : ""}${time ? ` at ${time}` : ""}`;
+}
+
 export function renderTemplateHtml(template: DocTemplate, inputs: Record<string, string>) {
   return template.renderHtml(inputs);
 }

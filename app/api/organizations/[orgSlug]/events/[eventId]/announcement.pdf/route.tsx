@@ -1,59 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertMember } from "@/src/lib/auth";
-import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { COMMUNITY_ID } from "@/src/lib/community";
-import { eventsCollectionPath, ensureOrgSlug, normalizeEvent, DEFAULT_TIMEZONE } from "@/src/lib/events";
+import { ensureOrgSlug, DEFAULT_TIMEZONE } from "@/src/lib/events";
+import { getPublishedEvent } from "@/src/lib/publicData.server";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { formatDateTime, type DateInput } from "@/src/lib/format";
 import { isValidTimeZone } from "@/src/lib/zonedTime";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {
+/** Plain text for anyone who opens the link in a browser (never raw JSON on a public link). */
+const plain = (message: string, status: number) =>
+  new NextResponse(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+
+/**
+ * The flyer for a published event, as a PDF. Public, like the event page: it only ever covers published
+ * events (decision 2026-11-03). The CDN keeps a copy for a minute, so pdf rendering doesn't rerun on every
+ * download; an unpublished event's flyer stops being served within that minute.
+ */
+export async function GET(_req: NextRequest, context: { params: Promise<{ orgSlug: string; eventId: string }> }) {
   const params = await context.params;
-  const adminEnvStatus = getAdminEnvStatus();
-  if (!adminEnvStatus.ok) {
-    return NextResponse.json(
-      { error: "Admin env not configured" },
-      { status: 503 }
-    );
-  }
+  if (!ensureOrgSlug(params.orgSlug)) return plain("This event isn't available.", 404);
+  const event = await getPublishedEvent(params.eventId);
+  if (event === undefined) return plain("The flyer can't be made right now. Try again in a few minutes.", 503);
+  if (!event) return plain("This event isn't available. It may have been removed, or it hasn't been announced yet.", 404);
 
-  try {
-    if (!ensureOrgSlug(params.orgSlug)) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    const member = await assertMember(req);
-    if (!member) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const db = getAdminDb();
-    const primaryRef = db.collection(eventsCollectionPath(params.orgSlug)).doc(params.eventId);
-    const primarySnap = await primaryRef.get();
-    const fallbackSnap = primarySnap.exists
-      ? null
-      : await db.collection(`community/${COMMUNITY_ID}/events`).doc(params.eventId).get();
-    const docSnap = primarySnap.exists ? primarySnap : fallbackSnap;
-    if (!docSnap?.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    const event = normalizeEvent(docSnap);
-    if (event.status !== "published") return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    const buffer = await renderEventPdf(event);
-    const fileName = `${event.title || "Event"} Announcement.pdf`;
-    return new NextResponse(new Uint8Array(buffer), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${fileName.replace(/"/g, "")}"`
-      }
-    });
-  } catch (error) {
-    if (error instanceof AdminEnvError) {
-      return NextResponse.json(
-        { error: "Admin env not configured" },
-        { status: 503 }
-      );
+  const buffer = await renderEventPdf(event);
+  const fileName = `${event.title || "Event"} Announcement.pdf`;
+  return new NextResponse(new Uint8Array(buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${fileName.replace(/"/g, "")}"`,
+      "Cache-Control": "public, s-maxage=60"
     }
-    throw error;
-  }
+  });
 }
 
 async function renderEventPdf(event: any): Promise<Uint8Array> {

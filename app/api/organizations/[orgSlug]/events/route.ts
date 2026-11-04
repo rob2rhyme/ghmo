@@ -1,7 +1,7 @@
 //app/api/organizations/[orgSlug]/events/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/src/lib/firebaseAdmin";
-import { ensureOrgSlug, normalizeEvent, queryAllEvents } from "@/src/lib/events";
+import { EventsIndexMissingError, ensureOrgSlug, queryEvents, toPublicEvent } from "@/src/lib/events";
+import type { EventRecord } from "@/src/lib/events.shared";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { toPlain } from "@/src/lib/serialize.server";
@@ -9,10 +9,11 @@ import { toPlain } from "@/src/lib/serialize.server";
 export const dynamic = "force-dynamic";
 
 /**
- * The public list (published events) may be served by the CDN for 5 minutes; next.config.mjs leaves this
+ * The public list (published events) may be served by the CDN for one minute. The CDN copy can't be expired
+ * when an admin unpublishes an event, so it is kept short and never served stale. next.config.mjs leaves this
  * path out of its blanket no-store, so the admin variants (status=all/draft/archived) set no-store here.
  */
-const PUBLIC_API_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
+const PUBLIC_API_CACHE_CONTROL = "public, s-maxage=60";
 
 export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug: string }> }) {
   const params = await context.params;
@@ -40,7 +41,6 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
       authMode = "admin";
     }
 
-    const db = getAdminDb();
     const statusConstraint =
       statusParam === "draft" || statusParam === "archived"
         ? statusParam
@@ -48,63 +48,15 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
           ? null
           : "published";
 
-    const normalizeAndSort = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) => {
-      const entries = docs.map(normalizeEvent);
-      const toMillis = (value: any) => {
-        if (!value) return Number.POSITIVE_INFINITY;
-        const raw = typeof value === "object" && typeof value.toDate === "function" ? value.toDate() : value;
-        const ts = new Date(raw).getTime();
-        return Number.isFinite(ts) ? ts : Number.POSITIVE_INFINITY;
-      };
-      return entries.sort((a, b) => toMillis(a.startsAt) - toMillis(b.startsAt));
-    };
-
-    const buildQuery = (collection: FirebaseFirestore.Query, withOrderBy: boolean) => {
-      let q = collection;
-      if (statusConstraint) {
-        q = q.where("status", "==", statusConstraint);
-      }
-      if (rangeStart) {
-        q = q.where("startsAt", ">=", new Date(rangeStart));
-      }
-      if (rangeEnd) {
-        q = q.where("startsAt", "<=", new Date(rangeEnd));
-      }
-      if (withOrderBy) {
-        q = q.orderBy("startsAt", "asc");
-      }
-      return q.limit(200);
-    };
-
-    // Every events location, merged (see eventCollectionPaths).
-    const runQueries = (withOrderBy: boolean) => queryAllEvents(db, collection => buildQuery(collection, withOrderBy));
-
-    let events: ReturnType<typeof normalizeEvent>[] = [];
+    let events: EventRecord[] = [];
     try {
-      const docs = await runQueries(true);
-      events = normalizeAndSort(docs);
-    } catch (err: any) {
-      const message = err?.message ? String(err.message) : "Unknown error";
-      const missingIndex =
-        err?.code === 9 ||
-        message.includes("FAILED_PRECONDITION") ||
-        message.includes("requires an index");
-      if (!missingIndex) {
-        console.error("Events query failed", message);
-        return NextResponse.json({ ok: false, error: "EVENTS_QUERY_FAILED" }, { status: 500 });
+      events = await queryEvents({ status: statusConstraint, rangeStart, rangeEnd });
+    } catch (err) {
+      if (err instanceof EventsIndexMissingError) {
+        return NextResponse.json({ ok: false, error: "MISSING_INDEX", message: err.message }, { status: 503 });
       }
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "MISSING_INDEX",
-            message: "Firestore composite index required for events query."
-          },
-          { status: 503 }
-        );
-      }
-      const docs = await runQueries(false);
-      events = normalizeAndSort(docs);
+      console.error("Events query failed", err instanceof Error ? err.message : String(err));
+      return NextResponse.json({ ok: false, error: "EVENTS_QUERY_FAILED" }, { status: 500 });
     }
 
     const now = Date.now();
@@ -119,7 +71,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ orgSlug
 
     // Firestore timestamps become epoch milliseconds; raw Timestamp objects reach the browser as
     // {_seconds, _nanoseconds}, which `new Date()` cannot read ("Invalid Date", and no upcoming events).
-    const response = NextResponse.json({ ok: true, events: filtered.map(evt => toPlain(evt)) });
+    const shaped = authMode === "public" ? filtered.map(toPublicEvent) : filtered;
+    const response = NextResponse.json({ ok: true, events: shaped.map(evt => toPlain(evt)) });
     response.headers.set("Cache-Control", authMode === "public" ? PUBLIC_API_CACHE_CONTROL : "no-store");
     if (process.env.NODE_ENV !== "production") {
       response.headers.set("x-events-auth", authMode);

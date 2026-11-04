@@ -1,11 +1,11 @@
 import { DocTemplate } from "../types";
-import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
+import { escapeHtml, formatDate, onDateAtTime } from "../render/renderTemplateHtml";
 
 export const eventHostInvitation: DocTemplate = {
   id: "event-host-invitation",
-  version: 2,
-  title: "Community Leader Invitation",
-  category: "Events",
+  version: 3,
+  title: "Community leader invitation",
+  category: "Event",
   description: "Invite a leader from another community to a GHMO event and ask them to spread the word.",
   fields: [
     { id: "hostName", label: "Leader's name", type: "text", placeholder: "Dhan Bahadur Rana", required: true },
@@ -19,7 +19,7 @@ export const eventHostInvitation: DocTemplate = {
       label: "Message to share",
       type: "textarea",
       rows: 5,
-      placeholder: "Celebrating members, sharing cultural program, community gratitude."
+      placeholder: "We will celebrate our members with a cultural program and a shared meal, and thank everyone who helped this year."
     },
     { id: "supportContact", label: "GHMO contact", type: "text", placeholder: "A name and phone number or email address" }
   ],
@@ -37,7 +37,7 @@ export const eventHostInvitation: DocTemplate = {
     const supportContact = escapeHtml(inputs.supportContact);
 
     const meta = [eventName, eventDate, eventTime, eventLocation].filter(Boolean).join(" · ");
-    const when = [eventDate ? ` on ${eventDate}` : "", eventTime ? ` at ${eventTime}` : "", eventLocation ? ` at ${eventLocation}` : ""].join("");
+    const when = onDateAtTime(eventDate, eventTime);
 
     return `
       <div>
@@ -46,7 +46,8 @@ export const eventHostInvitation: DocTemplate = {
         <div class="ghmo-letter-body">
           ${hostName ? `<p>Dear ${hostName},</p>` : ""}
           <p>
-            We would be glad to have you with us at ${eventName}${when}. Your presence means a lot to our community, and we hope you will
+            We would be glad to have you with us at ${eventName}${when}.${eventLocation ? ` It will be held at ${eventLocation}.` : ""}
+            Your presence means a lot to our community, and we hope you will
             share this invitation with ${leaderCommunity || "your community"} so friends and neighbors can join us too.
           </p>
           ${guestFocus ? `<p>${guestFocus}</p>` : ""}

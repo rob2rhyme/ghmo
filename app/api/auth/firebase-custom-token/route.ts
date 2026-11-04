@@ -15,14 +15,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Passkey session required (default). The claim lets Firestore rules check it too.
-    const { actor, authMethod } = await requireActiveAdmin(req, "ghmo");
+    // Strong session required (default). The claims let Firestore rules check it too: `authMethod` for the
+    // sign-in strength, `sessionExp` so the browser's database access ends when this session does (a
+    // Firebase sign-in in the browser could otherwise keep minting tokens after the cookie expires).
+    const { actor, authMethod, sessionExpiresAt } = await requireActiveAdmin(req, "ghmo");
+    if (!sessionExpiresAt) throw new AdminAccessError(401, "Unauthorized", "NO_SESSION_EXPIRY");
     const adminAuth = getAdminAuth();
     const token = await adminAuth.createCustomToken(actor.uid, {
       orgSlug: "ghmo",
       role: "admin",
       admin: true,
-      authMethod
+      authMethod,
+      sessionExp: sessionExpiresAt
     });
 
     return NextResponse.json(

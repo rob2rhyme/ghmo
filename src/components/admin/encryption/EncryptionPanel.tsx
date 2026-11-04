@@ -23,7 +23,7 @@ import { errorText, UnlockCard } from "./UnlockCard";
 import { RecoveryKeyFlow } from "./RecoveryKeyFlow";
 import { EXPLAIN, WhatIsThis } from "./WhatIsThis";
 
-const SETUP_STEPS = ["Set up this device", "Make a recovery key", "Give paper copies to 2 trusted people"];
+const SETUP_STEPS = ["Set up this device", "Make a recovery key", "Give a paper copy to each of 2 trustees"];
 
 /** The three setup steps, always visible, so the admin knows where they are and what comes next. */
 function SetupSteps({ current }: { current: number }) {
@@ -141,7 +141,7 @@ function BootstrapWizard() {
         <SetupSteps current={2} />
         <AdminSectionCard
           title={SETUP_STEPS[1]}
-          description="A recovery key is shown once. Two trustees each keep a paper copy. Without it, losing every admin device means losing all encrypted data."
+          description="A recovery key is shown once. Two trustees (people you trust) each keep a paper copy. Without it, losing every admin device means losing all encrypted data."
         >
           <div className="flex flex-col gap-1">
             <WhatIsThis question="What is the recovery key?">{EXPLAIN.recoveryKey}</WhatIsThis>

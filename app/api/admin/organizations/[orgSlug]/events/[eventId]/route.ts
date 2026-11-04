@@ -8,6 +8,7 @@ import { parseJsonBody } from "@/src/lib/validation";
 import { toPlain } from "@/src/lib/serialize.server";
 import { isValidTimeZone, parseEventDate } from "@/src/lib/zonedTime";
 import { z } from "zod";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +151,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
 
     const ref = existing.ref;
     await ref.set(updates, { merge: true });
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     const doc = await ref.get();
     await logAuditEvent({
       orgSlug: params.orgSlug,
@@ -201,6 +203,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ orgS
     const existing = await findEventDoc(getAdminDb(), params.eventId);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
     await existing.ref.delete();
+    expirePublicCache(PUBLIC_CACHE_TAGS.events);
     await logAuditEvent({
       orgSlug: params.orgSlug,
       action: "event_deleted",

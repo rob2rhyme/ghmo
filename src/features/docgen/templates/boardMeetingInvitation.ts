@@ -1,18 +1,18 @@
 import { DocTemplate } from "../types";
-import { escapeHtml, formatDate } from "../render/renderTemplateHtml";
+import { escapeHtml, formatDate, onDateAtTime } from "../render/renderTemplateHtml";
 
 export const boardMeetingInvitation: DocTemplate = {
   id: "board_meeting_invitation",
-  version: 2,
-  title: "Board Meeting Invitation",
-  category: "Governance",
+  version: 3,
+  title: "Board meeting invitation",
+  category: "Meeting",
   description: "Invite a board member to a board meeting, with the date, place and agenda.",
   fields: [
-    { id: "memberName", label: "Board member's name", type: "text", placeholder: "Ram Bahadur Thapa" },
+    { id: "memberName", label: "Board member's name", type: "text", placeholder: "Ram Bahadur Thapa Magar" },
     { id: "meetingTitle", label: "Meeting title", type: "text", placeholder: "Board Meeting", required: true },
     { id: "meetingDate", label: "Meeting date", type: "date", required: true },
     { id: "meetingTime", label: "Meeting time", type: "text", placeholder: "6:00 PM", required: true },
-    { id: "meetingLocation", label: "Meeting place", type: "text", placeholder: "GHMO Office / Community Center", required: true },
+    { id: "meetingLocation", label: "Meeting place", type: "text", placeholder: "GHMO community hall, Harrisburg", required: true },
     {
       id: "agenda",
       label: "Agenda",
@@ -35,7 +35,7 @@ export const boardMeetingInvitation: DocTemplate = {
     const rsvpContact = escapeHtml(inputs.rsvpContact);
 
     const meta = [meetingTitle, meetingDate, meetingTime].filter(Boolean).join(" · ");
-    const when = [meetingDate ? ` on ${meetingDate}` : "", meetingTime ? ` at ${meetingTime}` : "", meetingLocation ? ` at ${meetingLocation}` : ""].join("");
+    const when = onDateAtTime(meetingDate, meetingTime);
 
     return `
       <div>
@@ -44,7 +44,8 @@ export const boardMeetingInvitation: DocTemplate = {
         <div class="ghmo-letter-body">
           <p>Dear ${memberName || "board member"},</p>
           <p>
-            We invite you to the ${meetingTitle} of the ${organizationName}${when}. Your voice matters in the decisions we make together.
+            We invite you to the ${meetingTitle} of the ${organizationName}${when}.${meetingLocation ? ` We will meet at ${meetingLocation}.` : ""} Your
+            voice matters in the decisions we make together.
           </p>
           ${agenda ? `<p>On the agenda:<br/>${agenda}</p>` : ""}
           <p>Please let us know whether you can come, and get in touch if you have any questions before the meeting.</p>

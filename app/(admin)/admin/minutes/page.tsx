@@ -1,8 +1,9 @@
 //app/(admin)/admin/minutes/page.tsx
+import type { Metadata } from "next";
 import { MeetingMinutesRecord } from "@/src/lib/minutes";
 import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listAdminMinutes } from "@/src/lib/adminData.server";
 import { toPlain } from "@/src/lib/serialize.server";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
@@ -10,6 +11,10 @@ import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate
 import MinutesEditorClient from "@/src/components/admin/minutes/MinutesEditorClient";
 import MinutesRecordsClient from "@/src/components/admin/minutes/MinutesRecordsClient";
 import { SegmentedNav } from "@/src/components/ui/segmented";
+
+/** Tab title: "Meeting minutes · GHMO admin" (the admin layout adds the suffix). */
+export const metadata: Metadata = { title: "Meeting minutes" };
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,13 +39,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
     redirect("/admin/login");
   }
 
-  const minutesRes = await internalFetch(`/api/admin/minutes`);
-  if (!minutesRes.ok) {
-    const body = await minutesRes.text().catch(() => "");
-    throw new Error(`Failed to load minutes (${minutesRes.status}): ${body}`);
-  }
-  const data = await minutesRes.json();
-  const minutes = toPlain(data.minutes ?? []) as MeetingMinutesRecord[];
+  const minutes = toPlain(await listAdminMinutes(await requireActiveAdmin(undefined, COMMUNITY_SLUG))) as MeetingMinutesRecord[];
 
   const mode = modeParam === "records" ? "records" : "new";
 

@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
   const params = await context.params;
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+    return NextResponse.json({ error: "The site isn't set up to do this yet. Ask the site administrator." }, { status: 503 });
   }
 
   try {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       const checker = await envelopeChecker(actor.uid);
       if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
       if (withContact.some(row => !checker.ok(row.contact!.enc))) {
-        return NextResponse.json({ error: "Unknown or inactive encryption device." }, { status: 403 });
+        return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       }
     }
 
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     return NextResponse.json({ ok: true, created, skipped, withPhone }, { status: 201 });
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+      return NextResponse.json({ error: "The site isn't set up to do this yet. Ask the site administrator." }, { status: 503 });
     }
     throw error;
   }

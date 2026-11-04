@@ -30,7 +30,8 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
   const isAdmin = !loading && !!session?.adminId;
   const isAuthenticated = !loading && !!session?.authenticated;
 
-  const links = [...PUBLIC_NAV, ...(isAdmin ? [{ href: "/admin" as Route, label: "Admin" }] : [])];
+  // The admin area is another root layout that renders per request: a prefetch from here is never used.
+  const links: { href: Route; label: string; prefetch?: false }[] = [...PUBLIC_NAV, ...(isAdmin ? [{ href: "/admin" as Route, label: "Admin", prefetch: false as const }] : [])];
   const donateLabel = donateOpen ? "Donate" : "Support the Gumba";
   const donateCurrent = isActivePath(pathname, DONATE_HREF);
   // Signed out, the four links fit in the bar from tablet width; signed in (Admin link, Sign out) from desktop.
@@ -40,7 +41,7 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
         <Link href="/" className="flex min-h-11 min-w-0 items-center gap-3 rounded-md text-foreground">
-          <ThemeLogo alt="" className="size-9" />
+          <ThemeLogo alt="" className="size-9" sizes="36px" />
           <span className="truncate text-base font-semibold">
             <span className="xl:hidden">GHMO</span>
             <span className="hidden xl:inline">{label}</span>
@@ -55,6 +56,7 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={link.prefetch}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative inline-flex min-h-11 items-center rounded-md px-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
@@ -89,7 +91,7 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
             <SheetContent side="right" className="flex flex-col gap-4 p-4">
               <SheetHeader className="p-0 pr-10">
                 <SheetTitle className="flex items-center gap-3">
-                  <ThemeLogo alt="" className="size-9" />
+                  <ThemeLogo alt="" className="size-9" sizes="36px" />
                   <span className="min-w-0">{label}</span>
                 </SheetTitle>
                 <SheetDescription className="sr-only">Site navigation</SheetDescription>
@@ -101,6 +103,7 @@ export function CommunityHeader({ name, donateOpen = false }: CommunityHeaderPro
                     <Link
                       key={link.href}
                       href={link.href}
+                      prefetch={link.prefetch}
                       aria-current={active ? "page" : undefined}
                       onClick={() => setMenuOpen(false)}
                       className={cn(

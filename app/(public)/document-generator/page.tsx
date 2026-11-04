@@ -5,7 +5,6 @@ import { MessagePage } from "@/src/components/public/MessagePage";
 import { Button } from "@/src/components/ui/button";
 import { getContactEmail } from "@/src/lib/contact";
 
-export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Document generator · GHMO" };
 
 /** The document generator is a board tool; visitors who follow an old link get an explanation, not a sign-in form. */

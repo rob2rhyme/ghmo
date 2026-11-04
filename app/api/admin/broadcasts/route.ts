@@ -9,6 +9,7 @@ import { orgBroadcastsCollectionPath } from "@/src/lib/firestorePaths";
 import { toPlain } from "@/src/lib/serialize.server";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { parseJsonBody } from "@/src/lib/validation";
+import { listBroadcasts } from "@/src/lib/adminData.server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,7 @@ const ROUTE = "/api/admin/broadcasts";
 export async function GET(req: NextRequest) {
   const guard = await enforceActiveAdmin(req, COMMUNITY_SLUG);
   if ("response" in guard) return guard.response;
-  const snap = await getAdminDb().collection(orgBroadcastsCollectionPath(COMMUNITY_SLUG)).orderBy("updatedAt", "desc").limit(100).get();
-  return NextResponse.json({ broadcasts: snap.docs.map(doc => toPlain({ id: doc.id, ...doc.data() })) });
+  return NextResponse.json({ broadcasts: await listBroadcasts(guard) });
 }
 
 const createSchema = z.object({ subject: z.string().max(1000), body: z.string().max(100_000) });

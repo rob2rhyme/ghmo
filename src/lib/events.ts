@@ -30,6 +30,12 @@ export function normalizeEvent(doc: FirebaseFirestore.DocumentSnapshot): EventRe
   };
 }
 
+/** What visitors may see of an event: no creator uid, no internal flyer settings. */
+export function toPublicEvent(event: EventRecord): EventRecord {
+  const { id, title, summary, body, status, startsAt, endsAt, timezone, location, featured } = event;
+  return { id, title, summary, body, status, startsAt, endsAt, timezone, location, featured };
+}
+
 export function ensureOrgSlug(slug: string) {
   return slug === COMMUNITY_SLUG;
 }
@@ -78,6 +84,67 @@ export async function queryAllEvents(
     }
   }
   return docs;
+}
+
+/** The events query could not run because Firestore needs a composite index (production only). */
+export class EventsIndexMissingError extends Error {
+  constructor() {
+    super("Firestore composite index required for events query.");
+    this.name = "EventsIndexMissingError";
+  }
+}
+
+function startMillis(value: unknown): number {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const raw = typeof value === "object" && typeof (value as { toDate?: unknown }).toDate === "function" ? (value as { toDate: () => Date }).toDate() : value;
+  const ts = new Date(raw as string | number | Date).getTime();
+  return Number.isFinite(ts) ? ts : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Events from every location, soonest first: `status` null means every status. Used by the events API
+ * and the public pages. Throws EventsIndexMissingError when production lacks the composite index;
+ * elsewhere a missing index falls back to an unordered query sorted in memory.
+ */
+export async function queryEvents({
+  status,
+  rangeStart,
+  rangeEnd,
+  last
+}: {
+  status: string | null;
+  rangeStart?: string | null;
+  rangeEnd?: string | null;
+  /** Keep the latest `last` events of the range (soonest-first order), instead of the earliest 200. */
+  last?: number;
+}): Promise<EventRecord[]> {
+  const { getAdminDb } = await import("./firebaseAdmin");
+  const db = getAdminDb();
+  const build = (collection: FirebaseFirestore.Query, withOrderBy: boolean) => {
+    let q = collection;
+    if (status) q = q.where("status", "==", status);
+    if (rangeStart) q = q.where("startsAt", ">=", new Date(rangeStart));
+    if (rangeEnd) q = q.where("startsAt", "<=", new Date(rangeEnd));
+    if (withOrderBy) {
+      q = q.orderBy("startsAt", "asc");
+      // limitToLast keeps the newest ones with the same (status, startsAt) index as the ascending query.
+      return last ? q.limitToLast(last) : q.limit(200);
+    }
+    return q.limit(last ?? 200);
+  };
+  const sorted = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) =>
+    docs.map(normalizeEvent).sort((a, b) => startMillis(a.startsAt) - startMillis(b.startsAt));
+
+  try {
+    return sorted(await queryAllEvents(db, collection => build(collection, true)));
+  } catch (err) {
+    const error = err as { code?: unknown; message?: unknown };
+    const message = error?.message ? String(error.message) : "";
+    const missingIndex = error?.code === 9 || message.includes("FAILED_PRECONDITION") || message.includes("requires an index");
+    if (!missingIndex) throw err;
+    if (process.env.NODE_ENV === "production") throw new EventsIndexMissingError();
+    return sorted(await queryAllEvents(db, collection => build(collection, false)));
+  }
 }
 
 /** Published events for public views (calendar feeds), from every events location. */

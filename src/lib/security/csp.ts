@@ -1,20 +1,18 @@
 /**
  * Content-Security-Policy builders. Pure functions so they can be unit-tested.
  *
- * Secure areas (admin, login, member, signing, docs) get a strict nonce-based policy:
+ * Secure areas (admin, login, signing, docs, unsubscribe) get a strict nonce-based policy:
  * only scripts stamped with this request's nonce, or loaded by them ('strict-dynamic'),
  * may run. Public pages embed GoFundMe and social media, which load scripts from origins
  * we do not control, so they get a baseline policy instead. Public and secure pages use
  * separate root layouts, so public scripts never carry over into secure pages.
  */
 
-const SECURE_PREFIXES = ["/admin", "/login", "/sign", "/c/", "/docs", "/unsubscribe"] as const;
+// The events pages (/c/ghmo/events/**) are public and cached, so they are not listed here.
+const SECURE_PREFIXES = ["/admin", "/login", "/sign", "/docs", "/unsubscribe"] as const;
 
 export function isSecurePath(pathname: string): boolean {
-  return SECURE_PREFIXES.some(prefix => {
-    if (prefix.endsWith("/")) return pathname.startsWith(prefix);
-    return pathname === prefix || pathname.startsWith(`${prefix}/`);
-  });
+  return SECURE_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 export function createNonce(): string {
@@ -46,7 +44,7 @@ export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDoma
     // Inline styles are used by the letterhead/document previews. Style injection
     // cannot run code, so this is an accepted trade-off.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://i.ytimg.com https://*.googleusercontent.com",
+    "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://i.ytimg.com",
     "font-src 'self' data:",
     "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com" +
       (isDev ? " ws: http://localhost:*" : "") +

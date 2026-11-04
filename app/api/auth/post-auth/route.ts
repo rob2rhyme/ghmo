@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminAuth, getAdminDb } from "@/src/lib/firebaseAdmin";
+import { getAdminDb } from "@/src/lib/firebaseAdmin";
+import { findActiveMember, verifyIdToken } from "@/src/lib/auth";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
-import { normalizeMemberEmail, normalizeMemberName } from "@/src/lib/members";
+import { normalizeMemberName } from "@/src/lib/members";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -20,42 +21,35 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ ok: false });
 
   try {
-    const decoded = await getAdminAuth().verifyIdToken(token);
-    const emailLower = normalizeMemberEmail(decoded.email);
-    if (!emailLower) return NextResponse.json({ ok: false });
+    let decoded;
+    try {
+      // Revoked tokens are refused too.
+      decoded = await verifyIdToken(token);
+    } catch {
+      return NextResponse.json({ ok: false });
+    }
+    // The same rule as the session route: a verified email from the email link (or a token we minted), for an
+    // active member whose record is unclaimed or already this account's. Only then is the record linked.
+    const member = await findActiveMember(decoded);
+    if (!member) return NextResponse.json({ ok: false });
 
-    const db = getAdminDb();
-    const memberSnapshot = await db
-      .collection(orgMembersCollectionPath(COMMUNITY_SLUG))
-      .where("emailLower", "==", emailLower)
-      .where("status", "==", "active")
-      .limit(1)
-      .get();
-    if (memberSnapshot.empty) return NextResponse.json({ ok: false });
-
-    const memberDoc = memberSnapshot.docs[0];
-    const data = memberDoc.data() as Record<string, any>;
-    if (data.uid && data.uid !== decoded.uid) return NextResponse.json({ ok: false });
-
-    await memberDoc.ref.set(
-        {
-          uid: data.uid || decoded.uid,
-          email: data.email || decoded.email,
-          emailLower: data.emailLower || emailLower,
-          name: data.name || normalizeMemberName(decoded.name),
-          updatedAt: new Date()
-          // TODO: attach inviteCode metadata once invite codes are added.
-        },
+    const memberRef = getAdminDb().doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${member.memberId}`);
+    const data = ((await memberRef.get()).data() ?? {}) as Record<string, unknown>;
+    await memberRef.set(
+      {
+        uid: (data.uid as string | undefined) || decoded.uid,
+        email: (data.email as string | undefined) || decoded.email,
+        emailLower: (data.emailLower as string | undefined) || member.emailLower,
+        name: (data.name as string | undefined) || normalizeMemberName(decoded.name),
+        updatedAt: new Date()
+      },
       { merge: true }
     );
 
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof AdminEnvError) {
-      return NextResponse.json(
-        { error: "Admin env not configured", missing: err.issues },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
     }
     return NextResponse.json({ ok: false });
   }

@@ -15,14 +15,28 @@ const baseSecurityHeaders = [
  * sets its own Cache-Control (see PUBLIC_API_CACHE_CONTROL in the route); every other /api path is never
  * cached. Patterns are matched against the path after "/api/".
  */
-const publicApiPaths = ["calendar(?:/[^/]+)?", "media/youtube", "organizations/ghmo/events", "organizations/ghmo/donations/stats"];
+const publicApiPaths = [
+  "calendar(?:/[^/]+)?",
+  "media/youtube",
+  "organizations/ghmo/events",
+  "organizations/ghmo/events/[^/]+/announcement\\.pdf",
+  "organizations/ghmo/donations/stats"
+];
 
 const nextConfig = {
   typedRoutes: true,
   poweredByHeader: false,
+  // Cached public pages (Home, Donate, Minutes, Events) refresh every 5 minutes in the background. Without a
+  // limit, the first visitor after a quiet weekend would be served a days-old copy (a past event as "next")
+  // while the new one builds; after an hour the old copy is no longer served at all.
+  expireTime: 3600,
   experimental: {
     // Needed because the app has several root layouts (public vs. secure areas).
     globalNotFound: true
+  },
+  async redirects() {
+    // The public story of the Gumba Project lives on the Donate page; board members use /admin/gumba-project.
+    return [{ source: "/gumba-project", destination: "/donate", permanent: true }];
   },
   async headers() {
     return [

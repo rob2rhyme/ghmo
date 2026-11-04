@@ -9,7 +9,7 @@ import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc } f
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 const ORG = "organizations/ghmo";
-const CLAIMS = { orgSlug: "ghmo", role: "admin", admin: true, authMethod: "passkey" };
+const CLAIMS = { orgSlug: "ghmo", role: "admin", admin: true, authMethod: "passkey", sessionExp: Math.floor(Date.now() / 1000) + 3600 };
 const ALICE_DEVICE = "alice-device-0000001";
 const BOB_DEVICE = "bob-device-000000001";
 

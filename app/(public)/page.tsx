@@ -26,8 +26,9 @@ export default async function CommunityLanding() {
             Greater Harrisburg Magar Organization
           </h1>
           <div className="w-full max-w-sm">
-            <Image src="/assets/ghmo-akkha.png" alt={AKKHA_ALT} width={1287} height={126} className="h-auto w-full dark:hidden" />
-            <Image src="/assets/ghmo-dark-mode.png" alt={AKKHA_ALT} width={1287} height={126} className="hidden h-auto w-full dark:block" />
+            {/* Shown at most 384px wide (max-w-sm), so ask for that size, not the full 1287px file. */}
+            <Image src="/assets/ghmo-akkha.png" alt={AKKHA_ALT} width={1287} height={126} sizes="384px" className="h-auto w-full dark:hidden" />
+            <Image src="/assets/ghmo-dark-mode.png" alt={AKKHA_ALT} width={1287} height={126} sizes="384px" className="hidden h-auto w-full dark:block" />
           </div>
           <p className="max-w-xl text-lg text-muted-foreground">
             We are the Magar community of Greater Harrisburg, keeping our language, culture and traditions alive for the next
@@ -55,6 +56,7 @@ export default async function CommunityLanding() {
             alt={HOME_HERO_IMAGE.alt}
             fill
             priority
+            fetchPriority="high"
             sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
             className="object-cover"
           />
@@ -78,7 +80,7 @@ export default async function CommunityLanding() {
 
       {/* The events and feeds come from the network, so they stream in behind placeholders of about their own
           height; the hero and the text above paint at once and nothing below jumps when they arrive. */}
-      <Suspense fallback={<SectionPlaceholder title="Next events" cards={3} />}>
+      <Suspense fallback={<SectionPlaceholder title="Next events" cards={3} gridClassName="md:grid-cols-2 lg:grid-cols-3" />}>
         <UpcomingEvents limit={3} />
       </Suspense>
 
@@ -109,14 +111,14 @@ export default async function CommunityLanding() {
   );
 }
 
-function SectionPlaceholder({ title, cards }: { title: string; cards: number }) {
+function SectionPlaceholder({ title, cards, gridClassName = "md:grid-cols-3" }: { title: string; cards: number; gridClassName?: string }) {
   return (
     <section aria-busy="true" className="flex flex-col gap-4">
       <div className="flex min-w-0 flex-col gap-1">
         <PublicSectionTitle>{title}</PublicSectionTitle>
         <Skeleton className="h-5 w-56 max-w-full" />
       </div>
-      <ul className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3" aria-hidden="true">
+      <ul className={`grid grid-cols-[minmax(0,1fr)] gap-4 ${gridClassName}`} aria-hidden="true">
         {Array.from({ length: cards }).map((_, i) => (
           <li key={i}>
             <Skeleton className="h-44 rounded-xl" />

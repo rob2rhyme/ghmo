@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ExternalLink, Play } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { MediaSection } from "@/src/components/MediaSection";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { SocialIcon } from "@/src/components/public/SocialIcon";
@@ -10,24 +10,18 @@ import { Button } from "@/src/components/ui/button";
 import { COMMUNITY_NAME } from "@/src/lib/community";
 
 /**
- * One large card for GHMO's YouTube channel, shown while no feed has posts to list. The picture is the
- * latest video's thumbnail when the feed has one, else the building artwork; the whole card is the link.
+ * One large card for GHMO's YouTube channel, shown only while no feed has posts to list (so there is no
+ * video thumbnail to show). The picture is the building artwork, with no play button since it isn't a
+ * video; the whole card is the link.
  */
-function FeaturedYouTube({ href, thumbnail }: { href: string; thumbnail?: string | null }) {
+function FeaturedYouTube({ href }: { href: string }) {
   return (
     <section
       aria-labelledby="media-youtube"
       className="relative grid overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-colors hover:border-primary/50 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
     >
       <div className="relative aspect-video bg-muted md:aspect-auto md:min-h-64" aria-hidden="true">
-        {thumbnail ? (
-          <Image src={thumbnail} alt="" fill priority unoptimized sizes="(min-width: 768px) 40vw, 100vw" className="object-cover" />
-        ) : (
-          <Image src={HOME_HERO_IMAGE.src} alt="" fill priority sizes="(min-width: 1152px) 440px, (min-width: 768px) 40vw, 100vw" className="object-cover" />
-        )}
-        <span className="absolute bottom-4 left-4 grid size-12 place-items-center rounded-full bg-background/90 text-foreground shadow-xs">
-          <Play className="size-5 translate-x-px" />
-        </span>
+        <Image src={HOME_HERO_IMAGE.src} alt="" fill priority sizes="(min-width: 1152px) 440px, (min-width: 768px) 40vw, 100vw" className="object-cover" />
       </div>
       <div className="flex min-w-0 flex-col justify-center gap-3 p-6 md:p-8">
         <p className="flex items-center gap-2 text-sm font-semibold text-primary">
@@ -57,7 +51,6 @@ export default async function MultimediaHomeContent() {
   const withItems = feeds.filter(feed => feed.items.length > 0);
   const empty = feeds.filter(feed => feed.items.length === 0);
   const youtubeUrl = withItems.length ? null : (empty.find(feed => feed.source === "youtube")?.profileUrl ?? null);
-  const youtubeThumbnail = feeds.find(feed => feed.source === "youtube")?.items[0]?.thumbnail ?? null;
   const profileOnly = feedProfiles(youtubeUrl ? empty.filter(feed => feed.source !== "youtube") : empty);
 
   return (
@@ -71,7 +64,7 @@ export default async function MultimediaHomeContent() {
         }
       />
 
-      {youtubeUrl ? <FeaturedYouTube href={youtubeUrl} thumbnail={youtubeThumbnail} /> : null}
+      {youtubeUrl ? <FeaturedYouTube href={youtubeUrl} /> : null}
 
       {withItems.map(feed => (
         <MediaSection key={feed.source} feed={feed} headingLevel="h2" />

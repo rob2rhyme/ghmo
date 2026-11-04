@@ -38,14 +38,15 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
         <Alert variant="warning">
           <Clock />
           <AlertTitle>Too many checks</AlertTitle>
-          <AlertDescription>Too many checks from this connection. Please try again in a few minutes.</AlertDescription>
+          <AlertDescription>There have been many checks from this connection. Try again in a few minutes.</AlertDescription>
         </Alert>
       ) : !result ? (
         <Alert variant="destructive" role="status">
           <ShieldAlert />
           <AlertTitle>No matching certificate</AlertTitle>
           <AlertDescription>
-            We have no valid record for this code. The certificate may be a forgery, or the code may have been copied incorrectly.
+            We couldn&apos;t find a certificate with this code. Check that it was typed exactly as printed, or scan the QR code
+            again. If it still doesn&apos;t match, contact GHMO before you rely on the certificate.
           </AlertDescription>
         </Alert>
       ) : (
@@ -59,10 +60,11 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
                 <dd className="break-words font-medium text-foreground">{result.certificateId}</dd>
                 <dt className="text-muted-foreground">Type</dt>
                 <dd className="break-words text-foreground">{result.templateTitle}</dd>
-                <dt className="text-muted-foreground">Issued</dt>
+                {/* The day the signed certificate was recorded here, which can differ from the issue date printed on it. */}
+                <dt className="text-muted-foreground">Recorded on</dt>
                 <dd className="text-foreground">{formatShortDate(result.issuedAt)}</dd>
               </dl>
-              <p>Compare the certificate number and date with the document you were given.</p>
+              <p>Check that the certificate number above matches the one printed on the document you were given.</p>
             </AlertDescription>
           </Alert>
           <VerifyPdf expectedSha256={result.pdfSha256} />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { applyDonationStatsUpdate, logWebhookAudit, recordWebhookEvent, verifyGfmWebhookSignature } from "@/src/lib/gofundme";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
 
   if (payload.type?.startsWith("transaction") && typeof payload.data?.amount === "number") {
     await applyDonationStatsUpdate(orgSlug, payload.data.amount, { source: "webhook" });
+    expirePublicCache(PUBLIC_CACHE_TAGS.donations);
   }
 
   await logWebhookAudit(orgSlug, payload, true);

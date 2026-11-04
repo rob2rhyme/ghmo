@@ -40,7 +40,25 @@ async function fetchSession(signal?: AbortSignal): Promise<AuthSession | null> {
   }
 }
 
+/** Set by the server next to the session cookie (see sessionCookies.ts); readable, holds no secret. */
+const SIGNED_IN_HINT = "ghmo_signed_in=1";
+
+/** Visitors have no session: answer without a request to /api/auth/me. */
+function hasSignedInHint(): boolean {
+  try {
+    return document.cookie.split(/;\s*/).includes(SIGNED_IN_HINT);
+  } catch {
+    return true;
+  }
+}
+
+const SIGNED_OUT: AuthSession = { authenticated: false, isAdmin: false, role: null, uid: null, orgSlug: null };
+
 async function loadSession(force = false, signal?: AbortSignal): Promise<AuthSession | null> {
+  if (!hasSignedInHint()) {
+    cachedSession = SIGNED_OUT;
+    return SIGNED_OUT;
+  }
   if (!force && cachedSession !== undefined) {
     return cachedSession;
   }

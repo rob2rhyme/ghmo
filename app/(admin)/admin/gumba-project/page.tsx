@@ -1,8 +1,9 @@
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { internalFetch } from "@/src/lib/internalFetch";
+import { listAdminMinutes } from "@/src/lib/adminData.server";
+import { readDonationStats } from "@/src/lib/publicData.server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import type { Route } from "next";
+import type { Metadata, Route } from "next";
 import { NotebookPen } from "lucide-react";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
@@ -14,7 +15,7 @@ import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { percentOf } from "@/src/lib/adminView";
 import { formatDate, formatDateTime, formatShortDate, toDate, type DateInput } from "@/src/lib/format";
-import { MeetingAttendance } from "@/src/lib/minutes";
+import type { MeetingAttendance, MeetingMinutesRecord } from "@/src/lib/minutes";
 import { resolveActorLabel } from "@/src/lib/actor";
 import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
 import { statusBadge } from "@/src/lib/statusBadges";
@@ -27,6 +28,7 @@ type MinutesActionItem = {
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const metadata: Metadata = { title: "Gumba Project" };
 
 export default async function GumbaProjectPage() {
   try {
@@ -38,24 +40,8 @@ export default async function GumbaProjectPage() {
     throw error;
   }
 
-  const statsRes = await internalFetch(
-    `/api/organizations/${COMMUNITY_SLUG}/donations/stats`
-  );
-  if (!statsRes.ok) throw new Error("Failed to load donation stats");
-  const { stats } = (await statsRes.json()) as {
-    stats: {
-      totalRaised?: number;
-      goal?: number;
-      lastUpdatedAt?: DateInput;
-    };
-  };
-
-  const minutesRes = await internalFetch(`/api/admin/minutes`);
-  if (!minutesRes.ok) {
-    const body = await minutesRes.text().catch(() => "");
-    throw new Error(`Failed to load minutes (${minutesRes.status}): ${body}`);
-  }
-  const { minutes } = await minutesRes.json();
+  // Admins see the stored totals as they are now, not the public pages' 5-minute copy.
+  const [stats, minutes] = await Promise.all([readDonationStats(), listAdminMinutes(await requireActiveAdmin(undefined, COMMUNITY_SLUG)) as Promise<MeetingMinutesRecord[]>]);
 
   const totalRaised = stats?.totalRaised ?? 0;
   const goal = stats?.goal ?? 0;
@@ -133,6 +119,8 @@ export default async function GumbaProjectPage() {
             {recentMinutes.map(entry => {
               const attendanceSummary = formatAdminAttendance(entry.attendance);
               const decisions: string[] = Array.isArray(entry.decisions) ? entry.decisions : [];
+              // Encrypted minutes stay sealed here until they are approved, so their decisions can't be counted.
+              const sealed = Boolean(entry.encrypted) && entry.status !== "approved";
               const actionItems: MinutesActionItem[] = Array.isArray(entry.actionItems) ? entry.actionItems : [];
               const when = formatDate(entry.eventDate, { timeZone: DEFAULT_TIMEZONE });
               const badge = entry.status ? statusBadge("minutes", entry.status) : null;
@@ -142,7 +130,9 @@ export default async function GumbaProjectPage() {
                   href={`/admin/minutes?minutesId=${encodeURIComponent(entry.id)}` as Route}
                   title={entry.eventTitle || "Untitled meeting"}
                   badges={badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
-                  meta={[entry.meetingType, when || "Date not recorded", plural(decisions.length, "decision", "decisions")].filter(Boolean).join(" · ")}
+                  meta={[entry.meetingType, when || "Date not recorded", sealed ? "" : plural(decisions.length, "decision", "decisions")]
+                    .filter(Boolean)
+                    .join(" · ")}
                 >
                   <div className="mt-2 flex flex-col gap-2 text-sm">
                     {decisions.length ? (

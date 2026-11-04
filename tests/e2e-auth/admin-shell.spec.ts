@@ -111,8 +111,26 @@ test("on a phone the menu shows every page, then the user and Sign out at the en
   await context.close();
 });
 
-test("Plans & Issues: the header's New topic button opens the form with the title field ready", async ({ page }) => {
+test("Plans & Issues: on the first run the form is open and the header has no second New topic button", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/comms");
+  await expect(page.getByRole("heading", { name: "Start a new topic" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "New topic" })).toHaveCount(0);
+});
+
+test("Plans & Issues: the header's New topic button opens the form with the title field ready", async ({ page }) => {
+  await admin().db.doc("organizations/ghmo/commsThreads/t1").set({
+    title: "Hall booking for Lhosar",
+    body: "Which hall do we book?",
+    status: "open",
+    priority: "normal",
+    pinned: false,
+    createdBy: { uid: "alice", name: "Alice Rai" },
+    createdAt: Timestamp.now(),
+    lastActivityAt: Timestamp.now()
+  });
+  await signInWithNewPasskey(page, "alice", "/admin/comms");
+  await expect(page.getByText("Hall booking for Lhosar")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start a new topic" })).toHaveCount(0);
   await page.getByRole("link", { name: "New topic" }).click();
   await expect(page).toHaveURL(/\/admin\/comms\?new=1$/);
   await expect(page.getByRole("textbox", { name: "Title", exact: true })).toBeFocused();

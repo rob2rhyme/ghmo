@@ -2,7 +2,7 @@
  * Notification emails say that something happened, never what. No titles, names, message text or
  * minutes content: email passes through providers and inboxes we don't control.
  */
-export type NotificationKind = "chat" | "thread" | "minutes_submitted" | "calls";
+export type NotificationKind = "chat" | "thread" | "minutes_submitted" | "calls" | "security";
 
 /** Kinds a browser may trigger (the server triggers the rest itself). */
 export const CLIENT_NOTIFICATION_KINDS = ["chat", "thread"] as const;
@@ -11,7 +11,12 @@ const COPY: Record<NotificationKind, { subject: string; line: string; path: stri
   chat: { subject: "New activity in Admin chat", line: "There is new activity in Admin chat.", path: "/admin/chat" },
   thread: { subject: "New activity in Plans & Issues", line: "There is new activity in Plans & Issues.", path: "/admin/comms" },
   minutes_submitted: { subject: "Minutes are waiting for approval", line: "Meeting minutes were submitted and need an approver.", path: "/admin/minutes?mode=records" },
-  calls: { subject: "You have calls to make", line: "A call campaign is open and some of your people have not been reached yet.", path: "/admin/my-calls" }
+  calls: { subject: "You have calls to make", line: "A call campaign is open and some of your people have not been reached yet.", path: "/admin/my-calls" },
+  security: {
+    subject: "An admin's authenticator was locked",
+    line: "An admin's authenticator app was locked after too many wrong codes. A super admin can check it and reset it on the Security page.",
+    path: "/admin/security"
+  }
 };
 
 export function notificationMessage(kind: NotificationKind, origin: string) {

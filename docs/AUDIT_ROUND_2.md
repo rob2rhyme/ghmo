@@ -82,9 +82,8 @@ one listener per comment, kept across updates), P13 (public calendar, events and
 minutes; admin and auth stay `no-store`), P18 (`next/font/local` Inter with a size-adjusted fallback; worker caches
 optimised images, no 158 KB icon precache).
 
-**Deferred, and why.** P2–P4 and P7 (static rendering, no self-calls, one session check per admin page, server-rendered
-events) change how every page fetches and are the next careful pass with the browser suite as the net. P12, P14–P17 are
-scale and structure work. S7 (per-email sign-in limit), S10 (`__Host-` cookie: the test suites run over http), S15
+**Deferred, and why.** P2–P4 and P7 were done in a separate speed pass (next section). P12, P14–P17 are scale and
+structure work. S7 (per-email sign-in limit), S10 (`__Host-` cookie: the test suites run over http), S15
 (shape checks in Firestore rules), S16's SHA pinning and S18's permission matrix are next on the security list. L6's
 second half (different artwork on Donate) waits for the owner's photos.
 
@@ -96,6 +95,46 @@ blocking time 660–1,070 ms → 110–240 ms; desktop Donate CLS 0.91 → 0. Th
 loading skeleton being replaced by the page: the events and feeds now stream behind placeholders of their own height.
 Media's phone LCP rose to 3.3 s because the featured card gained a picture (measured against the 4 MB original; now the
 WebP, preloaded). Phones are not at 90 yet: the rest is P2–P4 (server rendering per request and the self-calls).
+
+**Speed pass (P2, P3, P4, P7), same day.**
+- **P2:** published events, donation totals and the minutes archive are read through shared loaders
+  (`src/lib/publicData.server.ts`) that keep the result in Next's data cache for 5 minutes, tagged by kind
+  (`src/lib/publicCache.server.ts`). Home, Donate and Minutes are built once and refreshed in the background
+  (`s-maxage=300` on the CDN). Every admin write expires its tag at once: event create, update and delete, every
+  minutes change, the encryption migration, the GoFundMe webhook and reconcile. A change made outside the app (the
+  Firebase console) shows within 5 minutes. A failed read at request time throws, so the last good page keeps being
+  served; during the build (CI has no Firebase settings) it shows a "can't be read" state instead of failing. (Round 3: the browser suites now
+  use the cache too and expire it on each reset.) Previously, against the emulators nothing was cached; a separate check on a
+  normal build confirmed that an admin write shows at once and a direct database write stays hidden until the refresh.
+- **P3:** admin pages call shared read functions (`src/lib/adminData.server.ts`) instead of their own API, and the API
+  routes call the same functions, so their answers are unchanged. `internalFetch` and its URL helper are deleted, which
+  also removes S5's session-forwarding path.
+- **P4:** in a server render, `requireActiveAdmin()` verifies the cookie and reads the admin record once for the layout
+  and the page (React `cache()`); every check and refusal reason is unchanged. The encryption gate requests the device
+  log alongside the overview instead of after it; every verification step is unchanged.
+- **P7:** the public events list and event page render on the server with their data. The event page reads one event,
+  decides admin-ness from the server session (no probe of the admin minutes API for every visitor) and includes the
+  event's minutes.
+- Also: creating an event through the API without a summary no longer fails with a 500. Lint warnings 75 → 67.
+
+Lighthouse, phone (same method as §2a). **Correction (round 3):** Home, Donate and Minutes below were measured on the
+"can't be read" pages the build had prebuilt without Firebase settings; `docs/AUDIT_ROUND_3.md` §2a re-measures them
+on real data (Home 94, Donate 98, Minutes 99).
+
+| Page | Audit | Round 2 | Speed pass | Phone LCP | Phone blocking |
+|---|---|---|---|---|---|
+| Home | 50 | 80 | **88** | 3.7 s | 158 ms |
+| Donate | 59 | 84 | **97** | 2.6 s | 85 ms |
+| Events | 58 | 87 | **99** (66 cold) | 0.8 s | 140 ms |
+| Minutes | 51 | 83 | **99** | 0.8 s | 118 ms |
+| Media | 80 | 92 | **98** | 1.9 s | 132 ms |
+| Board guide | 78 | 99 | **99** | 0.8 s | 140 ms |
+| Admin sign-in | 72 | 99 | **99** | 0.8 s | 118 ms |
+| Member sign-in | 78 | 97 | **97** | 0.8 s | 186 ms |
+
+Desktop is 100 on every page. Events renders per request (it sits under the secure, nonce-based layout): three runs
+scored 83, 99 and 99; the batch caught its first request after the server started (module load and first database
+read), which scored 66. Home's remaining phone time is the hero picture arriving on a slow connection.
 
 **Still needs the owner:** `GOFUNDME_PUBLIC_URL`, `CONTACT_EMAIL`, social links, community photos, and turning off
 password sign-in in the Firebase console (checklist).

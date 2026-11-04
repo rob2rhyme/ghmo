@@ -26,6 +26,8 @@ const PUBLIC_PAGES = [
   ["verify-unknown", "/verify/NOTACODE"],
   ["member-events", "/c/ghmo/events"],
   ["member-event-detail", "/c/ghmo/events/ev1"],
+  ["event-past-with-minutes", "/c/ghmo/events/ev4"],
+  ["event-past-no-minutes", "/c/ghmo/events/ev5"],
   ["onboarding-docs", "/docs/onboarding"],
   ["login", "/login"],
   ["admin-login-signed-out", "/admin/login"],
@@ -51,7 +53,10 @@ const ADMIN_PAGES = [
   ["admin-document-gallery", "/admin/document-gallery"],
   ["admin-gumba-project", "/admin/gumba-project"],
   ["admin-encryption", "/admin/encryption"],
-  ["admin-security", "/admin/security"]
+  ["admin-security", "/admin/security"],
+  // Public event pages as an admin sees them: minutes status and "Add minutes" load in the browser.
+  ["admin-view-event-past-with-minutes", "/c/ghmo/events/ev4"],
+  ["admin-view-event-past-no-minutes", "/c/ghmo/events/ev5"]
 ];
 
 async function seed() {
@@ -60,7 +65,7 @@ async function seed() {
   const now = Date.now();
   const org = db.doc("organizations/ghmo");
   await org.collection("minutes").doc("m1").set({
-    eventId: "ev1",
+    eventId: "ev4",
     eventTitle: "Spring general meeting",
     eventDate: Timestamp.fromMillis(now - 30 * day),
     meetingType: "General",
@@ -92,7 +97,12 @@ async function seed() {
     ["ev2", "General meeting", "Quarterly meeting for all members. Agenda inside.", 26, "Online (Zoom)"],
     ["ev3", "Youth football day", "Bring water and boots.", 40, "City Island park"]
   ] as const;
-  for (const [id, title, summary, inDays, location] of events) {
+  // Past events: one with approved minutes (m1), one without (a football day has no minutes).
+  const pastEvents = [
+    ["ev4", "Spring general meeting", "Quarterly meeting for all members.", -30, "Community hall, 100 Main St"],
+    ["ev5", "Summer picnic", "Games and food for families.", -10, "City Island park"]
+  ] as const;
+  for (const [id, title, summary, inDays, location] of [...events, ...pastEvents]) {
     await org.collection("events").doc(id).set({
       title,
       summary,
@@ -130,7 +140,7 @@ async function seed() {
   }
 }
 
-async function shoot(page: Page, name: string, url: string, { unlock = false } = {}) {
+async function shoot(page: Page, name: string, url: string, { unlock = false, before }: { unlock?: boolean; before?: (page: Page) => Promise<void> } = {}) {
   for (const theme of THEMES) {
     await page.emulateMedia({ colorScheme: theme });
     await page.evaluate(t => {
@@ -154,6 +164,7 @@ async function shoot(page: Page, name: string, url: string, { unlock = false } =
           await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
         }
       }
+      if (before) await before(page).catch(() => undefined);
       await page.waitForTimeout(600);
       const dir = path.join(OUT, size.name);
       fs.mkdirSync(dir, { recursive: true });
@@ -171,6 +182,17 @@ test.beforeAll(async () => {
 test("public, member and sign-in pages", async ({ page }) => {
   await page.goto("/");
   for (const [name, url] of PUBLIC_PAGES) if (wanted(name)) await shoot(page, name, url);
+});
+
+test("events list, past and all", async ({ page }) => {
+  // The Show switch is not in the address, so pick it the way a visitor would.
+  for (const show of ["Past", "All"]) {
+    const name = `member-events-${show.toLowerCase()}`;
+    if (!wanted(name)) continue;
+    await shoot(page, name, "/c/ghmo/events", {
+      before: p => p.getByRole("group", { name: "Show" }).getByRole("button", { name: show }).click()
+    });
+  }
 });
 
 test("admin pages", async ({ page }) => {

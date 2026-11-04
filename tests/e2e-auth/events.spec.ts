@@ -34,6 +34,57 @@ test("public events show real dates and list upcoming events", async ({ page, re
   await expect(page.getByText("Invalid Date")).toHaveCount(0);
 });
 
+test("a past event says so, offers no calendar button, and shows minutes only when there are some", async ({ page }) => {
+  const { db } = admin();
+  const when = Timestamp.fromMillis(Date.now() - 10 * DAY);
+  const past = { status: "published", startsAt: when, timezone: "America/New_York" };
+  await db.doc("organizations/ghmo/events/past1").set({ ...past, title: "Football day" });
+  await db.doc("organizations/ghmo/events/past2").set({ ...past, title: "Autumn general meeting" });
+  await db.doc("organizations/ghmo/minutes/min2").set({
+    eventId: "past2",
+    eventTitle: "Autumn general meeting",
+    meetingType: "General",
+    status: "approved",
+    eventDate: when,
+    approvedAt: Timestamp.now(),
+    createdAt: when,
+    agenda: [],
+    decisions: ["Paint the hall"],
+    actionItems: []
+  });
+
+  await page.goto("/c/ghmo/events/past1");
+  await expect(page.getByText("This event has passed.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Add to calendar", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Download flyer (PDF)" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Meeting minutes" })).toHaveCount(0);
+
+  await page.goto("/c/ghmo/events/past2");
+  await expect(page.getByRole("link", { name: "Read the minutes" })).toBeVisible();
+
+  // Upcoming events still offer the calendar file and say nothing about having passed.
+  await page.goto("/c/ghmo/events/ev1");
+  await expect(page.getByRole("link", { name: "Add to calendar", exact: true })).toBeVisible();
+  await expect(page.getByText("This event has passed.")).toHaveCount(0);
+
+  // The list shows upcoming events first; past ones are marked.
+  await page.goto("/c/ghmo/events");
+  await expect(page.getByText("Dashain celebration").first()).toBeVisible();
+  await expect(page.getByText("Football day")).toHaveCount(0);
+  await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "All" }).click();
+  const titles = await page.getByRole("heading", { level: 2 }).allTextContents();
+  expect(titles.indexOf("Dashain celebration")).toBeLessThan(titles.indexOf("Football day"));
+  await expect(page.locator("article").getByText("Past", { exact: true })).toHaveCount(2);
+
+  // An admin's browser adds the minutes controls.
+  await signInWithNewPasskey(page, "alice", "/admin");
+  await page.goto("/c/ghmo/events/past1");
+  await expect(page.getByRole("link", { name: "Add minutes" })).toBeVisible();
+  await page.goto("/c/ghmo/events/past2");
+  await expect(page.getByRole("link", { name: "Open meeting minutes" })).toBeVisible();
+  await expect(page.getByText("Approved", { exact: true })).toBeVisible();
+});
+
 test("editing an event loads it, missing events say so, and delete asks first", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin");
 

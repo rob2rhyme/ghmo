@@ -21,7 +21,10 @@ export default function VerifyPdf({ expectedSha256 }: { expectedSha256: string }
         <label htmlFor="verify-pdf" className="text-base font-semibold text-foreground">
           Check a PDF copy
         </label>
-        <p className="text-sm text-muted-foreground">Choose the PDF you were given. It stays on your device; only its fingerprint is compared.</p>
+        <p className="text-sm text-muted-foreground">
+          Optional. Choose the PDF file you were given; it stays on your device. Only the original file GHMO issued matches: a
+          scan, a printout or a copy saved again by another app won&apos;t, even when it looks the same.
+        </p>
       </div>
       <input
         id="verify-pdf"
@@ -40,7 +43,8 @@ export default function VerifyPdf({ expectedSha256 }: { expectedSha256: string }
         <Alert variant="destructive" role="status">
           <FileX2 />
           <AlertDescription className="font-semibold text-foreground">
-            This file does not match the issued certificate. It may have been altered, or it is a different copy.
+            This file does not match the issued certificate file. That is expected for a scan or a re-saved copy. Check the
+            certificate number above instead, or ask for the original PDF.
           </AlertDescription>
         </Alert>
       ) : null}

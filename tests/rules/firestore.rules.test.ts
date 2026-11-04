@@ -9,7 +9,8 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 const ORG = "organizations/ghmo";
-const ADMIN_CLAIMS = { orgSlug: "ghmo", role: "admin", admin: true, authMethod: "passkey" };
+// sessionExp: the admin session cookie's expiry, copied in by /api/auth/firebase-custom-token.
+const ADMIN_CLAIMS = { orgSlug: "ghmo", role: "admin", admin: true, authMethod: "passkey", sessionExp: Math.floor(Date.now() / 1000) + 3600 };
 
 let env: RulesTestEnvironment;
 
@@ -46,6 +47,15 @@ describe("admin access requires an active admin record", () => {
   it("keeps minutes server-written: admins can read them but not write them directly", async () => {
     await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m1`), { title: "Tampered" }));
     await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m2`), { title: "New" }));
+  });
+
+  it("ends database access when the admin's session has expired, or the token doesn't say when it ends", async () => {
+    const expired = env.authenticatedContext("active-admin", { ...ADMIN_CLAIMS, sessionExp: Math.floor(Date.now() / 1000) - 60 }).firestore();
+    await assertFails(getDoc(doc(expired, `${ORG}/minutes/m1`)));
+    const { sessionExp: _omit, ...withoutExpiry } = ADMIN_CLAIMS;
+    void _omit;
+    const noExpiry = env.authenticatedContext("active-admin", withoutExpiry).firestore();
+    await assertFails(getDoc(doc(noExpiry, `${ORG}/minutes/m1`)));
   });
 
   it("blocks a disabled admin even though the token still has the admin claim", async () => {

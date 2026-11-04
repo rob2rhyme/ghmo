@@ -19,11 +19,20 @@ service cloud.firestore {
         request.auth.token.authMethod == "dev";
     }
 
+    // Database access ends with the admin's 8-hour session: /api/auth/firebase-custom-token copies the
+    // session cookie's expiry into `sessionExp` (epoch seconds). Without it, the browser's Firebase sign-in
+    // could keep minting tokens after the session ended.
+    function withinSession() {
+      return request.auth.token.sessionExp is number &&
+        request.time.toMillis() < request.auth.token.sessionExp * 1000;
+    }
+
     function isAdmin() {
       return request.auth != null &&
         (request.auth.token.communityId == "ghmo-site" || request.auth.token.orgSlug == "ghmo") &&
         (request.auth.token.role == "admin" || request.auth.token.admin == true) &&
         hasStrongAuth() &&
+        withinSession() &&
         hasActiveAdminRecord();
     }
 

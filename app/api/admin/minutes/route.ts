@@ -19,6 +19,8 @@ import { normalizeAttendance, normalizeContent } from "@/src/lib/minutesContent"
 import { planTransition } from "@/src/lib/minutesWorkflow";
 import { getAppOrigin } from "@/src/lib/appUrl";
 import { notifyAdmins } from "@/src/lib/notify.server";
+import { listAdminMinutes } from "@/src/lib/adminData.server";
+import { expirePublicCache, PUBLIC_CACHE_TAGS } from "@/src/lib/publicCache.server";
 
 export const dynamic = "force-dynamic";
 
@@ -255,17 +257,7 @@ export async function GET(req: NextRequest) {
         .get();
       return NextResponse.json({ ok: true, versions: versions.docs.map(d => toPlain(d.data())) });
     }
-    const filterEventId = searchParams.get("eventId");
-    const minutesPath = orgMinutesCollectionPath(COMMUNITY_SLUG);
-    const db = getAdminDb();
-    let query: FirebaseFirestore.Query = db.collection(minutesPath);
-    if (filterEventId) {
-      query = query.where("eventId", "==", filterEventId);
-    }
-    query = query.orderBy("eventDate", "desc").limit(100);
-    const snap = await query.get();
-    const items = snap.docs.map(doc => toPlain(adminView({ id: doc.id, ...doc.data() })));
-
+    const items = await listAdminMinutes(guard, { eventId: searchParams.get("eventId") });
     return NextResponse.json({ ok: true, minutes: items });
   } catch (error) {
     if (error instanceof AdminEnvError) {
@@ -370,6 +362,7 @@ export async function POST(req: NextRequest) {
 
     // create() refuses an id that already exists, so a client can't overwrite someone else's minutes.
     await newRef.create(document);
+    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
     const createdDoc = newRef;
 
     await logAuditEvent({
@@ -481,6 +474,8 @@ export async function PATCH(req: NextRequest) {
     if ("error" in outcome) {
       return NextResponse.json({ error: outcome.error, ...("code" in outcome && outcome.code ? { code: outcome.code } : {}) }, { status: outcome.status });
     }
+    // Expire right after the write, so a failed audit write can't leave unpublished minutes showing.
+    expirePublicCache(PUBLIC_CACHE_TAGS.minutes);
 
     const afterSnap = await ref.get();
     await logAuditEvent({

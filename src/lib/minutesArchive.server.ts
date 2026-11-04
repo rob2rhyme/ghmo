@@ -5,7 +5,8 @@ import { COMMUNITY_SLUG } from "./community";
 import { toArchiveEntry, type ArchiveEntry } from "./minutesArchive";
 
 export async function listArchive(): Promise<ArchiveEntry[]> {
-  const snap = await getAdminDb().collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).where("status", "==", "approved").limit(300).get();
+  // Every approved record (a few a month), sorted below; an equality filter needs no composite index.
+  const snap = await getAdminDb().collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).where("status", "==", "approved").get();
   return snap.docs
     .map(doc => toArchiveEntry({ id: doc.id, ...doc.data() }))
     .filter((entry): entry is ArchiveEntry => entry !== null)
