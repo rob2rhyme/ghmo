@@ -20,7 +20,7 @@ test("adding a member records consent only when the box is ticked", async ({ pag
   await expect(shown(page, "No members yet")).toBeVisible();
 
   await page.getByLabel("Email", { exact: true }).fill("Sam@Example.org");
-  await page.getByLabel("Name (optional)").fill("Sam Lee");
+  await page.getByLabel("Name", { exact: true }).fill("Sam Lee");
   await page.getByRole("button", { name: "Add member" }).click();
   await expect(shown(page, "No consent recorded")).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailConsent).toBeUndefined();
@@ -59,7 +59,7 @@ test("importing needs the consent attestation, skips existing people and never r
 
   await page.getByRole("button", { name: "Import a list" }).click();
   await page.getByLabel("Paste your list").fill("email,name\nnew@example.org,New Person\nold@example.org,Old Person\nbroken\n");
-  await expect(shown(page, "2 valid addresses found.")).toBeVisible();
+  await expect(shown(page, "2 people found.")).toBeVisible();
   await expect(page.getByText("is not a valid email address")).toBeVisible();
 
   const importButton = page.getByRole("button", { name: /^Import 2 members$/ });

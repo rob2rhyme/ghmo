@@ -95,6 +95,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     }
 
     const now = updates.updatedAt as Date;
+    const memberHasEmail = String(beforeData.emailLower ?? "").includes("@");
+    if (body.emailConsent && !memberHasEmail) {
+      return NextResponse.json({ error: "This member has no email address, so there is nothing to consent to." }, { status: 400 });
+    }
     if (body.emailConsent) {
       updates.emailConsent = { at: now, source: body.emailConsent.source, byUid: actor.uid };
       updates.emailOptOutAt = null;
@@ -104,6 +108,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     if (body.emailOptOut) {
       updates.emailOptOutAt = now;
       hasChange = true;
+    }
+
+    // A member without an email is reached by phone only, so their number can't be removed.
+    if (!memberHasEmail && body.contact !== undefined && !body.contact?.hasPhone) {
+      return NextResponse.json({ error: "Someone without an email needs a phone number. Disable them instead if they should no longer be contacted." }, { status: 400 });
     }
 
     if (body.contact !== undefined) {

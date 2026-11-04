@@ -29,7 +29,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
 
   // --- Add a member with a number and call consent ---
   await page.getByLabel("Email", { exact: true }).fill("sam@example.org");
-  await page.getByLabel("Name (optional)").fill("Sam Lee");
+  await page.getByLabel("Name", { exact: true }).fill("Sam Lee");
   await page.getByLabel("Phone (optional)").fill("(717) 555-0100");
   await page.getByLabel("This person gave their number for community calls.").check();
   await page.getByRole("button", { name: "Add member" }).click();
@@ -67,7 +67,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
   // --- Import with a phone column: encrypted in the browser, consent recorded as imported ---
   await page.getByRole("button", { name: "Import a list" }).click();
   await page.getByLabel("Paste your list").fill("email,name,phone\npat@example.org,Pat,717-555-0101\nkim@example.org,Kim,\n");
-  await expect(shown(page, "2 valid addresses found. 1 with a phone number.")).toBeVisible();
+  await expect(shown(page, "2 people found. 1 with a phone number.")).toBeVisible();
   const importButton = page.getByRole("button", { name: /^Import 2 members$/ });
   await page.getByLabel(/These people agreed to receive email/).check();
   await expect(importButton).toBeDisabled();
@@ -135,4 +135,80 @@ test("without encryption on, numbers cannot be added and a plaintext phone is ne
   const plain = (await byEmail("plain@example.org"))!;
   expect(plain.hasPhone).toBe(false);
   expect(JSON.stringify(plain)).not.toContain("5550100");
+});
+
+test("a member without an email is saved with a name and phone, keeps their number, gets no email consent, and isn't duplicated by an import", async ({ page }) => {
+  test.setTimeout(180_000);
+  await signInWithNewPasskey(page, "alice", "/admin/encryption");
+  await turnOnEncryption(page, "Alice laptop");
+  await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Members" }).click();
+  await waitForStreamedContent(page);
+
+  // Without an email, a name is needed, and email consent can't be ticked.
+  await expect(page.getByLabel("This person asked to receive email from us.")).toBeDisabled();
+  await page.getByLabel("Phone (optional)").fill("717-555-0102");
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expect(page.getByText("Add a name for someone without an email.")).toBeVisible();
+  expect((await members().get()).size).toBe(0);
+
+  await page.getByLabel("Name", { exact: true }).fill("Maya Gurung");
+  await page.getByLabel("This person gave their number for community calls.").check();
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expect(shown(page, "No email (phone only)")).toBeVisible();
+  await expect(shown(page, "Can be called")).toBeVisible();
+  const [mayaDoc] = (await members().where("name", "==", "Maya Gurung").get()).docs;
+  const maya = mayaDoc.data();
+  expect(maya).toMatchObject({ emailLower: "", hasPhone: true, status: "active" });
+  expect(maya).not.toHaveProperty("email");
+  expect(maya).not.toHaveProperty("emailConsent");
+  expect(maya.phoneConsent).toMatchObject({ source: "admin_on_request", byUid: "alice" });
+  expect(JSON.stringify(maya)).not.toContain("5550102");
+
+  // The same name and number again is refused in the browser (only it can read the numbers).
+  await page.getByLabel("Name", { exact: true }).fill("maya gurung");
+  await page.getByLabel("Phone (optional)").fill("(717) 555-0102");
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expect(page.getByText("maya gurung with this number is already on the list.")).toBeVisible();
+  await page.getByLabel("Name", { exact: true }).fill("");
+  await page.getByLabel("Phone (optional)").fill("");
+
+  // The server enforces the same rules: no member with neither email nor phone, no email consent
+  // without an address, and a phone-only member keeps their number.
+  const api = await page.evaluate(async (id: string) => {
+    const send = async (url: string, method: string, body: unknown) =>
+      (await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).status;
+    return {
+      neither: await send("/api/organizations/ghmo/members", "POST", { name: "Nobody" }),
+      consent: await send(`/api/organizations/ghmo/members/${id}`, "PATCH", { emailConsent: { source: "admin_on_request" } }),
+      removeNumber: await send(`/api/organizations/ghmo/members/${id}`, "PATCH", { contact: null })
+    };
+  }, mayaDoc.id);
+  expect(api).toEqual({ neither: 400, consent: 400, removeNumber: 400 });
+  expect((await members().doc(mayaDoc.id).get()).data()).toMatchObject({ hasPhone: true });
+
+  // Clearing the number in the dialog is refused too.
+  await page.getByRole("button", { name: "Edit contact for Maya Gurung" }).click();
+  await page.getByLabel("Phone", { exact: true }).fill("");
+  await page.getByRole("button", { name: "Save contact" }).click();
+  await expect(page.getByText(/Someone without an email needs a phone number/)).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  // Import a list with no email column: Maya is already there; Hari shares her phone and is added.
+  await page.getByRole("button", { name: "Import a list" }).click();
+  await page.getByLabel("Paste your list").fill("name,phone\nMaya Gurung,717-555-0102\nHari Gurung,717-555-0102\n");
+  await expect(shown(page, "2 people found. 2 with a phone number. 2 without an email.")).toBeVisible();
+  await expect(page.getByLabel(/agreed to receive email from us/)).toHaveCount(0);
+  const importButton = page.getByRole("button", { name: /^Import 2 members$/ });
+  await expect(importButton).toBeDisabled();
+  await page.getByLabel(/These people gave their number for community calls/).check();
+  await importButton.click();
+  await expect(page.getByText("1 added (1 with a phone number), 1 already on the list")).toBeVisible();
+  expect((await members().get()).size).toBe(2);
+  const hari = (await members().where("name", "==", "Hari Gurung").get()).docs[0].data();
+  expect(hari).toMatchObject({ emailLower: "", hasPhone: true, phoneConsent: { source: "imported", byUid: "alice" } });
+  expect(hari).not.toHaveProperty("emailConsent");
+
+  const imported = (await admin().db.collection(`${ORG}/auditLogs`).where("action", "==", "members_imported").get()).docs[0].data();
+  expect(imported.after).toMatchObject({ created: 1, phoneOnly: 1, attested: false, phoneAttested: true });
+  expect(JSON.stringify(imported)).not.toContain("555");
 });

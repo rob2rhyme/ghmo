@@ -14,7 +14,7 @@ const nav = (page: Page, label: string) => page.getByRole("navigation", { name: 
 
 async function addMember(page: Page, name: string, email: string, phone: string) {
   await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByLabel("Name (optional)").fill(name);
+  await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Phone (optional)").fill(phone);
   await page.getByLabel("This person gave their number for community calls.").check();
   await page.getByRole("button", { name: "Add member" }).click();
