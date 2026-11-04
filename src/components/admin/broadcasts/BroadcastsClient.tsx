@@ -63,7 +63,7 @@ export default function BroadcastsClient({
           <Field label="Subject" description="For example: Dashain celebration on October 12">
             <Input id="new-subject" value={subject} onChange={e => setSubject(e.target.value)} maxLength={SUBJECT_MAX} required placeholder="A short subject line" />
           </Field>
-          <Field label="Message" description="For example: Namaste everyone, join us for Dashain on Saturday, October 12, 5 pm at the community hall. Food and tika for all ages. GHMO board">
+          <Field label="Message" description="For example: Namaste everyone, join us for Dashain on October 12 at 5 pm, at 123 Main Street, Harrisburg. Food and tika for all ages. GHMO board">
             <Textarea
               id="new-body"
               rows={8}

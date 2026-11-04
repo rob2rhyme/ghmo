@@ -1,6 +1,7 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { Timestamp } from "firebase-admin/firestore";
 import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "../e2e-auth/helpers";
 
@@ -236,6 +237,73 @@ test("open menus on a phone", async ({ page }) => {
   }
 });
 
+// The certificate steps run before encryption is turned on: with it on, a newly signed-in device is locked out of
+// the document generator until another device approves it.
+test("signing page states", async ({ page }) => {
+  const sessions = await seedSigningSessions();
+  for (const [state, session] of Object.entries(sessions)) {
+    const name = `sign-${state}`;
+    if (wanted(name)) await shoot(page, name, `/sign/${session.id}`);
+  }
+});
+
+/**
+ * The document generator's Review step with a two-page wedding certificate, then the whole issuing flow: a
+ * signature is requested (which assigns the certificate number), signed on another device, and the certificate
+ * finalized, so the check page has a real record to show ("found", then revoked).
+ */
+test("certificate: review step, signing and the check page", async ({ page, browser }) => {
+  if (ONLY.size && !["admin-docgen-review-wedding", "verify-found", "verify-revoked", "sign-signed"].some(name => ONLY.has(name))) return;
+  test.setTimeout(10 * 60_000);
+  await signInWithNewPasskey(page, "alice", "/admin/document-generator");
+  await shoot(page, "admin-docgen-review-wedding", "/admin/document-generator", { before: fillLongWedding });
+
+  // Issue it for real at desktop size.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/admin/document-generator", { waitUntil: "load" });
+  await fillLongWedding(page);
+  const { db } = admin();
+  const before = new Set((await db.collection("signingSessions").get()).docs.map(doc => doc.id));
+  await page.getByRole("button", { name: "Request signature", exact: true }).first().click();
+  let sessionId = "";
+  await expect
+    .poll(async () => {
+      sessionId = (await db.collection("signingSessions").get()).docs.map(doc => doc.id).find(id => !before.has(id)) ?? "";
+      return sessionId;
+    })
+    .not.toBe("");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+
+  const signer = await (await browser.newContext()).newPage();
+  await signer.goto(`/sign/${sessionId}`);
+  const canvas = signer.locator("canvas");
+  await canvas.waitFor();
+  const box = (await canvas.boundingBox())!;
+  await signer.mouse.move(box.x + 30, box.y + 120);
+  await signer.mouse.down();
+  await signer.mouse.move(box.x + 90, box.y + 40, { steps: 8 });
+  await signer.mouse.move(box.x + 160, box.y + 130, { steps: 8 });
+  await signer.mouse.move(box.x + 240, box.y + 60, { steps: 8 });
+  await signer.mouse.up();
+  await signer.getByRole("button", { name: "Submit signature" }).click();
+  await signer.getByText("Signature received. Thank you.").waitFor();
+  await page.getByText("Signed", { exact: true }).first().waitFor({ timeout: 20_000 });
+  if (wanted("admin-docgen-review-wedding")) {
+    fs.mkdirSync(path.join(OUT, "desktop"), { recursive: true });
+    await page.screenshot({ path: path.join(OUT, "desktop", "admin-docgen-review-wedding-signed--light.png"), fullPage: true });
+  }
+  await page.getByRole("button", { name: "Finalize & save signed certificate" }).click();
+  await page.getByText(/Signed PDF saved/).waitFor({ timeout: 60_000 });
+
+  const certificates = await db.collection("certificates").get();
+  const record = certificates.docs[0];
+  if (wanted("verify-found")) await shoot(signer, "verify-found", `/verify/${record.id}`);
+  if (wanted("sign-signed")) await shoot(signer, "sign-signed", `/sign/${sessionId}`);
+  // The status is not part of the record's signature, so a revoked record still checks out as GHMO's.
+  await record.ref.update({ status: "revoked" });
+  if (wanted("verify-revoked")) await shoot(signer, "verify-revoked", `/verify/${record.id}`);
+});
+
 test("admin pages with encryption on", async ({ page }) => {
   if (ONLY.size && !ONLY.has("encrypted")) return;
   await signInWithNewPasskey(page, "alice", "/admin/encryption");
@@ -246,3 +314,76 @@ test("admin pages with encryption on", async ({ page }) => {
     await shoot(page, `encu-${name}`, url, { unlock: true });
   }
 });
+
+/** A wedding certificate long enough to run onto a second page (a long custom blessing and a Maiti section). */
+const LONG_WEDDING: Array<[label: string, value: string, kind?: "select"]> = [
+  ["Date of issue / जारी मिति", "2026-11-04"],
+  ["Groom's name / दुलहाको नाम", "Saurav Thapa Magar"],
+  ["Bride's name / दुलहीको नाम", "Amrita Gurung"],
+  ["Bride's community / दुलहीको समुदाय", "Gurung|गुरुङ", "select"],
+  ["Maiti representative's name / माइती प्रतिनिधिको नाम", "Hari Bahadur Rana Magar"],
+  [
+    "Maiti acknowledgment (optional) / माइती स्वीकृति (वैकल्पिक)",
+    "The Maiti family welcomed the bride with tika and blessings, in front of both families and the community elders."
+  ],
+  ["Marriage date / विवाह मिति", "2026-11-04"],
+  ["Place of ceremony / विवाह स्थान", "Glenwood Garden, 4300 Derry Street, Harrisburg, PA"],
+  [
+    "Custom blessing (optional) / वैकल्पिक आशीर्वाद",
+    Array.from(
+      { length: 4 },
+      () =>
+        "May your home be full of laughter, your table full of friends, and your days full of patience and kindness for each other. May both families stand by you in every season of life."
+    ).join("\n")
+  ],
+  ["Witness 1 name / साक्षी १ नाम", "Dil Bahadur Pun Magar"],
+  ["Witness 2 name / साक्षी २ नाम", "Maya Rana Magar"],
+  ["Officiant's name / संस्कार सम्पन्न गराउने", "Dipak Thapa Magar"],
+  ["Officiant's title / पद", "Community elder"]
+];
+
+/** Opens the wedding certificate, fills every step, and stops on the Review step. */
+async function fillLongWedding(page: Page) {
+  // Phones choose the template from a list; wider screens from buttons.
+  const picker = page.getByLabel("Template", { exact: true });
+  if (await picker.isVisible().catch(() => false)) await picker.selectOption("wedding-certificate");
+  else await page.getByRole("button", { name: /Wedding certificate/i }).first().click({ timeout: 30_000 });
+  for (let step = 0; step < 8; step++) {
+    for (const [label, value, kind] of LONG_WEDDING) {
+      const control = page.getByLabel(label, { exact: true });
+      if (!(await control.isVisible().catch(() => false))) continue;
+      if (kind === "select") await control.selectOption(value);
+      else await control.fill(value);
+    }
+    const next = page.getByRole("button", { name: "Next", exact: true });
+    if (!(await next.isVisible().catch(() => false))) break;
+    await next.click({ timeout: 30_000 });
+  }
+  await page.getByRole("button", { name: "Save to gallery" }).waitFor({ timeout: 30_000 });
+  // Both letter pages are drawn once the letterhead has loaded.
+  await page.getByText(/Page 2 of/).first().waitFor({ timeout: 10_000 }).catch(() => undefined);
+}
+
+/** Signing requests seeded straight into the database, one per state the signer can see. */
+async function seedSigningSessions() {
+  const { db } = admin();
+  const day = 24 * 3600 * 1000;
+  const id = () => crypto.randomBytes(32).toString("hex");
+  const sessions = {
+    pending: { id: id(), status: "pending", expiresAt: new Date(Date.now() + day) },
+    expired: { id: id(), status: "pending", expiresAt: new Date(Date.now() - day) },
+    used: { id: id(), status: "finalized", expiresAt: new Date(Date.now() - day) }
+  };
+  for (const session of Object.values(sessions)) {
+    await db.collection("signingSessions").doc(session.id).set({
+      status: session.status,
+      role: "witness1",
+      certificateId: "GHMO-2026-001",
+      documentTitle: "Wedding certificate",
+      createdAt: new Date(),
+      expiresAt: session.expiresAt,
+      createdByUid: "alice"
+    });
+  }
+  return sessions;
+}

@@ -11,7 +11,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Segmented } from "@/src/components/ui/segmented";
-import { formatShortDate } from "@/src/lib/format";
+import { DUE_DATE, formatShortDate } from "@/src/lib/format";
 import { firestore } from "@/src/lib/firebaseFirestore";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { statusBadge } from "@/src/lib/statusBadges";
@@ -153,7 +153,7 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
                   <>
                     {item.eventTitle}
                     {item.assignedTo ? ` · ${item.assignedTo}` : ""}
-                    {item.dueDate ? ` · due ${formatShortDate(item.dueDate)}` : ""}
+                    {item.dueDate ? ` · due ${formatShortDate(item.dueDate, DUE_DATE)}` : ""}
                   </>
                 }
                 actions={

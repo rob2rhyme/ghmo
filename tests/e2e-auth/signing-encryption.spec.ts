@@ -23,7 +23,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
   await page.getByPlaceholder("GHMO-2026-001").fill("GHMO-2026-001");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("textbox").first().fill(GROOM);
-  const request = page.getByRole("button", { name: "Request", exact: true }).first();
+  const request = page.getByRole("button", { name: "Request signature", exact: true }).first();
   for (let i = 0; i < 8 && !(await request.isVisible().catch(() => false)); i++) {
     await page.getByRole("button", { name: "Next", exact: true }).click();
   }
@@ -39,7 +39,7 @@ test("signatures are sealed in the signer's browser, opened by an unlocked admin
   const signer = await signerContext.newPage();
   const signerViolations = collectCspViolations(signer);
   await signer.goto(`/sign/${sessionId}`);
-  await expect(signer.getByText(/Signature for/)).toBeVisible();
+  await expect(signer.getByRole("heading", { name: /^Sign as / })).toBeVisible();
   const canvas = signer.locator("canvas");
   const box = (await canvas.boundingBox())!;
   await signer.mouse.move(box.x + 20, box.y + 40);

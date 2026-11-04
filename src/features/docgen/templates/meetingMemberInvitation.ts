@@ -11,7 +11,7 @@ export const meetingMemberInvitation: DocTemplate = {
     { id: "memberName", label: "Member's name", type: "text", placeholder: "Sita Thapa Magar", required: true },
     { id: "meetingDate", label: "Meeting date", type: "date", required: true },
     { id: "meetingTime", label: "Time", type: "text", placeholder: "6:30 PM" },
-    { id: "location", label: "Location", type: "text", placeholder: "GHMO community hall, Harrisburg" },
+    { id: "location", label: "Location", type: "text", placeholder: "123 Main Street, Harrisburg, PA" },
     { id: "agenda", label: "What the meeting is about", type: "textarea", rows: 4, placeholder: "Gumba Project update, Dashain program planning, volunteer sign-up." },
     { id: "rsvpLink", label: "How to reply (link, phone or email)", type: "text", placeholder: "A phone number, email address or link" }
   ],

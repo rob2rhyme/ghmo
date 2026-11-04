@@ -12,6 +12,7 @@ import { checkRateLimit } from "@/src/lib/rateLimit";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import CheckCodeForm from "./CheckCodeForm";
 import VerifyPdf from "./VerifyPdf";
+import { shownCertificateNumber } from "./shownCertificateNumber";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Verify a certificate · GHMO", robots: { index: false, follow: false } };
@@ -29,6 +30,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const result = await lookup(code);
 
   const contactEmail = getContactEmail();
+  const certificateNumber = result && result !== "rate-limited" ? shownCertificateNumber(result.certificateId) : null;
 
   return (
     <PublicPage width="reading" className="gap-6">
@@ -53,18 +55,42 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
         <>
           <Alert variant={result.status === "valid" ? "success" : "destructive"} role="status">
             {result.status === "valid" ? <ShieldCheck /> : <ShieldX />}
-            <AlertTitle>{result.status === "valid" ? "Genuine certificate" : "This certificate has been revoked"}</AlertTitle>
+            <AlertTitle>{result.status === "valid" ? "Genuine certificate" : "This certificate is no longer valid"}</AlertTitle>
             <AlertDescription className="flex flex-col gap-3">
+              {result.status === "valid" ? null : (
+                <p>
+                  GHMO issued this certificate and has since withdrawn it, so don&apos;t rely on it.{" "}
+                  {contactEmail ? (
+                    <>
+                      To ask why, or whether a new one was issued, email{" "}
+                      <a href={`mailto:${contactEmail}`} className="font-semibold underline underline-offset-4">
+                        {contactEmail}
+                      </a>
+                      .
+                    </>
+                  ) : (
+                    "To ask why, or whether a new one was issued, contact the GHMO board."
+                  )}
+                </p>
+              )}
               <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
-                <dt className="text-muted-foreground">Certificate number</dt>
-                <dd className="break-words font-medium text-foreground">{result.certificateId}</dd>
+                {certificateNumber ? (
+                  <>
+                    <dt className="text-muted-foreground">Certificate number</dt>
+                    <dd className="break-words font-medium text-foreground">{certificateNumber}</dd>
+                  </>
+                ) : null}
                 <dt className="text-muted-foreground">Type</dt>
                 <dd className="break-words text-foreground">{result.templateTitle}</dd>
                 {/* The day the signed certificate was recorded here, which can differ from the issue date printed on it. */}
                 <dt className="text-muted-foreground">Recorded on</dt>
                 <dd className="text-foreground">{formatShortDate(result.issuedAt)}</dd>
               </dl>
-              <p>Check that the certificate number above matches the one printed on the document you were given.</p>
+              {result.status !== "valid" ? null : certificateNumber ? (
+                <p>Check that the certificate number above matches the one printed on the document you were given.</p>
+              ) : (
+                <p>This certificate was recorded without a number. Check the type and date above against the document you were given.</p>
+              )}
             </AlertDescription>
           </Alert>
           <VerifyPdf expectedSha256={result.pdfSha256} />

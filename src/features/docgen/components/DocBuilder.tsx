@@ -14,28 +14,15 @@ import { ProgressBar } from "@/src/components/ui/stat";
 import { Steps } from "@/src/components/ui/steps";
 import { cn } from "@/src/lib/utils";
 import DocForm from "./DocForm";
-import DocPreview, { hintValue } from "./DocPreview";
-import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "./LetterheadPage";
+import DocPreview, { hintValue, type DocPreviewHandle } from "./DocPreview";
 import TemplateTabs from "./TemplateTabs";
+import { buildLetterPdf, capturePages, downloadDataUrl, fitPagesAsJpeg, stackPagesAsJpeg } from "../export/letterExport";
+import { cleanSignatureDataUrl } from "../signatureInk";
 import LocalQrCode from "@/src/components/LocalQrCode";
 import { DocField, DocTemplateMeta, DocTemplateStep } from "../types";
 import { getTemplateById } from "../templates";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { documentLoc, newDocumentId } from "@/src/lib/documentRecords";
-
-async function toJpegDataUrl(pngUrl: string, quality = 0.82) {
-  const image = new Image();
-  image.src = pngUrl;
-  await image.decode();
-  const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  const context = canvas.getContext("2d")!;
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, 0, 0);
-  return canvas.toDataURL("image/jpeg", quality);
-}
 
 function pngDataUrl(bytes: Uint8Array) {
   let binary = "";
@@ -65,7 +52,12 @@ type SignatureSession = {
   expiresAt?: string;
 };
 
-const PIXEL_RATIO = 2;
+/**
+ * Size budgets for the issued PDF. Encrypted, it travels base64 inside JSON inside an envelope of at most 900,000
+ * characters; otherwise the server stores it base64 in a 1 MiB document.
+ */
+const MAX_ENCRYPTED_PDF_BYTES = 470_000;
+const MAX_PLAIN_PDF_BYTES = 700_000;
 /** Signature status polling: start at 2 s and back off to 5 s between rounds. */
 const POLL_START_MS = 2000;
 const POLL_MAX_MS = 5000;
@@ -73,7 +65,7 @@ const SIGNATURE_ROLES: Array<{ role: SignatureRole; label: string; inputKey: str
   { role: "witness1", label: "Witness 1", inputKey: "witness1SignatureImage" },
   { role: "witness2", label: "Witness 2", inputKey: "witness2SignatureImage" },
   { role: "officiant", label: "Officiant", inputKey: "officiantSignatureImage" },
-  { role: "issuingAuthority", label: "Issuing authority", inputKey: "issuingAuthoritySignatureImage" }
+  { role: "issuingAuthority", label: "Issuer", inputKey: "issuingAuthoritySignatureImage" }
 ];
 const SIGNATURE_FIELDS: Record<SignatureRole, string> = {
   witness1: "witness1Signature",
@@ -203,8 +195,10 @@ export default function DocBuilder({
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const previewRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<DocPreviewHandle | null>(null);
   const [letterheadReady, setLetterheadReady] = useState(false);
+  const [reviewPageCount, setReviewPageCount] = useState(1);
+  const [isNumbering, setIsNumbering] = useState(false);
   const [signatureSessions, setSignatureSessions] = useState<Record<SignatureRole, SignatureSession | undefined>>({
     witness1: undefined,
     witness2: undefined,
@@ -284,8 +278,30 @@ export default function DocBuilder({
     };
   }, [signatureTemplate, hasVerificationCode]);
 
-  /** Same value when requesting signatures and when issuing, so signatures can be matched to the certificate. */
-  const signingCertificateId = () => currentInputs.certificateNumber || currentInputs.certificateId || selectedTemplateMeta?.id || "";
+  /**
+   * Same value when requesting signatures and when issuing, so signatures can be matched to the certificate. Never
+   * the template's id: a certificate without a number gets one from the server first (ensureCertificateNumber).
+   */
+  const signingCertificateId = () => (currentInputs.certificateNumber || currentInputs.certificateId || "").trim();
+
+  /** The typed certificate number, or the next automatic one ("GHMO-2026-001"), which is then filled in. */
+  const ensureCertificateNumber = async (): Promise<string> => {
+    const existing = signingCertificateId();
+    if (existing) return existing;
+    setIsNumbering(true);
+    try {
+      const response = await fetch("/api/admin/certificates/number", { method: "POST" });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "A certificate number couldn't be assigned. Try again."));
+      const payload = (await response.json()) as { certificateNumber?: unknown };
+      if (typeof payload.certificateNumber !== "string" || !payload.certificateNumber) {
+        throw new Error("A certificate number couldn't be assigned. Try again.");
+      }
+      handleFieldChange("certificateNumber", payload.certificateNumber);
+      return payload.certificateNumber;
+    } finally {
+      setIsNumbering(false);
+    }
+  };
 
   const handleFieldChange = (fieldId: string, value: string) => {
     setInputsByTemplate(prev => ({
@@ -373,7 +389,8 @@ export default function DocBuilder({
                 signatureDataUrl = pngDataUrl(bytes);
               }
               if (signatureDataUrl) {
-                deps.handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[session.role], signatureDataUrl);
+                // Dark ink on transparent, trimmed (signatures from the old pad were light ink on navy).
+                deps.handleFieldChange(SIGNATURE_IMAGE_BY_ROLE[session.role], await cleanSignatureDataUrl(signatureDataUrl));
               }
             }
           } catch (error) {
@@ -409,33 +426,31 @@ export default function DocBuilder({
     await exportPage(format);
   };
 
-  /** Draws the review-step page and downloads it (call only once the letterhead has loaded). */
+  /** Draws every page of the review-step preview (call only once the letterhead has loaded). */
+  const capturePreviewPages = async () => {
+    const preview = previewRef.current;
+    if (!preview) throw new Error("The preview isn't ready yet. Try again in a moment.");
+    await preview.settle();
+    return capturePages(preview.pages());
+  };
+
+  /**
+   * Downloads the review-step pages. A PDF has one page per page; the image (JPEG) has every page, one under
+   * another, so nothing is left out of either.
+   */
   const exportPage = async (format: ExportFormat) => {
     if (!previewRef.current || !selectedTemplate || !selectedTemplateMeta) return;
     setIsExporting(true);
     try {
-      const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
-      const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
-      // Loaded on demand: the export libraries are only needed when someone downloads.
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(previewRef.current, {
-        width: exportWidth,
-        height: exportHeight,
-        pixelRatio: PIXEL_RATIO,
-        backgroundColor: "#ffffff"
-      });
-
+      const images = await capturePreviewPages();
+      const baseName = selectedTemplateMeta.title.replace(/\s+/g, "-") || "document";
+      const pages = images.length === 1 ? "" : ` (${images.length} pages)`;
       if (format === "jpeg") {
-        downloadDataUrl(dataUrl, `${selectedTemplateMeta?.title.replace(/\s+/g, "-") ?? "document"}.jpg`);
-        toast.success("Image (JPEG) downloaded");
+        downloadDataUrl(await stackPagesAsJpeg(images), `${baseName}.jpg`);
+        toast.success(images.length === 1 ? "Image (JPEG) downloaded" : `Image (JPEG) downloaded: ${images.length} pages, one under another`);
       } else {
-        const { jsPDF } = await import("jspdf");
-        const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        doc.addImage(dataUrl, "PNG", 0, 0, pageWidth, pageHeight);
-        doc.save(`${selectedTemplateMeta?.title.replace(/\s+/g, "-") ?? "document"}.pdf`);
-        toast.success("PDF downloaded");
+        (await buildLetterPdf(images, "PNG")).save(`${baseName}.pdf`);
+        toast.success(`PDF downloaded${pages}`);
       }
     } catch (error) {
       console.error("Document export failed", error);
@@ -492,7 +507,8 @@ export default function DocBuilder({
   const handleRequestSignature = async (role: SignatureRole) => {
     if (!selectedTemplateMeta) return;
     try {
-      const certificateId = signingCertificateId();
+      // Every signature is collected for a numbered certificate.
+      const certificateId = await ensureCertificateNumber();
       const response = await fetch("/api/admin/signing-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -521,6 +537,11 @@ export default function DocBuilder({
 
   const handleFinalizeSigned = async () => {
     if (!previewRef.current || !selectedTemplateMeta || !letterheadReady) return;
+    const certificateId = signingCertificateId();
+    if (!certificateId) {
+      toast.error("This certificate has no number yet. Request a signature first; that assigns one.");
+      return;
+    }
     const signedSessions = Object.values(signatureSessions).filter(
       session => session && session.status === "signed"
     ) as SignatureSession[];
@@ -530,15 +551,8 @@ export default function DocBuilder({
     }
     setIsFinalizing(true);
     try {
-      const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
-      const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(previewRef.current, {
-        width: exportWidth,
-        height: exportHeight,
-        pixelRatio: PIXEL_RATIO,
-        backgroundColor: "#ffffff"
-      });
+      // Every page is issued: the stored PDF, its hash and the download all cover the whole certificate.
+      const pngPages = await capturePreviewPages();
       const signatureMap = signedSessions.reduce<Record<string, string>>((acc, session) => {
         acc[session.role] = session.sessionId;
         return acc;
@@ -554,11 +568,8 @@ export default function DocBuilder({
       let signedPdf: Uint8Array<ArrayBuffer> | undefined;
       if (encrypted) {
         // The PDF is built and encrypted here, so the server never sees the signed certificate.
-        // JPEG keeps the encrypted PDF under the 1 MiB document limit.
-        const { jsPDF } = await import("jspdf");
-        const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
-        pdf.addImage(await toJpegDataUrl(dataUrl), "JPEG", 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-        const pdfBytes = new Uint8Array(pdf.output("arraybuffer"));
+        // JPEG pages keep the encrypted PDF under the 1 MiB document limit.
+        const { pdfBytes } = await fitPagesAsJpeg(pngPages, MAX_ENCRYPTED_PDF_BYTES);
         const docId = newDocumentId();
         signedPdf = pdfBytes;
         sealedCertificate = {
@@ -567,7 +578,9 @@ export default function DocBuilder({
           ...(await packPrivate(documentLoc(docId), { inputs: lockedInputs, pdfBase64: bytesToBase64(pdfBytes) }))
         };
       } else {
-        sealedCertificate = { inputs: lockedInputs, pngDataUrl: dataUrl };
+        // The server builds the PDF from these page images (one PDF page each) and hashes what it built.
+        const { jpegs } = await fitPagesAsJpeg(pngPages, MAX_PLAIN_PDF_BYTES);
+        sealedCertificate = { inputs: lockedInputs, pageImages: jpegs };
       }
       const response = await fetch(
         `/api/admin/signing-sessions/${signedSessions[0].sessionId}/finalize`,
@@ -580,7 +593,7 @@ export default function DocBuilder({
               templateTitle: selectedTemplateMeta.title,
               category: selectedTemplateMeta.category,
               templateVersion: selectedTemplateMeta.version,
-              certificateId: signingCertificateId(),
+              certificateId,
               verificationCode: currentInputs.verificationCode,
               ...sealedCertificate
             },
@@ -594,7 +607,7 @@ export default function DocBuilder({
       const payload = await response.json();
       // The issued PDF is what the verification page checks, so hand it over now.
       const issued = signedPdf ?? (payload?.pdfBase64 ? Uint8Array.from(atob(payload.pdfBase64), c => c.charCodeAt(0)) : undefined);
-      if (issued) downloadBytes(`${slugify(signingCertificateId() || "certificate")}.pdf`, issued as Uint8Array<ArrayBuffer>);
+      if (issued) downloadBytes(`${slugify(certificateId) || "certificate"}.pdf`, issued as Uint8Array<ArrayBuffer>);
       VERIFICATION_KEYS.forEach(key => handleFieldChange(key, ""));
       toast.success("Signed PDF saved to the document gallery and downloaded");
       setSignatureSessions({
@@ -627,8 +640,9 @@ export default function DocBuilder({
           if (status === "cancelled") statusLabel = "Canceled";
           const hasImage = Boolean(currentInputs[SIGNATURE_IMAGE_BY_ROLE[roleConfig.role]]);
           acc[SIGNATURE_FIELDS[roleConfig.role]] = {
-            label: status === "signed" || hasImage ? "Request again" : "Request",
+            label: status === "signed" || hasImage || status === "pending" || status === "expired" ? "Send a new link" : "Request signature",
             onClick: () => handleRequestSignature(roleConfig.role),
+            disabled: isNumbering,
             status: statusLabel,
             badge: status === "signed" || hasImage ? "Signed" : undefined
           };
@@ -637,6 +651,23 @@ export default function DocBuilder({
         {}
       )
     : undefined;
+
+  // A certificate number can be assigned up front; otherwise the first signature request assigns one.
+  const numberAction =
+    signatureEnabled && !currentInputs.certificateNumber?.trim()
+      ? {
+          certificateNumber: {
+            label: isNumbering ? "Assigning…" : "Assign the next number",
+            onClick: () => {
+              void ensureCertificateNumber().catch(error => {
+                console.error("Failed to assign a certificate number", error);
+                toast.error(error instanceof Error ? error.message : "A certificate number couldn't be assigned. Try again.");
+              });
+            },
+            disabled: isNumbering
+          }
+        }
+      : undefined;
 
   const showVersionNote = Boolean(
     initialDocId &&
@@ -698,7 +729,7 @@ export default function DocBuilder({
                 <>
                   <fieldset className="min-w-0">
                     <legend className="sr-only">{activeStep?.title}</legend>
-                    <DocForm fields={stepFields} values={mergedInputs} onChange={handleFieldChange} />
+                    <DocForm fields={stepFields} values={mergedInputs} onChange={handleFieldChange} fieldActions={numberAction} />
                   </fieldset>
                   <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
                     <Button
@@ -742,6 +773,7 @@ export default function DocBuilder({
                           template={selectedTemplate}
                           inputs={mergedInputs}
                           ref={previewRef}
+                          onPageCountChange={setReviewPageCount}
                           onBackgroundLoad={() => {
                             setLetterheadReady(true);
                             const format = pendingExport.current;
@@ -755,7 +787,11 @@ export default function DocBuilder({
                     ) : (
                       <EmptyState title="No preview yet" description="Choose a template to see a preview here." />
                     )}
-                    <p className="text-sm text-muted-foreground">This is how the letter-size (8.5 × 11 in) page will print and download.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {reviewPageCount > 1
+                        ? `This is how the ${reviewPageCount} letter-size (8.5 × 11 in) pages will print and download. Pages break between sections, and every download includes all of them.`
+                        : "This is how the letter-size (8.5 × 11 in) page will print and download."}
+                    </p>
                   </div>
 
                   {signatureEnabled ? (
@@ -897,12 +933,4 @@ export default function DocBuilder({
       </Dialog>
     </section>
   );
-}
-
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = filename;
-  link.click();
 }

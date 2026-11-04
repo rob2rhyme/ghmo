@@ -10,10 +10,10 @@ export const eventHostInvitation: DocTemplate = {
   fields: [
     { id: "hostName", label: "Leader's name", type: "text", placeholder: "Dhan Bahadur Rana", required: true },
     { id: "leaderCommunity", label: "Their organization or community", type: "text", placeholder: "Nepali Community of Central PA" },
-    { id: "eventName", label: "Event name", type: "text", placeholder: "Magar Heritage Celebration", required: true },
+    { id: "eventName", label: "Event name", type: "text", placeholder: "the Dashain celebration", hint: "As it reads in the letter: \"with us at the Dashain celebration\".", required: true },
     { id: "eventDate", label: "Event date", type: "date", required: true },
     { id: "eventTime", label: "Event time", type: "text", placeholder: "7:00 PM" },
-    { id: "eventLocation", label: "Event place", type: "text", placeholder: "Harrisburg community hall" },
+    { id: "eventLocation", label: "Event place", type: "text", placeholder: "123 Main Street, Harrisburg, PA" },
     {
       id: "guestFocus",
       label: "Message to share",

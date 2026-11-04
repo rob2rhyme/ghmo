@@ -1,7 +1,8 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState, useMemo } from "react";
-import LetterheadPage, { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
+import { LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
+import PagedLetter, { type PagedLetterHandle } from "@/src/features/docgen/components/PagedLetter";
 import { MeetingAttendance } from "@/src/lib/minutes";
 import { escapeHtml, formatDate } from "@/src/features/docgen/render/renderTemplateHtml";
 import { cn } from "@/src/lib/utils";
@@ -25,9 +26,13 @@ export type MinutesPreviewData = {
 
 type MinutesPreviewZoomMode = "fit" | "100";
 
+export type MinutesPreviewHandle = PagedLetterHandle;
+
 type MinutesPreviewProps = {
   minutes: MinutesPreviewData;
   onBackgroundLoad?: () => void;
+  /** Called when the minutes need more (or fewer) letter pages. */
+  onPageCountChange?: (count: number) => void;
   className?: string;
   zoomMode?: MinutesPreviewZoomMode;
 };
@@ -36,12 +41,13 @@ type MinutesPreviewProps = {
 const UNMEASURED_SCALE = 0.4;
 
 /**
- * The letter page, shrunk to fit its column. The page keeps its real 816 × 1056 px layout (so the
+ * The letter pages, shrunk to fit their column. Each page keeps its real 816 × 1056 px layout (so the
  * export is exact) and is scaled inside a box sized to the scaled page, so it takes no more room than
- * it shows and never pushes the layout sideways.
+ * it shows and never pushes the layout sideways. Long minutes continue on more pages, breaking between
+ * paragraphs and list items; the ref gives every page for the download.
  */
-const MinutesPreview = forwardRef<HTMLDivElement, MinutesPreviewProps>(
-  ({ minutes, onBackgroundLoad, className, zoomMode = "fit" }, ref) => {
+const MinutesPreview = forwardRef<MinutesPreviewHandle, MinutesPreviewProps>(
+  ({ minutes, onBackgroundLoad, onPageCountChange, className, zoomMode = "fit" }, ref) => {
     const previewHtml = useMemo(() => buildMinutesHtml(minutes), [minutes]);
     const viewerRef = useRef<HTMLDivElement | null>(null);
     const [containerWidth, setContainerWidth] = useState(0);
@@ -82,18 +88,14 @@ const MinutesPreview = forwardRef<HTMLDivElement, MinutesPreviewProps>(
           className
         )}
       >
-        <div className="mx-auto" style={{ width: LETTER_WIDTH_PX * scale, height: LETTER_HEIGHT_PX * scale }}>
-          <div
-            style={{
-              width: LETTER_WIDTH_PX,
-              height: LETTER_HEIGHT_PX,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left"
-            }}
-          >
-            <LetterheadPage ref={ref} contentHtml={previewHtml} onBackgroundLoad={onBackgroundLoad} />
-          </div>
-        </div>
+        <PagedLetter
+          ref={ref}
+          html={previewHtml}
+          scale={scale}
+          onBackgroundLoad={onBackgroundLoad}
+          onPageCountChange={onPageCountChange}
+          className="mx-auto w-fit"
+        />
       </div>
     );
   }
@@ -101,7 +103,7 @@ const MinutesPreview = forwardRef<HTMLDivElement, MinutesPreviewProps>(
 
 MinutesPreview.displayName = "MinutesPreview";
 
-function buildMinutesHtml(data: MinutesPreviewData) {
+export function buildMinutesHtml(data: MinutesPreviewData) {
   const formattedDate = formatIfDate(data.eventDate);
   const agendaHtml = renderList("Agenda", data.agenda);
   const decisionsHtml = renderList("Decisions", data.decisions);
