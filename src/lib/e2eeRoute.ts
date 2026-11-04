@@ -12,14 +12,14 @@ type Guard = Awaited<ReturnType<typeof requireActiveAdmin>>;
 /** Shared wrapper for E2EE keyring routes: passkey admin required, uniform errors. */
 export function e2eeRoute<C>(handler: (req: NextRequest, guard: Guard, context: C) => Promise<Response>) {
   return async (req: NextRequest, context: C) => {
-    if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
     try {
       const guard = await requireActiveAdmin(req, COMMUNITY_SLUG);
       return await handler(req, guard, context);
     } catch (error) {
       if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message }, { status: error.status });
       if (error instanceof KeyringError) return NextResponse.json({ error: error.message }, { status: error.status });
-      if (error instanceof AdminEnvError) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+      if (error instanceof AdminEnvError) return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
       throw error;
     }
   };

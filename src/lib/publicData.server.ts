@@ -3,7 +3,7 @@ import "server-only";
 import { unstable_rethrow } from "next/navigation";
 
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
-import { findEventDoc, normalizeEvent, queryAllEvents, queryEvents, toPublicEvent } from "./events";
+import { findEventDoc, normalizeEvent, queryAllEvents, queryEvents, toEventCard, toPublicEvent, type EventCardRecord } from "./events";
 import type { EventRecord } from "./events.shared";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgDonationsStatsDocPath, orgMinutesCollectionPath } from "./firestorePaths";
@@ -57,6 +57,15 @@ const cachedPublishedEvents = publicCached(
 /** Every published event, soonest first, with dates as epoch milliseconds. */
 export function getPublishedEvents(): Promise<EventRecord[] | null> {
   return orNull("published events", cachedPublishedEvents);
+}
+
+/**
+ * Every published event as a card (no body or status), soonest first: what the Events list and Home send to the
+ * browser. Same cached read as getPublishedEvents; the calendar feed and the events API use the full records.
+ */
+export async function getPublishedEventCards(): Promise<EventCardRecord[] | null> {
+  const events = await getPublishedEvents();
+  return events ? events.map(toEventCard) : null;
 }
 
 /** Firestore document ids as the app creates them; anything else is answered "not found" before any read or cache entry. */

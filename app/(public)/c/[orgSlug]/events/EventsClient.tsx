@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, CalendarPlus, CalendarX } from "lucide-react";
-import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
+import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { RefreshButton } from "@/src/components/states/RefreshButton";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
@@ -12,7 +12,7 @@ import { EventCard } from "@/src/components/public/events/EventCard";
 import { EventsCalendar } from "@/src/components/public/events/EventsCalendar";
 import { eventIsOver } from "@/src/components/public/events/eventDates";
 import { useNow } from "@/src/components/public/events/useNow";
-import type { EventRecord } from "@/src/lib/events.shared";
+import type { EventCardRecord } from "@/src/lib/events";
 
 type ViewMode = "list" | "grid" | "calendar";
 type StatusFilter = "future" | "past" | "all";
@@ -32,7 +32,7 @@ const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
 type EventsClientProps = {
   orgSlug: string;
   /** Published events from the server, soonest first; null when they could not be loaded. */
-  events: EventRecord[] | null;
+  events: EventCardRecord[] | null;
   /** When the server rendered this (cached) copy: the first paint's "now", before the browser's clock takes over. */
   renderedAt: number;
   /** From getContactEmail on the server; offered when loading fails. */
@@ -49,15 +49,14 @@ export default function EventsClient({ orgSlug, events: loadedEvents, renderedAt
   const now = useNow(renderedAt);
 
   const { upcoming, past } = useMemo(() => {
-    const upcoming: EventRecord[] = [];
-    const past: EventRecord[] = [];
+    const upcoming: EventCardRecord[] = [];
+    const past: EventCardRecord[] = [];
     for (const evt of events) (eventIsOver(evt, now) ? past : upcoming).push(evt);
     // Upcoming soonest first (as loaded); past most recent first.
     return { upcoming, past: past.reverse() };
   }, [events, now]);
 
   const filtered = filter === "future" ? upcoming : filter === "past" ? past : [...upcoming, ...past];
-  const pastIds = useMemo(() => new Set(past.map(evt => evt.id)), [past]);
   const hasEvents = events.length > 0;
 
   return (
@@ -112,16 +111,55 @@ export default function EventsClient({ orgSlug, events: loadedEvents, renderedAt
         <NoEvents filter={filter} onShow={setFilter} />
       ) : view === "calendar" ? (
         <EventsCalendar events={filtered} orgSlug={orgSlug} />
+      ) : filter === "all" && past.length ? (
+        // "All": upcoming and past under their own subheadings, so it's clear where the past ones start (R4 L8).
+        <div className="flex flex-col gap-8">
+          {upcoming.length ? (
+            <EventGroup id="events-upcoming" title="Upcoming events">
+              <EventList events={upcoming} orgSlug={orgSlug} view={view} headingLevel="h3" />
+            </EventGroup>
+          ) : null}
+          <EventGroup id="events-past" title="Past events">
+            <EventList events={past} orgSlug={orgSlug} view={view} headingLevel="h3" past />
+          </EventGroup>
+        </div>
       ) : (
-        <ul className={view === "grid" ? "grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3" : "flex max-w-3xl flex-col gap-4"}>
-          {filtered.map(evt => (
-            <li key={evt.id} className="min-w-0">
-              <EventCard evt={evt} orgSlug={orgSlug} compact={view === "grid"} past={pastIds.has(evt.id)} />
-            </li>
-          ))}
-        </ul>
+        <EventList events={filtered} orgSlug={orgSlug} view={view} past={filter === "past"} />
       )}
     </PublicPage>
+  );
+}
+
+function EventGroup({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-4">
+      <PublicSectionTitle id={id}>{title}</PublicSectionTitle>
+      {children}
+    </section>
+  );
+}
+
+function EventList({
+  events,
+  orgSlug,
+  view,
+  headingLevel,
+  past = false
+}: {
+  events: EventCardRecord[];
+  orgSlug: string;
+  view: Exclude<ViewMode, "calendar">;
+  headingLevel?: "h2" | "h3";
+  past?: boolean;
+}) {
+  return (
+    <ul className={view === "grid" ? "grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3" : "flex max-w-3xl flex-col gap-4"}>
+      {events.map(evt => (
+        <li key={evt.id} className="min-w-0">
+          <EventCard evt={evt} orgSlug={orgSlug} compact={view === "grid"} past={past} headingLevel={headingLevel} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

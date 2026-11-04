@@ -39,13 +39,13 @@ type StoredTotp = {
 
 const totpRef = (uid: string) => getAdminDb().doc(`${orgAdminDocPath(COMMUNITY_SLUG, uid)}/totp/main`);
 
-export type TotpStatus = { state: "none" | "pending" | "active"; recoveryCodesLeft: number };
+export type TotpStatus = { state: "none" | "pending" | "active"; recoveryCodesLeft: number; locked: boolean };
 
 export async function getTotpStatus(uid: string): Promise<TotpStatus> {
   const snap = await totpRef(uid).get();
-  if (!snap.exists) return { state: "none", recoveryCodesLeft: 0 };
+  if (!snap.exists) return { state: "none", recoveryCodesLeft: 0, locked: false };
   const data = snap.data() as StoredTotp;
-  return { state: data.status, recoveryCodesLeft: data.status === "active" ? data.recovery.length : 0 };
+  return { state: data.status, recoveryCodesLeft: data.status === "active" ? data.recovery.length : 0, locked: Boolean(data.lockedAt) };
 }
 
 export async function hasActiveTotp(uid: string): Promise<boolean> {
@@ -88,7 +88,7 @@ export async function confirmTotpEnrollment(uid: string, code: string, now = Dat
     if (!data || data.status !== "pending") throw new TotpError(409, "Start the authenticator setup first");
     const secret = decryptTotpSecret(data.secret, serverEncryptionKeys(), uid);
     const step = verifyTotp(secret, code, now);
-    if (step === null) throw new TotpError(400, "That code is not right. Check the app and try the next code.");
+    if (step === null) throw new TotpError(400, "That code didn't match. Type the newest code from your app.");
     const codes = generateRecoveryCodes();
     tx.update(totpRef(uid), {
       status: "active",

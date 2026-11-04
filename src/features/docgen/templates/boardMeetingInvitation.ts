@@ -12,7 +12,7 @@ export const boardMeetingInvitation: DocTemplate = {
     { id: "meetingTitle", label: "Meeting title", type: "text", placeholder: "Board Meeting", required: true },
     { id: "meetingDate", label: "Meeting date", type: "date", required: true },
     { id: "meetingTime", label: "Meeting time", type: "text", placeholder: "6:00 PM", required: true },
-    { id: "meetingLocation", label: "Meeting place", type: "text", placeholder: "GHMO community hall, Harrisburg", required: true },
+    { id: "meetingLocation", label: "Meeting place", type: "text", placeholder: "123 Main Street, Harrisburg, PA", required: true },
     {
       id: "agenda",
       label: "Agenda",

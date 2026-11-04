@@ -36,6 +36,18 @@ export function toPublicEvent(event: EventRecord): EventRecord {
   return { id, title, summary, body, status, startsAt, endsAt, timezone, location, featured };
 }
 
+/**
+ * What an event card (Events list, Home "Next events", calendar grid) needs: no `body` or `status`, which only the
+ * event page shows. Keeps the cached list pages' payload small (R4 P7). Type-only imports are fine from client code.
+ */
+export type EventCardRecord = Pick<EventRecord, "id" | "title" | "summary" | "startsAt" | "endsAt" | "timezone" | "location" | "featured">;
+
+/** The card shape of a public event: drops everything the cards don't show. */
+export function toEventCard(event: EventRecord): EventCardRecord {
+  const { id, title, summary, startsAt, endsAt, timezone, location, featured } = event;
+  return { id, title, summary, startsAt, endsAt, timezone, location, featured };
+}
+
 export function ensureOrgSlug(slug: string) {
   return slug === COMMUNITY_SLUG;
 }

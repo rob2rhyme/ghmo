@@ -68,8 +68,11 @@ describe("document templates", () => {
     const field = (id: string) => wedding.fields.find(f => f.id === id)!;
     const ISSUER = "Greater Harrisburg Magar Organization";
 
-    it("is version 2 and is issued by GHMO by default", () => {
-      expect(wedding.version).toBe(2);
+    it("is version 3, calls itself a community certificate, and is issued by GHMO by default", () => {
+      expect(wedding.version).toBe(3);
+      expect(wedding.description).toContain("community wedding certificate");
+      expect(wedding.description).toContain("not a legal marriage record");
+      expect(wedding.description).not.toMatch(/^A marriage certificate/);
       expect(field("issuingAuthority").defaultValue).toBe(ISSUER);
       const html = wedding.renderHtml({});
       expect(html).toMatch(/Issued by \/ जारीकर्ता:<\/span>\s*<span class="ghmo-cert-value">Greater Harrisburg Magar Organization</);
@@ -109,11 +112,55 @@ describe("document templates", () => {
       expect(wedding.renderHtml({ brideEthnicity: "Other|अन्य", brideEthnicityOther: "Magar" })).not.toMatch(recognition);
     });
 
+    it("prints the Maiti part only for a Magar groom and a bride from another community, and a neutral welcome otherwise", () => {
+      const maiti = /Maiti|माइती/;
+      const withNote = { maitiRepresentativeName: "Hari Rana", maitiWitnessNote: "Blessed by the elders." };
+
+      // Magar groom, Gurung bride: the Maiti representative stands in for the bride's parental home.
+      const magarGroom = wedding.renderHtml({ groomCommunity: "Magar|मगर", brideEthnicity: "Gurung|गुरुङ", ...withNote });
+      expect(magarGroom).toContain("recognizes their union within the Magar community");
+      expect(magarGroom).toContain("designated Maiti representative from the Magar community");
+      expect(magarGroom).toContain("Note: Maiti means the bride’s parental home.");
+      expect(magarGroom).toContain("मगर समुदायका ‘माइती’ प्रतिनिधि Hari Rana");
+      expect(magarGroom).toContain("Blessed by the elders.");
+
+      // Magar bride, Tamang groom; and two partners who are both not Magar: no Maiti part, a neutral welcome.
+      for (const inputs of [
+        { groomCommunity: "Tamang|तामाङ", brideEthnicity: "Magar|मगर" },
+        { groomCommunity: "Gurung|गुरुङ", brideEthnicity: "Rai|राई" }
+      ]) {
+        const html = wedding.renderHtml({ ...inputs, ...withNote });
+        expect(html).toContain("Community recognition (interethnic marriage)");
+        expect(html).toContain("welcomes the couple and recognizes their union.");
+        expect(html).toContain("यस दम्पतीलाई सम्मानपूर्वक स्वागत गर्दै यो विवाहलाई मान्यता दिन्छ।");
+        expect(html).not.toContain("within the Magar community");
+        expect(html).not.toContain("मगर समुदायभित्र");
+        expect(html).not.toMatch(maiti);
+        expect(html).not.toContain("Blessed by the elders.");
+      }
+      expect(wedding.renderHtml({ groomCommunity: "Gurung|गुरुङ", brideEthnicity: "Rai|राई" })).toContain(
+        "joins the Gurung and Rai communities"
+      );
+    });
+
+    it("keeps the same layout at any screen width and prints a readable check address", () => {
+      const html = wedding.renderHtml({ verificationQrImage: "data:image/png;base64,iVBORw0KGgo=", verificationUrl: "https://example.org/verify/ABC" });
+      expect(html).not.toMatch(/@media \((max|min)-width/);
+      expect(html).toMatch(/\.ghmo-cert-verify-url \{[^}]*font-size: 0\.65rem;/);
+    });
+
+    it("prints typed dates as the same calendar day", () => {
+      const html = wedding.renderHtml({ marriageDate: "2026-11-04", issueDate: "2026-11-05" });
+      expect(html).toContain("November 4, 2026");
+      expect(html).toContain("November 5, 2026");
+    });
+
     it("prints corrected labels for values saved with the old ones", () => {
       const html = wedding.renderHtml({ brideEthnicity: "Bahun|ब्राह्मण" });
       expect(html).toContain(">Bahun<");
       expect(html).toContain(">बाहुन<");
       expect(wedding.renderHtml({ brideEthnicity: "Chetri|क्षेत्री" })).toContain(">Chhetri<");
+      // The Maiti role prints for a Magar groom (the default) and a bride from another community.
       expect(wedding.renderHtml({ brideEthnicity: "Rai|राई" })).toContain("(समुदायका ज्येष्ठ)");
     });
 

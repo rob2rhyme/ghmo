@@ -29,7 +29,7 @@ const linkClass =
  * Public site footer: who GHMO is, the main links, social profiles that are set up, a contact address when
  * one is configured (getContactEmail), and a small site credit.
  */
-export function SiteFooter({ name, contactEmail = null }: { name: string; contactEmail?: string | null }) {
+export function SiteFooter({ name, contactEmail = null, secure = false }: { name: string; contactEmail?: string | null; secure?: boolean }) {
   const socials = getSocialProfiles();
   const year = new Date().getFullYear();
 
@@ -74,7 +74,8 @@ export function SiteFooter({ name, contactEmail = null }: { name: string; contac
             <ul className="flex flex-col">
               {EXPLORE_LINKS.map(link => (
                 <li key={link.href}>
-                  <Link href={link.href} className={linkClass}>
+                  {/* In a secure root layout these pages are in another root layout: no prefetch (R4 P5). */}
+                  <Link href={link.href} prefetch={secure ? false : undefined} className={linkClass}>
                     {link.label}
                   </Link>
                 </li>

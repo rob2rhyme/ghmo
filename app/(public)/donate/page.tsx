@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Info } from "lucide-react";
-import { GoFundMeProDonationEmbed } from "@/src/components/GoFundMeProDonationEmbed";
 import { DonateAction } from "@/src/components/public/DonateAction";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
-import { getDonateUrl, getDonationEmbedCampaignId } from "@/src/lib/donateLink";
+import { getDonateUrl } from "@/src/lib/donateLink";
 import { cachedPageData } from "@/src/lib/publicCache.server";
 import { getDonationStats } from "@/src/lib/publicData.server";
 import { pageOpenGraph } from "@/src/lib/siteMetadata";
@@ -46,7 +45,6 @@ export default async function DonatePage() {
   const numberFormatter = new Intl.NumberFormat("en-US");
 
   const donateUrl = getDonateUrl();
-  const embedCampaignId = getDonationEmbedCampaignId();
 
   const hasGoal = goal != null && goal > 0;
   const percent = hasGoal ? Math.min(100, Math.round((totalRaised / (goal as number)) * 100)) : 0;
@@ -79,6 +77,8 @@ export default async function DonatePage() {
             fill
             priority
             fetchPriority="high"
+            // The page's largest paint: quality 60 is visibly the same here and much smaller (R4 P12).
+            quality={60}
             sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
             className="object-cover object-top"
           />
@@ -212,11 +212,6 @@ export default async function DonatePage() {
           supporting this important mission.
         </p>
         {donateUrl ? <DonateAction donateUrl={donateUrl} /> : null}
-        {embedCampaignId ? (
-          <div className="pt-2">
-            <GoFundMeProDonationEmbed campaignId={embedCampaignId} fallbackUrl={donateUrl} />
-          </div>
-        ) : null}
       </section>
     </PublicPage>
   );

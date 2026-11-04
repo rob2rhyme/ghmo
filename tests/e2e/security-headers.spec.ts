@@ -9,7 +9,7 @@ function collectCspViolations(page: Page) {
   return violations;
 }
 
-const SECURE_PAGES = ["/admin/login", "/login", "/docs/onboarding", "/sign/not-a-real-session"];
+const SECURE_PAGES = ["/admin/login", "/login", "/sign/not-a-real-session"];
 
 for (const path of SECURE_PAGES) {
   test(`secure page ${path} runs under a nonce CSP without violations`, async ({ page }) => {
@@ -37,14 +37,21 @@ for (const path of SECURE_PAGES) {
   });
 }
 
-// The events list is a public, cached page (it moved out of the secure area in round 3).
-for (const path of ["/", "/c/ghmo/events"]) {
-  test(`public page ${path} gets the baseline CSP`, async ({ page }) => {
+// Public pages (the events pages since round 3, the board guide since round 4) get a fixed policy from
+// next.config.mjs: scripts from this site only, and exactly one policy header.
+for (const path of ["/", "/c/ghmo/events", "/docs/onboarding", "/donate"]) {
+  test(`public page ${path} gets the baseline CSP without violations`, async ({ page }) => {
+    const violations = collectCspViolations(page);
     const response = await page.goto(path);
     const csp = response?.headers()["content-security-policy"] ?? "";
+    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).not.toContain("nonce-");
+    expect(csp.split("script-src").length, "a single policy").toBe(2);
+    await page.waitForLoadState("load");
+    await page.waitForTimeout(1000);
+    expect(violations).toEqual([]);
   });
 }
 

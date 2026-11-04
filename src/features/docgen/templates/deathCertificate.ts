@@ -13,7 +13,7 @@ export const deathCertificate: DocTemplate = {
     { id: "dateOfPassing", label: "Date of passing", type: "date", required: true },
     { id: "serviceDate", label: "Memorial service date", type: "date" },
     { id: "serviceTime", label: "Memorial service time", type: "text", placeholder: "11:00 AM" },
-    { id: "serviceLocation", label: "Service place", type: "text", placeholder: "Community hall, Harrisburg" },
+    { id: "serviceLocation", label: "Memorial service place", type: "text", placeholder: "Funeral home or temple, with its address" },
     { id: "contactPerson", label: "Family contact", type: "text", placeholder: "A name and phone number" },
     {
       id: "remarks",

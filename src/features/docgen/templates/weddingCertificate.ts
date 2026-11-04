@@ -92,7 +92,7 @@ const FIELDS: DocField[] = [
     label: "Maiti representative's name / माइती प्रतिनिधिको नाम",
     type: "text",
     placeholder: "Elder's name",
-    hint: "Printed only when the bride's and groom's communities differ."
+    hint: "Printed only when the groom is Magar and the bride is from another community."
   },
   {
     id: "maitiRepresentativeRole",
@@ -147,7 +147,13 @@ const FIELDS: DocField[] = [
     placeholder: ISSUER,
     defaultValue: ISSUER
   },
-  { id: "certificateNumber", label: "Certificate number / प्रमाणपत्र नं.", type: "text", placeholder: "GHMO-2026-001" },
+  {
+    id: "certificateNumber",
+    label: "Certificate number / प्रमाणपत्र नं.",
+    type: "text",
+    placeholder: "GHMO-2026-001",
+    hint: "Leave it blank and the next number is assigned when you request the first signature. It prints with the issuer's details and on the check page behind the QR code."
+  },
   { id: "issueDate", label: "Date of issue / जारी मिति", type: "date" },
   { id: "officialSeal", label: "Official seal or stamp / आधिकारिक छाप", type: "text", placeholder: "Seal / Stamp" },
   { id: "witness1Name", label: "Witness 1 name / साक्षी १ नाम", type: "text", placeholder: "Elder's name" },
@@ -196,10 +202,12 @@ function choice(inputs: Record<string, string>, fieldId: string, otherFieldId?: 
 
 export const weddingCertificate: DocTemplate = {
   id: "wedding-certificate",
-  version: 2,
+  // Version 3: the Maiti section prints only for a Magar groom and a bride from another community (R4 C5).
+  version: 3,
   title: "Wedding certificate",
   category: "Certificate",
-  description: "A marriage certificate in English and Nepali, signed by witnesses and the officiant, with a code anyone can check.",
+  description:
+    "A community wedding certificate in English and Nepali (not a legal marriage record), signed by witnesses and the officiant, with a code anyone can check.",
   steps: [
     {
       id: "document-details",
@@ -253,6 +261,12 @@ export const weddingCertificate: DocTemplate = {
     const interethnic = Boolean(
       groomCommunity && brideCommunity && groomCommunity.en.toLowerCase() !== brideCommunity.en.toLowerCase()
     );
+    const isMagar = (community: Choice | null) => community?.en.toLowerCase() === "magar";
+    // A Maiti representative stands in for the bride's parental home, so that part prints only when a Magar
+    // groom marries a bride from another community. When the bride is the Magar partner, or neither partner is
+    // Magar, the certificate welcomes the couple in neutral words instead.
+    // Owner decision 2026-11-04 (audit round 4, C5); the board will confirm the wording.
+    const maitiRecognition = interethnic && isMagar(groomCommunity) && !isMagar(brideCommunity);
     const maitiRepresentativeName = escapeHtml(inputs.maitiRepresentativeName) || emptyLine;
     const maitiRole = choice(inputs, "maitiRepresentativeRole", "maitiRepresentativeRoleOther");
     const maitiRoleEn = maitiRole?.en ?? emptyLine;
@@ -323,7 +337,9 @@ export const weddingCertificate: DocTemplate = {
       interethnic && groomCommunity && brideCommunity
         ? `
               <p class="ghmo-cert-subheading">Community recognition (interethnic marriage)</p>
-              <p class="ghmo-cert-paragraph">
+              ${
+                maitiRecognition
+                  ? `<p class="ghmo-cert-paragraph">
                 This marriage joins the ${groomCommunity.en} and ${brideCommunity.en} communities. The ${organizationName}
                 welcomes the couple and recognizes their union within the Magar community, in keeping with Magar custom,
                 mutual consent and community acceptance.
@@ -337,12 +353,19 @@ export const weddingCertificate: DocTemplate = {
                 in that role.
               </p>
               ${maitiNoteHtml}`
+                  : `<p class="ghmo-cert-paragraph">
+                This marriage joins the ${groomCommunity.en} and ${brideCommunity.en} communities. The ${organizationName}
+                welcomes the couple and recognizes their union.
+              </p>`
+              }`
         : "";
     const nepaliRecognition =
       interethnic && groomCommunity && brideCommunity
         ? `
               <p class="ghmo-cert-subheading">सामुदायिक मान्यता (अन्तरजातीय विवाह)</p>
-              <p class="ghmo-cert-paragraph">
+              ${
+                maitiRecognition
+                  ? `<p class="ghmo-cert-paragraph">
                 यो विवाहले ${groomCommunity.np} र ${brideCommunity.np} समुदायलाई जोडेको छ। ${organizationName} (GHMO) ले
                 मगर परम्परा, आपसी सहमति र सामुदायिक स्वीकृतिअनुसार यस दम्पतीलाई सम्मानपूर्वक स्वागत गर्दै मगर समुदायभित्र
                 यो विवाहलाई मान्यता दिन्छ।
@@ -356,6 +379,11 @@ export const weddingCertificate: DocTemplate = {
                 भूमिका निर्वाह गर्न सक्नुहुन्छ।
               </p>
               ${maitiNoteHtml}`
+                  : `<p class="ghmo-cert-paragraph">
+                यो विवाहले ${groomCommunity.np} र ${brideCommunity.np} समुदायलाई जोडेको छ। ${organizationName} (GHMO) ले
+                यस दम्पतीलाई सम्मानपूर्वक स्वागत गर्दै यो विवाहलाई मान्यता दिन्छ।
+              </p>`
+              }`
         : "";
 
     return `
@@ -485,7 +513,8 @@ export const weddingCertificate: DocTemplate = {
           }
           .ghmo-cert-verify-url {
             display: block;
-            font-size: 0.5rem;
+            font-size: 0.65rem;
+            line-height: 1.3;
             word-break: break-all;
           }
           .ghmo-cert-signature-image {
@@ -502,17 +531,8 @@ export const weddingCertificate: DocTemplate = {
             break-inside: avoid;
             page-break-inside: avoid;
           }
-          @media (max-width: 640px) {
-            .ghmo-cert {
-              font-size: 0.9rem;
-            }
-            .ghmo-cert-row {
-              grid-template-columns: 1fr;
-            }
-            .ghmo-cert-signature-grid {
-              grid-template-columns: 1fr;
-            }
-          }
+          /* No viewport media queries: the page is a fixed 816 px letter page, and a certificate made on a phone
+             must look exactly like one made on a desktop. */
           @media screen {
             .doc-page {
               width: 100%;

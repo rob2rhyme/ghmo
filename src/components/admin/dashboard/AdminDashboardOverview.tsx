@@ -23,6 +23,7 @@ import AdminKpiCard from "@/src/components/admin/AdminKpiCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AllMinutesLink } from "./AllMinutesLink";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import type { MeetingMinutesRecord } from "@/src/lib/minutes";
@@ -49,7 +50,10 @@ type AdminDashboardOverviewProps = {
   community: { id: string; name?: string };
   adminName?: string;
   stats: { totalRaised?: number; goal?: number; donorCount?: number };
-  minutes: MeetingMinutesRecord[];
+  /** The latest records (list fields only), newest meeting first. */
+  minutes: Pick<MeetingMinutesRecord, "id" | "eventTitle" | "eventDate" | "meetingType" | "status">[];
+  /** How many records wait for approval and how many are drafts, over all minutes (counted on the server). */
+  minutesCounts: { submitted: number; draft: number };
   auditLogs: AuditLogView[];
   webhookEvents: WebhookEventView[];
 };
@@ -69,7 +73,7 @@ function EmptyNote({ children }: { children: ReactNode }) {
   return <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
-export default function AdminDashboardOverview({ community, adminName, stats, minutes, auditLogs, webhookEvents }: AdminDashboardOverviewProps) {
+export default function AdminDashboardOverview({ community, adminName, stats, minutes, minutesCounts, auditLogs, webhookEvents }: AdminDashboardOverviewProps) {
   const [reconciling, setReconciling] = useState(false);
   const [now] = useState(() => Date.now());
 
@@ -88,8 +92,8 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
     return latest || null;
   }, [webhookEvents]);
 
-  const awaitingApproval = (minutes || []).filter(entry => entry.status === "submitted").length;
-  const drafts = (minutes || []).filter(entry => entry.status === "draft").length;
+  const awaitingApproval = minutesCounts.submitted;
+  const drafts = minutesCounts.draft;
   const goalPercent = percentOf(stats.totalRaised, stats.goal);
 
   const triggerReconcile = async () => {
@@ -214,12 +218,8 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
           title="Recent minutes"
           description="The latest records, newest meeting first."
           actions={
-            recentMinutes.length ? (
-              // One link at every width, in the header, so the list stays the card's last child and runs to its edge.
-              <Button asChild variant="ghost" className="-mr-3 max-sm:-ml-3">
-                <Link href="/admin/minutes?mode=records">All minutes</Link>
-              </Button>
-            ) : null
+            // One link at every width, in the header, so the list stays the card's last child and runs to its edge.
+            recentMinutes.length ? <AllMinutesLink /> : null
           }
         >
           {recentMinutes.length === 0 ? (

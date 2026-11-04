@@ -14,7 +14,7 @@ const COPY: Record<NotificationKind, { subject: string; line: string; path: stri
   calls: { subject: "You have calls to make", line: "A call campaign is open and some of your people have not been reached yet.", path: "/admin/my-calls" },
   security: {
     subject: "An admin's authenticator was locked",
-    line: "An admin's authenticator app was locked after too many wrong codes. A super admin can check it and reset it on the Security page.",
+    line: "An admin's authenticator app was locked after too many wrong codes. Open Security to see who, and reset it after checking with them.",
     path: "/admin/security"
   }
 };

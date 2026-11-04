@@ -4,7 +4,7 @@ import { z } from "zod";
 import { findActiveMember, SESSION_COOKIE_NAME, verifyIdToken } from "@/src/lib/auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { getAdminAuth, getAdminDb } from "@/src/lib/firebaseAdmin";
-import { getAdminProfile, requireActiveAdmin } from "@/src/lib/admin";
+import { requireActiveAdmin } from "@/src/lib/admin";
 import { orgAdminDocPath } from "@/src/lib/firestorePaths";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { checkRateLimit } from "@/src/lib/rateLimit";
@@ -17,13 +17,15 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({ idToken: z.string().min(20).max(8192) });
 
 /**
- * Exchanges a fresh ID token for a session cookie. Only allowlisted people get one:
- * an active admin (custom claim + active admin record) or an active member.
+ * Exchanges a fresh ID token for a member session cookie (the member email-link sign-in). Admin sessions are
+ * never made here: they come only from the server-side sign-in steps (passkey, authenticator, email link), so
+ * a token the browser holds (for example the Firestore token from /api/auth/firebase-custom-token) can't be
+ * turned into a new admin session.
  */
 export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
-    return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+    return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
   }
 
   const rate = await checkRateLimit(`session-create:${getClientIp(req.headers)}`, 20, 10 * 60 * 1000);
@@ -40,21 +42,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const claims = decoded as typeof decoded & { orgSlug?: string; role?: string };
-    let allowed = false;
-    if (claims.orgSlug === COMMUNITY_SLUG && claims.role === "admin") {
-      const profile = await getAdminProfile(COMMUNITY_SLUG, decoded.uid);
-      allowed = profile?.status === "active";
-    }
-    if (!allowed) {
-      allowed = Boolean(await findActiveMember(decoded));
-    }
+    const claims = decoded as typeof decoded & { role?: string; admin?: boolean };
+    // Admin tokens are refused outright (see above), even when the same person is also a member.
+    if (claims.role === "admin" || claims.admin === true) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    const allowed = Boolean(await findActiveMember(decoded));
     if (!allowed) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
 
     return await createSessionResponse(parsed.data.idToken);
   } catch (error) {
     if (error instanceof AdminEnvError) {
-      return NextResponse.json({ error: "Admin env not configured" }, { status: 503 });
+      return NextResponse.json({ error: "This can't be loaded right now. Try again in a few minutes." }, { status: 503 });
     }
     throw error;
   }

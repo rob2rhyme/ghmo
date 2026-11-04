@@ -73,7 +73,8 @@ type EventMinutesCardProps = {
 /**
  * The event's meeting minutes. Visitors see a card only when approved minutes exist (rendered on the
  * server). An admin's browser adds the minutes' status and the admin links, and offers "Add minutes"
- * once the event is over.
+ * once the event is over. The admin links don't prefetch: the admin area is another root layout that renders
+ * per request, so a prefetch from here is never used.
  */
 export function EventMinutesCard({ event, approvedMinutesId, renderedAt }: EventMinutesCardProps) {
   const admin = useAdminMinutes(event.id);
@@ -87,7 +88,7 @@ export function EventMinutesCard({ event, approvedMinutesId, renderedAt }: Event
         <div className="flex flex-wrap gap-2">
           {approvedMinutesId ? <ReadMinutesButton id={approvedMinutesId} /> : null}
           <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-            <Link href={"/admin/minutes" as Route}>Open meeting minutes</Link>
+            <Link href={"/admin/minutes" as Route} prefetch={false}>Open meeting minutes</Link>
           </Button>
         </div>
       </MinutesFrame>
@@ -106,7 +107,7 @@ export function EventMinutesCard({ event, approvedMinutesId, renderedAt }: Event
             <div className="flex flex-wrap gap-2">
               {minutes.status === "approved" ? <ReadMinutesButton id={minutes.id} /> : null}
               <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-                <Link href={`/admin/minutes?minutesId=${encodeURIComponent(minutes.id)}` as Route}>Open meeting minutes</Link>
+                <Link href={`/admin/minutes?minutesId=${encodeURIComponent(minutes.id)}` as Route} prefetch={false}>Open meeting minutes</Link>
               </Button>
             </div>
           </>
@@ -114,7 +115,7 @@ export function EventMinutesCard({ event, approvedMinutesId, renderedAt }: Event
           <>
             <p className="text-sm text-muted-foreground">No minutes recorded for this event yet.</p>
             <Button asChild variant="outline" size="lg" className="w-full sm:w-auto sm:self-start">
-              <Link href={`/admin/minutes?mode=new&eventId=${encodeURIComponent(event.id)}` as Route}>Add minutes</Link>
+              <Link href={`/admin/minutes?mode=new&eventId=${encodeURIComponent(event.id)}` as Route} prefetch={false}>Add minutes</Link>
             </Button>
           </>
         )}

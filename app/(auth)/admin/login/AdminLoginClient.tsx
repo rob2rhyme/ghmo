@@ -260,7 +260,7 @@ export default function AdminLoginClient({
 
               <p className="text-sm text-muted-foreground">
                 First time?{" "}
-                <Link href="/docs/onboarding" className="font-semibold text-primary underline-offset-4 hover:underline">
+                <Link href="/docs/onboarding" prefetch={false} className="font-semibold text-primary underline-offset-4 hover:underline">
                   Read the board member guide
                 </Link>
               </p>

@@ -72,7 +72,11 @@ test("a past event says so, offers no calendar button, and shows minutes only wh
   await expect(page.getByText("Dashain celebration").first()).toBeVisible();
   await expect(page.getByText("Football day")).toHaveCount(0);
   await page.getByRole("group", { name: "Show" }).getByRole("button", { name: "All" }).click();
-  const titles = await page.getByRole("heading", { level: 2 }).allTextContents();
+  // "All" puts the two groups under their own subheadings; the cards are h3 inside them.
+  const groups = await page.getByRole("main").getByRole("heading", { level: 2 }).allTextContents();
+  expect(groups).toEqual(["Upcoming events", "Past events"]);
+  const titles = await page.getByRole("main").getByRole("heading", { level: 3 }).allTextContents();
+  expect(titles.indexOf("Dashain celebration")).toBeGreaterThanOrEqual(0);
   expect(titles.indexOf("Dashain celebration")).toBeLessThan(titles.indexOf("Football day"));
   await expect(page.locator("article").getByText("Past", { exact: true })).toHaveCount(2);
 

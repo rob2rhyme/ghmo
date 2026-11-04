@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildPublicCsp, buildSecureCsp, createNonce, isSecurePath } from "@/src/lib/security/csp";
+import { buildPublicCsp, buildSecureCsp, createNonce, isSecurePath, SECURE_PREFIXES } from "@/src/lib/security/csp";
+// @ts-expect-error -- plain ESM config file without types
+import { PUBLIC_CSP, PUBLIC_CSP_SECURE_PREFIXES, publicPageSource } from "../../next.config.mjs";
 
 describe("isSecurePath", () => {
-  it.each(["/admin", "/admin/login", "/admin/minutes", "/login", "/sign/abc", "/docs/onboarding", "/unsubscribe"])(
+  it.each(["/admin", "/admin/login", "/admin/minutes", "/login", "/sign/abc", "/unsubscribe"])(
     "treats %s as secure",
     path => expect(isSecurePath(path)).toBe(true)
   );
 
-  it.each(["/", "/donate", "/multimedia", "/gumba-project", "/administrator", "/signup", "/loginx", "/c", "/c/ghmo/events", "/c/ghmo/events/ev1"])(
+  it.each(["/", "/donate", "/multimedia", "/gumba-project", "/administrator", "/signup", "/loginx", "/c", "/c/ghmo/events", "/c/ghmo/events/ev1", "/docs/onboarding"])(
     "treats %s as public",
     path => expect(isSecurePath(path)).toBe(false)
   );
@@ -63,5 +65,28 @@ describe("buildPublicCsp", () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("upgrade-insecure-requests");
+  });
+});
+
+describe("next.config.mjs public CSP header (kept in step with this module)", () => {
+  it("sends the same policy as buildPublicCsp", () => {
+    expect(PUBLIC_CSP).toBe(buildPublicCsp({ upgradeInsecure: false }));
+  });
+
+  it("covers exactly the non-secure paths, so a page never gets two policies", () => {
+    expect(PUBLIC_CSP_SECURE_PREFIXES.map((p: string) => `/${p}`)).toEqual([...SECURE_PREFIXES]);
+    const pattern = new RegExp(`^${(publicPageSource as string).slice("/:path(".length, -1)}$`);
+    for (const path of ["/", "/donate", "/c/ghmo/events", "/docs/onboarding", "/minutes/m1", "/administrator", "/loginx"]) {
+      expect(isSecurePath(path), path).toBe(false);
+      expect(pattern.test(path.slice(1)), path).toBe(true);
+    }
+    for (const path of ["/admin", "/admin/minutes", "/login", "/sign/abc", "/unsubscribe", "/api/auth/me"]) {
+      expect(pattern.test(path.slice(1)), path).toBe(false);
+    }
+  });
+
+  it("allows scripts from this site only", () => {
+    expect(PUBLIC_CSP).toContain("script-src 'self' 'unsafe-inline'");
+    expect(PUBLIC_CSP).not.toMatch(/https?:/);
   });
 });

@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, HandHeart } from "lucide-react";
@@ -8,7 +7,6 @@ import { HOME_HERO_IMAGE } from "@/src/components/public/homeHero";
 import { PublicPage, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { UpcomingEvents } from "@/src/components/public/UpcomingEvents";
 import { Button } from "@/src/components/ui/button";
-import { Skeleton } from "@/src/components/ui/skeleton";
 import { getDonateUrl } from "@/src/lib/donateLink";
 
 const AKKHA_ALT = "Greater Harrisburg Magar Organization, written in Akkha script";
@@ -57,6 +55,8 @@ export default async function CommunityLanding() {
             fill
             priority
             fetchPriority="high"
+            // The page's largest paint: quality 60 is visibly the same here and much smaller (R4 P12).
+            quality={60}
             sizes="(min-width: 1152px) 540px, (min-width: 1024px) 45vw, 100vw"
             className="object-cover"
           />
@@ -78,11 +78,9 @@ export default async function CommunityLanding() {
         </div>
       </section>
 
-      {/* The events and feeds come from the network, so they stream in behind placeholders of about their own
-          height; the hero and the text above paint at once and nothing below jumps when they arrive. */}
-      <Suspense fallback={<SectionPlaceholder title="Next events" cards={3} gridClassName="md:grid-cols-2 lg:grid-cols-3" />}>
-        <UpcomingEvents limit={3} />
-      </Suspense>
+      {/* No Suspense here: the page is built ahead and served from the cache, so the events and feeds are already in
+          its HTML. A boundary would only send them after the footer, to be moved into place by script (R4 P4). */}
+      <UpcomingEvents limit={3} />
 
       {/* Gumba Project */}
       <section
@@ -104,27 +102,7 @@ export default async function CommunityLanding() {
         </div>
       </section>
 
-      <Suspense fallback={<SectionPlaceholder title="Follow us" cards={3} />}>
-        <HomeMultimediaSection />
-      </Suspense>
+      <HomeMultimediaSection />
     </PublicPage>
-  );
-}
-
-function SectionPlaceholder({ title, cards, gridClassName = "md:grid-cols-3" }: { title: string; cards: number; gridClassName?: string }) {
-  return (
-    <section aria-busy="true" className="flex flex-col gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        <PublicSectionTitle>{title}</PublicSectionTitle>
-        <Skeleton className="h-5 w-56 max-w-full" />
-      </div>
-      <ul className={`grid grid-cols-[minmax(0,1fr)] gap-4 ${gridClassName}`} aria-hidden="true">
-        {Array.from({ length: cards }).map((_, i) => (
-          <li key={i}>
-            <Skeleton className="h-44 rounded-xl" />
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

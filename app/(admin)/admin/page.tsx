@@ -32,7 +32,7 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const { stats, webhookEvents, auditLogs, blocks, minutes } = await loadAdminDashboard(await requireActiveAdmin(undefined, COMMUNITY_SLUG));
+  const { stats, webhookEvents, auditLogs, minutes, minutesCounts } = await loadAdminDashboard(await requireActiveAdmin(undefined, COMMUNITY_SLUG));
 
   if (process.env.NODE_ENV !== "production") {
     const payload = {
@@ -40,7 +40,6 @@ export default async function AdminPage() {
       stats,
       webhookEvents,
       auditLogs,
-      blocks,
       minutes,
     };
     for (const [key, val] of Object.entries(payload)) {
@@ -60,6 +59,7 @@ export default async function AdminPage() {
       webhookEvents={toPlain(webhookEvents)}
       auditLogs={toPlain(auditLogs)}
       minutes={toPlain(minutes)}
+      minutesCounts={minutesCounts}
     />
   );
 }

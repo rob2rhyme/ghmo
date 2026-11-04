@@ -8,8 +8,9 @@
  * separate root layouts, so public scripts never carry over into secure pages.
  */
 
-// The events pages (/c/ghmo/events/**) are public and cached, so they are not listed here.
-const SECURE_PREFIXES = ["/admin", "/login", "/sign", "/docs", "/unsubscribe"] as const;
+// The events pages (/c/ghmo/events/**) and the board guide (/docs) are public, so they are not listed here.
+// next.config.mjs repeats this list for the public CSP header (tests/unit/csp.test.ts keeps them in step).
+export const SECURE_PREFIXES = ["/admin", "/login", "/sign", "/unsubscribe"] as const;
 
 export function isSecurePath(pathname: string): boolean {
   return SECURE_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -60,8 +61,14 @@ export function buildSecureCsp({ nonce, isDev, upgradeInsecure, firebaseAuthDoma
   ]);
 }
 
-export function buildPublicCsp({ upgradeInsecure }: { upgradeInsecure: boolean }): string {
+/**
+ * The public pages' policy. It is a fixed header (next.config.mjs sends it, so cached pages need no function
+ * run): scripts only from this site, because public pages share the admin area's address. No third-party
+ * script runs here (decision 2026-11-04). Inline scripts are allowed because cached pages can't carry a nonce.
+ */
+export function buildPublicCsp({ upgradeInsecure, isDev = false }: { upgradeInsecure: boolean; isDev?: boolean }): string {
   return join([
+    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "This can't be loaded right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     const customToken = await issueCustomToken(adminDoc.id, role, "dev");
     const idToken = await exchangeCustomTokenForIdToken(customToken);
     if (!idToken) {
-      return NextResponse.json({ error: "Unable to mint session" }, { status: 500 });
+      return NextResponse.json({ error: "Signing in didn't finish. Try again in a few minutes." }, { status: 500 });
     }
 
     const decoded = await verifyIdToken(idToken);
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "This can't be loaded right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

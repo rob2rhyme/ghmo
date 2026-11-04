@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Clock, Eraser } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -8,16 +8,19 @@ import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
+import { Skeleton } from "@/src/components/ui/skeleton";
+import { cleanSignatureCanvas } from "@/src/features/docgen/signatureInk";
 import { fromBase64Url, sealSignature, type PublicJwk } from "@/src/lib/e2ee";
 import { formatDateTime } from "@/src/lib/format";
 
 type SigningStatus = "pending" | "signed" | "expired" | "finalized" | "cancelled";
 
+/** Who the person signs as, in a sentence: "Sign as witness 1", "as the issuer". */
 const ROLE_LABELS: Record<string, string> = {
-  witness1: "Witness 1",
-  witness2: "Witness 2",
-  officiant: "Officiant",
-  issuingAuthority: "Issuing authority"
+  witness1: "witness 1",
+  witness2: "witness 2",
+  officiant: "the officiant",
+  issuingAuthority: "the issuer"
 };
 
 type SealTarget = { epoch: number; publicJwk: PublicJwk };
@@ -69,7 +72,7 @@ export default function SigningPage() {
   // Next 16 hands page params over as a promise; the hook reads them synchronously in a client page.
   const params = useParams<{ sessionId: string }>();
   const [seal, setSeal] = useState<SealTarget | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const padRef = useRef<SignaturePadHandle | null>(null);
   const [status, setStatus] = useState<SigningStatus | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -78,13 +81,11 @@ export default function SigningPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<{ title: string; detail: string } | null>(null);
   const [padError, setPadError] = useState<string | null>(null);
-  /** True once the person has drawn something in the box since it was last cleared. */
-  const hasInk = useRef(false);
   /** This page sent the signature (as opposed to opening a link that was already used). */
   const [justSigned, setJustSigned] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const roleLabel = useMemo(() => (role ? ROLE_LABELS[role] ?? role : "Signer"), [role]);
+  const roleLabel = useMemo(() => (role ? ROLE_LABELS[role] ?? role : null), [role]);
 
   /** Shows what was read; returns the session's status, or null when it couldn't be read. */
   const showSession = useCallback((read: SessionRead): SigningStatus | null => {
@@ -112,97 +113,18 @@ export default function SigningPage() {
     };
   }, [params.sessionId, showSession]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-
-    const resize = () => {
-      const ratio = window.devicePixelRatio || 1;
-      const width = canvas.offsetWidth;
-      const height = canvas.offsetHeight;
-      canvas.width = width * ratio;
-      canvas.height = height * ratio;
-      context.scale(ratio, ratio);
-      context.lineWidth = 2;
-      context.lineCap = "round";
-      context.strokeStyle = "#f8fafc";
-      context.fillStyle = "#0b1220";
-      context.fillRect(0, 0, width, height);
-    };
-
-    resize();
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-
-    let drawing = false;
-
-    const getPoint = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    };
-
-    const handlePointerDown = (event: PointerEvent) => {
-      drawing = true;
-      hasInk.current = true;
-      setPadError(null);
-      const point = getPoint(event);
-      context.beginPath();
-      context.moveTo(point.x, point.y);
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!drawing) return;
-      const point = getPoint(event);
-      context.lineTo(point.x, point.y);
-      context.stroke();
-    };
-
-    const handlePointerUp = () => {
-      drawing = false;
-      context.closePath();
-    };
-
-    canvas.addEventListener("pointerdown", handlePointerDown);
-    canvas.addEventListener("pointermove", handlePointerMove);
-    canvas.addEventListener("pointerup", handlePointerUp);
-    canvas.addEventListener("pointerleave", handlePointerUp);
-    return () => {
-      canvas.removeEventListener("pointerdown", handlePointerDown);
-      canvas.removeEventListener("pointermove", handlePointerMove);
-      canvas.removeEventListener("pointerup", handlePointerUp);
-      canvas.removeEventListener("pointerleave", handlePointerUp);
-    };
-  }, []);
-
-  const handleClear = () => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#0b1220";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    hasInk.current = false;
-  };
-
   const handleSubmit = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const pad = padRef.current;
+    if (!pad) return;
     setMessage(null);
-    if (!hasInk.current) {
-      setPadError("Sign inside the box first.");
-      return;
-    }
     setIsSubmitting(true);
     try {
-      const dataUrl = canvas.toDataURL("image/png");
+      // Dark ink on a transparent background, trimmed to the ink: it goes onto a white certificate as is.
+      const dataUrl = await pad.signature();
+      if (!dataUrl) {
+        setPadError("Sign inside the box first.");
+        return;
+      }
       // When the workspace is end-to-end encrypted, the signature is sealed here and the server only stores ciphertext.
       const signature = seal
         ? { signatureSealed: await sealSignature(pngBytes(dataUrl), seal.publicJwk, seal.epoch, params.sessionId) }
@@ -238,6 +160,7 @@ export default function SigningPage() {
     }
   };
 
+  const isLoading = status === null && loadError === null;
   const isExpired = status === "expired";
   const isCancelled = status === "cancelled";
   const isSigned = status === "signed" || status === "finalized";
@@ -250,8 +173,8 @@ export default function SigningPage() {
       <Card className="gap-6">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium text-primary">Signature request</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Signature for {roleLabel}</h1>
-          {role ? (
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{roleLabel ? `Sign as ${roleLabel}` : "Sign a certificate"}</h1>
+          {roleLabel ? (
             <p className="text-base text-foreground">
               You&apos;re signing {what} from the Greater Harrisburg Magar Organization (GHMO) as {roleLabel}.
             </p>
@@ -270,7 +193,18 @@ export default function SigningPage() {
             <AlertDescription className="text-foreground">{message}</AlertDescription>
           </Alert>
         ) : null}
-        {loadFailed ? null : isExpired ? (
+        {loadFailed ? null : isLoading ? (
+          <div role="status" aria-label="Loading the signature request" className="flex flex-col gap-4">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-48 w-full rounded-xl" />
+            <div className="flex gap-2">
+              <Skeleton className="h-11 w-24" />
+              <Skeleton className="h-11 w-40" />
+            </div>
+          </div>
+        ) : isExpired ? (
           <Alert variant="destructive">
             <Clock />
             <AlertDescription className="text-foreground">This link has expired. {ASK_FOR_NEW_LINK}</AlertDescription>
@@ -303,15 +237,13 @@ export default function SigningPage() {
               <p id="signature-pad-label" className="text-sm font-medium text-foreground">
                 Your signature
               </p>
-              <div className="rounded-xl border border-border bg-muted p-2">
-                {/* The pad's own colours are drawn into the saved image, so they are set in code above, not by the theme. */}
-                <canvas
-                  ref={canvasRef}
-                  aria-labelledby="signature-pad-label"
-                  aria-describedby={padError ? "signature-pad-error" : undefined}
-                  className="h-48 w-full touch-none rounded-md border border-dashed border-border"
-                />
-              </div>
+              <SignaturePad
+                ref={padRef}
+                labelledBy="signature-pad-label"
+                describedBy={padError ? "signature-pad-error" : undefined}
+                onInk={() => setPadError(null)}
+                onReset={() => setPadError("The box was cleared because the screen size changed. Sign again.")}
+              />
               {padError ? (
                 <p id="signature-pad-error" role="alert" className="text-sm font-medium text-destructive">
                   {padError}
@@ -319,7 +251,7 @@ export default function SigningPage() {
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="lg" onClick={handleClear}>
+              <Button type="button" variant="outline" size="lg" onClick={() => padRef.current?.clear()}>
                 <Eraser aria-hidden="true" />
                 Clear
               </Button>
@@ -333,3 +265,139 @@ export default function SigningPage() {
     </div>
   );
 }
+
+type SignaturePadHandle = {
+  /** The drawing as dark ink on transparent, trimmed to the ink; null when nothing was drawn. */
+  signature: () => Promise<string | null>;
+  clear: () => void;
+};
+
+type SignaturePadProps = {
+  labelledBy: string;
+  describedBy?: string;
+  onInk: () => void;
+  /** The box was cleared because its size changed (a phone turned, a window resized). */
+  onReset: () => void;
+};
+
+/** Ink drawn on the pad: dark on the white box, in every theme, and in the saved image. */
+const PAD_INK = "#0b1220";
+
+/**
+ * The signature box. It is only shown once the request has been read and is waiting for a signature. Resizing
+ * a canvas wipes it, so a size change clears the drawing on purpose and says so; Submit then asks for a new
+ * signature instead of sending a blank one.
+ */
+const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(({ labelledBy, describedBy, onInk, onReset }, ref) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** True once the person has drawn something since the box was last cleared. */
+  const hasInk = useRef(false);
+  const callbacks = useRef({ onInk, onReset });
+  useEffect(() => {
+    callbacks.current = { onInk, onReset };
+  });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return undefined;
+    let size = { width: 0, height: 0 };
+    let drawing = false;
+
+    const fit = () => {
+      const width = canvas.offsetWidth;
+      const height = canvas.offsetHeight;
+      if (!width || !height || (width === size.width && height === size.height)) return;
+      const hadInk = hasInk.current;
+      size = { width, height };
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      context.lineWidth = 2.5;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.strokeStyle = PAD_INK;
+      hasInk.current = false;
+      if (hadInk) callbacks.current.onReset();
+    };
+
+    const point = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+    const down = (event: PointerEvent) => {
+      drawing = true;
+      hasInk.current = true;
+      callbacks.current.onInk();
+      canvas.setPointerCapture?.(event.pointerId);
+      const { x, y } = point(event);
+      context.beginPath();
+      context.moveTo(x, y);
+      // A tap leaves a dot.
+      context.lineTo(x + 0.1, y + 0.1);
+      context.stroke();
+    };
+    const move = (event: PointerEvent) => {
+      if (!drawing) return;
+      const { x, y } = point(event);
+      context.lineTo(x, y);
+      context.stroke();
+    };
+    const up = () => {
+      drawing = false;
+      context.closePath();
+    };
+
+    fit();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => fit()) : null;
+    observer?.observe(canvas);
+    window.addEventListener("resize", fit);
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+    canvas.addEventListener("pointerleave", up);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", fit);
+      canvas.removeEventListener("pointerdown", down);
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", up);
+      canvas.removeEventListener("pointerleave", up);
+    };
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    signature: async () => {
+      const canvas = canvasRef.current;
+      if (!canvas || !hasInk.current) return null;
+      return cleanSignatureCanvas(canvas);
+    },
+    clear: () => {
+      const canvas = canvasRef.current;
+      const context = canvas?.getContext("2d");
+      if (!canvas || !context) return;
+      context.save();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.restore();
+      hasInk.current = false;
+    }
+  }));
+
+  return (
+    <div className="rounded-xl border border-border bg-muted p-2">
+      {/* White in every theme: what is drawn here is what prints on the certificate. */}
+      <canvas
+        ref={canvasRef}
+        aria-labelledby={labelledBy}
+        aria-describedby={describedBy}
+        className="h-48 w-full touch-none rounded-md border border-dashed border-slate-300 bg-white"
+      />
+    </div>
+  );
+});
+
+SignaturePad.displayName = "SignaturePad";

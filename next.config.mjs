@@ -23,9 +23,26 @@ const publicApiPaths = [
   "organizations/ghmo/donations/stats"
 ];
 
+/**
+ * The public pages' Content-Security-Policy, as a fixed header so cached pages are served without a function run
+ * (proxy.ts only runs on the secure prefixes, where it sets a per-request nonce policy). Keep in step with
+ * buildPublicCsp and SECURE_PREFIXES in src/lib/security/csp.ts; tests/unit/csp.test.ts checks both.
+ */
+const SECURE_PREFIXES = ["admin", "login", "sign", "unsubscribe"];
+const isDev = process.env.NODE_ENV === "development";
+const PUBLIC_CSP = [
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'"
+].join("; ");
+const publicPageSource = `/:path((?!(?:${SECURE_PREFIXES.join("|")}|api|_next)(?:/|$)).*)`;
+
 const nextConfig = {
   typedRoutes: true,
   poweredByHeader: false,
+  // Home and Donate ask for quality 60; Next serves only the qualities listed here.
+  images: { qualities: [60, 75] },
   // Cached public pages (Home, Donate, Minutes, Events) refresh every 5 minutes in the background. Without a
   // limit, the first visitor after a quiet weekend would be served a days-old copy (a past event as "next")
   // while the new one builds; after an hour the old copy is no longer served at all.
@@ -41,6 +58,13 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: baseSecurityHeaders },
+      { source: publicPageSource, headers: [{ key: "Content-Security-Policy", value: PUBLIC_CSP }] },
+      // Behind HTTPS (Vercel), also upgrade any http: subresource; local http test servers don't send this header.
+      {
+        source: publicPageSource,
+        has: [{ type: "header", key: "x-forwarded-proto", value: "https" }],
+        headers: [{ key: "Content-Security-Policy", value: `${PUBLIC_CSP}; upgrade-insecure-requests` }]
+      },
       // Signing links carry a secret token in the URL: never leak it via Referer.
       { source: "/sign/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
       { source: `/api/:path((?!(?:${publicApiPaths.join("|")})$).*)`, headers: [{ key: "Cache-Control", value: "no-store" }] },
@@ -50,4 +74,5 @@ const nextConfig = {
   }
 };
 
+export { PUBLIC_CSP, SECURE_PREFIXES as PUBLIC_CSP_SECURE_PREFIXES, publicPageSource };
 export default nextConfig;

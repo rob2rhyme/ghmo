@@ -13,7 +13,9 @@ export const dynamic = "force-dynamic";
 
 const signingSessionSchema = z.object({
   role: z.enum(["witness1", "witness2", "officiant", "issuingAuthority"]),
-  certificateId: z.string().trim().max(200).optional(),
+  // The certificate's number ("GHMO-2026-001"): every signature is collected for a numbered certificate, and
+  // finalizing checks that each signature was collected for the number being issued.
+  certificateId: z.string().trim().min(1).max(200),
   /** What is being signed ("Wedding certificate"), shown to the signer. Plain text, no personal details. */
   documentTitle: z.string().trim().max(80).optional(),
   expiresInMinutes: z.number().int().min(1).max(60).optional()
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
       .set({
         status: "pending",
         role: payload.role,
-        certificateId: payload.certificateId ?? null,
+        certificateId: payload.certificateId,
         documentTitle: payload.documentTitle || null,
         createdAt: FieldValue.serverTimestamp(),
         expiresAt,

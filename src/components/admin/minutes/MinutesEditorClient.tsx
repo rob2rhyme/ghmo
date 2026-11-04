@@ -13,8 +13,8 @@ import {
   MeetingSignatures,
   MinutesStatus
 } from "@/src/lib/minutes";
-import MinutesPreview, { MinutesPreviewData } from "@/src/features/minutes/components/MinutesPreview";
-import { LETTER_HEIGHT_PX, LETTER_WIDTH_PX } from "@/src/features/docgen/components/LetterheadPage";
+import MinutesPreview, { MinutesPreviewData, type MinutesPreviewHandle } from "@/src/features/minutes/components/MinutesPreview";
+import { buildLetterPdf, capturePages, downloadDataUrl, stackPagesAsJpeg } from "@/src/features/docgen/export/letterExport";
 import { COMMUNITY_SLUG } from "@/src/lib/community.constants";
 import { resolveActorName } from "@/src/lib/actor";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
@@ -66,7 +66,6 @@ type MinutesEditorClientProps = {
 type ExportFormat = "pdf" | "jpeg";
 type PreviewZoomMode = "fit" | "100";
 
-const PIXEL_RATIO = 2;
 const isNonNull = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
 /** A random Firestore-style document id; chosen here so the ciphertext can be bound to it. */
@@ -97,8 +96,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyForm()));
   const [minutesSaveStatus, setMinutesSaveStatus] = useState<string | null>(null);
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
-  const minutesPreviewRef = useRef<HTMLDivElement | null>(null);
+  const minutesPreviewRef = useRef<MinutesPreviewHandle | null>(null);
   const [previewReady, setPreviewReady] = useState(false);
+  const [previewPageCount, setPreviewPageCount] = useState(1);
   const [isExportingMinutes, setIsExportingMinutes] = useState(false);
   const [minutesExportStatus, setMinutesExportStatus] = useState<string | null>(null);
   const [approvalNotesInput, setApprovalNotesInput] = useState("");
@@ -356,17 +356,10 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
 
     setIsExportingMinutes(true);
     setMinutesExportStatus(null);
-    const exportWidth = LETTER_WIDTH_PX * PIXEL_RATIO;
-    const exportHeight = LETTER_HEIGHT_PX * PIXEL_RATIO;
     try {
-      // Loaded on demand: the export libraries are only needed when someone downloads.
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(minutesPreviewRef.current, {
-        width: exportWidth,
-        height: exportHeight,
-        pixelRatio: PIXEL_RATIO,
-        backgroundColor: "#ffffff"
-      });
+      // Every page: long minutes continue on more pages instead of being cut off.
+      await minutesPreviewRef.current.settle();
+      const images = await capturePages(minutesPreviewRef.current.pages());
       const safeTitle = (displayEventTitle || "meeting-minutes")
         .toLowerCase()
         .replace(/\s+/g, "-")
@@ -375,16 +368,12 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
         .replace(/^-|-$/g, "");
       const baseName = safeTitle || "meeting-minutes";
       if (format === "jpeg") {
-        downloadDataUrl(`${baseName}.jpg`, dataUrl);
-        toast.success("Image (JPEG) downloaded.");
+        // One image: the pages one under another.
+        downloadDataUrl(await stackPagesAsJpeg(images), `${baseName}.jpg`);
+        toast.success(images.length === 1 ? "Image (JPEG) downloaded." : `Image (JPEG) downloaded: ${images.length} pages, one under another.`);
       } else {
-        const { jsPDF } = await import("jspdf");
-        const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        doc.addImage(dataUrl, "PNG", 0, 0, pageWidth, pageHeight);
-        doc.save(`${baseName}.pdf`);
-        toast.success("PDF downloaded.");
+        (await buildLetterPdf(images, "PNG")).save(`${baseName}.pdf`);
+        toast.success(images.length === 1 ? "PDF downloaded." : `PDF downloaded (${images.length} pages).`);
       }
     } catch (err) {
       console.error("Minutes export failed", err);
@@ -504,9 +493,8 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
     setStatusActionStatus(null);
   }, [editingEntry]);
 
-  useEffect(() => {
-    setPreviewReady(false);
-  }, [previewMinutesData]);
+  // previewReady stays true once the letterhead has loaded: edits re-render the same pages, whose letterhead image
+  // doesn't load again (resetting it here used to leave the downloads disabled after the first edit).
 
   const editingVersion = editingEntry?.version;
   useEffect(() => {
@@ -855,6 +843,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
             ref={minutesPreviewRef}
             minutes={previewMinutesData}
             onBackgroundLoad={() => setPreviewReady(true)}
+            onPageCountChange={setPreviewPageCount}
             zoomMode={previewZoomMode}
             className="min-h-0 xl:flex-1"
           />
@@ -868,6 +857,11 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                 Download image (JPEG)
               </Button>
             </div>
+            {previewPageCount > 1 ? (
+              <p className="text-sm text-muted-foreground">
+                These minutes don&apos;t fit on one page: they continue on {previewPageCount} pages, and the PDF includes every page.
+              </p>
+            ) : null}
             {minutesExportStatus || exportBlockedReason ? (
               <p role="status" className={cn("text-sm", minutesExportStatus ? "font-medium text-destructive" : "text-muted-foreground")}>
                 {minutesExportStatus?.replace(/^Error: /, "") ?? exportBlockedReason}
@@ -986,13 +980,6 @@ function AddButton({ onClick, children }: { onClick: () => void; children: React
       {children}
     </Button>
   );
-}
-
-function downloadDataUrl(filename: string, dataUrl: string) {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = filename;
-  link.click();
 }
 
 function createEmptyForm(): MeetingMinutesFormInput {

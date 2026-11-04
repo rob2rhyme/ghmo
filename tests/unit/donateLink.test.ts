@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDonateUrl, getDonationEmbedCampaignId } from "@/src/lib/donateLink";
+import { getDonateUrl } from "@/src/lib/donateLink";
 
 describe("getDonateUrl", () => {
   it("is null until a real campaign link is set", () => {
@@ -14,13 +14,5 @@ describe("getDonateUrl", () => {
     expect(getDonateUrl("http://www.gofundme.com/f/ghmo-gumba")).toBeNull();
     expect(getDonateUrl("https://gofundme.com.evil.example/f/x")).toBeNull();
     expect(getDonateUrl("not a url")).toBeNull();
-  });
-});
-
-describe("getDonationEmbedCampaignId", () => {
-  it("needs a plain campaign id", () => {
-    expect(getDonationEmbedCampaignId(undefined)).toBeNull();
-    expect(getDonationEmbedCampaignId("abc-123")).toBe("abc-123");
-    expect(getDonationEmbedCampaignId("<script>")).toBeNull();
   });
 });

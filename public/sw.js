@@ -7,6 +7,8 @@
  *  - Optimised public images (/_next/image, same origin) are served from a small cache and refreshed in
  *    the background (stale-while-revalidate), at most IMAGE_CACHE_LIMIT entries.
  *  - When a page can't load because the device is offline, a static offline page is shown instead.
+ *  - Navigation preload is on: the browser starts the page request while the worker is still starting, so a
+ *    return visit doesn't wait for the worker before the network. The preloaded answer is used as-is.
  * Bump VERSION when this file's caching rules change; old caches are deleted on activate.
  */
 const VERSION = "v2";
@@ -21,13 +23,23 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then(keys => Promise.all(keys.filter(key => key.startsWith("ghmo-") && key !== STATIC_CACHE && key !== IMAGE_CACHE).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
+  const preload = self.registration.navigationPreload ? self.registration.navigationPreload.enable().catch(() => undefined) : Promise.resolve();
+  const cleanup = caches
+    .keys()
+    .then(keys => Promise.all(keys.filter(key => key.startsWith("ghmo-") && key !== STATIC_CACHE && key !== IMAGE_CACHE).map(key => caches.delete(key))));
+  event.waitUntil(Promise.all([preload, cleanup]).then(() => self.clients.claim()));
 });
+
+/** Pages: the navigation-preload answer when there is one, else the network; never a cache. Offline page on failure. */
+async function navigationResponse(event) {
+  try {
+    const preloaded = await event.preloadResponse;
+    if (preloaded) return preloaded;
+    return await fetch(event.request);
+  } catch {
+    return (await caches.match(OFFLINE_URL)) || Response.error();
+  }
+}
 
 function isCacheableAsset(url) {
   return url.origin === self.location.origin && (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/"));
@@ -49,8 +61,8 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   if (request.mode === "navigate") {
-    // Network only; fall back to the offline page when there is no connection.
-    event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
+    // Network only (via navigation preload); fall back to the offline page when there is no connection.
+    event.respondWith(navigationResponse(event));
     return;
   }
 

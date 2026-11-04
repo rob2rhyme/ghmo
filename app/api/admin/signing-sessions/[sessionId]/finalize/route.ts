@@ -24,10 +24,15 @@ import { deviceBelongsTo, largeEnvelopeSchema, type EnvelopeInput } from "@/src/
 export const dynamic = "force-dynamic";
 
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
-/** Certificate image cap. (The resulting PDF must still fit in a 1 MiB Firestore document.) */
+const JPEG_DATA_URL_PREFIX = "data:image/jpeg;base64,";
+/** Certificate image cap, for all pages together. (The resulting PDF must still fit in a 1 MiB Firestore document.) */
 const MAX_PNG_DATA_URL_CHARS = 8 * 1024 * 1024;
-/** Image plus the rest of the payload. */
+/** A certificate runs to two pages today; this leaves room without inviting abuse. */
+const MAX_PAGES = 6;
+/** Images plus the rest of the payload. */
 const MAX_FINALIZE_BODY_BYTES = MAX_PNG_DATA_URL_CHARS + 512 * 1024;
+/** The stored PDF (base64) and the inputs share one Firestore document of at most 1 MiB. */
+const MAX_STORED_PDF_BASE64_CHARS = 960_000;
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 const INPUT_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_INPUT_FIELDS = 100;
@@ -52,6 +57,7 @@ const finalizeSchema = z.object({
     // With encryption on the browser builds the PDF and sends it, with the inputs, as `enc` bound to `docId`.
     docId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
     enc: largeEnvelopeSchema.optional(),
+    // One page image (older browsers' copy of this page).
     pngDataUrl: z
       .string()
       .max(MAX_PNG_DATA_URL_CHARS)
@@ -60,10 +66,32 @@ const finalizeSchema = z.object({
           value.startsWith(PNG_DATA_URL_PREFIX) && BASE64_PATTERN.test(value.slice(PNG_DATA_URL_PREFIX.length)),
         { message: "Expected a PNG data URL" }
       )
+      .optional(),
+    // Every page, in order (PNG or JPEG): the PDF gets one page per image.
+    pageImages: z
+      .array(
+        z
+          .string()
+          .max(MAX_PNG_DATA_URL_CHARS)
+          .refine(value => pageImageFormat(value) !== null, { message: "Expected a PNG or JPEG data URL" })
+      )
+      .min(1)
+      .max(MAX_PAGES)
+      .refine(pages => pages.reduce((sum, page) => sum + page.length, 0) <= MAX_PNG_DATA_URL_CHARS, { message: "The page images are too large" })
       .optional()
   }),
   signatures: z.partialRecord(z.enum(["witness1", "witness2", "officiant", "issuingAuthority"]), signingSessionIdSchema).optional()
 });
+
+function pageImageFormat(value: string): "PNG" | "JPEG" | null {
+  for (const [prefix, format] of [
+    [PNG_DATA_URL_PREFIX, "PNG"],
+    [JPEG_DATA_URL_PREFIX, "JPEG"]
+  ] as const) {
+    if (value.startsWith(prefix) && BASE64_PATTERN.test(value.slice(prefix.length))) return format;
+  }
+  return null;
+}
 
 function toDate(value: unknown): Date | undefined {
   if (!value) return undefined;
@@ -98,14 +126,25 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     }
     const e2eeOn = (await getState()).enabled;
     if (e2eeOn) {
-      if (!certificatePayload.enc || !certificatePayload.docId || !certificatePayload.pdfSha256 || certificatePayload.inputs || certificatePayload.pngDataUrl) {
+      if (
+        !certificatePayload.enc ||
+        !certificatePayload.docId ||
+        !certificatePayload.pdfSha256 ||
+        certificatePayload.inputs ||
+        certificatePayload.pngDataUrl ||
+        certificatePayload.pageImages
+      ) {
         return NextResponse.json({ error: "Encryption is on: send the finalized document encrypted.", code: "E2EE_REQUIRED" }, { status: 400 });
       }
       if (!(await deviceBelongsTo(certificatePayload.enc as EnvelopeInput, actor.uid))) {
         return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
       }
-    } else if (certificatePayload.enc || !certificatePayload.pngDataUrl) {
+    } else if (certificatePayload.enc || Boolean(certificatePayload.pngDataUrl) === Boolean(certificatePayload.pageImages)) {
       return NextResponse.json({ error: "Invalid certificate payload" }, { status: 400 });
+    }
+    // A certificate is issued under its own number, never the template's name (older pages fell back to it).
+    if (certificatePayload.certificateId?.trim() === certificatePayload.templateId) {
+      return NextResponse.json({ error: "This certificate has no number yet. Request a signature again to assign one." }, { status: 400 });
     }
     const sessionIds = new Set<string>([params.sessionId]);
     if (payload.signatures) {
@@ -172,12 +211,23 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
       // create() refuses an id that already exists, so a finalized certificate can't be replaced.
       batch.create(savedRef, { ...common, enc: certificatePayload.enc });
     } else {
+      // One PDF page per page image; the hash covers the whole PDF, every page.
+      const pages = certificatePayload.pageImages ?? [certificatePayload.pngDataUrl!];
       const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      doc.addImage(certificatePayload.pngDataUrl!, "PNG", 0, 0, pageWidth, pageHeight);
+      pages.forEach((image, index) => {
+        if (index > 0) doc.addPage("letter", "portrait");
+        doc.addImage(image, pageImageFormat(image)!, 0, 0, pageWidth, pageHeight);
+      });
       const pdfBytes = Buffer.from(doc.output("arraybuffer"));
       pdfBase64 = pdfBytes.toString("base64");
+      if (pdfBase64.length > MAX_STORED_PDF_BASE64_CHARS) {
+        return NextResponse.json(
+          { error: "This certificate is too large to save. Shorten the custom blessing or notes and try again." },
+          { status: 413 }
+        );
+      }
       pdfSha256 = sha256Hex(pdfBytes);
       savedRef = documentsCollection.doc();
       batch.create(savedRef, { ...common, inputs: certificatePayload.inputs ?? {}, pdfBase64 });

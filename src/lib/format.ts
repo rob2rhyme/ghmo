@@ -26,6 +26,12 @@ export function formatDate(value: DateInput, { timeZone }: Opts = {}): string {
 }
 
 /** "Dec 12, 2026" */
+/**
+ * For a date typed as a calendar day (a minutes due date): stored as midnight UTC, so it must be shown in UTC,
+ * or viewers west of UTC see the day before.
+ */
+export const DUE_DATE = { timeZone: "UTC" } as const;
+
 export function formatShortDate(value: DateInput, { timeZone }: Opts = {}): string {
   const d = toDate(value);
   return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone }) : "";

@@ -96,13 +96,22 @@ export default function NotificationsPanel() {
       }
       description={
         <>
-          Get an email when there is new activity in Admin chat or Plans & Issues, or minutes need approval. The email never contains any
-          content, only a link, and you get at most one of each kind every 30 minutes.
+          An email never contains any content, only a link, and you get at most one of each kind every 30 minutes.
           {prefs.address ? ` Sent to ${prefs.address}.` : ""}
         </>
       }
     >
       <div className="flex flex-col gap-3">
+        {/* Every kind in src/lib/notifications.ts (R4 C12). Outside the description, which is a <p>. */}
+        <div className="text-sm">
+          <p>When they are on, you get an email when:</p>
+          <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+            <li>there is new activity in Admin chat or Plans &amp; Issues</li>
+            <li>meeting minutes are waiting for approval</li>
+            <li>a call campaign has calls for you to make (and a reminder while some are left)</li>
+            <li>an admin&apos;s authenticator app is locked after too many wrong codes</li>
+          </ul>
+        </div>
         {!prefs.configured ? <p className="text-sm text-muted-foreground">Email sending isn&apos;t set up on this site yet, so nothing will be sent.</p> : null}
         <div className="flex flex-wrap gap-2">
           <Button onClick={toggle} loading={busy} variant="outline">

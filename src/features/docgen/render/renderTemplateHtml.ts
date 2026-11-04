@@ -5,6 +5,14 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric"
 });
+/** For typed calendar dates: the day is fixed at midnight UTC and read back in UTC, so no time zone can shift it. */
+const CALENDAR_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  timeZone: "UTC"
+});
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export const LETTERHEAD_STYLES = `
   * {
@@ -77,10 +85,25 @@ export function escapeHtml(value?: string) {
     .replace(/'/g, "&#39;");
 }
 
-/** A date for letter HTML. Anything that isn't a date is shown as typed, escaped (it lands in HTML). */
+/**
+ * A date for letter HTML. A typed date ("2026-11-04", what a date field holds) is a calendar day and prints as
+ * that day everywhere: `new Date("2026-11-04")` is midnight UTC, which is still November 3 in Harrisburg.
+ * A value with a time (ISO with "T") is a moment and prints as the local day. Anything that isn't a date is
+ * shown as typed, escaped (it lands in HTML).
+ */
 export function formatDate(value?: string) {
   if (!value) return "";
   try {
+    const calendar = CALENDAR_DATE.exec(value.trim());
+    if (calendar) {
+      const [, year, month, day] = calendar.map(Number);
+      const utc = new Date(Date.UTC(year, month - 1, day));
+      // Rejects impossible days such as 2026-02-31 instead of rolling them into March.
+      if (utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day) {
+        return CALENDAR_DATE_FORMATTER.format(utc);
+      }
+      return escapeHtml(value);
+    }
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return escapeHtml(value);
     return DATE_FORMATTER.format(date);

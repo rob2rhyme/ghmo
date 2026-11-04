@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const adminEnvStatus = getAdminEnvStatus();
   if (!adminEnvStatus.ok) {
     return NextResponse.json(
-      { error: "Admin env not configured" },
+      { error: "This can't be loaded right now. Try again in a few minutes." },
       { status: 503 }
     );
   }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey) {
       console.warn("Missing NEXT_PUBLIC_FIREBASE_API_KEY; cannot send email login link");
-      return NextResponse.json({ error: "Email login is temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: "Email sign-in isn't available right now. Try again in a few minutes." }, { status: 503 });
     }
 
     // Never log the email, continue URL or Identity Toolkit body (plan S-08).
@@ -122,20 +122,20 @@ export async function POST(req: NextRequest) {
             {
               ok: false,
               code: "QUOTA_EXCEEDED",
-              message: "Daily email sign-in quota exceeded. Try again tomorrow or enable billing."
+              message: "Today's limit for sign-in emails has been reached. Try again tomorrow, or sign in with your authenticator app or passkey."
             },
             { status: 429 }
           );
         }
         console.error("Identity Toolkit sendOobCode failed", { status: identityRes.status, code });
         return NextResponse.json(
-          { ok: false, code: "SEND_FAILED", message: "Unable to send sign-in link right now." },
+          { ok: false, code: "SEND_FAILED", message: "The sign-in email couldn't be sent. Try again in a few minutes." },
           { status: 503 }
         );
       }
     } catch (error) {
       console.error("Failed to send admin email sign-in link", error instanceof Error ? error.message : "unknown error");
-      return NextResponse.json({ error: "Unable to send sign-in link right now" }, { status: 500 });
+      return NextResponse.json({ error: "The sign-in email couldn't be sent. Try again in a few minutes." }, { status: 500 });
     }
 
     await logAuditEvent({
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof AdminEnvError) {
       return NextResponse.json(
-        { error: "Admin env not configured" },
+        { error: "This can't be loaded right now. Try again in a few minutes." },
         { status: 503 }
       );
     }

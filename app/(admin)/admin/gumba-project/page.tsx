@@ -7,6 +7,7 @@ import type { Metadata, Route } from "next";
 import { NotebookPen } from "lucide-react";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
+import { AllMinutesLink } from "@/src/components/admin/dashboard/AllMinutesLink";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -14,7 +15,7 @@ import { EmptyState } from "@/src/components/ui/empty-state";
 import { ProgressBar, StatGrid, StatTile } from "@/src/components/ui/stat";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { percentOf } from "@/src/lib/adminView";
-import { formatDate, formatDateTime, formatShortDate, toDate, type DateInput } from "@/src/lib/format";
+import { formatDate, formatDateTime, formatShortDate, toDate, DUE_DATE, type DateInput } from "@/src/lib/format";
 import type { MeetingAttendance, MeetingMinutesRecord } from "@/src/lib/minutes";
 import { resolveActorLabel } from "@/src/lib/actor";
 import { DEFAULT_TIMEZONE } from "@/src/lib/events.shared";
@@ -62,7 +63,7 @@ export default async function GumbaProjectPage() {
         description={lastUpdated ? `Last update from GoFundMe: ${lastUpdated}` : undefined}
         actions={
           <Button asChild variant="outline" size="row">
-            <Link href="/donate">See the Donate page</Link>
+            <Link href="/donate" prefetch={false}>See the Donate page</Link>
           </Button>
         }
       >
@@ -97,11 +98,7 @@ export default async function GumbaProjectPage() {
       <AdminSectionCard
         title="Recent meeting minutes"
         description="The last three meetings, for the decisions and tasks behind the project."
-        actions={
-          <Button asChild variant="ghost" size="row">
-            <Link href="/admin/minutes?mode=records">All minutes</Link>
-          </Button>
-        }
+        actions={recentMinutes.length ? <AllMinutesLink /> : null}
       >
         {recentMinutes.length === 0 ? (
           <EmptyState
@@ -148,7 +145,7 @@ export default async function GumbaProjectPage() {
                         <ul className="list-disc space-y-1 pl-5">
                           {actionItems.map((action, idx) => (
                             <li key={`${entry.id}-action-${idx}`}>
-                              {[action.task, action.assignedTo, action.dueDate && formatShortDate(action.dueDate) ? `due ${formatShortDate(action.dueDate)}` : ""]
+                              {[action.task, action.assignedTo, action.dueDate && formatShortDate(action.dueDate, DUE_DATE) ? `due ${formatShortDate(action.dueDate, DUE_DATE)}` : ""]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </li>

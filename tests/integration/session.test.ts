@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { DELETE, POST } from "@/app/api/auth/session/route";
+import { GET as CUSTOM_TOKEN } from "@/app/api/auth/firebase-custom-token/route";
 import { getAuthContextFromRequest } from "@/src/lib/auth";
 import { getAdminAuth, getAdminDb } from "@/src/lib/firebaseAdmin";
 
@@ -63,23 +64,51 @@ beforeEach(async () => {
 afterAll(clearEmulators);
 
 describe("POST /api/auth/session", () => {
-  it("gives an active admin a revocable, HttpOnly session cookie", async () => {
-    const res = await postSession(await idTokenFor("admin-1", ADMIN_CLAIMS, "admin@example.org"));
+  it("gives an allowlisted member a revocable, HttpOnly session cookie", async () => {
+    const res = await postSession(await idTokenFor("member-uid", {}, "member@example.org"));
     expect(res.status).toBe(200);
     const { header, value } = sessionCookieFrom(res);
     expect(header).toMatch(/HttpOnly/i);
     expect(header).toMatch(/SameSite=lax/i);
     expect(header).toMatch(/Max-Age=28800/);
     // It is a session cookie, not the raw ID token.
-    await expect(getAdminAuth().verifySessionCookie(value, true)).resolves.toMatchObject({ uid: "admin-1" });
+    await expect(getAdminAuth().verifySessionCookie(value, true)).resolves.toMatchObject({ uid: "member-uid" });
     // The pre-Phase-1 cookie gets cleared.
     expect(res.headers.getSetCookie().some(c => c.startsWith("sessionToken=;"))).toBe(true);
   });
 
-  it("refuses a disabled admin", async () => {
-    const res = await postSession(await idTokenFor("admin-off", ADMIN_CLAIMS, "off@example.org"));
-    expect(res.status).toBe(403);
+  it("never makes an admin session: admin sessions come only from the server-side sign-in steps", async () => {
+    const active = await postSession(await idTokenFor("admin-1", ADMIN_CLAIMS, "admin@example.org"));
+    expect(active.status).toBe(403);
+    expect(sessionCookieFrom(active).header).toBeUndefined();
+    const disabled = await postSession(await idTokenFor("admin-off", ADMIN_CLAIMS, "off@example.org"));
+    expect(disabled.status).toBe(403);
+  });
+
+  it("refuses the browser's Firestore token (it carries sessionExp), even for a member", async () => {
+    const res = await postSession(await idTokenFor("member-uid", { sessionExp: Math.floor(Date.now() / 1000) + 3600 }, "member@example.org"));
+    expect(res.status).toBe(401);
     expect(sessionCookieFrom(res).header).toBeUndefined();
+  });
+
+  it("can't renew an admin session: cookie -> Firestore custom token -> new cookie is refused", async () => {
+    // An admin session as the server-side sign-in makes it (passkey strength).
+    const idToken = await idTokenFor("admin-1", { ...ADMIN_CLAIMS, authMethod: "passkey" }, "admin@example.org");
+    const cookie = await getAdminAuth().createSessionCookie(idToken, { expiresIn: 3600 * 1000 });
+    const tokenRes = await CUSTOM_TOKEN(
+      new NextRequest("http://localhost/api/auth/firebase-custom-token", { headers: { cookie: `__session=${cookie}` } })
+    );
+    expect(tokenRes.status).toBe(200);
+    const { token } = (await tokenRes.json()) as { token: string };
+    const signIn = await fetch(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, returnSecureToken: true })
+    });
+    const { idToken: firestoreToken } = (await signIn.json()) as { idToken: string };
+    const renewed = await postSession(firestoreToken);
+    expect(renewed.status).toBeGreaterThanOrEqual(400);
+    expect(sessionCookieFrom(renewed).header).toBeUndefined();
   });
 
   it("refuses an arbitrary Firebase user who is not on any allowlist", async () => {
@@ -110,8 +139,10 @@ describe("POST /api/auth/session", () => {
 
 describe("session verification and logout", () => {
   it("authenticates requests with the session cookie, and logout revokes it", async () => {
-    const login = await postSession(await idTokenFor("admin-1", ADMIN_CLAIMS, "admin@example.org"));
-    const { value } = sessionCookieFrom(login);
+    // An admin session as the server-side sign-in steps make it (they call createSessionCookie directly).
+    const value = await getAdminAuth().createSessionCookie(await idTokenFor("admin-1", ADMIN_CLAIMS, "admin@example.org"), {
+      expiresIn: 3600 * 1000
+    });
 
     const ctx = await getAuthContextFromRequest(requestWithCookie(value));
     expect(ctx).toMatchObject({ uid: "admin-1", orgSlug: "ghmo", role: "admin" });

@@ -19,9 +19,3 @@ export function getDonateUrl(value = process.env.GOFUNDME_PUBLIC_URL): string | 
     return null;
   }
 }
-
-/** A GoFundMe Pro campaign id for the embedded donation form, from GOFUNDME_PRO_CAMPAIGN_ID. */
-export function getDonationEmbedCampaignId(value = process.env.GOFUNDME_PRO_CAMPAIGN_ID): string | null {
-  const raw = value?.trim();
-  return raw && /^[A-Za-z0-9_-]{1,128}$/.test(raw) ? raw : null;
-}

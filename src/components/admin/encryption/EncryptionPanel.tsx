@@ -19,6 +19,7 @@ import { useE2ee, type DeviceView, type PreparedRecovery } from "@/src/lib/e2ee/
 import { formatShortDate } from "@/src/lib/format";
 import { DeviceSetupForm } from "./DeviceSetupForm";
 import { MigrationSection } from "./MigrationSection";
+import { PAUSED_BODY, PAUSED_NEXT_STEP, PAUSED_TITLE, PausedDetails } from "./PausedNotice";
 import { errorText, UnlockCard } from "./UnlockCard";
 import { RecoveryKeyFlow } from "./RecoveryKeyFlow";
 import { EXPLAIN, WhatIsThis } from "./WhatIsThis";
@@ -575,15 +576,11 @@ export default function EncryptionPanel() {
     return (
       <Alert variant="destructive">
         <ShieldAlert />
-        <AlertTitle>The device list failed its integrity check</AlertTitle>
+        <AlertTitle>{PAUSED_TITLE}</AlertTitle>
         <AlertDescription>
-          <p>{integrity.status === "failed" ? integrity.reason : "It could not be verified."}</p>
-          <p className="mt-2">
-            Encryption is paused on this device: nothing is unlocked, approved or written. This can mean the database was changed outside the app.
-          </p>
-          <p className="mt-2 font-medium text-foreground">
-            Stop and contact your super admin; they have the incident guide. Tell the other admins, and compare device safety codes with their owners.
-          </p>
+          <p>{PAUSED_BODY}</p>
+          <p className="mt-2 font-medium text-foreground">{PAUSED_NEXT_STEP}</p>
+          <PausedDetails reason={integrity.status === "failed" ? integrity.reason : null} />
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="outline" onClick={refresh}>
               <RefreshCw aria-hidden="true" />
