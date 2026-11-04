@@ -208,7 +208,8 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
 | **8** | Email broadcasts to members | **Built (8-A to 8-E, §10.8). Waiting on the owner's set-up steps before the first real send.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
-| **9** | Member outreach: calling tree and call campaigns | **Built 2026-11-01 (9-A to 9-D, §12.7); not yet pushed or deployed.** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
+| **9** | Member outreach: calling tree and call campaigns | **Built and merged 2026-11-01 (9-A to 9-D, §12.7); members without email added 2026-11-04 (#82).** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
+| **11** | Officer positions, member groups and event tasks | **Planned 2026-11-05 (§15), not started.** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, and calling-tree suggestions from the callers group. Admins only; decisions D17–D20 proposed. | Owner accepts D17–D20; each sub-phase's exit criteria in §15.4. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -927,3 +928,78 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 - Duplicates: repeated emails are caught by the server as before. Without an email the browser, which can read the numbers, treats the same name and number (`phoneOnlyKey`) as the same person, both when adding one and in imports; people sharing a household phone with different names are separate members.
 - Members page: Email optional with a hint, Name needed without an email, email consent disabled without an address, a *Phone only* filter, list sorted by name, import preview counts people (and those without an email), example CSV with a phone-only row.
 - Tests: `tests/unit/members.test.ts` (state, display name, duplicate key, CSV rows without an email, refusals, mistyped email still refused, household phone kept); `tests/e2e-auth/members-contact.spec.ts` (name required, saved with `emailLower: ""` and no consent, duplicate refused, server refuses neither-email-nor-phone, email consent and removing the number, dialog refuses clearing it, import of a name-and-phone list skips the existing person and adds the household member, audit counts without numbers). Existing browser tests follow the new labels.
+
+---
+
+## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05, not started)
+
+**Goal.** The member list gains the organisation's structure: who holds which officer position (president, treasurer, secretary, board member…), which working groups people belong to (a phone-tree group that calls members about events, and event teams such as cooking, marketing and shopping), and a task checklist per event so each group knows what it owns. Admins only: members have no usable sign-in today (§15.1), so group leads who are admins coordinate their people in the app, and member self-service is a later phase.
+
+### 15.1 What was checked (2026-11-05)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| Nothing like positions, groups or event tasks exists. Officer titles appear only in the wedding-certificate dropdown (23 titles, English + Nepali) and as free-text chair/secretary names on minutes. | `src/features/docgen/templates/weddingCertificate.ts:98-127`, `src/lib/minutes.ts:9-12` | The dropdown's titles seed the new positions list; the docgen dropdown is left as it is. |
+| `members.roles` is an allowlist of `["member"]` so a member record can never grant admin power. Admin power lives only in `admins/{uid}`; there is no admin-management UI. | `app/api/organizations/[orgSlug]/members/route.ts:56-60`, `src/lib/admin.ts:160` | Positions and groups get their own fields and collections; `roles` is untouched. |
+| Members cannot use the app. The `/login` email link issues a cookie with no role claim, so every page and rule treats them as signed out; nothing links to `/login`. | `app/api/auth/session/route.ts:45-51`, `src/lib/auth.ts:84-88` | Decision: admins only for this phase. Nothing below depends on member sign-in, and nothing blocks adding it later. |
+| Callers in the calling tree must be active admins; only super admins edit the tree. | `src/lib/callingTree.server.ts:47-72` (D15) | The phone-tree group suggests callers; it never bypasses D15. |
+| Pages read Firestore directly through `adminData.server.ts`; audit actions need a sentence in `ACTIVITY`; composite indexes must be declared and created. | `src/lib/adminData.server.ts`, `src/lib/adminView.ts:63-126`, `firestore.indexes.json` | Every query below is single-field with in-memory sorting, so no new index. |
+
+### 15.2 Decisions for the owner (recommendations first; accept or change before 11-A starts)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D17 | Where does group membership live? | As `groupIds[]` on the member document, with the lead on the group document. | "Groups of a member" is free on the Members page (it already loads everyone); "members of a group" is one `array-contains` query; no new rules or index; membership changes go through one route. |
+| D18 | Who may edit what? | Positions catalogue and officer terms: super admin. Groups, membership, event tasks and templates: any active admin. Deleting a group or a template: super admin. | The officer record is governance; day-to-day coordination stays open to every admin. |
+| D19 | Encrypt any of it? | No. Positions, group membership and task notes stay plaintext. | Lists and filters need plain fields, officers already appear on certificates and the public site, and task notes are event logistics, not personal data. The task dialog says to keep notes about the work, not about people; numbers stay on the member's contact card. A `#notes` envelope slot stays possible later, as for member contacts. |
+| D20 | How does the phone-tree group map to callers? | Link a member to an admin by `uid`, else by `emailLower`, active admins only. Group members who are admins are suggested as callers; the rest are flagged "needs admin access to use My Calls"; nobody is added automatically. | The owner sees who still needs an admin account; D15 and the tree logic are untouched. |
+
+### 15.3 Design
+
+**Data (all under `organizations/ghmo`, plaintext, server-written, admin-read; new paths in `src/lib/firestorePaths.ts`):**
+- `positions/{id}`: `title`, `titleNe`, `order`, `active`, `builtIn`. Deterministic ids for the defaults (`president`, `general_secretary`…) so seeding is idempotent. Seeded lazily and idempotently on the first visit to the Positions page or the positions API (`ensurePositionDefaults` in `src/lib/positions.server.ts`); built-ins can be renamed or deactivated, not deleted.
+- `positionTerms/{id}`: `positionId`, `memberId`, `startsOn` ("YYYY-MM-DD"), `endsOn` (string or null), `note`, `createdBy`. Current = `endsOn` null or ≥ today (Harrisburg date). Setting a new holder can close the previous holder's term the day before. Past officers stay on record.
+- `groups/{id}`: `name`, `description`, `leadMemberId`, `kind` (`"callers"` or null), `active`, `builtIn`. The phone-tree group is `groups/phone_tree_callers` with `kind: "callers"`, created on first use; code finds it by `kind`, so it can be renamed. Member counts are computed on read.
+- `members/{id}.groupIds[]` (D17), written only by the group-members route.
+- `eventTasks/{id}`: `eventId`, `title`, `notes`, `groupId` (or null), `memberIds[]`, `dueOn`, `status` (open | done), `order`, `doneAt`, `doneBy`, `createdBy`. Top-level, not under the event, because events live in up to three collections and the public pages cache event documents; a separate collection can never leak into `toPublicEvent`.
+- `eventTaskTemplates/{id}`: `name`, `description`, `items[]` of `{ title, notes, groupId, dueOffsetDays, order }` (negative offsets mean "days before the event").
+- Member-to-admin link (`linkMemberToAdmin` in `src/lib/groups.ts`): `member.uid` equals an admin's id, else `member.emailLower` equals `admin.emailLower`; only active admins count; phone-only members never link.
+
+**API (pattern of `app/api/admin/calling-tree/route.ts`: env check, `requireActiveAdmin`, `isSuperAdmin` where needed, zod, `logAuditEvent`, each action labelled in `ACTIVITY`):**
+- `/api/admin/positions` (GET list with terms; POST, super), `/api/admin/positions/[id]` (PATCH, super), `/api/admin/positions/[id]/terms` (POST with `endPrevious`, super), `/api/admin/positions/terms/[termId]` (PATCH, DELETE, super).
+- `/api/admin/groups` (GET with counts and lead names; POST), `/api/admin/groups/[id]` (PATCH; DELETE super, which removes the id from every member in batches), `/api/admin/groups/[id]/members` (PUT `{ add, remove }`; the lead must stay a member).
+- `/api/admin/organizations/ghmo/events/[eventId]/tasks` (GET, POST), `…/tasks/[taskId]` (PATCH incl. status, DELETE), `…/tasks/apply-template` (POST; skips titles already present, computes due dates from the event start).
+- `/api/admin/task-templates` (GET, POST from items or from an existing event), `/api/admin/task-templates/[id]` (PATCH; DELETE super).
+- Validation: ids via `MEMBER_ID_PATTERN`, dates `YYYY-MM-DD` with `endsOn ≥ startsOn`, one open term per position and member, group must be active, members must exist. Page reads added to `adminData.server.ts`. The route sweep covers anonymous refusal.
+
+**Pages (style per `docs/UI_STYLE.md`, built from `AdminList`, `AdminSectionCard`, `Segmented`, `Select`, `Badge`, `Dialog`, `ConfirmDialog`):**
+- Sidebar: **Positions** and **Groups** under Community after Members (separate pages: three different jobs; `isActiveNavItem` and the page search work unchanged).
+- **Positions** `/admin/positions`: Current | Past | All; a row per position ("President / अध्यक्ष", current holder "since Mar 2025", past terms underneath); super admins get Set holder (member, start, optional end, confirm closing the previous term), End term, Rename, Add position.
+- **Groups** `/admin/groups` and `/admin/groups/[id]`: rows with member count, lead and open-task count; the group page lists people (badges Lead, and for the callers group Admin or "Needs admin access to use My Calls"), Add people, Make lead, Remove; and the group's tasks across events (Open | Done, due date, overdue badge, link to the event).
+- **Members**: rows gain position and group badges (three, then "+n"); Group and Position filters beside the existing ones; a Groups action opens a checkbox dialog.
+- **Event tasks**: a panel under the event form on `/admin/events/[id]/edit` (checkbox to mark done, due date, group and people, notes; Add task; Use a template; Save as template). Creating an event lands on its edit page so tasks can be added at once. The Events list shows "3 of 7 tasks done". Templates live at `/admin/events/templates`, linked from the Events page.
+
+**Calling tree:** `listCallerCandidates()` also loads the callers group and returns suggested admin members and flagged non-admin members; the Calling Tree page shows suggestions first with a badge, an info note listing who needs admin access, and a super-admin button "Check everyone in the group". `saveTree` and D15 unchanged; with no group the page is as today.
+
+### 15.4 Sub-phases (each ends deployable: lint, tests, build green)
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **11-A** | Positions, terms, groups, `groupIds`, seeds, routes, rules, nav, Positions and Groups pages, member badges and filters | Visiting Positions seeds the defaults; a holder is set with a start date and the predecessor's term closes; a group with a lead and members exists; Members filters by group; rules tests pass |
+| **11-B** | Event tasks and templates, routes, the panel on the event page, the group page's task section, the templates page | Tasks are created, done and deleted on an event; applying a template skips duplicates and computes due dates; a group page lists its tasks |
+| **11-C** | Calling-tree suggestions from the callers group | Admin group members suggested, non-admins flagged, the existing calling-tree spec unchanged and green |
+| **11-D** | Task counts on the Events list; plan §15, README data model and routes, admin guide, go-live checklist ("enter current officers with start dates; put the callers in the phone-tree group") | Docs merged |
+
+### 15.5 Tests and risks
+Unit: `tests/unit/positions.test.ts` (current and past terms, closing the previous term, overlap refused), `tests/unit/groups.test.ts` (uid beats email, inactive admins excluded, phone-only never linked, add and remove deduplicated), `tests/unit/eventTasks.test.ts` (due-date offsets across daylight-saving changes, duplicate skipping, overdue). Rules: one block proving admin read, admin write refused and anonymous read refused for all five collections. Browser: `positions-groups.spec.ts`, `event-tasks.spec.ts`, `calling-tree-groups.spec.ts`.
+
+| Risk | Mitigation |
+|---|---|
+| A group page lists names | Admin-only, plaintext names already shown on Members, never numbers |
+| Task notes could hold personal details | Help text in the dialog; numbers belong on the contact card; a later `#notes` envelope is possible |
+| Templates re-applied twice | Titles already present are skipped; past due dates show as overdue rather than being dropped |
+| A query gains an `orderBy` and needs an index | Keep every query single-field and sort in memory; the rules tests and the build would otherwise fail as in #82 |
+| Tasks reaching the public site | Separate collection, `toPublicEvent` unchanged, a rules test proves anonymous reads fail |
+
+### 15.6 Out of scope
+Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push), SMS or Messenger integration, a public "Our board" page, task comments or attachments, merging event tasks with minutes action items (only the overdue rule is shared), changing the docgen position dropdown.
