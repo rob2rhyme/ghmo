@@ -11,6 +11,10 @@ paths = [
 
 # A fake signing key used only by the browser tests (it decodes to plain ASCII text and protects
 # nothing). It appeared in two earlier commits; the test config now generates a fresh key each run.
+#
+# A fake schedule secret used only by the browser tests. It appeared in two earlier commits of the digest PR;
+# the test config now generates a fresh one each run.
 regexes = [
-  '''dGVzdC1jZXJ0aWZpY2F0ZS1rZXktMzItYnl0ZXMtbG9uZyEh'''
+  '''dGVzdC1jZXJ0aWZpY2F0ZS1rZXktMzItYnl0ZXMtbG9uZyEh''',
+  '''test-cron-secret-0123456789'''
 ]

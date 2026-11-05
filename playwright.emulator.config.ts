@@ -35,8 +35,9 @@ export const EMULATOR_ENV = {
   MAIL_API_URL: "http://127.0.0.1:4010/emails",
   BROADCAST_ORG_NAME: "Test Org",
   FEATURE_BROADCASTS: "true",
-  // The daily digest's schedule calls /api/cron/task-digest with this secret.
-  CRON_SECRET: "test-cron-secret-0123456789",
+  // The daily digest's schedule calls /api/cron/task-digest with this secret. A fresh throwaway value every run
+  // (the test workers reuse what the first load put in the environment), so no secret-looking text is committed.
+  CRON_SECRET: process.env.CRON_SECRET || crypto.randomBytes(24).toString("hex"),
   BROADCAST_CHUNK_SIZE: "2",
   BROADCAST_POSTAL_ADDRESS: "1 Main Street, Springfield",
   RESEND_WEBHOOK_SECRET: "whsec_" + Buffer.from("test-webhook-secret-bytes").toString("base64")

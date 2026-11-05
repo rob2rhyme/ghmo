@@ -42,7 +42,9 @@ test.afterAll(() => new Promise(resolve => stub.close(() => resolve(undefined)))
 const ORG = "organizations/ghmo";
 const DAY = 24 * 3600 * 1000;
 const CRON = "/api/cron/task-digest";
-const AUTH = { Authorization: "Bearer test-cron-secret-0123456789" };
+// The test config puts a fresh random secret in the environment for the server and for these workers.
+const SECRET = process.env.CRON_SECRET!;
+const AUTH = { Authorization: `Bearer ${SECRET}` };
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
 test.beforeEach(async () => {
@@ -78,7 +80,7 @@ test("the schedule is configured and its route refuses anyone without the secret
   expect(config.crons).toEqual([{ path: CRON, schedule: "0 13 * * *" }]);
   expect((await request.get(CRON)).status()).toBe(401);
   expect((await request.get(CRON, { headers: { Authorization: "Bearer wrong" } })).status()).toBe(401);
-  expect((await request.get(CRON, { headers: { Authorization: "test-cron-secret-0123456789" } })).status()).toBe(401);
+  expect((await request.get(CRON, { headers: { Authorization: SECRET } })).status()).toBe(401);
   expect((await request.post(CRON, { headers: AUTH })).status()).toBe(405);
 });
 
