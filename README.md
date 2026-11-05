@@ -58,6 +58,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/call-campaigns` and `/admin/call-campaigns/[id]` (one campaign per announcement: who was reached, RSVPs, call log, CSV export; plan §12)
   - `/admin/positions` (who holds each officer position and since when; super admins change it, plan §15) and `/admin/groups`, `/admin/groups/[groupId]` (teams of members with a lead, including the phone tree callers; any admin)
   - `/admin/events/templates` (ready-made task checklists) and, on each event's edit page, its Tasks section with Send reminders (plan §15 and §16)
+  - `/admin/members/[memberId]` (a member's profile: member since, city and state, family members; plan §17)
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
@@ -101,6 +102,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `eventTasks/{id}`: one task of an event (`eventId`, title, notes, `groupId`, `memberIds[]`, `dueOn`, `status` open or done, `order`, `doneAt`, `doneBy`). `eventTaskTemplates/{id}`: name, description and `items[]` (title, notes, `groupId`, `dueOffsetDays` from the event day). Plaintext, admin-read, server-written, outside the event documents so they never reach the public site (plan §15, 11-B).
   - `eventTaskReminders/{eventId}~{memberId}`: the last time a person was reminded about an event's tasks (`lastSentAt`, `lastSentBy`, `count`) and any send in progress (`claimId`, `claimedAt`); keeps the 24-hour limit. Server-only, admin-read (plan §16).
   - `taskDigest/settings`: whether the daily overdue-task digest is on (off by default), who changed it, the day it last ran and a summary of the last run. The per-person digest record is `eventTaskReminders/digest~{memberId}` with `kind: "digest"`. Admin-read, server-written (plan §16, 12-B).
+  - On each member document (plan §17): `memberSince` ("YYYY-MM-DD"), `city` and `state` (plain; no street address is kept). Family members (`family[]` of name, relationship, phone) live inside the encrypted `contact` envelope.
   - `auditLogs/{logId}`.
 - Communication log collections (all under `organizations/ghmo`):
   - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.

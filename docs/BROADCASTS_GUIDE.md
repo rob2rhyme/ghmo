@@ -109,6 +109,14 @@ On an event's **Tasks** section, **Send reminders** emails the people who own ta
 - The card shows the last run, for example "2 people emailed". If it says nothing was sent, the reason is shown. A red note means the schedule secret or the email set-up is missing.
 - A reminder sent by hand and the digest are separate, so someone you reminded in the morning can still get the digest.
 
+## 1h. A member's profile (Admin → Members → Profile)
+
+Press **Profile** on a member's row to open their page. Only admins can see it.
+- **Membership:** set **Member since** (the day they joined) and the page shows how long, for example "Member since Mar 2019 · 7 years, 8 months". If you don't know the date, **Use the day they were added** fills in the day they went on this list as a start. Dates in the future or before 1950 are refused. Add the **City** and **State** they live in. A state name such as "Pennsylvania" is saved as "PA". There is no street address anywhere. The Members list shows the city and state and the search finds them.
+- **Family:** press **Add family member** and give a name, and if you know it how they are related and a phone number. Up to ten. This is for reference, so a caller knows who else to ask for. Family members are never emailed or called by the site, and listing a number does not mean they agreed to be contacted. It is kept encrypted like phone numbers, so you need to unlock this device first, and numbers show as dots until you press **Show**.
+- **Edit contact** on the Members page keeps the family list.
+- Anyone who asks what is held about them, or to have it removed, is handled as in the runbook (case M for numbers).
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
