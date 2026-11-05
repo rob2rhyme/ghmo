@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireActiveAdmin, requireSuperAdmin } from "@/src/lib/admin";
+import { isSuperAdmin, requireActiveAdmin, requireSuperAdmin } from "@/src/lib/admin";
 import { auditActor, auditMeta, envUnavailable, failureResponse, routeError } from "@/src/lib/adminRoute.server";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -29,12 +29,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ groupId
   const unavailable = envUnavailable();
   if (unavailable) return unavailable;
   try {
-    await requireActiveAdmin(req, COMMUNITY_SLUG);
+    const { admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const { groupId } = await context.params;
     if (!ID.test(groupId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const group = await readGroup(groupId);
     if (!group) return NextResponse.json({ error: "That group doesn't exist." }, { status: 404 });
-    return NextResponse.json({ group, memberIds: await listGroupMemberIds(groupId) });
+    return NextResponse.json({ group, memberIds: await listGroupMemberIds(groupId), superAdmin: isSuperAdmin(admin) });
   } catch (error) {
     return routeError(error);
   }

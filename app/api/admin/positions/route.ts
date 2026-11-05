@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireActiveAdmin, requireSuperAdmin } from "@/src/lib/admin";
+import { isSuperAdmin, requireActiveAdmin, requireSuperAdmin } from "@/src/lib/admin";
 import { auditActor, auditMeta, envUnavailable, failureResponse, routeError } from "@/src/lib/adminRoute.server";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -23,9 +23,9 @@ export async function GET(req: NextRequest) {
   const unavailable = envUnavailable();
   if (unavailable) return unavailable;
   try {
-    await requireActiveAdmin(req, COMMUNITY_SLUG);
+    const { admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const { positions, terms } = await listPositionsWithTerms();
-    return NextResponse.json({ positions, terms, today: todayIn(new Date(), POSITION_TIME_ZONE) });
+    return NextResponse.json({ positions, terms, today: todayIn(new Date(), POSITION_TIME_ZONE), superAdmin: isSuperAdmin(admin) });
   } catch (error) {
     return routeError(error);
   }

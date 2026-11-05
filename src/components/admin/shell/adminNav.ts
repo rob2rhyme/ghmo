@@ -5,6 +5,7 @@ import {
   FolderOpen,
   ListChecks,
   Landmark,
+  Medal,
   LayoutDashboard,
   LockKeyhole,
   Mail,
@@ -16,6 +17,7 @@ import {
   ScrollText,
   ShieldCheck,
   Users,
+  UsersRound,
   type LucideIcon
 } from "lucide-react";
 
@@ -48,6 +50,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/events", label: "Events", icon: CalendarDays, keywords: "new event, calendar, programs, schedule" },
       { href: "/admin/members", label: "Members", icon: Users, keywords: "people, contacts, phone numbers, consent, import, email list" },
+      { href: "/admin/positions", label: "Positions", icon: Medal, keywords: "president, treasurer, secretary, board, officers, terms, who holds" },
+      { href: "/admin/groups", label: "Groups", icon: UsersRound, keywords: "teams, cooks, marketing, shopping, callers, lead, committee" },
       { href: "/admin/broadcasts", label: "Broadcasts", icon: Mail, keywords: "announcement, newsletter, send email, messenger" },
       { href: "/admin/calling-tree", label: "Calling tree", icon: Network, keywords: "callers, phone tree, assignments" },
       { href: "/admin/call-campaigns", label: "Call campaigns", icon: Megaphone, keywords: "phone round, rsvp, script, call progress" },
