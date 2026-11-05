@@ -1,4 +1,4 @@
-# Sending an email to members (broadcasts)
+# Member guide: email, phone calls and the group chats (broadcasts)
 
 A short guide for admins. The technical design is in `docs/PROJECT_PLAN.md` §10.
 
@@ -12,6 +12,36 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 - Importing a list: only tick "These people agreed to receive email from us" if that is true for everyone on it. It is recorded with your name.
 - When someone asks to stop, press **They asked to stop**. If they ask to come back, **They asked to be added back**.
 - The page shows who can be emailed. People who unsubscribed by link, marked an email as spam, or whose address bounced are left out automatically.
+
+## 1a. Turn on encryption and keep the recovery key safe (Admin → Encryption)
+
+Phone numbers can only be saved once encryption is on, so this comes first. It is for **admins only**. Community members never set anything up, and the site never asks them to sign in.
+
+**Who does what**
+- **A super admin does all three steps once.** This turns encryption on for the whole site. It takes about 10 minutes, and the **two trustees** should be there, in person or on a call. Trustees are two trusted people, such as the president and the treasurer, who each keep a paper copy of the recovery key.
+- **Every other admin who will read numbers does step 1 on their own phone or computer.** Then an admin who already has an approved device approves theirs.
+- **An admin without an approved device** can still use the rest of the admin area. On the Members page their numbers show as "Phone number on file (unlock to view)".
+- **Be careful whom you approve.** An approved device can read every member's number, not only the ones assigned to that caller.
+
+**The three steps (Admin → Encryption)**
+1. **Set up this device.** Name it, for example "Rob's MacBook". Choose a passphrase of at least 12 characters, such as four random words. You type it each time you unlock the device. Write it on paper. Nobody can reset it.
+2. **Make a recovery key.** Press **Create recovery key**. It is shown **once**. Write it out by hand or print it, twice. Press **I have written it down**, then type the groups back in to prove you copied it correctly.
+3. **Name the two trustees.** Tick that each one has their own paper copy, then press **Turn on end-to-end encryption**.
+
+**Adding another admin's device.** The new admin opens Admin → Encryption on their device, names it and creates a passphrase. The page shows a 20-digit **safety code**. An admin who already has an approved device compares that code with them by phone or in person, then presses **Approve device**. Never approve a device whose code you did not check.
+
+**If something goes wrong: the recovery plan**
+1. **A forgotten passphrase or one lost device.** Set the device up again. Another admin approves it after comparing the safety code. This is why every community should have at least three admins with approved devices.
+2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Revoke selected and rotate keys**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
+3. **Every admin device is gone.** The **paper recovery key** is the way back. On the Encryption page, "Lost every device?" lets a trustee's paper copy activate a new device. You still have to sign in as an admin, so the paper alone is not enough. Treat it as highly sensitive anyway.
+4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key** with both trustees present, then **Rotate keys now**. Everyone destroys the old copies.
+5. **The worst case.** If every device is lost and no working paper key exists, the encrypted data is gone for good. That means phone numbers, admin chat and drafts. Names and emails are not encrypted, so they survive, and the numbers would have to be collected again.
+
+**Habits that make recovery work**
+- Keep the two paper copies in different safe places, held by two different people. Never keep them in email, photos or a shared drive.
+- Once a year, run the recovery drill in `docs/KEY_ROTATION_DRILL.md`. Each trustee uses the **Test** box with their own paper copy, and it must say "Recovery key works". The test changes nothing.
+- Delete old Firestore backups made before encryption was on, because they hold plaintext.
+- For incidents, see `docs/RUNBOOK_INCIDENT.md`: case A (lost device), case D (recovery key), case L (a caller leaves) and case M (a member asks not to be called).
 
 ## 1b. Phone numbers (Admin → Members)
 
@@ -64,4 +94,4 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 
 ## If something goes wrong
 
-Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M.
+A lost device or recovery key: see §1a and `docs/RUNBOOK_INCIDENT.md`, cases A and D. Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M.
