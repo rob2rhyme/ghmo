@@ -290,3 +290,27 @@ describe("event tasks, templates, reminder records and the digest switch (plan ย
     }
   });
 });
+
+describe("notes on a member's profile (plan ยง17, 13-B)", () => {
+  const path = `${ORG}/members/m1/notes/n1`;
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/members/m1`), { status: "active" });
+      await setDoc(doc(ctx.firestore(), path), { authorUid: "active-admin", authorName: "Alice", enc: { v: 1 } });
+    });
+  });
+
+  it("lets an active admin read a note but not write, change or delete one from a browser", async () => {
+    await assertSucceeds(getDoc(doc(admin(), path)));
+    await assertFails(setDoc(doc(admin(), path), { enc: { v: 1, tampered: true } }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1/notes/n2`), { enc: { v: 1 } }));
+  });
+
+  it("keeps notes from visitors, members and disabled admins", async () => {
+    const disabled = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+    await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), path)));
+    await assertFails(getDoc(doc(disabled, path)));
+  });
+});
