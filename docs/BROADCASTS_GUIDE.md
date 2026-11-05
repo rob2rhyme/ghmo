@@ -12,6 +12,8 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 - Importing a list: only tick "These people agreed to receive email from us" if that is true for everyone on it. It is recorded with your name.
 - When someone asks to stop, press **They asked to stop**. If they ask to come back, **They asked to be added back**.
 - The page shows who can be emailed. People who unsubscribed by link, marked an email as spam, or whose address bounced are left out automatically.
+- **Fixing a typo in a name (super admin):** press **Edit name** on the person's row, correct it and save. Their email, phone number, consent and groups stay as they are, and the activity log keeps the old and new spelling. Someone without an email can't have an empty name. Other admins don't see the button.
+- **Search box:** type part of a name or email to narrow the list. The **x** at the right end clears it (so does the Escape key). The same box in the group and task pickers works the same way.
 
 ## 1a. Turn on encryption and keep the recovery key safe (Admin → Encryption)
 

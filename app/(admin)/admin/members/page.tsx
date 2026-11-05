@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import MembersClient, { type MemberRow } from "@/src/components/admin/members/MembersClient";
-import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
+import { requireActiveAdmin, AdminAccessError, isSuperAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listMembers } from "@/src/lib/adminData.server";
 import { listGroupsWithCounts } from "@/src/lib/groups.server";
@@ -24,7 +24,8 @@ export default async function MembersPage() {
     throw error;
   }
 
-  const members = (await listMembers(await requireActiveAdmin(undefined, COMMUNITY_SLUG))) as MemberRow[];
+  const check = await requireActiveAdmin(undefined, COMMUNITY_SLUG);
+  const members = (await listMembers(check)) as MemberRow[];
 
   // Groups and officer titles only add badges and filters; if they can't be read the list still works.
   const [groups, officers] = await Promise.all([
@@ -43,7 +44,7 @@ export default async function MembersPage() {
   return (
     <div className="flex flex-col gap-6">
       <AdminPageHeader title="Members" description="Everyone on the community list, and whether they agreed to be emailed or called." />
-      <MembersClient initialMembers={members ?? []} groups={groups} officers={officers} />
+      <MembersClient initialMembers={members ?? []} groups={groups} officers={officers} superAdmin={isSuperAdmin(check.admin)} />
     </div>
   );
 }

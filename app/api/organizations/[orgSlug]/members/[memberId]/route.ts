@@ -3,6 +3,7 @@ import { getClientIp } from "@/src/lib/security/clientIp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
+import { isSuperAdmin } from "@/src/lib/admin";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { normalizeMemberName, sanitizeMemberRoles } from "@/src/lib/members";
@@ -75,10 +76,20 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     let hasChange = false;
 
+    // Fixing a typo in someone's name is for a super admin. Sending the name they already have changes nothing,
+    // so other updates that happen to carry it keep working for every admin. Someone without an email is known
+    // only by name and number, so their name can't be blanked.
     if (Object.prototype.hasOwnProperty.call(body, "name")) {
-      const name = normalizeMemberName(body.name);
-      updates.name = name ?? null;
-      hasChange = true;
+      const name = normalizeMemberName(body.name) ?? null;
+      const current = normalizeMemberName(typeof beforeData.name === "string" ? beforeData.name : null) ?? null;
+      if (name !== current) {
+        if (!isSuperAdmin(admin)) return NextResponse.json({ error: "Only a super admin can change a member's name." }, { status: 403 });
+        if (!name && !String(beforeData.emailLower ?? "").includes("@")) {
+          return NextResponse.json({ error: "Someone without an email needs a name." }, { status: 400 });
+        }
+        updates.name = name;
+        hasChange = true;
+      }
     }
 
     if (body.status !== undefined) {

@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
+import { SearchInput } from "@/src/components/ui/search-input";
 import { Segmented } from "@/src/components/ui/segmented";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
@@ -280,7 +281,7 @@ function AddPeopleDialog({ people, busy, onClose, onSave }: { people: MemberLite
           <DialogTitle>Add people</DialogTitle>
           <DialogDescription>Tick the members to add, then save.</DialogDescription>
         </DialogHeader>
-        <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} />
+        <SearchInput aria-label="Search members" placeholder="Search by name or email" value={query} onChange={setQuery} />
         <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-md border border-border">
           {shown.length === 0 ? <li className="p-3 text-sm text-muted-foreground">No one matches.</li> : null}
           {shown.map(member => (
