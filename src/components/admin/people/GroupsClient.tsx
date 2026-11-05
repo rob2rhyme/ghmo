@@ -20,7 +20,7 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { GROUP_DESCRIPTION_MAX, GROUP_NAME_MAX, type Group } from "@/src/lib/groups";
 import { memberDisplayName } from "@/src/lib/members";
 
-type GroupRow = Group & { memberCount: number };
+type GroupRow = Group & { memberCount: number; openTaskCount?: number };
 
 export default function GroupsClient() {
   const router = useRouter();
@@ -97,7 +97,7 @@ export default function GroupsClient() {
                   key={group.id}
                   href={`/admin/groups/${group.id}` as Route}
                   title={group.name}
-                  meta={`${group.memberCount} ${group.memberCount === 1 ? "person" : "people"}${lead ? ` · Lead: ${lead}` : ""}`}
+                  meta={`${group.memberCount} ${group.memberCount === 1 ? "person" : "people"}${lead ? ` · Lead: ${lead}` : ""}${group.openTaskCount ? ` · ${group.openTaskCount} open ${group.openTaskCount === 1 ? "task" : "tasks"}` : ""}`}
                   badges={
                     <>
                       {group.kind === "callers" ? <Badge variant="default">Phone tree callers</Badge> : null}

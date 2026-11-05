@@ -5,7 +5,7 @@ import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listAdminEvents } from "@/src/lib/adminData.server";
 import Link from "next/link";
 import type { Route } from "next";
-import { CalendarDays, Plus } from "lucide-react";
+import { CalendarDays, ClipboardList, Plus } from "lucide-react";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
@@ -77,12 +77,20 @@ export default async function AdminEventsPage() {
         title="Events"
         description="Meetings and community gatherings. Published events show on the public Events page."
         actions={
-          <Button asChild>
-            <Link href="/admin/events/new">
-              <Plus aria-hidden="true" />
-              New event
-            </Link>
-          </Button>
+          <>
+            <Button asChild variant="outline">
+              <Link href="/admin/events/templates">
+                <ClipboardList aria-hidden="true" />
+                Task templates
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/admin/events/new">
+                <Plus aria-hidden="true" />
+                New event
+              </Link>
+            </Button>
+          </>
         }
       />
 

@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
@@ -33,8 +34,10 @@ export default function NewEventPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "The event could not be saved.");
-      toast.success("Event saved.");
-      router.replace("/admin/events");
+      // Land on the edit page so the event's tasks can be added straight away.
+      toast.success("Event saved. Add its tasks below.");
+      const id = data?.event?.id as string | undefined;
+      router.replace(id ? (`/admin/events/${encodeURIComponent(id)}/edit` as Route) : "/admin/events");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The event could not be saved.");
     } finally {

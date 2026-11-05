@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { CalendarX2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
+import EventTasksPanel from "@/src/components/admin/events/EventTasksPanel";
 import { EMPTY_EVENT_FORM, EventForm, toInputDate, validateEventForm, type EventFormValues } from "@/src/components/admin/events/EventForm";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
@@ -178,6 +179,7 @@ export default function EditEventPage() {
           Delete event
         </Button>
       </div>
+      <EventTasksPanel eventId={eventId} />
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
