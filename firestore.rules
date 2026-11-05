@@ -87,6 +87,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Event task checklists and their templates (plan §15, 11-B): admins read; every change goes through
+    // /api/admin/organizations/ghmo/events/{id}/tasks and /api/admin/task-templates, so each is audited.
+    // They live outside the event documents, so they can never reach the public site.
+    match /organizations/{orgSlug}/eventTasks/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /organizations/{orgSlug}/eventTaskTemplates/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Broadcast emails to members: drafted, approved and (later) sent only through /api/admin/broadcasts,
     // so the second-admin approval and its audit trail cannot be skipped from a browser.
     match /organizations/{orgSlug}/broadcasts/{doc=**} {

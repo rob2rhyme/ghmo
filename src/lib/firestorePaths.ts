@@ -20,3 +20,5 @@ export const orgDocumentsCollectionPath = (orgSlug: string) => `${orgDocPath(org
 export const orgPositionsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/positions`;
 export const orgPositionTermsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/positionTerms`;
 export const orgGroupsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/groups`;
+export const orgEventTasksCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTasks`;
+export const orgEventTaskTemplatesCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTaskTemplates`;

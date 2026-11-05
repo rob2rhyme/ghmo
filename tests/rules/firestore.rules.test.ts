@@ -257,3 +257,34 @@ describe("positions, terms and groups (plan §15)", () => {
     }
   });
 });
+
+describe("event tasks and task templates (plan §15, 11-B)", () => {
+  const paths = ["eventTasks/t1", "eventTaskTemplates/tpl1"];
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/eventTasks/t1`), { eventId: "e1", title: "Book hall", status: "open" });
+      await setDoc(doc(ctx.firestore(), `${ORG}/eventTaskTemplates/tpl1`), { name: "General meeting", items: [] });
+    });
+  });
+
+  it("lets an active admin read them", async () => {
+    for (const path of paths) await assertSucceeds(getDoc(doc(admin(), `${ORG}/${path}`)));
+  });
+
+  it("is server-written: an admin cannot tick off, add or change a task from a browser", async () => {
+    for (const path of paths) {
+      await assertFails(setDoc(doc(admin(), `${ORG}/${path}`), { status: "done" }, { merge: true }));
+      await assertFails(setDoc(doc(admin(), `${ORG}/${path.split("/")[0]}/new`), { title: "New" }));
+    }
+  });
+
+  it("keeps them from visitors, members and disabled admins, so task notes never reach the public site", async () => {
+    const disabled = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
+    for (const path of paths) {
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/${path}`)));
+      await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/${path}`)));
+      await assertFails(getDoc(doc(disabled, `${ORG}/${path}`)));
+    }
+  });
+});
