@@ -220,3 +220,40 @@ describe("admin chat", () => {
     await assertFails(setDoc(doc(admin(), `${ORG}/adminChatMessages/msg1`), { body: "edited" }));
   });
 });
+
+describe("positions, terms and groups (plan §15)", () => {
+  const paths = ["positions/president", "positionTerms/t1", "groups/phone_tree_callers"];
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      for (const path of paths) await setDoc(doc(ctx.firestore(), `${ORG}/${path}`), { title: "x", name: "x" });
+    });
+  });
+
+  it("lets an active admin read them", async () => {
+    for (const path of paths) await assertSucceeds(getDoc(doc(admin(), `${ORG}/${path}`)));
+  });
+
+  it("is server-written: an admin cannot change who holds an office or who is in a group from a browser", async () => {
+    for (const path of paths) {
+      await assertFails(setDoc(doc(admin(), `${ORG}/${path}`), { title: "Tampered" }, { merge: true }));
+      await assertFails(setDoc(doc(admin(), `${ORG}/${path.split("/")[0]}/new`), { title: "New" }));
+    }
+  });
+
+  it("keeps group membership on members server-written too", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/members/m1`), { status: "active", groupIds: [] });
+    });
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { groupIds: ["phone_tree_callers"] }, { merge: true }));
+  });
+
+  it("keeps them from visitors, members and disabled admins", async () => {
+    const disabled = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
+    for (const path of paths) {
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/${path}`)));
+      await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/${path}`)));
+      await assertFails(getDoc(doc(disabled, `${ORG}/${path}`)));
+    }
+  });
+});
