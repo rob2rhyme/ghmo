@@ -118,7 +118,19 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
 - **Notes:** write what happened or what you were told, then **Add note**. Each note shows your name and the date, newest first. Notes are encrypted like phone numbers, so you need this device unlocked to write or read them. A note can't be edited. You can delete your own note, and a super admin can delete anyone's. Keep notes to facts, because other admins read them. The activity log records that a note was added or deleted, never what it said. A member can have up to 200 notes.
 - **Calls:** the profile lists every call made to them for an announcement: the campaign, when, what happened (reached, voicemail, no answer…), who called and the caller's note. Above the list: how many campaigns they were in, how many attempts, and in how many they were reached.
 - **How the call went:** when a caller logs a call where the person was reached, they may choose **Polite**, **Neutral** or **Rude** (or leave it not recorded). Say how the call went, not what you think of the person. It is encrypted like notes, shows only on this profile (never in lists, exports, the campaign dashboard or the activity log), and the profile adds up the ratings: for example "1 polite · 1 rude". A super admin can press **Clear rating** if one was a mistake; the call and its note stay.
-- Anyone who asks what is held about them, or to have it removed, is handled as in the runbook (case M for numbers).
+- **What a profile holds, and who can see it:**
+
+  | Item | Kept | Who can read it | Who can remove it |
+  |---|---|---|---|
+  | Name, email, consent history, groups | Plain, on the member record | Every admin | A super admin can correct the name. The record can be disabled, not deleted, in the app |
+  | Member since, city, state | Plain | Every admin | Any admin (clear the field) |
+  | Phone numbers, language, household, contact note, family | Encrypted | Admins on an approved, unlocked device | Any admin (Edit contact, Remove) |
+  | Notes | Encrypted text; author and date plain | Admins on an approved, unlocked device | The author, or a super admin |
+  | Calls: campaign, time, outcome, RSVP, caller | Plain | Every admin | Not removable (the record of who was called) |
+  | Call notes and ratings (polite, neutral, rude) | Encrypted | Admins on an approved, unlocked device | A super admin can clear a rating; a call note stays |
+  | The activity log | Plain, never the text of a note, rating or number | Every admin | Not removable |
+
+- **Keep notes useful and safe.** Write what the community needs: how to reach someone, when they prefer calls, what they offered to help with. Every admin with an approved device can read every note, so don't record health, immigration, money or family problems, and don't write opinions you wouldn't say to the person. A person who asks what is held about them, or to have it removed, is handled as in the runbook (case O; case M for numbers).
 
 ## 2. Write it (Admin → Broadcasts)
 
