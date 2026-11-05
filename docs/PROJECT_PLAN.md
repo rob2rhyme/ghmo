@@ -209,7 +209,8 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
 | **8** | Email broadcasts to members | **Built (8-A to 8-E, §10.8). Waiting on the owner's set-up steps before the first real send.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 | **9** | Member outreach: calling tree and call campaigns | **Built and merged 2026-11-01 (9-A to 9-D, §12.7); members without email added 2026-11-04 (#82).** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
-| **11** | Officer positions, member groups and event tasks | **Planned 2026-11-05 (§15), not started.** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, and calling-tree suggestions from the callers group. Admins only; decisions D17–D20 proposed. | Owner accepts D17–D20; each sub-phase's exit criteria in §15.4. |
+| **11** | Officer positions, member groups and event tasks | **Built and merged 2026-11-05 (11-A to 11-D, §15.7; PRs #86, #87, #88, #94).** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, calling-tree suggestions from the callers group, and task counts on the Events list. Admins only. | Owner publishes the Firestore rules again and enters the officers (go-live checklist). |
+| **12** | Reminders to team members | **Planned 2026-11-05 (§16); 12-A in progress.** Email reminders about the tasks a person owns, sent by an admin from the event page, to consented members only. Decisions D21–D24 taken as recommended. | Owner reads §16.2; the email provider and footer settings from Phase 8 are already needed for broadcasts. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1031,3 +1032,54 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 - `taskCountsByEvent` in `src/lib/eventTasks.server.ts` (one read of every task's event, status and due date, counted with `countTasks`). The Events list shows "3 of 7 tasks done" under each event's date, and a red "2 overdue" badge when open tasks are past due. If the counts can't be read the list still loads without them.
 - Go-live checklist (`docs/GO_LIVE_CHECKLIST.md`): enter the current officers with start dates, fill the callers group, make event groups with leads, write a general-meeting template, and publish the Firestore rules again. Admin guide §1e and §1f, README routes and data model, and this section were written with each step.
 - Phase 11 is complete. Not built, as listed in §15.6: member sign-in and "my tasks" pages, reminders to team members, a public board page, task comments, merging with minutes action items.
+
+## 16. Phase 12 — Reminders to team members (planned 2026-11-05)
+
+**Goal.** An admin can remind the people who own tasks on an event, by email, with one button. A person gets one email listing their open tasks for that event. Members who did not agree to be emailed, who opted out, whose address bounced, or who have no email (phone-only) are never emailed; the admin sees who they are so they can be phoned instead (the calling tree and call campaigns already do that). Admins only trigger it: members still have no sign-in, so nothing here depends on one.
+
+### 16.1 What was checked (2026-11-05)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| Members are emailed only when `memberEmailState` is `ready` (active, has an email, consent recorded, not opted out, not bounced). Every broadcast email carries the organization's name and postal address and a signed unsubscribe link, with the one-click headers. | `src/lib/members.ts`, `src/lib/broadcastMail.ts`, `src/lib/unsubscribeToken.ts` | Reminders use the same checks, footer and unsubscribe token, so one unsubscribe stops everything. No second consent model. |
+| Sending goes through Resend. A batch endpoint takes up to 100 messages with an idempotency key. A shared daily quota (`broadcastQuota/{day}`, default 100) and the `FEATURE_BROADCASTS` switch guard the free tier; `sendingBlocker` explains what is missing. | `src/lib/mailer.server.ts`, `src/lib/broadcastSending.ts`, `src/lib/broadcastSender.server.ts` | Reminders reserve their emails from the same daily quota inside a transaction and obey the same switch, so reminders can never starve a broadcast or overshoot the provider limit. |
+| Admin notification emails are content-free and opt-in. Broadcasts to members need a second admin's approval because they carry free text to everyone. | `src/lib/notifications.ts`, `src/lib/broadcast.ts` | Member reminders are not content-free (a person needs to know which task), but they use a fixed template, name only that person's own tasks, and go only to the few people a task is given to. No free text, so no approval step. |
+| Task titles and due dates are plaintext (D19); notes may hold details. | §15.3 | Emails list titles and due dates only, never notes, never other people's names. |
+| There is no scheduled job in the project, and Vercel's Hobby plan allows cron only once a day. | `vercel.json` | 12-A is manual. An automatic daily digest is a later step that needs a secret and an owner decision. |
+
+### 16.2 Decisions (taken as recommended; change any before 12-B)
+
+| ID | Question | Decision | Effect |
+|---|---|---|---|
+| D21 | Which people and which channel? | Email only, to consented members. Named people on a task, plus the lead of the task's group; never the whole group. | A group of 60 cooks is not emailed by accident; the lead passes it on. Phone-only members are listed as "can't be emailed" so an admin can call. |
+| D22 | Who may send, and is there an approval step? | Any active admin; no approval step; fixed template. | Same openness as assigning tasks (D18). The risk a second approver guards against in broadcasts (free text to everyone) is absent. |
+| D23 | Limits | One reminder per person per event every 24 hours; at most 50 people per send; shares the broadcast daily quota, kill switch and footer; ten sends per admin per hour. | Repeated clicks cannot spam; the free tier is protected. |
+| D24 | Manual or automatic? | Manual first (12-A). An automatic daily digest of overdue tasks is 12-B, off by default. | No cron secret or schedule to get wrong before the manual flow is proven. |
+
+### 16.3 Design
+
+- **Planner** (`src/lib/taskReminders.ts`, pure): from an event's tasks, groups, members and the last reminder times, returns who will be emailed (with their tasks), who cannot be and why, who was reminded in the last 24 hours, and how many open tasks nobody can be reminded about. Mode `all` (every open task) or `overdue` (open tasks past due, in the organization's time zone).
+- **Email** (same file): subject "Reminder: your tasks for {event}"; body lists the person's open tasks with due dates and "overdue" where it applies, the event date, and a line asking them to tell whoever gave them the task if they cannot do it. The standard footer and unsubscribe link are added by `withUnsubscribeFooter`.
+- **Storage:** `organizations/ghmo/eventTaskReminders/{eventId}_{memberId}`: `eventId`, `memberId`, `lastSentAt`, `claimId`, `claimedAt`, `count`. Server-only, admin-read. A claim is written in one transaction that re-checks the 24-hour cooldown and any in-flight claim (under three minutes old), reserves quota and refuses if today's quota would be passed. After a successful send `lastSentAt` is set; on failure the claim and the reserved quota are released, so a failed send never blocks a retry. The provider idempotency key is the claim id.
+- **API:** `POST /api/admin/organizations/ghmo/events/[eventId]/tasks/remind` with `{ mode, send }`. `send: false` returns the preview and changes nothing; `send: true` sends and returns counts. Audited as `event_tasks_reminded` with counts only.
+- **UI:** a **Send reminders** button in the event's Tasks section opens a preview (will be emailed, cannot be emailed and why, reminded recently, tasks nobody is assigned to), then a confirm button showing the number.
+- Deleting an event removes its reminder records.
+
+### 16.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **12-A** | Planner, email, claim and send, route, rules, the dialog, tests, docs | A reminder reaches only consented people with their own tasks; a second click within 24 hours sends nothing; a failed provider call leaves no block; phone-only people are listed, not emailed; unsubscribe link present |
+| **12-B** | Automatic daily digest of overdue tasks (Vercel Cron, secret, an on/off switch in settings, off by default) | Owner approves the schedule; one digest per person per day |
+| **12-C** | Docs: admin guide, go-live line, runbook case for a wrong reminder or a complaint | Docs merged |
+
+### 16.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| A reminder reaches someone who did not agree | Only `ready` members; consent and opt-out are re-read at send time, not taken from the preview |
+| Task titles hold something sensitive | Admin help text already says to keep task text about the work; notes are never sent |
+| Double send after a crash or double click | Claim in a transaction, cooldown, in-flight check, provider idempotency key |
+| Reminders use up the day's quota | Reserved from the broadcast quota in the same transaction; refused with the number left |
+
+Out of scope: SMS, voice or Messenger reminders (decided in Phase 8–9), reminders to whole groups, free-text messages, member sign-in and "my tasks", read receipts.
