@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, NotebookPen, Pencil, Plus, UsersRound } from "lucide-react";
+import { Eye, EyeOff, NotebookPen, PhoneCall, Pencil, Plus, UsersRound } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
@@ -18,6 +18,8 @@ import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
+import { MANNER_LABELS, OUTCOME_LABELS, RSVP_LABELS, attemptMannerLoc, attemptNoteLoc, isManner, type Manner, type MannerPayload } from "@/src/lib/callCampaigns";
+import { mannerCounts, mannerSummaryLine, summarizeHistory, type HistoryEntry } from "@/src/lib/callHistory";
 import { formatDateTime, formatShortDate, toDate } from "@/src/lib/format";
 import { NOTE_MAX, canDeleteNote, checkNoteText, cleanNoteText, memberNoteLoc, type NoteMeta, type NotePayload } from "@/src/lib/memberNotes";
 import {
@@ -114,6 +116,7 @@ export default function MemberProfileClient({
         <div className="flex flex-col gap-6">
           <FamilyCard member={member} onSaved={setMember} />
           <NotesCard member={member} me={me} />
+          <CallsCard member={member} me={me} />
         </div>
       </EncryptionGate>
     </div>
@@ -591,6 +594,204 @@ function NotesCard({ member, me }: { member: ProfileMember; me: { uid: string; s
         onConfirm={async () => {
           if (deleting) await remove(deleting);
         }}
+      />
+    </AdminSectionCard>
+  );
+}
+
+type CallsResponse = { history: HistoryEntry[]; callerNames: Record<string, string> };
+const MANNER_VARIANT: Record<Manner, "success" | "secondary" | "destructive"> = { polite: "success", neutral: "secondary", rude: "destructive" };
+
+/**
+ * Every call made to this member across campaigns: when, the outcome, who called, their note, and how the call went.
+ * Notes and ratings are encrypted, so they open only on an unlocked device. A super admin can clear a rating.
+ */
+function CallsCard({ member, me }: { member: ProfileMember; me: { uid: string; superAdmin: boolean } }) {
+  const e2ee = useE2ee();
+  const ready = e2ee.enabled && e2ee.status === "unlocked";
+  const [data, setData] = useState<CallsResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Map<string, string>>(() => new Map());
+  const [manners, setManners] = useState<Map<string, Manner | null>>(() => new Map());
+  const [reload, setReload] = useState(0);
+  const [clearing, setClearing] = useState<{ campaignId: string; attemptId: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/organizations/ghmo/members/${member.id}/calls`, { cache: "no-store" })
+      .then(async res => {
+        const body = (await res.json().catch(() => ({}))) as Partial<CallsResponse> & { error?: string };
+        if (!res.ok || !body.history) throw new Error(body.error || "Could not load the call history");
+        if (cancelled) return;
+        setData({ history: body.history, callerNames: body.callerNames ?? {} });
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setLoadError(errorText(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [member.id, reload]);
+
+  // Lock or sign-out: forget the plaintext so nothing shows until the next unlock.
+  const [wasReady, setWasReady] = useState(ready);
+  if (wasReady !== ready) {
+    setWasReady(ready);
+    if (!ready) {
+      setNotes(new Map());
+      setManners(new Map());
+    }
+  }
+
+  // Open every note and rating on this device once it is unlocked.
+  const { decrypt } = e2ee;
+  useEffect(() => {
+    if (!ready || !data) return;
+    const attempts = data.history.flatMap(entry => entry.call.attempts.map(attempt => ({ campaignId: entry.campaign.id, attempt })));
+    const pendingNotes = attempts.filter(({ attempt }) => attempt.note && !notes.has(attempt.id));
+    const pendingManners = attempts.filter(({ attempt }) => attempt.manner && !manners.has(attempt.id));
+    if (pendingNotes.length === 0 && pendingManners.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const noteEntries = await Promise.all(
+        pendingNotes.map(async ({ campaignId, attempt }) => {
+          try {
+            return [attempt.id, (await decrypt<{ note?: string }>(attempt.note, attemptNoteLoc(campaignId, member.id, attempt.id))).note ?? ""] as const;
+          } catch {
+            return [attempt.id, ""] as const;
+          }
+        })
+      );
+      const mannerEntries = await Promise.all(
+        pendingManners.map(async ({ campaignId, attempt }) => {
+          try {
+            const { manner } = await decrypt<MannerPayload>(attempt.manner, attemptMannerLoc(campaignId, member.id, attempt.id));
+            return [attempt.id, isManner(manner) ? manner : null] as const;
+          } catch {
+            return [attempt.id, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      if (noteEntries.length) setNotes(current => new Map([...current, ...noteEntries]));
+      if (mannerEntries.length) setManners(current => new Map([...current, ...mannerEntries]));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, data, notes, manners, decrypt, member.id]);
+
+  const clearRating = async () => {
+    if (!clearing) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/call-campaigns/${clearing.campaignId}/calls/${member.id}/attempts/${clearing.attemptId}/manner`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(body.error || "Could not clear the rating");
+      setManners(current => {
+        const next = new Map(current);
+        next.delete(clearing.attemptId);
+        return next;
+      });
+      setClearing(null);
+      setReload(count => count + 1);
+      toast.success("Rating cleared");
+    } catch (error) {
+      toast.error(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const history = data?.history ?? [];
+  const summary = summarizeHistory(history);
+  const ratedAttempts = history.flatMap(entry => entry.call.attempts).filter(attempt => attempt.manner);
+  const opened = ratedAttempts.filter(attempt => manners.has(attempt.id));
+  const counts = mannerCounts(opened.map(attempt => manners.get(attempt.id)));
+
+  return (
+    <AdminSectionCard
+      title="Calls"
+      description="Every call made to this member for an announcement: when, what happened and who called. Notes and ratings are encrypted and open only on an unlocked device."
+      icon={<PhoneCall aria-hidden="true" />}
+    >
+      {loadError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      ) : !data ? (
+        <Skeleton className="h-16 w-full" />
+      ) : history.length === 0 ? (
+        <EmptyState icon={<PhoneCall aria-hidden="true" />} title="No calls yet" description="Calls made to this member in a call campaign show here." />
+      ) : (
+        <>
+          <p className="text-sm" data-testid="calls-summary">
+            In {summary.campaigns} {summary.campaigns === 1 ? "campaign" : "campaigns"} · {summary.attempts} {summary.attempts === 1 ? "attempt" : "attempts"} · reached in {summary.reached}
+          </p>
+          <p className="text-sm text-muted-foreground" data-testid="manner-summary">
+            {!ready && ratedAttempts.length > 0 ? "How calls went: unlock this device to see." : ratedAttempts.length > opened.length ? "How calls went: opening…" : `How calls went: ${mannerSummaryLine(counts)}`}
+          </p>
+          <AdminList bare label="Call history">
+            {history.map(entry => (
+              <AdminListRow
+                key={entry.campaign.id}
+                stacked
+                title={entry.campaign.title}
+                meta={[
+                  entry.campaign.createdAt ? formatShortDate(entry.campaign.createdAt, { timeZone: POSITION_TIME_ZONE }) : null,
+                  entry.call.outcome ? OUTCOME_LABELS[entry.call.outcome] : "Not called yet",
+                  entry.call.rsvp ? RSVP_LABELS[entry.call.rsvp] : null
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              >
+                {entry.call.attempts.length > 0 ? (
+                  <ul className="flex flex-col gap-2 text-sm" aria-label={`Attempts for ${entry.campaign.title}`}>
+                    {entry.call.attempts.map(attempt => {
+                      const note = notes.get(attempt.id);
+                      const manner = manners.get(attempt.id);
+                      return (
+                        <li key={attempt.id} className="flex flex-col gap-1">
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-medium">{OUTCOME_LABELS[attempt.outcome]}</span>
+                            <span className="text-muted-foreground">
+                              {attempt.at ? formatDateTime(attempt.at, { timeZone: POSITION_TIME_ZONE }) : "no time"} · {data.callerNames[attempt.byUid] ?? "an admin"}
+                            </span>
+                            {attempt.manner && ready && manner ? <Badge variant={MANNER_VARIANT[manner]}>{MANNER_LABELS[manner]}</Badge> : null}
+                            {attempt.manner && me.superAdmin ? (
+                              <Button size="sm" variant="ghost" onClick={() => setClearing({ campaignId: entry.campaign.id, attemptId: attempt.id })} aria-label={`Clear the rating on the ${OUTCOME_LABELS[attempt.outcome].toLowerCase()} call by ${data.callerNames[attempt.byUid] ?? "an admin"}`}>
+                                Clear rating
+                              </Button>
+                            ) : null}
+                          </span>
+                          {attempt.note ? (
+                            ready ? (
+                              note ? <span className="whitespace-pre-line break-words text-muted-foreground">{note}</span> : null
+                            ) : (
+                              <span className="text-muted-foreground">Note saved (unlock to read).</span>
+                            )
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </AdminListRow>
+            ))}
+          </AdminList>
+        </>
+      )}
+      <ConfirmDialog
+        open={Boolean(clearing)}
+        onOpenChange={open => !open && setClearing(null)}
+        title="Clear this rating?"
+        description="Only the rating is removed. The call, its outcome and its note stay."
+        confirmLabel="Clear rating"
+        destructive
+        busy={busy}
+        onConfirm={clearRating}
       />
     </AdminSectionCard>
   );

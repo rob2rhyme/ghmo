@@ -58,7 +58,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/call-campaigns` and `/admin/call-campaigns/[id]` (one campaign per announcement: who was reached, RSVPs, call log, CSV export; plan §12)
   - `/admin/positions` (who holds each officer position and since when; super admins change it, plan §15) and `/admin/groups`, `/admin/groups/[groupId]` (teams of members with a lead, including the phone tree callers; any admin)
   - `/admin/events/templates` (ready-made task checklists) and, on each event's edit page, its Tasks section with Send reminders (plan §15 and §16)
-  - `/admin/members/[memberId]` (a member's profile: member since, city and state, family members, notes; plan §17)
+  - `/admin/members/[memberId]` (a member's profile: member since, city and state, family members, notes, call history and how calls went; plan §17)
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
@@ -103,6 +103,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `eventTaskReminders/{eventId}~{memberId}`: the last time a person was reminded about an event's tasks (`lastSentAt`, `lastSentBy`, `count`) and any send in progress (`claimId`, `claimedAt`); keeps the 24-hour limit. Server-only, admin-read (plan §16).
   - `taskDigest/settings`: whether the daily overdue-task digest is on (off by default), who changed it, the day it last ran and a summary of the last run. The per-person digest record is `eventTaskReminders/digest~{memberId}` with `kind: "digest"`. Admin-read, server-written (plan §16, 12-B).
   - On each member document (plan §17): `memberSince` ("YYYY-MM-DD"), `city` and `state` (plain; no street address is kept). Family members (`family[]` of name, relationship, phone) live inside the encrypted `contact` envelope.
+  - On each call attempt inside `callCampaigns/{id}/calls/{memberId}.attempts[]` (plan §17, 13-C): an optional encrypted `manner` envelope (polite, neutral or rude), never returned to the campaign dashboard.
   - `members/{memberId}/notes/{noteId}`: one note on a member's profile (plan §17, 13-B): `enc` (the encrypted text), `authorUid`, `authorName`, `createdAt`. Server-written only, admin-read; append-only (a note is added or deleted, never edited).
   - `auditLogs/{logId}`.
 - Communication log collections (all under `organizations/ghmo`):
