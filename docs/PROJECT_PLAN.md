@@ -210,7 +210,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **8** | Email broadcasts to members | **Built (8-A to 8-E, §10.8). Waiting on the owner's set-up steps before the first real send.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 | **9** | Member outreach: calling tree and call campaigns | **Built and merged 2026-11-01 (9-A to 9-D, §12.7); members without email added 2026-11-04 (#82).** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
 | **11** | Officer positions, member groups and event tasks | **Built and merged 2026-11-05 (11-A to 11-D, §15.7; PRs #86, #87, #88, #94).** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, calling-tree suggestions from the callers group, and task counts on the Events list. Admins only. | Owner publishes the Firestore rules again and enters the officers (go-live checklist). |
-| **12** | Reminders to team members | **Planned 2026-11-05 (§16); 12-A in progress.** Email reminders about the tasks a person owns, sent by an admin from the event page, to consented members only. Decisions D21–D24 taken as recommended. | Owner reads §16.2; the email provider and footer settings from Phase 8 are already needed for broadcasts. |
+| **12** | Reminders to team members | **Built and merged 2026-11-05 (12-A to 12-C, §16.6; PRs #95 and #96).** Email reminders about the tasks a person owns: sent by an admin from the event page (12-A), and an optional automatic daily digest of overdue tasks that is off until a super admin switches it on (12-B). Consented members only, with the unsubscribe link and the shared daily email limit. Admins only trigger it. Decisions D21–D26 taken as recommended. | Owner adds `CRON_SECRET` in Vercel if they want the digest, publishes the Firestore rules again, and sends one test reminder (go-live checklist). |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1003,7 +1003,7 @@ Unit: `tests/unit/positions.test.ts` (current and past terms, closing the previo
 | Tasks reaching the public site | Separate collection, `toPublicEvent` unchanged, a rules test proves anonymous reads fail |
 
 ### 15.6 Out of scope
-Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push), SMS or Messenger integration, a public "Our board" page, task comments or attachments, merging event tasks with minutes action items (only the overdue rule is shared), changing the docgen position dropdown.
+Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push; email reminders came later in Phase 12, §16), SMS or Messenger integration, a public "Our board" page, task comments or attachments, merging event tasks with minutes action items (only the overdue rule is shared), changing the docgen position dropdown.
 
 ### 15.7 Progress
 **11-A built (2026-11-05).** Decisions D17 to D20 were accepted with "start 11-A".
@@ -1031,9 +1031,9 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 **11-D built (2026-11-05).**
 - `taskCountsByEvent` in `src/lib/eventTasks.server.ts` (one read of every task's event, status and due date, counted with `countTasks`). The Events list shows "3 of 7 tasks done" under each event's date, and a red "2 overdue" badge when open tasks are past due. If the counts can't be read the list still loads without them.
 - Go-live checklist (`docs/GO_LIVE_CHECKLIST.md`): enter the current officers with start dates, fill the callers group, make event groups with leads, write a general-meeting template, and publish the Firestore rules again. Admin guide §1e and §1f, README routes and data model, and this section were written with each step.
-- Phase 11 is complete. Not built, as listed in §15.6: member sign-in and "my tasks" pages, reminders to team members, a public board page, task comments, merging with minutes action items.
+- Phase 11 is complete. Not built, as listed in §15.6: member sign-in and "my tasks" pages, reminders to team members (email reminders were added in Phase 12, §16; SMS, voice and push were not), a public board page, task comments, merging with minutes action items.
 
-## 16. Phase 12 — Reminders to team members (planned 2026-11-05)
+## 16. Phase 12 — Reminders to team members (planned 2026-11-05; 12-A to 12-C built 2026-11-05)
 
 **Goal.** An admin can remind the people who own tasks on an event, by email, with one button. A person gets one email listing their open tasks for that event. Members who did not agree to be emailed, who opted out, whose address bounced, or who have no email (phone-only) are never emailed; the admin sees who they are so they can be phoned instead (the calling tree and call campaigns already do that). Admins only trigger it: members still have no sign-in, so nothing here depends on one.
 
@@ -1047,7 +1047,7 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 | Task titles and due dates are plaintext (D19); notes may hold details. | §15.3 | Emails list titles and due dates only, never notes, never other people's names. |
 | There is no scheduled job in the project, and Vercel's Hobby plan allows cron only once a day. | `vercel.json` | 12-A is manual. An automatic daily digest is a later step that needs a secret and an owner decision. |
 
-### 16.2 Decisions (taken as recommended; change any before 12-B)
+### 16.2 Decisions (taken as recommended; the owner can change any of them)
 
 | ID | Question | Decision | Effect |
 |---|---|---|---|
@@ -1095,7 +1095,6 @@ Out of scope: SMS, voice or Messenger reminders (decided in Phase 8–9), remind
 - UI: **Send reminders** in the event's Tasks section opens a preview (will be emailed, can't be emailed and why, reminded in the last 24 hours, tasks nobody is assigned to) and a confirm button showing the number. Browser spec `tests/e2e-auth/task-reminders.spec.ts` (mail stub).
 - Docs: admin guide §1g, go-live checklist line, runbook case N, README data model.
 - Notes: a group's task goes to the group's lead only. A send reaches at most 50 people; the rest are picked up by the next send because the first 50 are then in their 24-hour window. The provider is never given a person's other tasks, notes or other recipients.
-- Still to do: 12-B (automatic daily digest, needs the owner's go-ahead on a schedule and a secret) and 12-C items beyond those already written.
 
 **12-B built (2026-11-05).**
 - Pure rules and tests: `planDigest`, `digestCap` and `digestEmail` in `src/lib/taskReminders.ts` (7 new unit tests): overdue open tasks of upcoming or recently ended events, grouped by event for each person; the lead gets the group's tasks; the same consent rules as 12-A; 20-hour per-person cooldown; the cap and who waits.
@@ -1104,3 +1103,10 @@ Out of scope: SMS, voice or Messenger reminders (decided in Phase 8–9), remind
 - Rules: `taskDigest` is admin-read, server-write only (rules test extended).
 - UI: a **Daily overdue digest** card on the Events page with the On/Off state, the last run, warnings when the schedule secret or email set-up is missing, and Switch on (with a confirmation) or Switch off for super admins. Browser spec `tests/e2e-auth/task-digest.spec.ts` (3 tests, mail stub).
 - Notes: Vercel Hobby runs a cron once a day and may start it anywhere in the hour; crons run only on the production deployment. A manual reminder and the digest are independent, so someone reminded by hand in the morning can still get the digest. 12-C (docs) was written along with 12-A and 12-B.
+
+**12-C built (2026-11-05).** The documentation was written with each step and checked against the code on this date: every number in the guide, the go-live checklist and the runbook (50 people per send and per day, ten sends per admin per hour, 24 hours between reminders, 20 hours between digests, half of the daily limit, the 13:00 UTC schedule, the 7-day event window) matches `src/lib/taskReminders.ts` and `vercel.json`. This step also corrected the status lines in this plan (roadmap row, §16 heading, §16.2, §15.7) that still read as planned. Where each part is described:
+- **Admin guide** (`docs/BROADCASTS_GUIDE.md`): §1g, sending a reminder, who is and is not emailed, the limits, and the daily digest card.
+- **Go-live checklist** (`docs/GO_LIVE_CHECKLIST.md`): the task reminders line (email set-up is shared with broadcasts, publish the rules again, send one test) and the optional daily digest line (`CRON_SECRET`, redeploy, switch on, check the next day's run).
+- **Runbook** (`docs/RUNBOOK_INCIDENT.md`): case N, a reminder to the wrong person or a complaint, including switching the digest off.
+- **README**: the data model (`eventTaskReminders`, `taskDigest/settings`) and the scheduled route.
+- Phase 12 is complete. Not built, as listed in §16.5: reminders by SMS, voice or Messenger, reminders to whole groups, free-text messages, member sign-in and "my tasks" pages, read receipts.

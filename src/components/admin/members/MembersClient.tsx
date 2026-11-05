@@ -15,11 +15,13 @@ import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Segmented } from "@/src/components/ui/segmented";
+import { SearchInput } from "@/src/components/ui/search-input";
 import { Select } from "@/src/components/ui/select";
 import { Textarea } from "@/src/components/ui/textarea";
 import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
 import MemberGroupsDialog, { type GroupChoice } from "@/src/components/admin/people/MemberGroupsDialog";
+import RenameMemberDialog from "@/src/components/admin/people/RenameMemberDialog";
 import type { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import {
   CONTACT_LIMITS,
@@ -97,13 +99,16 @@ const errorText = (error: unknown, fallback: string) => (error instanceof Error 
 export default function MembersClient({
   initialMembers,
   groups = [],
-  officers = {}
+  officers = {},
+  superAdmin = false
 }: {
   initialMembers: MemberRow[];
   /** Every group, for the filter, the badges and the Groups dialog. */
   groups?: GroupChoice[];
   /** Titles of the positions each member holds today, by member id. */
   officers?: Record<string, string[]>;
+  /** Only a super admin may fix a member's name (a typo), so only they get the Edit name button. */
+  superAdmin?: boolean;
 }) {
   const [members, setMembers] = useState(initialMembers);
   const { contacts, ready: phonesReady, remember: rememberContact, e2ee } = useMemberContacts(members);
@@ -112,6 +117,7 @@ export default function MembersClient({
   const [filter, setFilter] = useState<Filter>("all");
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("any");
   const [groupsFor, setGroupsFor] = useState<MemberRow | null>(null);
+  const [renaming, setRenaming] = useState<MemberRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
@@ -515,7 +521,7 @@ export default function MembersClient({
         description={`${counts.ready} of ${members.length} can be emailed. ${counts.has_phone} ${counts.has_phone === 1 ? "has" : "have"} a phone number${counts.no_email ? `, ${counts.no_email} of them with no email` : ""}.`}
       >
         <div className="flex flex-col gap-3">
-          <Input aria-label="Search members" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} className="max-lg:h-11 md:max-w-xs" />
+          <SearchInput aria-label="Search members" placeholder="Search by name or email" value={query} onChange={setQuery} className="md:max-w-xs" inputClassName="max-lg:h-11" />
           <div className="lg:hidden">
             <Select aria-label="Filter members" value={filter} onChange={e => setFilter(e.target.value as Filter)} className="h-11">
               {filters.map(item => (
@@ -642,6 +648,11 @@ export default function MembersClient({
                           {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
                         </Button>
                       ) : null}
+                      {superAdmin ? (
+                        <Button size="row" variant="outline" loading={busy} onClick={() => setRenaming(member)} aria-label={`Edit name of ${displayName}`}>
+                          Edit name
+                        </Button>
+                      ) : null}
                       {groups.length > 0 ? (
                         <Button size="row" variant="outline" loading={busy} onClick={() => setGroupsFor(member)} aria-label={`Groups for ${displayName}`}>
                           Groups
@@ -676,6 +687,19 @@ export default function MembersClient({
           </AdminList>
         )}
       </AdminSectionCard>
+
+      {renaming ? (
+        <RenameMemberDialog
+          currentName={renaming.name ?? ""}
+          label={memberDisplayName(renaming)}
+          nameRequired={!hasEmail(renaming)}
+          busy={busyId === renaming.id}
+          onClose={() => setRenaming(null)}
+          onSave={async name => {
+            if (await update(renaming, { name: name.trim() || null }, "Name updated")) setRenaming(null);
+          }}
+        />
+      ) : null}
 
       {groupsFor ? (
         <MemberGroupsDialog

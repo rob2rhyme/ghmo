@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
+import { SearchInput } from "@/src/components/ui/search-input";
 import { Select } from "@/src/components/ui/select";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
@@ -354,7 +355,7 @@ function TaskDialog({
           </Field>
           <fieldset className="grid gap-2">
             <legend className="text-sm font-medium">People ({picked.size} of {MAX_ASSIGNEES} at most)</legend>
-            <Input aria-label="Search people" placeholder="Search by name or email" value={query} onChange={e => setQuery(e.target.value)} />
+            <SearchInput aria-label="Search people" placeholder="Search by name or email" value={query} onChange={setQuery} />
             <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-md border border-border">
               {people.length === 0 ? <li className="p-3 text-sm text-muted-foreground">No one matches.</li> : null}
               {people.map(member => (
