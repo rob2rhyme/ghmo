@@ -212,6 +212,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **11** | Officer positions, member groups and event tasks | **Built and merged 2026-11-05 (11-A to 11-D, §15.7; PRs #86, #87, #88, #94).** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, calling-tree suggestions from the callers group, and task counts on the Events list. Admins only. | Owner publishes the Firestore rules again and enters the officers (go-live checklist). |
 | **12** | Reminders to team members | **Built and merged 2026-11-05 (12-A to 12-C, §16.6; PRs #95 and #96).** Email reminders about the tasks a person owns: sent by an admin from the event page (12-A), and an optional automatic daily digest of overdue tasks that is off until a super admin switches it on (12-B). Consented members only, with the unsubscribe link and the shared daily email limit. Admins only trigger it. Decisions D21–D26 taken as recommended. | Owner adds `CRON_SECRET` in Vercel if they want the digest, publishes the Firestore rules again, and sends one test reminder (go-live checklist). |
 | **13** | Member profile | **Planned 2026-11-05 (§17); 13-A and 13-B built.** A page per member with how long they have been a member, city and state (no street address), family members with optional phone numbers, a log of notes admins add, the history of calls to them, and how polite or rude each call was. Admins only. Decisions D27–D31 taken as recommended. | Owner reads §17.2 (what is encrypted, who can write notes and ratings) and §17.5 (privacy). |
+| **14** | Push notifications | **Planned 2026-11-05 (§18), not started.** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner reads §18.2 and sets the push keys (go-live checklist) before 14-A is used. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1180,3 +1181,57 @@ Out of scope: a street address, photos, member self-service or a member-facing p
 - Delete: the author or a super admin (the server decides; the button only shows for them). Notes cannot be edited.
 - Browser spec `tests/e2e-auth/member-notes.spec.ts` (2 tests): ciphertext and plain author and date in Firestore, no text in the log, order, length limit, author and super-admin delete, a plain admin refused on another's note, and encryption-off refusals.
 - Still to do: 13-C call history and manner, 13-D docs and the privacy runbook case.
+
+## 18. Phase 14 — Push notifications (planned 2026-11-05, not started)
+
+**Goal.** An admin who switched it on gets a notification on their phone or computer when something needs them: a new message in Admin chat, new activity in Plans & Issues, and the other alerts that today only arrive as email (meeting minutes waiting for approval, calls to make, a broadcast waiting for its second approver, a security alert). It uses the installed web app (PWA) and the standard Web Push protocol, so no app store app and no third-party notification service or SDK is needed. Like the emails, a notification says that something happened, never what.
+
+### 18.1 What was checked (2026-11-05)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| Alerts are content-free emails sent by one function, `notifyAdmins(kind, actorUid, origin, onlyUids?)`, with five kinds (`chat`, `thread`, `minutes_submitted`, `calls`, `security`). It skips the person who caused the activity, sends only to active admins who opted in (`notifyEmail`), and sends at most one email per person per kind every 30 minutes. It is called from the chat and thread routes (through `/api/admin/notify`), minutes submission, call campaigns and a locked authenticator. | `src/lib/notify.server.ts`, `src/lib/notifications.ts`, `app/api/admin/notify/route.ts` | Push hooks into the same function, so every place that can email an alert can also push it, with the same recipients and the same words. |
+| The opt-in is one switch on the Security page. | `app/api/admin/notifications/route.ts` | Push gets its own switch there, per device, because permission is granted per browser. |
+| The site is an installable web app with a deliberately small service worker that never caches pages or API answers, and it has no push or notification-click handling. | `public/sw.js`, plan §11 | Push adds two small handlers (show a notification, open the page when it is tapped) and changes nothing about caching. |
+| There is no push library in the project and no secret for it. | `package.json` | Adds the `web-push` package (MIT) and a VAPID key pair as environment variables. |
+| On iPhone, web push works only for an app added to the Home Screen (iOS 16.4 or later); Android and desktop browsers allow it in the browser. | platform behaviour | The Security card says so and shows the steps. |
+
+### 18.2 Decisions (proposed; accept or change before 14-A)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D32 | How are notifications sent? | Standard Web Push with VAPID keys, using the `web-push` library, straight to each browser's own push service. No Firebase SDK, no notification vendor. | One small dependency; nothing about the community goes to a third-party service beyond the encrypted push itself. |
+| D33 | What does a notification say? | The same content-free words as the email ("New activity in Admin chat", "Minutes are waiting for approval") and a link to the page; never a message text, name or title. | Nothing private shows on a lock screen or passes through a push service. |
+| D34 | Who gets one, and how often? | Active admins who switched push on for that device, for the kinds they left on; never the person who caused the activity. At most one push per person per kind a minute, and a newer one replaces the older one in the tray (same tag). | A busy chat does not buzz a phone for every line. |
+| D35 | Members? | No. Admins only: members have no sign-in. | Nothing here depends on member sign-in. |
+| D36 | What is stored, and how is it protected? | One server-only record per device (the browser's push address and keys, the admin, when it was added). The server sends only to addresses at the known push services (Google, Mozilla, Apple, Microsoft), so a made-up address cannot make the server call an arbitrary site. A device whose address has expired is deleted; a disabled admin gets nothing; an admin can turn push off for a device at any time. | A stolen database dump or a forged subscription does not widen what the server will contact. |
+
+### 18.3 Design
+
+- **Keys and settings:** `VAPID_PUBLIC_KEY` (also exposed to the browser), `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (a mailto address) in Vercel; push does nothing, and the Security card says why, until they are set.
+- **Storage:** `organizations/ghmo/pushSubscriptions/{id}`: `uid`, `endpoint`, `p256dh`, `auth`, `label` (for example "Chrome on Android"), `kinds` (which alerts), `createdAt`, `lastSentAt`. Server-only; a person sees only their own devices, through the API.
+- **Routes:** `POST /api/admin/push` (subscribe this device), `PATCH` (change kinds), `DELETE` (turn off this device), `GET` (this admin's devices and whether push is set up).
+- **Sending:** `notifyAdmins` also calls a push sender for the same recipients. Sending is best effort and never blocks the action that caused it. A 404 or 410 answer from the push service deletes that device.
+- **Service worker:** a `push` handler that shows the content-free notification (title, one line, tag, icon) and a `notificationclick` handler that opens or focuses the page; `sw.js` keeps its no-caching rules.
+- **Security page:** a "Push notifications on this device" card: the button asks the browser for permission (it has to be a tap), switches for each kind, a list of this admin's devices with Turn off, and a plain note for iPhone.
+- **Kinds:** the five existing ones in 14-A (chat and Plans & Issues first); 14-B adds the broadcast-waiting-for-approval alert and any others found, each wired the same way.
+
+### 18.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **14-A** | Keys, subscription storage and routes, service worker handlers, Security card, sending for admin chat and Plans & Issues | A device can be switched on and off; a chat message pushes to the other opted-in admins' devices but not to the sender; a stub push service receives a correctly signed, encrypted request; an expired device is removed; a forged address is refused |
+| **14-B** | The other alerts: minutes, calls, security, broadcast approval, with per-kind switches | Each alert pushes with its own words and link; switching a kind off stops it |
+| **14-C** | Docs: admin guide (including iPhone steps), go-live checklist (the keys), runbook case (a notification went to the wrong person or too many) | Docs merged |
+
+### 18.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| A notification reveals something private on a lock screen | Fixed, content-free wording only; no names, titles or text |
+| The server is made to call an arbitrary address | Only known push-service hosts are accepted when a device is added and again when sending |
+| Too many pushes | One per person per kind a minute; newer replaces older; per-kind switches |
+| Push stops working silently | The Security card shows each device and when one last worked; expired devices are removed |
+| Browsers cannot be driven by a real push service in tests | The sender is tested against a local stub that checks the signing and encryption headers; the service worker handlers are small and covered by a browser test that fires a push event |
+
+Out of scope: pushes to members, notification text with content, SMS or voice alerts, native iOS or Android apps, and read receipts.
