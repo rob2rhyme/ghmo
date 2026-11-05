@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Mail, Phone, SearchX, ShieldOff, Upload, UserPlus } from "lucide-react";
@@ -39,11 +40,13 @@ import {
   normalizeContact,
   parseMemberCsv,
   phoneOnlyKey,
+  type ContactForm,
   type MemberCallState,
   type MemberContact,
   type MemberEmailState
 } from "@/src/lib/members";
 import { groupNamesFor } from "@/src/lib/groups";
+import { contactIsEmpty, locationLabel, withFamily } from "@/src/lib/memberProfile";
 
 export type MemberRow = {
   id: string;
@@ -62,6 +65,10 @@ export type MemberRow = {
   callOptOutAt?: unknown;
   /** Member groups this person is in (plan §15, 11-A); written only by the groups routes. */
   groupIds?: string[];
+  /** Profile facts (plan §17): the day they joined, and city and state. */
+  memberSince?: string | null;
+  city?: string | null;
+  state?: string | null;
 };
 
 const STATE_LABEL: Record<MemberEmailState, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
@@ -181,7 +188,11 @@ export default function MembersClient({
         if (groupFilter === "none" && (member.groupIds?.length ?? 0) > 0) return false;
         if (groupFilter.startsWith("g:") && !(member.groupIds ?? []).includes(groupFilter.slice(2))) return false;
         if (!needle) return true;
-        return (member.emailLower ?? "").includes(needle) || (member.name ?? "").toLowerCase().includes(needle);
+        return (
+          (member.emailLower ?? "").includes(needle) ||
+          (member.name ?? "").toLowerCase().includes(needle) ||
+          locationLabel(member.city, member.state).toLowerCase().includes(needle)
+        );
       })
       .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
   }, [members, query, filter, groupFilter, officers]);
@@ -256,8 +267,16 @@ export default function MembersClient({
     }
   };
 
-  const saveContact = async (member: MemberRow, form: Record<keyof MemberContact, string>) => {
-    const { contact, hasPhone, problems } = normalizeContact(form);
+  const saveContact = async (member: MemberRow, form: ContactForm) => {
+    // A contact this device couldn't open must not be replaced by the form: that would lose what is in it.
+    if (member.contact && !contacts.get(member.id)?.ok) {
+      toast.error("This contact can't be read on this device, so it can't be changed here.");
+      return false;
+    }
+    const normalized = normalizeContact(form);
+    const { hasPhone, problems } = normalized;
+    // The form has no family list, which lives on the profile page, so keep the one already stored instead of erasing it.
+    const contact = withFamily(normalized.contact, contacts.get(member.id)?.ok ? (contacts.get(member.id) as { ok: true; contact: MemberContact }).contact.family : undefined);
     if (problems.length) {
       toast.error(problems[0]);
       return false;
@@ -266,7 +285,7 @@ export default function MembersClient({
       toast.error("Someone without an email needs a phone number. Disable them instead if they should no longer be contacted.");
       return false;
     }
-    const empty = Object.keys(contact).length === 0;
+    const empty = contactIsEmpty(contact);
     const patch = empty ? { contact: null } : { contact: await sealContact(member.id, contact, hasPhone) };
     const saved = await update(member, patch, empty ? "Contact removed" : "Contact saved");
     if (saved) rememberContact(member.id, empty ? null : contact);
@@ -521,7 +540,7 @@ export default function MembersClient({
         description={`${counts.ready} of ${members.length} can be emailed. ${counts.has_phone} ${counts.has_phone === 1 ? "has" : "have"} a phone number${counts.no_email ? `, ${counts.no_email} of them with no email` : ""}.`}
       >
         <div className="flex flex-col gap-3">
-          <SearchInput aria-label="Search members" placeholder="Search by name or email" value={query} onChange={setQuery} className="md:max-w-xs" inputClassName="max-lg:h-11" />
+          <SearchInput aria-label="Search members" placeholder="Search by name, email or city" value={query} onChange={setQuery} className="md:max-w-xs" inputClassName="max-lg:h-11" />
           <div className="lg:hidden">
             <Select aria-label="Filter members" value={filter} onChange={e => setFilter(e.target.value as Filter)} className="h-11">
               {filters.map(item => (
@@ -593,7 +612,16 @@ export default function MembersClient({
                 <AdminListRow
                   key={member.id}
                   title={<span className="break-all">{displayName}</span>}
-                  meta={member.name && hasEmail(member) ? <span className="break-all">{member.emailLower}</span> : undefined}
+                  meta={
+                    member.name && hasEmail(member) ? (
+                      <span className="break-all">
+                        {member.emailLower}
+                        {locationLabel(member.city, member.state) ? ` · ${locationLabel(member.city, member.state)}` : ""}
+                      </span>
+                    ) : locationLabel(member.city, member.state) ? (
+                      <span>{locationLabel(member.city, member.state)}</span>
+                    ) : undefined
+                  }
                   badges={
                     <>
                       <Badge variant={meta.variant}>{meta.label}</Badge>
@@ -648,6 +676,11 @@ export default function MembersClient({
                           {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
                         </Button>
                       ) : null}
+                      <Button asChild size="row" variant="outline">
+                        <Link href={`/admin/members/${member.id}` as Route} aria-label={`Profile of ${displayName}`}>
+                          Profile
+                        </Link>
+                      </Button>
                       {superAdmin ? (
                         <Button size="row" variant="outline" loading={busy} onClick={() => setRenaming(member)} aria-label={`Edit name of ${displayName}`}>
                           Edit name
@@ -857,7 +890,7 @@ function PhoneLine({ name, ready, view, revealed, onToggle }: { name: string; re
   );
 }
 
-const EMPTY_FORM: Record<keyof MemberContact, string> = { phone: "", altPhone: "", language: "", household: "", notes: "" };
+const EMPTY_FORM: ContactForm = { phone: "", altPhone: "", language: "", household: "", notes: "" };
 
 function ContactDialog({
   member,
@@ -868,9 +901,9 @@ function ContactDialog({
   member: MemberRow;
   initial: ContactView | undefined;
   onClose: () => void;
-  onSave: (form: Record<keyof MemberContact, string>) => Promise<void>;
+  onSave: (form: ContactForm) => Promise<void>;
 }) {
-  const [form, setForm] = useState<Record<keyof MemberContact, string>>(() => {
+  const [form, setForm] = useState<ContactForm>(() => {
     if (!initial?.ok) return EMPTY_FORM;
     const c = initial.contact;
     return { phone: c.phone ?? "", altPhone: c.altPhone ?? "", language: c.language ?? "", household: c.household ?? "", notes: c.notes ?? "" };
