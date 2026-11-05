@@ -1083,3 +1083,14 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 | Reminders use up the day's quota | Reserved from the broadcast quota in the same transaction; refused with the number left |
 
 Out of scope: SMS, voice or Messenger reminders (decided in Phase 8–9), reminders to whole groups, free-text messages, member sign-in and "my tasks", read receipts.
+
+### 16.6 Progress
+**12-A built (2026-11-05).**
+- Pure rules and tests: `src/lib/taskReminders.ts` (owners of a task, the plan of who is emailed, who can't be and why, who was reminded recently, the fixed email text, the plain-words labels) with 11 unit tests.
+- Server: `src/lib/taskReminders.server.ts`. `previewReminders` changes nothing. `sendReminders` re-reads each member's consent and reminder record inside one transaction, drops anyone who has opted out or was just reminded, reserves the day's broadcast quota (refusing with the number left if it would be passed), then sends one provider batch with an idempotency key; a failed batch releases the claims and the quota. Deleting an event removes its reminder records.
+- Route: `POST /api/admin/organizations/ghmo/events/[eventId]/tasks/remind` with `{ mode, send }`; ten sends per admin per hour; audited as `event_tasks_reminded` with counts only.
+- Rules: `eventTaskReminders` is admin-read, server-write only (rules test extended).
+- UI: **Send reminders** in the event's Tasks section opens a preview (will be emailed, can't be emailed and why, reminded in the last 24 hours, tasks nobody is assigned to) and a confirm button showing the number. Browser spec `tests/e2e-auth/task-reminders.spec.ts` (mail stub).
+- Docs: admin guide §1g, go-live checklist line, runbook case N, README data model.
+- Notes: a group's task goes to the group's lead only. A send reaches at most 50 people; the rest are picked up by the next send because the first 50 are then in their 24-hour window. The provider is never given a person's other tasks, notes or other recipients.
+- Still to do: 12-B (automatic daily digest, needs the owner's go-ahead on a schedule and a secret) and 12-C items beyond those already written.

@@ -108,6 +108,13 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 2. **Remove the number entirely:** also press **Edit contact**, clear every field and save. The encrypted contact is deleted from the member record. Older Firestore backups may still hold the ciphertext until they expire.
 3. The audit log records both actions with the admin's name; it never held the number.
 
+## N. A task reminder went to the wrong person, or someone complains about it
+
+1. **Stop further reminders:** nobody is emailed again about the same event for 24 hours, so a wrong send cannot repeat by itself. To stop it for good, correct the task under **Admin → Events → the event → Tasks** (who it is given to, or the group and its lead), or remove the task.
+2. **Someone does not want these emails:** open **Admin → Members** and press **They asked to stop** for them (or ask them to use the unsubscribe link in the email). They are never reminded or broadcast to again.
+3. **Who got it:** the audit log shows who sent reminders for which event and how many; the reminder records (Firestore `eventTaskReminders`) show who was emailed and when. Reminders list only a person's own task titles and due dates, never notes or other people's names.
+4. **If many complain or the provider warns:** follow case I (spam complaints), and switch sending off with `FEATURE_BROADCASTS=false`, which also stops reminders.
+
 ## After any incident
 
 - Write down what happened, what you did and what you'll change. Keep it with this runbook.
