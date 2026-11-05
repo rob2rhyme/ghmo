@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import MemberProfileClient, { type ProfileMember } from "@/src/components/admin/members/MemberProfileClient";
-import { requireActiveAdmin, AdminAccessError } from "@/src/lib/admin";
+import { requireActiveAdmin, AdminAccessError, isSuperAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getMember } from "@/src/lib/adminData.server";
 import { groupNamesFor } from "@/src/lib/groups";
@@ -49,7 +49,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
         title={memberDisplayName(member)}
         description="What the community knows about this member. Only admins can see this page."
       />
-      <MemberProfileClient initialMember={member} groupNames={groupNames} officerTitles={officerTitles} />
+      <MemberProfileClient initialMember={member} groupNames={groupNames} officerTitles={officerTitles} me={{ uid: check.actor.uid, superAdmin: isSuperAdmin(check.admin) }} />
     </div>
   );
 }

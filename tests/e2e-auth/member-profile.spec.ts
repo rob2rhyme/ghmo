@@ -68,7 +68,7 @@ test("member since, city and state: saved, shown with how long, cleaned up, and 
   // Family is encrypted, so without encryption there is nothing to add and the page says so.
   await page.goto("/admin/members/m1");
   await waitForStreamedContent(page);
-  await expect(page.getByText(/Turn on encryption \(Admin → Encryption\) to add them/)).toBeVisible();
+  await expect(page.getByText(/Family details are kept encrypted\. Turn on encryption/)).toBeVisible();
   await page.goto("/admin/members/nope");
   await expect(page.getByText(/could not be found|not found|404/i).first()).toBeVisible();
 });

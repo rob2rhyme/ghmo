@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, Pencil, Plus, UsersRound } from "lucide-react";
+import { Eye, EyeOff, NotebookPen, Pencil, Plus, UsersRound } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import { useMemberContacts } from "@/src/components/admin/members/useMemberContacts";
+import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -15,7 +16,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
-import { formatShortDate, toDate } from "@/src/lib/format";
+import { Skeleton } from "@/src/components/ui/skeleton";
+import { Textarea } from "@/src/components/ui/textarea";
+import { formatDateTime, formatShortDate, toDate } from "@/src/lib/format";
+import { NOTE_MAX, canDeleteNote, checkNoteText, cleanNoteText, memberNoteLoc, type NoteMeta, type NotePayload } from "@/src/lib/memberNotes";
 import {
   CITY_MAX,
   FAMILY_NAME_MAX,
@@ -33,7 +37,7 @@ import {
   withFamily
 } from "@/src/lib/memberProfile";
 import { POSITION_TIME_ZONE, todayIn } from "@/src/lib/positions";
-import { formatPhone, maskPhone, memberCallState, memberContactLoc, memberEmailState, type FamilyMember } from "@/src/lib/members";
+import { formatPhone, maskPhone, memberCallState, memberContactLoc, memberEmailState, newMemberId, type FamilyMember } from "@/src/lib/members";
 
 export type ProfileMember = {
   id: string;
@@ -73,7 +77,18 @@ const EMAIL_STATE: Record<string, string> = {
 };
 const CALL_STATE: Record<string, string> = { ready: "Can be called", no_consent: "No call consent", opted_out: "Asked not to be called", no_phone: "No phone number", inactive: "Disabled" };
 
-export default function MemberProfileClient({ initialMember, groupNames, officerTitles }: { initialMember: ProfileMember; groupNames: string[]; officerTitles: string[] }) {
+export default function MemberProfileClient({
+  initialMember,
+  groupNames,
+  officerTitles,
+  me
+}: {
+  initialMember: ProfileMember;
+  groupNames: string[];
+  officerTitles: string[];
+  /** The signed-in admin: whose notes they may delete (their own, or any for a super admin). */
+  me: { uid: string; superAdmin: boolean };
+}) {
   const [member, setMember] = useState(initialMember);
   const today = todayIn(new Date(), POSITION_TIME_ZONE);
   const emailState = memberEmailState({ ...member, emailLower: member.emailLower ?? "" });
@@ -95,8 +110,11 @@ export default function MemberProfileClient({ initialMember, groupNames, officer
         ))}
       </div>
       <MembershipCard member={member} today={today} onSaved={setMember} />
-      <EncryptionGate what="family details">
-        <FamilyCard member={member} onSaved={setMember} />
+      <EncryptionGate what="family details and notes">
+        <div className="flex flex-col gap-6">
+          <FamilyCard member={member} onSaved={setMember} />
+          <NotesCard member={member} me={me} />
+        </div>
       </EncryptionGate>
     </div>
   );
@@ -368,5 +386,212 @@ function FamilyDialog({ person, busy, onClose, onSave }: { person: FamilyMember 
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type StoredNote = NoteMeta & { enc: unknown };
+
+/**
+ * The notes log: add a note, read them newest first with who wrote each and when. The text is encrypted in this
+ * browser, so it needs an unlocked device. Notes can't be edited; their author or a super admin can delete one.
+ */
+function NotesCard({ member, me }: { member: ProfileMember; me: { uid: string; superAdmin: boolean } }) {
+  const e2ee = useE2ee();
+  const ready = e2ee.enabled && e2ee.status === "unlocked";
+  const [notes, setNotes] = useState<StoredNote[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [texts, setTexts] = useState<Map<string, string | null>>(() => new Map());
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<StoredNote | null>(null);
+
+  // Fetch the notes (still encrypted) on open and again after an add or delete.
+  const [reload, setReload] = useState(0);
+  const refresh = useCallback(() => setReload(count => count + 1), []);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/organizations/ghmo/members/${member.id}/notes`, { cache: "no-store" })
+      .then(async res => {
+        const data = (await res.json().catch(() => ({}))) as { notes?: StoredNote[]; error?: string };
+        if (!res.ok || !data.notes) throw new Error(data.error || "Could not load the notes");
+        if (cancelled) return;
+        setNotes(data.notes);
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setLoadError(errorText(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [member.id, reload]);
+
+  // Lock or sign-out: forget the plaintext so nothing shows until the next unlock.
+  const [wasReady, setWasReady] = useState(ready);
+  if (wasReady !== ready) {
+    setWasReady(ready);
+    if (!ready) setTexts(new Map());
+  }
+
+  // Open each note on this device once it is unlocked.
+  const { decrypt } = e2ee;
+  useEffect(() => {
+    if (!ready || !notes) return;
+    const pending = notes.filter(note => !texts.has(note.id));
+    if (pending.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        pending.map(async note => {
+          try {
+            return [note.id, (await decrypt<NotePayload>(note.enc, memberNoteLoc(member.id, note.id))).text] as const;
+          } catch {
+            return [note.id, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setTexts(current => {
+        const next = new Map(current);
+        for (const [id, text] of entries) next.set(id, text);
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, notes, texts, decrypt, member.id]);
+
+  const problem = draft.trim() ? checkNoteText(draft) : null;
+
+  const add = async () => {
+    const text = cleanNoteText(draft);
+    const invalid = checkNoteText(text);
+    if (invalid) {
+      toast.error(invalid);
+      return;
+    }
+    if (!ready) {
+      toast.error("Unlock this device first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const id = newMemberId();
+      const enc = await e2ee.encrypt(memberNoteLoc(member.id, id), { text } satisfies NotePayload);
+      const res = await fetch(`/api/organizations/ghmo/members/${member.id}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, enc }) });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not save the note");
+      setTexts(current => new Map(current).set(id, text));
+      setDraft("");
+      refresh();
+      toast.success("Note added");
+    } catch (error) {
+      toast.error(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (note: StoredNote) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/organizations/ghmo/members/${member.id}/notes/${note.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not delete the note");
+      setDeleting(null);
+      refresh();
+      toast.success("Note deleted");
+    } catch (error) {
+      toast.error(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AdminSectionCard
+      title="Notes"
+      description="Write what happened or what you were told. Notes are encrypted, carry your name and the date, and can't be edited. You can delete your own; a super admin can delete any."
+      icon={<NotebookPen aria-hidden="true" />}
+    >
+      {!e2ee.enabled ? (
+        <Alert>
+          <AlertDescription>Notes are kept encrypted. Turn on encryption (Admin → Encryption) to add them.</AlertDescription>
+        </Alert>
+      ) : (
+        <form
+          className="grid gap-2"
+          onSubmit={event => {
+            event.preventDefault();
+            void add();
+          }}
+        >
+          <Field label="Add a note" error={problem}>
+            <Textarea value={draft} onChange={e => setDraft(e.target.value)} rows={3} />
+          </Field>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" loading={busy} disabled={!draft.trim() || Boolean(problem) || !ready}>
+              Add note
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {cleanNoteText(draft).length} of {NOTE_MAX}
+            </span>
+          </div>
+        </form>
+      )}
+      {loadError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      ) : !notes ? (
+        <Skeleton className="h-16 w-full" />
+      ) : notes.length === 0 ? (
+        <EmptyState icon={<NotebookPen aria-hidden="true" />} title="No notes yet" description="Notes you add show here with your name and the date." />
+      ) : (
+        <AdminList bare label="Notes">
+          {notes.map(note => {
+            const text = texts.get(note.id);
+            return (
+              <AdminListRow
+                key={note.id}
+                stacked
+                title={
+                  !ready ? (
+                    <span className="text-muted-foreground">Unlock this device to read the note</span>
+                  ) : text === undefined ? (
+                    <span className="text-muted-foreground">Opening…</span>
+                  ) : text === null ? (
+                    <span className="text-destructive">This note can&apos;t be opened on this device.</span>
+                  ) : (
+                    <span className="whitespace-pre-line break-words font-normal">{text}</span>
+                  )
+                }
+                meta={`${note.authorName || "An admin"} · ${note.createdAt ? formatDateTime(note.createdAt, { timeZone: POSITION_TIME_ZONE }) : "no date"}`}
+                actions={
+                  canDeleteNote(note, me) ? (
+                    <Button size="row" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleting(note)} aria-label={`Delete the note from ${note.authorName || "an admin"}`}>
+                      Delete
+                    </Button>
+                  ) : undefined
+                }
+              />
+            );
+          })}
+        </AdminList>
+      )}
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={open => !open && setDeleting(null)}
+        title="Delete this note?"
+        description="It is removed for everyone and can't be brought back."
+        confirmLabel="Delete note"
+        destructive
+        busy={busy}
+        onConfirm={async () => {
+          if (deleting) await remove(deleting);
+        }}
+      />
+    </AdminSectionCard>
   );
 }
