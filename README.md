@@ -56,6 +56,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/events`
   - `/admin/calling-tree` (who calls whom; super admins plan and save, plan §12) and `/admin/my-calls` (a caller's own people)
   - `/admin/call-campaigns` and `/admin/call-campaigns/[id]` (one campaign per announcement: who was reached, RSVPs, call log, CSV export; plan §12)
+  - `/admin/positions` (who holds each officer position and since when; super admins change it, plan §15) and `/admin/groups`, `/admin/groups/[groupId]` (teams of members with a lead, including the phone tree callers; any admin)
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
@@ -94,6 +95,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `donations/stats` + `donations/webhookEvents/{eventId}`.
   - `callingTree/current` (`callers[]`, `version`, `updatedAt`, `updatedBy`) and `callingTree/current/assignments/{memberId}` (`callerUid`, `assignedAt`, `assignedBy`): the calling tree (plan §12), server-only; no client may read or write it.
   - `callCampaigns/{id}` and `callCampaigns/{id}/calls/{memberId}`: call campaigns (plan §12): title, event, encrypted script, counts; per member the caller, outcome, RSVP and append-only attempts with encrypted notes. Server-only.
+  - `positions/{id}` and `positionTerms/{id}`: officer positions (title, Nepali title, order, active, several-holders flag) and who held each from which date to which (`startsOn`, `endsOn` or null). `groups/{id}`: name, description, `leadMemberId`, `kind` (`callers` for the phone tree group). Group membership is `members/{id}.groupIds[]`. All plaintext, admin-read, server-written (plan §15).
   - `auditLogs/{logId}`.
 - Communication log collections (all under `organizations/ghmo`):
   - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.

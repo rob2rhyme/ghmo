@@ -19,6 +19,7 @@ import { Select } from "@/src/components/ui/select";
 import { Textarea } from "@/src/components/ui/textarea";
 import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
+import MemberGroupsDialog, { type GroupChoice } from "@/src/components/admin/people/MemberGroupsDialog";
 import type { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import {
   CONTACT_LIMITS,
@@ -40,6 +41,7 @@ import {
   type MemberContact,
   type MemberEmailState
 } from "@/src/lib/members";
+import { groupNamesFor } from "@/src/lib/groups";
 
 export type MemberRow = {
   id: string;
@@ -56,6 +58,8 @@ export type MemberRow = {
   contact?: unknown;
   phoneConsent?: { at?: unknown; source?: string } | null;
   callOptOutAt?: unknown;
+  /** Member groups this person is in (plan §15, 11-A); written only by the groups routes. */
+  groupIds?: string[];
 };
 
 const STATE_LABEL: Record<MemberEmailState, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
@@ -76,6 +80,8 @@ const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "suc
 };
 
 type Filter = "all" | MemberEmailState | "has_phone";
+/** The group filter: everyone, officers, people in no group, or one group by id. */
+type GroupFilter = "any" | "officers" | "none" | `g:${string}`;
 
 const SAMPLE_CSV = "email,name,phone\nsam@example.org,Sam Lee,717-555-0100\npat@example.org,Pat Rai,\n,Maya Gurung,717-555-0102";
 
@@ -88,12 +94,24 @@ async function call<T>(url: string, method: string, body: unknown): Promise<T> {
 
 const errorText = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
-export default function MembersClient({ initialMembers }: { initialMembers: MemberRow[] }) {
+export default function MembersClient({
+  initialMembers,
+  groups = [],
+  officers = {}
+}: {
+  initialMembers: MemberRow[];
+  /** Every group, for the filter, the badges and the Groups dialog. */
+  groups?: GroupChoice[];
+  /** Titles of the positions each member holds today, by member id. */
+  officers?: Record<string, string[]>;
+}) {
   const [members, setMembers] = useState(initialMembers);
   const { contacts, ready: phonesReady, remember: rememberContact, e2ee } = useMemberContacts(members);
   const { encrypt } = e2ee;
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>("any");
+  const [groupsFor, setGroupsFor] = useState<MemberRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
@@ -153,11 +171,14 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
       .filter(member => {
         if (filter === "has_phone" && !member.hasPhone) return false;
         if (filter !== "all" && filter !== "has_phone" && memberEmailState(member) !== filter) return false;
+        if (groupFilter === "officers" && !officers[member.id]?.length) return false;
+        if (groupFilter === "none" && (member.groupIds?.length ?? 0) > 0) return false;
+        if (groupFilter.startsWith("g:") && !(member.groupIds ?? []).includes(groupFilter.slice(2))) return false;
         if (!needle) return true;
         return (member.emailLower ?? "").includes(needle) || (member.name ?? "").toLowerCase().includes(needle);
       })
       .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
-  }, [members, query, filter]);
+  }, [members, query, filter, groupFilter, officers]);
 
   const replace = (updated: MemberRow) => setMembers(list => list.map(m => (m.id === updated.id ? updated : m)));
 
@@ -511,6 +532,18 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
             onChange={setFilter}
             options={filters.map(item => ({ value: item.key, label: item.label, count: item.count }))}
           />
+          {groups.length > 0 || Object.keys(officers).length > 0 ? (
+            <Select aria-label="Filter by group" value={groupFilter} onChange={e => setGroupFilter(e.target.value as GroupFilter)} className="max-lg:h-11 md:max-w-xs">
+              <option value="any">Any group</option>
+              <option value="officers">Officers (hold a position)</option>
+              {groups.map(group => (
+                <option key={group.id} value={`g:${group.id}`}>
+                  {group.name}
+                </option>
+              ))}
+              <option value="none">In no group</option>
+            </Select>
+          ) : null}
         </div>
 
         {visible.length === 0 ? (
@@ -527,6 +560,7 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                   onClick={() => {
                     setQuery("");
                     setFilter("all");
+                    setGroupFilter("any");
                   }}
                 >
                   Show everyone
@@ -559,6 +593,16 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                       <Badge variant={meta.variant}>{meta.label}</Badge>
                       {isEmailConsentSource(source) ? <span className="text-sm text-muted-foreground">{EMAIL_CONSENT_LABELS[source]}</span> : null}
                       {member.hasPhone && callMeta ? <Badge variant={callMeta.variant}>{callMeta.label}</Badge> : null}
+                      {(officers[member.id] ?? []).map(title => (
+                        <Badge key={`o-${title}`} variant="default">
+                          {title}
+                        </Badge>
+                      ))}
+                      {groupNamesFor(member.groupIds, groups).map(groupName => (
+                        <Badge key={`g-${groupName}`} variant="outline">
+                          {groupName}
+                        </Badge>
+                      ))}
                     </>
                   }
                   actions={
@@ -598,6 +642,11 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
                           {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
                         </Button>
                       ) : null}
+                      {groups.length > 0 ? (
+                        <Button size="row" variant="outline" loading={busy} onClick={() => setGroupsFor(member)} aria-label={`Groups for ${displayName}`}>
+                          Groups
+                        </Button>
+                      ) : null}
                       {/* Set apart at the row end: a divider before it, ghost red, and a confirmation. */}
                       <span aria-hidden="true" className="hidden h-6 w-px bg-border sm:block" />
                       {member.status === "active" ? (
@@ -627,6 +676,33 @@ export default function MembersClient({ initialMembers }: { initialMembers: Memb
           </AdminList>
         )}
       </AdminSectionCard>
+
+      {groupsFor ? (
+        <MemberGroupsDialog
+          name={memberDisplayName(groupsFor)}
+          groups={groups}
+          current={(groupsFor.groupIds ?? []).filter(id => groups.some(g => g.id === id))}
+          busy={busyId === groupsFor.id}
+          onClose={() => setGroupsFor(null)}
+          onSave={async (add, remove) => {
+            const target = groupsFor;
+            setBusyId(target.id);
+            try {
+              for (const id of add) await call(`/api/admin/groups/${id}/members`, "POST", { add: [target.id] });
+              for (const id of remove) await call(`/api/admin/groups/${id}/members`, "POST", { remove: [target.id] });
+              const kept = (target.groupIds ?? []).filter(id => !remove.includes(id));
+              replace({ ...target, groupIds: [...kept, ...add] });
+              toast.success("Groups saved");
+              setGroupsFor(null);
+            } catch (error) {
+              toast.error(errorText(error, "Could not save groups"));
+              await refresh();
+            } finally {
+              setBusyId(null);
+            }
+          }}
+        />
+      ) : null}
 
       {editing ? (
         <ContactDialog

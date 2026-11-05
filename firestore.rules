@@ -71,6 +71,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Officer positions, their terms, and member groups (plan §15, 11-A): admins read; every change goes
+    // through /api/admin/positions, /api/admin/position-terms and /api/admin/groups, so each is audited and
+    // the term-overlap and one-lead rules cannot be skipped from a browser.
+    match /organizations/{orgSlug}/positions/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /organizations/{orgSlug}/positionTerms/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /organizations/{orgSlug}/groups/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Broadcast emails to members: drafted, approved and (later) sent only through /api/admin/broadcasts,
     // so the second-admin approval and its audit trail cannot be skipped from a browser.
     match /organizations/{orgSlug}/broadcasts/{doc=**} {

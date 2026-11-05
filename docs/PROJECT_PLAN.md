@@ -931,7 +931,7 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 
 ---
 
-## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05, not started)
+## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A built 2026-11-05)
 
 **Goal.** The member list gains the organisation's structure: who holds which officer position (president, treasurer, secretary, board member…), which working groups people belong to (a phone-tree group that calls members about events, and event teams such as cooking, marketing and shopping), and a task checklist per event so each group knows what it owns. Admins only: members have no usable sign-in today (§15.1), so group leads who are admins coordinate their people in the app, and member self-service is a later phase.
 
@@ -966,8 +966,8 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 - Member-to-admin link (`linkMemberToAdmin` in `src/lib/groups.ts`): `member.uid` equals an admin's id, else `member.emailLower` equals `admin.emailLower`; only active admins count; phone-only members never link.
 
 **API (pattern of `app/api/admin/calling-tree/route.ts`: env check, `requireActiveAdmin`, `isSuperAdmin` where needed, zod, `logAuditEvent`, each action labelled in `ACTIVITY`):**
-- `/api/admin/positions` (GET list with terms; POST, super), `/api/admin/positions/[id]` (PATCH, super), `/api/admin/positions/[id]/terms` (POST with `endPrevious`, super), `/api/admin/positions/terms/[termId]` (PATCH, DELETE, super).
-- `/api/admin/groups` (GET with counts and lead names; POST), `/api/admin/groups/[id]` (PATCH; DELETE super, which removes the id from every member in batches), `/api/admin/groups/[id]/members` (PUT `{ add, remove }`; the lead must stay a member).
+- `/api/admin/positions` (GET list with terms; POST, super), `/api/admin/positions/[id]` (PATCH, super), `/api/admin/positions/[id]/terms` (POST with `endPrevious`, super), `/api/admin/position-terms/[termId]` (PATCH, DELETE, super).
+- `/api/admin/groups` (GET with counts and lead names; POST), `/api/admin/groups/[id]` (PATCH; DELETE super, which removes the id from every member in batches), `/api/admin/groups/[id]/members` (POST `{ add, remove }`; the lead must stay a member).
 - `/api/admin/organizations/ghmo/events/[eventId]/tasks` (GET, POST), `…/tasks/[taskId]` (PATCH incl. status, DELETE), `…/tasks/apply-template` (POST; skips titles already present, computes due dates from the event start).
 - `/api/admin/task-templates` (GET, POST from items or from an existing event), `/api/admin/task-templates/[id]` (PATCH; DELETE super).
 - Validation: ids via `MEMBER_ID_PATTERN`, dates `YYYY-MM-DD` with `endsOn ≥ startsOn`, one open term per position and member, group must be active, members must exist. Page reads added to `adminData.server.ts`. The route sweep covers anonymous refusal.
@@ -1003,3 +1003,13 @@ Unit: `tests/unit/positions.test.ts` (current and past terms, closing the previo
 
 ### 15.6 Out of scope
 Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push), SMS or Messenger integration, a public "Our board" page, task comments or attachments, merging event tasks with minutes action items (only the overdue rule is shared), changing the docgen position dropdown.
+
+### 15.7 Progress
+**11-A built (2026-11-05).** Decisions D17 to D20 were accepted with "start 11-A".
+- Pure rules and tests: `src/lib/positions.ts` (dates, term status, overlap, `planTerm`, `termEditConflict`, the 16 default positions) and `src/lib/groups.ts` (cleaning, `planMembership`, `linkMemberToAdmin`), with 31 unit tests.
+- Storage: `src/lib/positions.server.ts` (idempotent seeding on first read, terms written in a transaction so two admins cannot both seat a president) and `src/lib/groups.server.ts` (the callers group is created on first read; membership is `groupIds` written in batches of 450; delete removes the id from every member).
+- Routes: `/api/admin/positions`, `positions/[positionId]`, `positions/[positionId]/terms`, `/api/admin/position-terms/[termId]`, `/api/admin/groups`, `groups/[groupId]`, `groups/[groupId]/members`. Shared helpers in `src/lib/adminRoute.server.ts`. Nine new activity sentences. Super admin: positions, terms, deleting a group. Any admin: groups and membership.
+- Rules: `positions`, `positionTerms` and `groups` are admin-read and server-write only (new block in `tests/rules/firestore.rules.test.ts`, also proving `groupIds` on a member cannot be written from a browser).
+- Pages: Positions (Current and Past terms, set holder, end term, add and edit a position), Groups and Group (create, add people, make lead, remove, edit, delete), nav items, and on Members the group and officer badges, a group filter and a Groups dialog. Browser spec `tests/e2e-auth/positions-groups.spec.ts`.
+- Differences from the design above: the term route is `/api/admin/position-terms/[termId]` and group membership is a POST; the Positions page has Current and Past terms only (a past term can be removed if entered by mistake); Members shows every badge rather than three plus "+n"; "End term" sets the end date to today, so the person still holds the seat through today. Open-task counts on group rows and the group page's task section arrive with 11-B.
+- Still to do: 11-B event tasks and templates, 11-C calling-tree suggestions (the callers group page already notes that callers need admin access), 11-D task counts and the go-live line.
