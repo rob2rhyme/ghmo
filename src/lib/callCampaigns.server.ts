@@ -18,6 +18,7 @@ import {
   type Rsvp
 } from "./callCampaigns";
 import type { EnvelopeInput } from "./e2eeEnvelope.server";
+import { sortHistoryNewestFirst, type HistoryEntry } from "./callHistory";
 
 /**
  * Storage for call campaigns (plan §12.3). Server-written only; the rules deny every client read and
@@ -198,6 +199,8 @@ export type RecordAttemptInput = {
   attemptId: string;
   input: AttemptInput;
   note: EnvelopeInput | null;
+  /** How the call went (polite, neutral or rude), encrypted in the browser; optional (plan §17, D30). */
+  manner?: EnvelopeInput | null;
   actorUid: string;
   actorIsSuperAdmin: boolean;
   now: Date;
@@ -222,12 +225,15 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<RecordAt
     }
     const plan = planAttempt({ campaignStatus: campaign.status, row: call, input: input.input, actorUid: input.actorUid, actorIsSuperAdmin: input.actorIsSuperAdmin });
     if (!plan.ok) return plan;
-    const attempt = { id: input.attemptId, at: input.now, outcome: input.input.outcome, byUid: input.actorUid, ...(input.note ? { note: input.note } : {}) };
+    const attempt = { id: input.attemptId, at: input.now, outcome: input.input.outcome, byUid: input.actorUid, ...(input.note ? { note: input.note } : {}), ...(input.manner ? { manner: input.manner } : {}) };
+    // The rating is stored with the attempt but never sent back to the dashboard or in this answer.
+    const { manner: _stored, ...visible } = attempt;
+    void _stored;
     const counts: CampaignCounts = { ...campaign.counts };
     for (const [key, diff] of Object.entries(plan.countsDelta)) counts[key as keyof CampaignCounts] += diff ?? 0;
     tx.update(callRef, { outcome: plan.row.outcome, rsvp: plan.row.rsvp, attempts: [...callSnap.get("attempts") ?? [], attempt], updatedAt: input.now });
     tx.update(campaignRef, { counts });
-    const stored: StoredCall = { ...plan.row, attempts: [...call.attempts, { ...attempt, at: input.now.getTime() }], updatedAt: input.now.getTime() };
+    const stored: StoredCall = { ...plan.row, attempts: [...call.attempts, { ...visible, at: input.now.getTime() }], updatedAt: input.now.getTime() };
     return { ok: true, call: stored, counts } as const;
   });
 }
@@ -253,4 +259,56 @@ export function callersWithWork(calls: CallRow[]): string[] {
 /** Admin names for the dashboard, without exposing anything else about the admins. */
 export async function callerNames(): Promise<Record<string, string>> {
   return Object.fromEntries((await listAdmins(COMMUNITY_SLUG)).map(a => [a.id, a.name]));
+}
+
+/**
+ * Every call made to one member, across all campaigns, newest campaign first (plan §17, 13-C). Notes and manner
+ * ratings are returned as the encrypted envelopes they are stored as; the profile page opens them on the admin's device.
+ */
+export async function memberCallHistory(memberId: string): Promise<{ history: HistoryEntry[]; callerNames: Record<string, string> }> {
+  const campaigns = await listCampaigns();
+  const db = getAdminDb();
+  const refs = campaigns.map(campaign => callsCol(campaign.id).doc(memberId));
+  const snaps: FirebaseFirestore.DocumentSnapshot[] = [];
+  for (let i = 0; i < refs.length; i += 100) snaps.push(...(await db.getAll(...refs.slice(i, i + 100))));
+  const history: HistoryEntry[] = [];
+  snaps.forEach((snap, index) => {
+    if (!snap.exists) return;
+    const campaign = campaigns[index];
+    const attempts = Array.isArray(snap.get("attempts")) ? (snap.get("attempts") as Record<string, unknown>[]) : [];
+    history.push({
+      campaign: { id: campaign.id, title: campaign.title, eventTitle: campaign.eventTitle, createdAt: campaign.createdAt, status: campaign.status },
+      call: {
+        callerUid: (snap.get("callerUid") as string) ?? "",
+        outcome: (snap.get("outcome") as Outcome | null | undefined) ?? null,
+        rsvp: (snap.get("rsvp") as Rsvp | null | undefined) ?? null,
+        attempts: attempts.map(a => ({
+          id: (a.id as string) ?? "",
+          at: toMillis(a.at),
+          outcome: a.outcome as Outcome,
+          byUid: (a.byUid as string) ?? "",
+          ...(a.note ? { note: a.note } : {}),
+          ...(a.manner ? { manner: a.manner } : {})
+        }))
+      }
+    });
+  });
+  return { history: sortHistoryNewestFirst(history), callerNames: await callerNames() };
+}
+
+/** Removes the manner rating from one attempt (a super admin's correction). The attempt itself, and its note, stay. */
+export async function clearAttemptManner(input: { campaignId: string; memberId: string; attemptId: string; now: Date }): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const ref = callsCol(input.campaignId).doc(input.memberId);
+  return getAdminDb().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return { ok: false, status: 404, error: "Not found." } as const;
+    const attempts = (Array.isArray(snap.get("attempts")) ? snap.get("attempts") : []) as Record<string, unknown>[];
+    const index = attempts.findIndex(a => a.id === input.attemptId);
+    if (index < 0) return { ok: false, status: 404, error: "Not found." } as const;
+    if (!attempts[index].manner) return { ok: false, status: 409, error: "This call has no rating to clear." } as const;
+    const { manner: _removed, ...rest } = attempts[index];
+    void _removed;
+    tx.update(ref, { attempts: attempts.map((a, i) => (i === index ? rest : a)), updatedAt: input.now });
+    return { ok: true } as const;
+  });
 }

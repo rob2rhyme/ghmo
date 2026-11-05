@@ -16,7 +16,7 @@ import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
-import { OUTCOMES, OUTCOME_LABELS, RSVPS, RSVP_LABELS, attemptNoteLoc, campaignScriptLoc, isFinalOutcome, type Outcome, type Rsvp } from "@/src/lib/callCampaigns";
+import { MANNERS, MANNER_LABELS, OUTCOMES, OUTCOME_LABELS, RSVPS, RSVP_LABELS, attemptMannerLoc, attemptNoteLoc, campaignScriptLoc, isFinalOutcome, type Manner, type MannerPayload, type Outcome, type Rsvp } from "@/src/lib/callCampaigns";
 import { statusBadge } from "@/src/lib/statusBadges";
 import { formatPhone, maskPhone } from "@/src/lib/members";
 import { api, formatDay, memberLabel, newId, type CallView, type CampaignView, type MemberLite } from "./campaignShared";
@@ -111,13 +111,15 @@ function MyCalls() {
       return next;
     });
 
-  const logAttempt = async (params: { outcome: Outcome; rsvp: Rsvp | null; note: string }) => {
+  const logAttempt = async (params: { outcome: Outcome; rsvp: Rsvp | null; note: string; manner: Manner | null }) => {
     if (!logging) return false;
     const { campaign, call } = logging;
     try {
       const attemptId = newId();
       const body: Record<string, unknown> = { attemptId, outcome: params.outcome, rsvp: params.outcome === "reached" ? params.rsvp : null };
       if (params.note.trim()) body.note = await encrypt(attemptNoteLoc(campaign.id, call.memberId, attemptId), { note: params.note.trim() });
+      // How the call went is optional, only for a call that reached them, and encrypted like the note.
+      if (params.manner && params.outcome === "reached") body.manner = await encrypt(attemptMannerLoc(campaign.id, call.memberId, attemptId), { manner: params.manner } satisfies MannerPayload);
       const { call: updated } = await api<{ call: CallView }>(`/api/admin/call-campaigns/${campaign.id}/calls/${call.memberId}`, { method: "POST", body: JSON.stringify(body) });
       setCampaigns(current => {
         if (!current) return current;
@@ -336,17 +338,18 @@ function LogCallDialog({
   campaignTitle: string;
   current: CallView;
   onClose: () => void;
-  onSave: (params: { outcome: Outcome; rsvp: Rsvp | null; note: string }) => Promise<void>;
+  onSave: (params: { outcome: Outcome; rsvp: Rsvp | null; note: string; manner: Manner | null }) => Promise<void>;
 }) {
   const [outcome, setOutcome] = useState<Outcome>("reached");
   const [rsvp, setRsvp] = useState<Rsvp | null>(current.rsvp);
   const [note, setNote] = useState("");
+  const [manner, setManner] = useState<Manner | null>(null);
   const [saving, setSaving] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await onSave({ outcome, rsvp, note });
+      await onSave({ outcome, rsvp, note, manner: outcome === "reached" ? manner : null });
     } finally {
       setSaving(false);
     }
@@ -388,6 +391,24 @@ function LogCallDialog({
                   Didn&apos;t say
                 </label>
               </div>
+            </fieldset>
+          ) : null}
+          {outcome === "reached" ? (
+            <fieldset className="space-y-1.5">
+              <legend className="text-sm font-medium">How was the call? (optional)</legend>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Manner">
+                {MANNERS.map(value => (
+                  <label key={value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${manner === value ? "border-primary bg-primary/5" : "border-border"}`}>
+                    <input type="radio" name="manner" value={value} checked={manner === value} onChange={() => setManner(value)} />
+                    {MANNER_LABELS[value]}
+                  </label>
+                ))}
+                <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${manner === null ? "border-primary bg-primary/5" : "border-border"}`}>
+                  <input type="radio" name="manner" value="" checked={manner === null} onChange={() => setManner(null)} />
+                  Not recorded
+                </label>
+              </div>
+              <p className="text-sm text-muted-foreground">Say how the call went, not what you think of the person. It is encrypted, shows only on their profile, and a super admin can clear it.</p>
             </fieldset>
           ) : null}
           <Field label="Note (optional, encrypted)">

@@ -211,6 +211,8 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **9** | Member outreach: calling tree and call campaigns | **Built and merged 2026-11-01 (9-A to 9-D, §12.7); members without email added 2026-11-04 (#82).** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
 | **11** | Officer positions, member groups and event tasks | **Built and merged 2026-11-05 (11-A to 11-D, §15.7; PRs #86, #87, #88, #94).** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, calling-tree suggestions from the callers group, and task counts on the Events list. Admins only. | Owner publishes the Firestore rules again and enters the officers (go-live checklist). |
 | **12** | Reminders to team members | **Built and merged 2026-11-05 (12-A to 12-C, §16.6; PRs #95 and #96).** Email reminders about the tasks a person owns: sent by an admin from the event page (12-A), and an optional automatic daily digest of overdue tasks that is off until a super admin switches it on (12-B). Consented members only, with the unsubscribe link and the shared daily email limit. Admins only trigger it. Decisions D21–D26 taken as recommended. | Owner adds `CRON_SECRET` in Vercel if they want the digest, publishes the Firestore rules again, and sends one test reminder (go-live checklist). |
+| **13** | Member profile | **Planned 2026-11-05 (§17); 13-A to 13-C built.** A page per member with how long they have been a member, city and state (no street address), family members with optional phone numbers, a log of notes admins add, the history of calls to them, and how polite or rude each call was. Admins only. Decisions D27–D31 taken as recommended. | Owner reads §17.2 (what is encrypted, who can write notes and ratings) and §17.5 (privacy). |
+| **14** | Push notifications | **Planned 2026-11-05 (§18), not started.** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner reads §18.2 and sets the push keys (go-live checklist) before 14-A is used. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1110,3 +1112,132 @@ Out of scope: SMS, voice or Messenger reminders (decided in Phase 8–9), remind
 - **Runbook** (`docs/RUNBOOK_INCIDENT.md`): case N, a reminder to the wrong person or a complaint, including switching the digest off.
 - **README**: the data model (`eventTaskReminders`, `taskDigest/settings`) and the scheduled route.
 - Phase 12 is complete. Not built, as listed in §16.5: reminders by SMS, voice or Messenger, reminders to whole groups, free-text messages, member sign-in and "my tasks" pages, read receipts.
+
+## 17. Phase 13 — Member profile (planned 2026-11-05)
+
+**Goal.** Each member gets a profile page that gathers what the community knows about them in one place, for admins only: how long they have been a member, their city and state, their family members (with phone numbers if known), a log of notes that admins add, the history of calls made to them and what happened, and how polite or rude each call was. It sits on top of the member list, call campaigns and encrypted contact record that already exist.
+
+### 17.1 What was checked (2026-11-05)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| A member's phone, second number, language, household and one free-text note live in one end-to-end encrypted envelope bound to `members/{id}#contact`; the server stores it but cannot read it. Names, emails, consent flags and groups are plaintext. | `src/lib/members.ts`, `src/lib/memberContact.server.ts`, D12 and D19 | Anything personal that a database reader should not see (family members and their numbers, notes, call manner) is encrypted the same way. Coarse facts the lists need (city, state, member since) are plaintext fields. |
+| The only place that writes the contact envelope is Edit contact on the Members page, and it rebuilds the contact from its form fields alone. | `saveContact` in `src/components/admin/members/MembersClient.tsx` | Anything new in the envelope would be erased by an unrelated edit unless that save carries it through. 13-A changes it to keep the family list. |
+| Every call attempt is stored on the call record with its outcome, caller and time; the attempt note is an encrypted envelope bound to campaign, member and attempt. RSVP and the call's latest outcome are on the call record. | `src/lib/callCampaigns.ts`, `src/lib/callCampaigns.server.ts` | The call history is already recorded; 13-C reads it across campaigns. A manner rating is one more optional encrypted field on an attempt. |
+| Member lists load every member with plaintext fields only; encrypted data is read on the device after unlock, one member at a time on the profile page. | `app/(admin)/admin/members/page.tsx`, `useMemberContacts` | A profile page can load one member, decrypt on the device, and never put encrypted content into a list or an export. |
+
+### 17.2 Decisions (taken as recommended; the owner can change any of them)
+
+| ID | Question | Decision | Effect |
+|---|---|---|---|
+| D27 | What is encrypted and what is plain? | Plain on the member record: member-since date, city, state. Encrypted on the device: family members and their phone numbers, notes, and the manner rating of each call. | Lists can show and filter by city and state; nothing about a person's family, notes or manners is readable in the database or in a backup. |
+| D28 | Who may write what? | Any active admin edits member since, city, state and family, and adds notes. A note is append-only with its author's name and the date; its author or a super admin can delete it. | A note cannot be quietly rewritten, and a mistake can be removed. |
+| D29 | What are family members for? | Reference only: a name, how they are related, and an optional phone number. Up to ten per member. They are never contacted, never put in the calling tree or a campaign, and entering a number gives no consent to be called. | The profile helps a caller know who to ask for; it does not widen who can be phoned. |
+| D30 | How is "polite or rude" recorded? | A three-level, optional scale (polite, neutral, rude) that the caller chooses for each call attempt, stored encrypted with the attempt. The profile shows counts and the latest few. It never appears in lists, filters, exports or the activity log. Super admins can clear a rating. | Plain facts about a call, not free-text insults; one wrong click can be fixed; nothing leaks outside the profile. |
+| D31 | Address? | None. City and state only: the city as text, the state as a US two-letter code (a full name such as "Pennsylvania" is turned into "PA") or other text for places outside the US. | No street address is ever collected. |
+
+### 17.3 Design
+
+- **Member record** (plaintext, set through the existing member update route by any admin): `memberSince` ("YYYY-MM-DD", not in the future), `city` (80 characters), `state` (40). The profile shows "Member since Mar 2019, 6 years 8 months". Without a date it offers the day the person was added to the list as a starting point.
+- **Family** (encrypted, inside the contact envelope as `family: [{ name, relationship, phone }]`): edited on the profile; the Edit contact save on the Members page keeps it.
+- **Notes** (13-B, encrypted): one small record per note under `members/{id}/notes/{noteId}`, each an envelope bound to its own location, with `authorUid`, `authorName` and `createdAt` in plain fields so the order and authorship are visible without decrypting.
+- **Call history and manner** (13-C): the profile reads the member's call record in every campaign (campaign title and date, each attempt's time, outcome, caller, RSVP) and the decrypted notes and manner of each attempt. Callers record the manner on My Calls when logging an attempt.
+- **Page:** `/admin/members/[memberId]`, opened with a **Profile** button on each Members row. One card per area; areas that need decryption show the unlock card until the device is unlocked.
+
+### 17.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **13-A** | Profile page, member since, city and state, family members; Edit contact keeps family | Fields save and show; family is ciphertext in Firestore, readable after unlock, and survives an Edit contact save |
+| **13-B** | Notes log | Notes added with author and date, encrypted, deletable by author or super admin |
+| **13-C** | Call history and manner | History across campaigns on the profile; manner recorded per attempt, encrypted, clearable by a super admin |
+| **13-D** | Docs, privacy runbook case (a member asks what is held about them, or to have it removed), go-live line | Docs merged |
+
+### 17.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| Notes and manner ratings are opinions about people and could be unfair or leak | Encrypted, admin-only, never in lists, exports or the activity log; authors named; three fixed levels for manner; guidance text asks for what happened, not opinions; a super admin can remove any of it; the runbook covers a member asking to see or erase their data |
+| Family phone numbers are third-party data | Encrypted; never contacted or consented by implication; shown masked until an admin presses Show |
+| Edit contact wiping new fields | The save now merges what is already stored; a browser test edits the contact and checks the family list survives |
+| City and state used to guess an address | No street, number or postcode field exists |
+
+Out of scope: a street address, photos, member self-service or a member-facing profile, scoring or ranking members, exporting profiles, and any use of manner ratings to exclude someone automatically.
+
+### 17.6 Progress
+**13-A built (2026-11-05).** Decisions D27 to D31 taken as recommended.
+- Pure rules and tests: `src/lib/memberProfile.ts` (member-since check and "7 years, 8 months" wording, city and state with US state names turned into codes, the family list: names, optional relationship, optional phone stored as E.164, at most ten) with 10 unit tests; `FamilyMember` and `family` added to `MemberContact` in `src/lib/members.ts`.
+- Server: the existing member update route accepts `memberSince` (a real day, after 1950, not in the future), `city` and `state` from any active admin; a blank clears one. The activity log keeps before and after. A one-member loader (`getMember`) feeds the page.
+- Page: `/admin/members/[memberId]`, opened with a **Profile** button on each Members row. A Membership card (member since, city, state, with "Use the day they were added" when no date is set) and a Family card that sits inside the encryption gate. The Members list also shows and searches city and state.
+- Family is stored inside the encrypted contact envelope, so it is ciphertext in Firestore and absent from the activity log. Numbers show masked until Show; family are never called or emailed.
+- Edit contact on the Members page used to rebuild the contact from its form fields, which would have erased family; it now carries the stored family list through, refuses to overwrite a contact this device cannot open, and counts a contact with only a family list as not empty. A browser test removes that carry-through and fails, so it guards the behaviour.
+- Browser spec `tests/e2e-auth/member-profile.spec.ts` (2 tests).
+
+**13-B built (2026-11-05).**
+- Pure rules and tests: `src/lib/memberNotes.ts` (the location a note is bound to, member and note id; the 2000-character limit and the 200-note cap; who may delete; newest-first order) with 6 unit tests.
+- Server: `src/lib/memberNotes.server.ts` and routes `GET` and `POST /api/organizations/ghmo/members/[memberId]/notes`, `DELETE …/notes/[noteId]`. The note text is the browser's encrypted envelope, checked to come from an active device of the signed-in admin and stored without being read; `authorUid`, `authorName` and `createdAt` are plain. A note id that exists is refused, and a member at 200 notes must delete one first. Audited as `member_note_added` and `member_note_deleted` with the note id only, never the text.
+- Rules: notes live under `members/{id}/notes/{noteId}`, which the existing members rule already makes admin-read and server-write only; a rules test now proves reads for admins and refusal for browser writes and for everyone else.
+- UI: a **Notes** card on the profile (add a note, list newest first with author and date, character count, delete with confirmation). It sits inside the encryption gate with Family, so it needs an unlocked device to add or read; with encryption off it says so. A note this device cannot open says that plainly.
+- Delete: the author or a super admin (the server decides; the button only shows for them). Notes cannot be edited.
+- Browser spec `tests/e2e-auth/member-notes.spec.ts` (2 tests): ciphertext and plain author and date in Firestore, no text in the log, order, length limit, author and super-admin delete, a plain admin refused on another's note, and encryption-off refusals.
+
+## 18. Phase 14 — Push notifications (planned 2026-11-05, not started)
+
+**Goal.** An admin who switched it on gets a notification on their phone or computer when something needs them: a new message in Admin chat, new activity in Plans & Issues, and the other alerts that today only arrive as email (meeting minutes waiting for approval, calls to make, a broadcast waiting for its second approver, a security alert). It uses the installed web app (PWA) and the standard Web Push protocol, so no app store app and no third-party notification service or SDK is needed. Like the emails, a notification says that something happened, never what.
+
+### 18.1 What was checked (2026-11-05)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| Alerts are content-free emails sent by one function, `notifyAdmins(kind, actorUid, origin, onlyUids?)`, with five kinds (`chat`, `thread`, `minutes_submitted`, `calls`, `security`). It skips the person who caused the activity, sends only to active admins who opted in (`notifyEmail`), and sends at most one email per person per kind every 30 minutes. It is called from the chat and thread routes (through `/api/admin/notify`), minutes submission, call campaigns and a locked authenticator. | `src/lib/notify.server.ts`, `src/lib/notifications.ts`, `app/api/admin/notify/route.ts` | Push hooks into the same function, so every place that can email an alert can also push it, with the same recipients and the same words. |
+| The opt-in is one switch on the Security page. | `app/api/admin/notifications/route.ts` | Push gets its own switch there, per device, because permission is granted per browser. |
+| The site is an installable web app with a deliberately small service worker that never caches pages or API answers, and it has no push or notification-click handling. | `public/sw.js`, plan §11 | Push adds two small handlers (show a notification, open the page when it is tapped) and changes nothing about caching. |
+| There is no push library in the project and no secret for it. | `package.json` | Adds the `web-push` package (MIT) and a VAPID key pair as environment variables. |
+| On iPhone, web push works only for an app added to the Home Screen (iOS 16.4 or later); Android and desktop browsers allow it in the browser. | platform behaviour | The Security card says so and shows the steps. |
+
+### 18.2 Decisions (proposed; accept or change before 14-A)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D32 | How are notifications sent? | Standard Web Push with VAPID keys, using the `web-push` library, straight to each browser's own push service. No Firebase SDK, no notification vendor. | One small dependency; nothing about the community goes to a third-party service beyond the encrypted push itself. |
+| D33 | What does a notification say? | The same content-free words as the email ("New activity in Admin chat", "Minutes are waiting for approval") and a link to the page; never a message text, name or title. | Nothing private shows on a lock screen or passes through a push service. |
+| D34 | Who gets one, and how often? | Active admins who switched push on for that device, for the kinds they left on; never the person who caused the activity. At most one push per person per kind a minute, and a newer one replaces the older one in the tray (same tag). | A busy chat does not buzz a phone for every line. |
+| D35 | Members? | No. Admins only: members have no sign-in. | Nothing here depends on member sign-in. |
+| D36 | What is stored, and how is it protected? | One server-only record per device (the browser's push address and keys, the admin, when it was added). The server sends only to addresses at the known push services (Google, Mozilla, Apple, Microsoft), so a made-up address cannot make the server call an arbitrary site. A device whose address has expired is deleted; a disabled admin gets nothing; an admin can turn push off for a device at any time. | A stolen database dump or a forged subscription does not widen what the server will contact. |
+
+### 18.3 Design
+
+- **Keys and settings:** `VAPID_PUBLIC_KEY` (also exposed to the browser), `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (a mailto address) in Vercel; push does nothing, and the Security card says why, until they are set.
+- **Storage:** `organizations/ghmo/pushSubscriptions/{id}`: `uid`, `endpoint`, `p256dh`, `auth`, `label` (for example "Chrome on Android"), `kinds` (which alerts), `createdAt`, `lastSentAt`. Server-only; a person sees only their own devices, through the API.
+- **Routes:** `POST /api/admin/push` (subscribe this device), `PATCH` (change kinds), `DELETE` (turn off this device), `GET` (this admin's devices and whether push is set up).
+- **Sending:** `notifyAdmins` also calls a push sender for the same recipients. Sending is best effort and never blocks the action that caused it. A 404 or 410 answer from the push service deletes that device.
+- **Service worker:** a `push` handler that shows the content-free notification (title, one line, tag, icon) and a `notificationclick` handler that opens or focuses the page; `sw.js` keeps its no-caching rules.
+- **Security page:** a "Push notifications on this device" card: the button asks the browser for permission (it has to be a tap), switches for each kind, a list of this admin's devices with Turn off, and a plain note for iPhone.
+- **Kinds:** the five existing ones in 14-A (chat and Plans & Issues first); 14-B adds the broadcast-waiting-for-approval alert and any others found, each wired the same way.
+
+### 18.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **14-A** | Keys, subscription storage and routes, service worker handlers, Security card, sending for admin chat and Plans & Issues | A device can be switched on and off; a chat message pushes to the other opted-in admins' devices but not to the sender; a stub push service receives a correctly signed, encrypted request; an expired device is removed; a forged address is refused |
+| **14-B** | The other alerts: minutes, calls, security, broadcast approval, with per-kind switches | Each alert pushes with its own words and link; switching a kind off stops it |
+| **14-C** | Docs: admin guide (including iPhone steps), go-live checklist (the keys), runbook case (a notification went to the wrong person or too many) | Docs merged |
+
+### 18.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| A notification reveals something private on a lock screen | Fixed, content-free wording only; no names, titles or text |
+| The server is made to call an arbitrary address | Only known push-service hosts are accepted when a device is added and again when sending |
+| Too many pushes | One per person per kind a minute; newer replaces older; per-kind switches |
+| Push stops working silently | The Security card shows each device and when one last worked; expired devices are removed |
+| Browsers cannot be driven by a real push service in tests | The sender is tested against a local stub that checks the signing and encryption headers; the service worker handlers are small and covered by a browser test that fires a push event |
+
+Out of scope: pushes to members, notification text with content, SMS or voice alerts, native iOS or Android apps, and read receipts.
+
+**13-C built (2026-11-05).**
+- Pure rules and tests: `MANNERS` (polite, neutral, rude), `attemptMannerLoc` and `MannerPayload` in `src/lib/callCampaigns.ts`; `src/lib/callHistory.ts` (newest-first order, totals, manner counts and the plain "3 polite · 1 neutral · 1 rude" line) with 6 unit tests.
+- Server: a call attempt may carry an optional encrypted `manner` envelope, bound to campaign, member and attempt and checked to come from an active device of the caller, like the note. The server refuses a rating on a call that did not reach the person. The campaign dashboard's attempt data is built from named fields, so the rating never reaches it, and the answer to the caller leaves it out too. `GET /api/organizations/ghmo/members/[memberId]/calls` returns every call made to a member across campaigns with each attempt's outcome and caller (notes and ratings still encrypted), for any active admin. `DELETE …/calls/[memberId]/attempts/[attemptId]/manner` clears one rating (super admin); the attempt, its outcome and its note stay. The activity log says a rating was cleared and where, never what it was, and the call log entries never mention a rating.
+- UI: the log-a-call dialog on My Calls asks "How was the call?" (Polite, Neutral, Rude, or Not recorded) only when the person was reached, with the reminder to say how the call went, not what you think of the person. The profile has a **Calls** card: totals ("In 2 campaigns · 2 attempts · reached in 2"), the rating counts once decrypted, each campaign with its latest outcome and RSVP, and each attempt with time, caller, note and rating badge; super admins get **Clear rating**.
+- Browser spec `tests/e2e-auth/call-history.spec.ts`: two campaigns, a rude and a polite rating as ciphertext, none in the audit log or the dashboard data, the rating refused on an unreached call, the history and counts on the profile, a plain admin refused when clearing, and a super admin clearing it.
+- Still to do: 13-D docs and the privacy runbook case (a member asks what is held about them, or to have it removed).

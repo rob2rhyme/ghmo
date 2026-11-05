@@ -138,6 +138,13 @@ export async function listMembers(_check: AdminCheck) {
   return asJson(snapshot.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }))) as JsonRecord[];
 }
 
+/** One member for the profile page (plaintext fields and the encrypted envelope as stored), or null when there is none. */
+export async function getMember(_check: AdminCheck, memberId: string) {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(memberId)) return null;
+  const snap = await getAdminDb().doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${memberId}`).get();
+  return snap.exists ? (asJson(toPlain({ id: snap.id, ...snap.data() })) as JsonRecord) : null;
+}
+
 // ---- Minutes ----
 
 /** The admin view of minutes records, newest meeting first; `eventId` narrows to one event. */

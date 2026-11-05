@@ -6,7 +6,9 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { isSuperAdmin } from "@/src/lib/admin";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
+import { checkMemberSince, cleanCity, normalizeState } from "@/src/lib/memberProfile";
 import { normalizeMemberName, sanitizeMemberRoles } from "@/src/lib/members";
+import { POSITION_TIME_ZONE, todayIn } from "@/src/lib/positions";
 import { toPlain } from "@/src/lib/serialize.server";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
 import { parseJsonBody } from "@/src/lib/validation";
@@ -23,6 +25,10 @@ const MEMBER_ROLES = ["member"] as const;
 
 const updateMemberSchema = z.object({
   name: z.string().max(120).nullable().optional(),
+  /** The profile facts (plan §17, 13-A): the day they joined, and city and state (no street address). Null or empty clears one. */
+  memberSince: z.string().max(10).nullable().optional(),
+  city: z.string().max(200).nullable().optional(),
+  state: z.string().max(200).nullable().optional(),
   status: z.enum(["active", "disabled"]).optional(),
   roles: z.array(z.enum(MEMBER_ROLES)).max(10).optional(),
   /** Records consent; this also clears an earlier opt-out, so it is how an admin re-subscribes someone who asked to be added back. */
@@ -90,6 +96,25 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
         updates.name = name;
         hasChange = true;
       }
+    }
+
+    // Any active admin may set these. The date must be a real day that is not in the future.
+    if (Object.prototype.hasOwnProperty.call(body, "memberSince")) {
+      const since = body.memberSince?.trim() || null;
+      if (since) {
+        const problem = checkMemberSince(since, todayIn(new Date(), POSITION_TIME_ZONE));
+        if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      }
+      updates.memberSince = since;
+      hasChange = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "city")) {
+      updates.city = cleanCity(body.city) || null;
+      hasChange = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "state")) {
+      updates.state = normalizeState(body.state) || null;
+      hasChange = true;
     }
 
     if (body.status !== undefined) {

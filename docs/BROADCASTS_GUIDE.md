@@ -109,6 +109,17 @@ On an event's **Tasks** section, **Send reminders** emails the people who own ta
 - The card shows the last run, for example "2 people emailed". If it says nothing was sent, the reason is shown. A red note means the schedule secret or the email set-up is missing.
 - A reminder sent by hand and the digest are separate, so someone you reminded in the morning can still get the digest.
 
+## 1h. A member's profile (Admin → Members → Profile)
+
+Press **Profile** on a member's row to open their page. Only admins can see it.
+- **Membership:** set **Member since** (the day they joined) and the page shows how long, for example "Member since Mar 2019 · 7 years, 8 months". If you don't know the date, **Use the day they were added** fills in the day they went on this list as a start. Dates in the future or before 1950 are refused. Add the **City** and **State** they live in. A state name such as "Pennsylvania" is saved as "PA". There is no street address anywhere. The Members list shows the city and state and the search finds them.
+- **Family:** press **Add family member** and give a name, and if you know it how they are related and a phone number. Up to ten. This is for reference, so a caller knows who else to ask for. Family members are never emailed or called by the site, and listing a number does not mean they agreed to be contacted. It is kept encrypted like phone numbers, so you need to unlock this device first, and numbers show as dots until you press **Show**.
+- **Edit contact** on the Members page keeps the family list.
+- **Notes:** write what happened or what you were told, then **Add note**. Each note shows your name and the date, newest first. Notes are encrypted like phone numbers, so you need this device unlocked to write or read them. A note can't be edited. You can delete your own note, and a super admin can delete anyone's. Keep notes to facts, because other admins read them. The activity log records that a note was added or deleted, never what it said. A member can have up to 200 notes.
+- **Calls:** the profile lists every call made to them for an announcement: the campaign, when, what happened (reached, voicemail, no answer…), who called and the caller's note. Above the list: how many campaigns they were in, how many attempts, and in how many they were reached.
+- **How the call went:** when a caller logs a call where the person was reached, they may choose **Polite**, **Neutral** or **Rude** (or leave it not recorded). Say how the call went, not what you think of the person. It is encrypted like notes, shows only on this profile (never in lists, exports, the campaign dashboard or the activity log), and the profile adds up the ratings: for example "1 polite · 1 rude". A super admin can press **Clear rating** if one was a mistake; the call and its note stay.
+- Anyone who asks what is held about them, or to have it removed, is handled as in the runbook (case M for numbers).
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

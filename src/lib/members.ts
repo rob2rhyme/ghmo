@@ -93,9 +93,17 @@ export type MemberContact = {
   /** Free text that groups people who share one phone or one home, so one call covers them (9-B). */
   household?: string;
   notes?: string;
+  /** Relatives, for reference only: never contacted or called (plan §17, D29). Kept by every contact save. */
+  family?: FamilyMember[];
 };
 
+/** One relative on a member's profile. Name is required; how they are related and a phone number are optional. */
+export type FamilyMember = { name: string; relationship?: string; /** E.164 */ phone?: string };
+
 export const CONTACT_LIMITS = { language: 40, household: 80, notes: 1000 } as const;
+
+/** The text fields of the Edit contact form. The family list is edited on the profile page, not here. */
+export type ContactForm = Record<"phone" | "altPhone" | "language" | "household" | "notes", string>;
 
 /**
  * Turns what people type into E.164, or null when it is not a phone number. US numbers (10 digits, or 11
@@ -131,7 +139,7 @@ export function maskPhone(e164: string): string {
 }
 
 /** Normalizes a contact form; returns the clean contact and whether anything is in it. */
-export function normalizeContact(input: Partial<Record<keyof MemberContact, string | null | undefined>>): { contact: MemberContact; hasPhone: boolean; problems: string[] } {
+export function normalizeContact(input: Partial<Record<keyof ContactForm, string | null | undefined>>): { contact: MemberContact; hasPhone: boolean; problems: string[] } {
   const contact: MemberContact = {};
   const problems: string[] = [];
   for (const key of ["phone", "altPhone"] as const) {
