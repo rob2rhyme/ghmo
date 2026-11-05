@@ -14,6 +14,19 @@ export const attemptNoteLoc = (campaignId: string, memberId: string, attemptId: 
   docId: `${campaignId}/${memberId}#${attemptId}`
 });
 
+/** A note on one attempt's manner: how the call went, in three fixed levels (plan §17, D30). Encrypted with the attempt. */
+export const attemptMannerLoc = (campaignId: string, memberId: string, attemptId: string): RecordLocation => ({
+  path: CALL_CAMPAIGNS_PATH,
+  docId: `${campaignId}/${memberId}#${attemptId}:manner`
+});
+
+export const MANNERS = ["polite", "neutral", "rude"] as const;
+export type Manner = (typeof MANNERS)[number];
+export const isManner = (value: unknown): value is Manner => typeof value === "string" && (MANNERS as readonly string[]).includes(value);
+export const MANNER_LABELS: Record<Manner, string> = { polite: "Polite", neutral: "Neutral", rude: "Rude" };
+/** What is encrypted inside a manner record. */
+export type MannerPayload = { manner: Manner };
+
 export const OUTCOMES = ["reached", "voicemail", "no_answer", "wrong_number", "callback", "declined"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export const isOutcome = (value: unknown): value is Outcome => typeof value === "string" && (OUTCOMES as readonly string[]).includes(value);

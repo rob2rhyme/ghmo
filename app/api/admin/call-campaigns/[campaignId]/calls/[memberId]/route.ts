@@ -21,7 +21,9 @@ const attemptSchema = z.object({
   attemptId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
   outcome: z.enum(OUTCOMES),
   rsvp: z.enum(RSVPS).nullable().optional(),
-  note: envelopeSchema.nullable().optional()
+  note: envelopeSchema.nullable().optional(),
+  /** How the call went, encrypted in the browser and bound to this attempt (plan §17, D30). Only for a call where the person was reached. */
+  manner: envelopeSchema.nullable().optional()
 });
 
 /** Appends one call attempt (plan §12.3): the assigned caller or a super admin, on an open campaign, audited without the number or the note. */
@@ -34,10 +36,13 @@ export async function POST(req: NextRequest, context: Params) {
     const parsed = await parseJsonBody(req, attemptSchema);
     if (!parsed.ok) return parsed.response;
     const body = parsed.data;
-    if (body.note) {
+    if (body.manner && body.outcome !== "reached") return NextResponse.json({ error: "How the call went can only be recorded when the person was reached." }, { status: 400 });
+    if (body.note || body.manner) {
       const checker = await envelopeChecker(actor.uid);
       if (!checker.enabled) return NextResponse.json({ error: "Encryption is not enabled." }, { status: 400 });
-      if (!checker.ok(body.note as EnvelopeInput)) return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
+      for (const envelope of [body.note, body.manner]) {
+        if (envelope && !checker.ok(envelope as EnvelopeInput)) return NextResponse.json({ error: "This device isn't set up for encryption, or was removed. Open Encryption to check." }, { status: 403 });
+      }
     }
     const now = new Date();
     const result = await recordAttempt({
@@ -46,6 +51,7 @@ export async function POST(req: NextRequest, context: Params) {
       attemptId: body.attemptId,
       input: { outcome: body.outcome, rsvp: body.rsvp ?? null },
       note: body.note ?? null,
+      manner: body.manner ?? null,
       actorUid: actor.uid,
       actorIsSuperAdmin: isSuperAdmin(admin),
       now
