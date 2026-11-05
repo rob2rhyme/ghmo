@@ -4,6 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { COMMUNITY_SLUG } from "./community";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgGroupsCollectionPath, orgMembersCollectionPath } from "./firestorePaths";
+import { memberDisplayName } from "./members";
+import { listAdmins } from "./admin";
 import { fail, type Failure } from "./adminRoute.server";
 import { clearGroupFromTasks, openTaskCountsByGroup } from "./eventTasks.server";
 import {
@@ -14,7 +16,9 @@ import {
   cleanGroupDescription,
   cleanGroupName,
   groupNameKey,
+  linkMemberToAdmin,
   planMembership,
+  type CallerLink,
   type Group
 } from "./groups";
 
@@ -179,4 +183,26 @@ export async function updateGroupMembers(input: { groupId: string; add: string[]
     await batch.commit();
   }
   return { ok: true, added: plan.added, removed: plan.removed, group };
+}
+
+/** The group marked as the phone tree callers (found by its kind, so it can be renamed). */
+export async function findCallersGroup(): Promise<Group | null> {
+  await ensureBuiltInGroups();
+  const snap = await groupsCol().where("kind", "==", CALLERS_KIND).limit(1).get();
+  return snap.empty ? null : mapGroup(snap.docs[0].id, snap.docs[0].data());
+}
+
+/** For each member of a group, the admin account they are (decision D20), matched by sign-in id and then by email. */
+export async function callerLinksForGroup(groupId: string): Promise<CallerLink[]> {
+  const [snap, admins] = await Promise.all([membersCol().where("groupIds", "array-contains", groupId).get(), listAdmins(COMMUNITY_SLUG)]);
+  return snap.docs.map(doc => {
+    const data = doc.data();
+    const admin = linkMemberToAdmin({ uid: data.uid as string | null | undefined, emailLower: data.emailLower as string | null | undefined }, admins);
+    return {
+      memberId: doc.id,
+      name: memberDisplayName({ name: data.name as string | null | undefined, emailLower: data.emailLower as string | null | undefined }),
+      status: (data.status as string | undefined) ?? "active",
+      adminId: admin?.id ?? null
+    };
+  });
 }

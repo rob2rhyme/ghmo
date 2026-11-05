@@ -3,6 +3,8 @@ import { listAdmins, type AdminProfile } from "./admin";
 import { COMMUNITY_SLUG } from "./community";
 import { orgDocPath, orgMembersCollectionPath } from "./firestorePaths";
 import type { Assignment } from "./callingTree";
+import { callerLinksForGroup, findCallersGroup } from "./groups.server";
+import { suggestCallers } from "./groups";
 
 /**
  * Storage for the calling tree (plan §12.3). Server-written only; the rules deny every client read
@@ -44,9 +46,23 @@ export async function readAssignments(callerUid?: string): Promise<StoredAssignm
     .sort((a, b) => a.memberId.localeCompare(b.memberId));
 }
 
-/** Active admins who may be callers (the BOD allowlist, decision D15), with the fields the pages show. */
-export async function listCallerCandidates(): Promise<Pick<AdminProfile, "id" | "name" | "status">[]> {
-  return (await listAdmins(COMMUNITY_SLUG)).map(admin => ({ id: admin.id, name: admin.name, status: admin.status }));
+export type CallerCandidate = Pick<AdminProfile, "id" | "name" | "status"> & { suggested: boolean };
+export type CallersGroupSummary = { id: string; name: string; needsAdminAccess: { memberId: string; name: string }[] };
+
+/**
+ * Active admins who may be callers (the BOD allowlist, decision D15), with the fields the pages show. Admins who
+ * are in the phone tree callers group are marked `suggested` (decision D20, plan §15 11-C); members of that group
+ * who are not admins are listed so the page can say they need admin access. Suggestions never change who may be a
+ * caller: `saveTree` still accepts only active admins.
+ */
+export async function listCallerCandidates(): Promise<{ candidates: CallerCandidate[]; callersGroup: CallersGroupSummary | null }> {
+  const [admins, group] = await Promise.all([listAdmins(COMMUNITY_SLUG), findCallersGroup()]);
+  const { suggestedAdminIds, needsAdminAccess } = group && group.active ? suggestCallers(await callerLinksForGroup(group.id)) : { suggestedAdminIds: [], needsAdminAccess: [] };
+  const suggested = new Set(suggestedAdminIds);
+  return {
+    candidates: admins.map(admin => ({ id: admin.id, name: admin.name, status: admin.status, suggested: admin.status === "active" && suggested.has(admin.id) })),
+    callersGroup: group && group.active ? { id: group.id, name: group.name, needsAdminAccess } : null
+  };
 }
 
 export type SaveTreeInput = {

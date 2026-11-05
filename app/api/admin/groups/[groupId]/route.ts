@@ -5,7 +5,7 @@ import { auditActor, auditMeta, envUnavailable, failureResponse, routeError } fr
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { GROUP_DESCRIPTION_MAX, GROUP_NAME_MAX } from "@/src/lib/groups";
-import { deleteGroup, listGroupMemberIds, readGroup, updateGroup } from "@/src/lib/groups.server";
+import { callerLinksForGroup, deleteGroup, listGroupMemberIds, readGroup, updateGroup } from "@/src/lib/groups.server";
 import { MEMBER_ID_PATTERN } from "@/src/lib/memberContact.server";
 import { parseJsonBody } from "@/src/lib/validation";
 
@@ -34,7 +34,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ groupId
     if (!ID.test(groupId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const group = await readGroup(groupId);
     if (!group) return NextResponse.json({ error: "That group doesn't exist." }, { status: 404 });
-    return NextResponse.json({ group, memberIds: await listGroupMemberIds(groupId), superAdmin: isSuperAdmin(admin) });
+    // For the phone tree callers group, say which people are admins (they can use My Calls) and which still need access.
+    const adminAccess = group.kind === "callers" ? Object.fromEntries((await callerLinksForGroup(groupId)).map(link => [link.memberId, link.adminId !== null])) : null;
+    return NextResponse.json({ group, memberIds: await listGroupMemberIds(groupId), superAdmin: isSuperAdmin(admin), adminAccess });
   } catch (error) {
     return routeError(error);
   }
