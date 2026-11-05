@@ -77,8 +77,11 @@ test("call history on the profile: outcome, caller, note and manner; manner stay
   await page.getByRole("button", { name: "Save call" }).click();
   await expect(page.getByText("Logged: Reached").first()).toBeVisible();
 
-  // Encrypted with the attempt; not in the log, and not in the campaign dashboard's data.
-  const callDocs = (await Promise.all((await db.collection(`${ORG}/callCampaigns`).get()).docs.map(c => c.ref.collection("calls").get()))).flatMap(s => s.docs);
+  // Encrypted with the attempt; not in the log, and not in the campaign dashboard's data. Both toasts can be on
+  // screen at once, so wait for both attempts to be saved rather than for the toast.
+  const readCalls = async () => (await Promise.all((await db.collection(`${ORG}/callCampaigns`).get()).docs.map(c => c.ref.collection("calls").get()))).flatMap(s => s.docs);
+  await expect.poll(async () => (await readCalls()).filter(d => (d.get("attempts") ?? []).length > 0).length).toBe(2);
+  const callDocs = await readCalls();
   expect(callDocs).toHaveLength(2);
   for (const call of callDocs) {
     const attempt = call.get("attempts")[0];
