@@ -25,7 +25,7 @@ import { dueLabel } from "@/src/components/admin/events/EventTasksPanel";
 import { isOverdue, type EventTask } from "@/src/lib/eventTasks";
 import { memberDisplayName } from "@/src/lib/members";
 
-type Detail = { group: Group; memberIds: string[]; superAdmin: boolean };
+type Detail = { group: Group; memberIds: string[]; superAdmin: boolean; adminAccess?: Record<string, boolean> | null };
 type GroupTask = EventTask & { eventTitle: string; eventDay: string | null };
 type TaskList = { tasks: GroupTask[]; today: string };
 
@@ -71,7 +71,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   }
   if (!detail) return <Skeleton className="h-64 w-full" />;
 
-  const { group, memberIds, superAdmin } = detail;
+  const { group, memberIds, superAdmin, adminAccess } = detail;
   const inGroup = memberIds
     .map(id => byId.get(id))
     .filter((m): m is MemberLite => Boolean(m))
@@ -149,6 +149,9 @@ export default function GroupClient({ groupId }: { groupId: string }) {
                   badges={
                     <>
                       {isLead ? <Badge>Lead</Badge> : null}
+                      {adminAccess && member.status === "active" ? (
+                        adminAccess[member.id] ? <Badge variant="success">Admin</Badge> : <Badge variant="warning">Needs admin access to use My Calls</Badge>
+                      ) : null}
                       {member.status === "disabled" ? <Badge variant="secondary">Disabled</Badge> : null}
                     </>
                   }

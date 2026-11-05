@@ -931,7 +931,7 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 
 ---
 
-## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A and 11-B built 2026-11-05)
+## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A to 11-C built 2026-11-05)
 
 **Goal.** The member list gains the organisation's structure: who holds which officer position (president, treasurer, secretary, board member…), which working groups people belong to (a phone-tree group that calls members about events, and event teams such as cooking, marketing and shopping), and a task checklist per event so each group knows what it owns. Admins only: members have no usable sign-in today (§15.1), so group leads who are admins coordinate their people in the app, and member self-service is a later phase.
 
@@ -1012,7 +1012,7 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 - Rules: `positions`, `positionTerms` and `groups` are admin-read and server-write only (new block in `tests/rules/firestore.rules.test.ts`, also proving `groupIds` on a member cannot be written from a browser).
 - Pages: Positions (Current and Past terms, set holder, end term, add and edit a position), Groups and Group (create, add people, make lead, remove, edit, delete), nav items, and on Members the group and officer badges, a group filter and a Groups dialog. Browser spec `tests/e2e-auth/positions-groups.spec.ts`.
 - Differences from the design above: the term route is `/api/admin/position-terms/[termId]` and group membership is a POST; the Positions page has Current and Past terms only (a past term can be removed if entered by mistake); Members shows every badge rather than three plus "+n"; "End term" sets the end date to today, so the person still holds the seat through today. Open-task counts on group rows and the group page's task section arrive with 11-B.
-- Still to do: 11-C calling-tree suggestions (the callers group page already notes that callers need admin access), 11-D task counts on the Events list and the go-live line.
+- Still to do: 11-D task counts on the Events list and the go-live line.
 
 **11-B built (2026-11-05).**
 - Pure rules and tests: `src/lib/eventTasks.ts` (cleaning, the event's calendar day, due dates from template offsets counted in calendar days so a daylight-saving change cannot shift them, overdue, counts, sorting, `planTemplateApplication` that skips titles already present, template items from an event's tasks) with 17 unit tests.
@@ -1021,3 +1021,9 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 - Rules: `eventTasks` and `eventTaskTemplates` are admin-read and server-write only (rules test also proves visitors and members cannot read them, so task notes never reach the public site).
 - Pages: a Tasks section on the event edit page (add, edit, mark done, overdue badge, Use a template, Save as template, saves as you go), creating an event now lands on its edit page, `/admin/events/templates` (linked from Events), a Tasks section on the Group page, and open-task counts on the Groups list. Browser spec `tests/e2e-auth/event-tasks.spec.ts`.
 - Differences from the design: a template item whose due date is more than a year from the event day keeps no due date; "Save as template" does not keep assigned people (only groups); the Events list task counts stay in 11-D.
+
+**11-C built (2026-11-05).**
+- Pure rule: `suggestCallers` in `src/lib/groups.ts` (with `linkMemberToAdmin` from 11-A): members of the callers group who are active admins are suggested once each; active members who are not admins are listed as needing admin access; disabled members are ignored. 3 new unit tests.
+- Server: `findCallersGroup` and `callerLinksForGroup` in `src/lib/groups.server.ts`; `listCallerCandidates` in `src/lib/callingTree.server.ts` now returns each admin with a `suggested` flag plus a `callersGroup` summary (null when the group is switched off). `GET /api/admin/calling-tree` passes both through; `GET /api/admin/groups/[groupId]` adds `adminAccess` (who is an admin) for the callers group. `saveTree` and decision D15 are untouched: the server still accepts only active admins as callers.
+- Pages: on the Calling Tree page suggested admins are listed first with an "In Phone tree callers" badge; an info note names the members who need admin access (with a link to the group); a super admin gets **Check everyone in the group**, which only ticks the boxes, and nothing is saved until Save calling tree. With no group, or the group switched off, the page is as before. On the callers group page each active person shows **Admin** or **Needs admin access to use My Calls**. Browser spec `tests/e2e-auth/calling-tree-groups.spec.ts`.
+- Matching is by email (members added by an admin have no sign-in id), so a person whose member email differs from their admin email will show as needing access until the emails agree.

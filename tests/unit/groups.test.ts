@@ -6,7 +6,8 @@ import {
   groupNameKey,
   groupNamesFor,
   linkMemberToAdmin,
-  planMembership
+  planMembership,
+  suggestCallers
 } from "@/src/lib/groups";
 
 const admins = [
@@ -89,5 +90,27 @@ describe("names", () => {
     ];
     expect(groupNamesFor(["marketing", "gone", "cooking"], groups)).toEqual(["Marketing", "Cooking team"]);
     expect(groupNamesFor(undefined, groups)).toEqual([]);
+  });
+});
+
+describe("suggestCallers", () => {
+  const link = (memberId: string, name: string, adminId: string | null, status = "active") => ({ memberId, name, status, adminId });
+
+  it("suggests members who are admins and flags those who are not", () => {
+    const result = suggestCallers([link("m1", "Asha Rai", "alice"), link("m2", "Zed", null), link("m3", "Bina Thapa", null), link("m4", "Carol", "carol")]);
+    expect(result.suggestedAdminIds).toEqual(["alice", "carol"]);
+    expect(result.needsAdminAccess).toEqual([
+      { memberId: "m3", name: "Bina Thapa" },
+      { memberId: "m2", name: "Zed" }
+    ]);
+  });
+
+  it("suggests an admin once even if two members link to them, and ignores disabled members", () => {
+    const result = suggestCallers([link("m1", "A", "alice"), link("m2", "A again", "alice"), link("m3", "Gone", "bob", "disabled"), link("m4", "Left", null, "disabled")]);
+    expect(result).toEqual({ suggestedAdminIds: ["alice"], needsAdminAccess: [] });
+  });
+
+  it("says nothing for an empty group", () => {
+    expect(suggestCallers([])).toEqual({ suggestedAdminIds: [], needsAdminAccess: [] });
   });
 });

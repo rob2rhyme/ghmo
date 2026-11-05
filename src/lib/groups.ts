@@ -56,6 +56,26 @@ export function linkMemberToAdmin<A extends AdminForLink>(member: MemberForLink,
   return active.find(admin => (admin.emailLower ?? "").trim() === email) ?? null;
 }
 
+export type CallerLink = { memberId: string; name: string; status: string; adminId: string | null };
+
+/**
+ * What the phone tree callers group means for the calling tree (decision D20): members who are active admins are
+ * suggested as callers; active members who are not (a phone-only member, an email that matches no admin) need admin
+ * access before they can use My Calls. Disabled members are ignored. This only suggests: callers must still be
+ * ticked and saved by a super admin, and the tree's own rule (every caller is an active admin, D15) is unchanged.
+ */
+export function suggestCallers(links: CallerLink[]): { suggestedAdminIds: string[]; needsAdminAccess: { memberId: string; name: string }[] } {
+  const suggested = new Set<string>();
+  const needsAdminAccess: { memberId: string; name: string }[] = [];
+  for (const link of links) {
+    if (link.status !== "active") continue;
+    if (link.adminId) suggested.add(link.adminId);
+    else needsAdminAccess.push({ memberId: link.memberId, name: link.name });
+  }
+  needsAdminAccess.sort((a, b) => a.name.localeCompare(b.name));
+  return { suggestedAdminIds: [...suggested], needsAdminAccess };
+}
+
 export type MembershipPlan =
   | { ok: true; added: string[]; removed: string[] }
   | { ok: false; status: number; error: string };

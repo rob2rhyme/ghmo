@@ -21,7 +21,8 @@ import { countByCaller, moveMember, planAssignments, spread, type Assignment, ty
 import { formatShortDate } from "@/src/lib/format";
 import { memberCallState } from "@/src/lib/members";
 
-type Candidate = { id: string; name: string; status: "active" | "disabled" };
+type Candidate = { id: string; name: string; status: "active" | "disabled"; suggested?: boolean };
+type CallersGroup = { id: string; name: string; needsAdminAccess: { memberId: string; name: string }[] };
 type StoredAssignment = Assignment & { assignedAt: string | null; assignedBy: string };
 type TreeResponse = {
   me: { uid: string; superAdmin: boolean };
@@ -29,6 +30,7 @@ type TreeResponse = {
   counts: Record<string, number>;
   total: number;
   candidates: Candidate[];
+  callersGroup?: CallersGroup | null;
   assignments: StoredAssignment[];
 };
 type MemberLite = {
@@ -178,7 +180,11 @@ function CallingTree() {
   }
 
   const superAdmin = data.me.superAdmin;
-  const activeCandidates = data.candidates.filter(c => c.status === "active");
+// Admins from the phone tree callers group come first (plan §15, 11-C); the rest keep their order.
+  const activeCandidates = data.candidates.filter(c => c.status === "active").sort((a, b) => Number(Boolean(b.suggested)) - Number(Boolean(a.suggested)));
+  const callersGroup = data.callersGroup ?? null;
+  const suggestedIds = activeCandidates.filter(c => c.suggested).map(c => c.id);
+  const suggestionsLeft = suggestedIds.filter(id => !callers.includes(id));
   const encryptionOn = e2ee.enabled;
   const planBlocker =
     callers.length === 0
@@ -274,6 +280,33 @@ function CallingTree() {
             called.
           </WhatIsThis>
         </div>
+        {callersGroup && callersGroup.needsAdminAccess.length > 0 ? (
+          <Alert variant="info">
+            <Network />
+            <AlertTitle>Some callers group members need admin access</AlertTitle>
+            <AlertDescription>
+              <span>
+                {callersGroup.needsAdminAccess.map(person => person.name).join(", ")} {callersGroup.needsAdminAccess.length === 1 ? "is" : "are"} in {callersGroup.name} but{" "}
+                {callersGroup.needsAdminAccess.length === 1 ? "isn't an admin" : "aren't admins"} yet, so they can&apos;t use My calls. Callers have to be admins.{" "}
+              </span>
+              <Link href={`/admin/groups/${callersGroup.id}` as Route} className="underline underline-offset-4">
+                Open the group
+              </Link>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {superAdmin && callersGroup && suggestedIds.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" onClick={() => setCallers(list => [...new Set([...list, ...suggestedIds])])} disabled={suggestionsLeft.length === 0} className="max-sm:h-11">
+              Check everyone in the group
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              {suggestionsLeft.length === 0
+                ? `Everyone in ${callersGroup.name} who is an admin is already checked.`
+                : `${suggestionsLeft.length} admin${suggestionsLeft.length === 1 ? "" : "s"} from ${callersGroup.name} not checked yet. Nothing is saved until you save the calling tree.`}
+            </p>
+          </div>
+        ) : null}
         <ul className="grid gap-2 sm:grid-cols-2" aria-label="Callers">
           {activeCandidates.map(candidate => {
             const on = callers.includes(candidate.id);
@@ -283,6 +316,7 @@ function CallingTree() {
                   <input type="checkbox" className="size-4 accent-primary" checked={on} disabled={!superAdmin} onChange={() => toggleCaller(candidate.id)} />
                   <span className="truncate">{candidate.name}</span>
                 </label>
+                {candidate.suggested ? <Badge variant="outline">In {callersGroup?.name ?? "callers group"}</Badge> : null}
                 {on ? <Badge variant="secondary">{people(counts[candidate.id] ?? 0)}</Badge> : null}
               </li>
             );

@@ -59,6 +59,7 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 - A super admin ticks the board members who make calls and presses **Plan assignments**. Everyone who can be called (number on file, call consent, no opt-out) is split as evenly as possible, people who share a household go to the same caller, and anyone already assigned stays put. The preview lists every change; **Save calling tree** stores it.
 - To move one person by hand, pick another caller in the dropdown next to their name and save.
 - Each caller opens **My Calls** on their phone: their people, numbers masked until **Show**, and **Call** to dial. Someone who asks not to be called disappears from the list straight away.
+- **Phone tree callers group:** put the people who will phone others in the built-in **Phone tree callers** group (Admin → Groups). On the Calling Tree page, admins from that group are listed first with a badge, and **Check everyone in the group** ticks them for you. You still press **Save calling tree**. Callers must be admins, matched by the same email as their member record. A group member who isn't an admin yet is named in a note and shows **Needs admin access to use My Calls** on the group page.
 
 ## 1d. Calling everyone about an announcement (Admin → Call Campaigns, Admin → My Calls)
 

@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   try {
     const { actor, admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
     const superAdmin = isSuperAdmin(admin);
-    const [tree, all, candidates] = await Promise.all([readTree(), readAssignments(), listCallerCandidates()]);
+    const [tree, all, { candidates, callersGroup }] = await Promise.all([readTree(), readAssignments(), listCallerCandidates()]);
     const counts = countByCaller(all, tree.callers);
     const assignments = superAdmin ? all : all.filter(a => a.callerUid === actor.uid);
     return NextResponse.json({
@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       counts,
       total: all.length,
       candidates,
+      callersGroup,
       assignments: assignments.map(a => ({ ...a, assignedAt: a.assignedAt?.toISOString() ?? null }))
     });
   } catch (error) {
