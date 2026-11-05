@@ -105,6 +105,8 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   task_template_updated: { verb: "changed a task template", detail: true },
   task_template_deleted: { verb: "deleted a task template", detail: true },
   event_tasks_reminded: { verb: "sent task reminders", detail: true },
+  task_digest_switched: { verb: "switched the daily task digest", detail: true },
+  task_digest_run: { verb: "ran the daily task digest", detail: true },
   calling_tree_updated: { verb: "updated the calling tree", detail: true },
   call_campaign_created: { verb: "opened a call campaign", detail: true },
   call_campaign_closed: { verb: "closed a call campaign", detail: true },

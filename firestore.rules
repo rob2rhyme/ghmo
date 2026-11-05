@@ -106,6 +106,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // The daily task digest's switch and last run (plan §16, 12-B): changed only through /api/admin/task-digest and
+    // the schedule's route; admins may read it.
+    match /organizations/{orgSlug}/taskDigest/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Broadcast emails to members: drafted, approved and (later) sent only through /api/admin/broadcasts,
     // so the second-admin approval and its audit trail cannot be skipped from a browser.
     match /organizations/{orgSlug}/broadcasts/{doc=**} {

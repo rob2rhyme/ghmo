@@ -163,3 +163,113 @@ export function reminderEmail(input: { eventTitle: string; eventDay: string | nu
     ].join("\n")
   };
 }
+
+// ---- The automatic daily digest (plan §16, 12-B) ----------------------------------------------------------------
+
+/** One digest per person per day; a little under 24 hours so a slightly early run the next day still counts. */
+export const DIGEST_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+/** Overdue tasks of events that ended longer ago than this are left alone: the moment has passed. */
+export const DIGEST_EVENT_LOOKBACK_DAYS = 7;
+/** At most this many digests a day, and never more than half of the day's email limit, so broadcasts keep room. */
+export const MAX_DIGESTS_PER_DAY = 50;
+
+/** How many digests may go out today: half the daily limit at most, 50 at most, and no more than what is left. */
+export function digestCap(input: { dailyLimit: number; sentToday: number }): number {
+  return Math.max(0, Math.min(MAX_DIGESTS_PER_DAY, Math.floor(input.dailyLimit / 2), input.dailyLimit - input.sentToday));
+}
+
+export type DigestEvent = { id: string; title: string; day: string | null };
+export type DigestSection = { eventId: string; eventTitle: string; eventDay: string | null; lines: ReminderLine[] };
+
+export type DigestPlan = {
+  /** Most overdue tasks first, then by name. Cut at the cap. */
+  recipients: { memberId: string; name: string; overdueCount: number; sections: DigestSection[] }[];
+  /** People with overdue tasks who can't be emailed (no email, no consent, opted out, bounced, disabled, removed). */
+  cannotEmail: number;
+  /** Eligible people left for tomorrow because of the cap. */
+  deferred: number;
+  /** Overdue tasks nobody can be reminded about. */
+  unassigned: number;
+};
+
+/**
+ * Who gets today's digest: each person with overdue tasks in recent or upcoming events gets one email with all of
+ * them, grouped by event. Same consent rules as a manual reminder, and a person already sent a digest in the last
+ * 20 hours is skipped.
+ */
+export function planDigest(input: {
+  events: DigestEvent[];
+  tasks: (TaskIn & { eventId: string })[];
+  groups: GroupIn[];
+  members: Map<string, ReminderMember>;
+  /** When each person was last sent a digest. */
+  history: Map<string, ReminderHistory>;
+  today: string;
+  now: Date;
+  cap: number;
+}): DigestPlan {
+  const oldest = addDaysIso(input.today, -DIGEST_EVENT_LOOKBACK_DAYS);
+  const events = new Map(input.events.filter(event => !event.day || event.day >= oldest).map(event => [event.id, event]));
+  const bySection = new Map<string, Map<string, ReminderLine[]>>();
+  let unassigned = 0;
+  for (const task of sortTasks(input.tasks)) {
+    const event = events.get(task.eventId);
+    if (!event || task.status !== "open" || !isOverdue(task, input.today)) continue;
+    const owners = taskOwners(task, input.groups);
+    if (owners.length === 0) {
+      unassigned += 1;
+      continue;
+    }
+    for (const memberId of owners) {
+      const sections = bySection.get(memberId) ?? new Map<string, ReminderLine[]>();
+      const lines = sections.get(event.id) ?? [];
+      lines.push({ title: task.title, dueOn: task.dueOn, overdue: true });
+      sections.set(event.id, lines);
+      bySection.set(memberId, sections);
+    }
+  }
+
+  const recipients: DigestPlan["recipients"] = [];
+  let cannotEmail = 0;
+  for (const [memberId, sections] of bySection) {
+    const member = input.members.get(memberId);
+    if (!member || memberEmailState(member) !== "ready") {
+      cannotEmail += 1;
+      continue;
+    }
+    const history = input.history.get(memberId);
+    const sentRecently = history?.lastSentAt && input.now.getTime() - history.lastSentAt.getTime() < DIGEST_COOLDOWN_MS;
+    const inFlight = history?.claimedAt && input.now.getTime() - history.claimedAt.getTime() < CLAIM_IN_FLIGHT_MS;
+    if (sentRecently || inFlight) continue;
+    const ordered: DigestSection[] = [...sections]
+      .map(([eventId, lines]) => ({ eventId, eventTitle: events.get(eventId)?.title ?? "an event", eventDay: events.get(eventId)?.day ?? null, lines }))
+      .sort((a, b) => (a.eventDay ?? "9999-12-31").localeCompare(b.eventDay ?? "9999-12-31") || a.eventTitle.localeCompare(b.eventTitle));
+    recipients.push({ memberId, name: memberDisplayName({ name: member.name, emailLower: member.emailLower }), overdueCount: ordered.reduce((n, section) => n + section.lines.length, 0), sections: ordered });
+  }
+  recipients.sort((a, b) => b.overdueCount - a.overdueCount || a.name.localeCompare(b.name));
+  const cap = Math.max(0, input.cap);
+  return { recipients: recipients.slice(0, cap), cannotEmail, deferred: Math.max(0, recipients.length - cap), unassigned };
+}
+
+/** A calendar date plus a number of days, for "7 days ago" without a time zone in the way. */
+function addDaysIso(day: string, days: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** The fixed digest: this person's overdue tasks, grouped by event. The footer and unsubscribe link are added by the sender. */
+export function digestEmail(input: { recipientName: string; sections: DigestSection[] }): { subject: string; text: string } {
+  const first = oneLine(input.recipientName).split(" ")[0];
+  const blocks = input.sections.flatMap(section => {
+    const when = section.eventDay ? ` (${formatShortDate(section.eventDay, { timeZone: "UTC" })})` : "";
+    return [
+      `${oneLine(section.eventTitle)}${when}`,
+      ...section.lines.map(line => `- ${oneLine(line.title)} (${line.dueOn ? `was due ${formatShortDate(line.dueOn, { timeZone: "UTC" })}` : "no due date"})`),
+      ""
+    ];
+  });
+  return {
+    subject: "Reminder: tasks that are overdue",
+    text: [`Hello ${first || "there"},`, "", "These tasks of yours are past their due date:", "", ...blocks, "If you can't do one of these, please tell the person who gave it to you."].join("\n")
+  };
+}

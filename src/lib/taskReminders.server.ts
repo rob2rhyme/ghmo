@@ -50,7 +50,7 @@ export type ReminderPreview = {
   mode: ReminderMode;
 };
 
-async function readMembers(ids: string[]): Promise<Map<string, ReminderMember & { email?: string }>> {
+export async function readMembers(ids: string[]): Promise<Map<string, ReminderMember & { email?: string }>> {
   const out = new Map<string, ReminderMember & { email?: string }>();
   for (let i = 0; i < ids.length; i += 100) {
     const snaps = await db().getAll(...ids.slice(i, i + 100).map(id => membersCol().doc(id)));

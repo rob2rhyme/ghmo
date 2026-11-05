@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLAIM_IN_FLIGHT_MS, MAX_REMINDERS_PER_SEND, REMINDER_COOLDOWN_MS, cannotEmailLabel, planReminders, reminderEmail, taskOwners } from "@/src/lib/taskReminders";
+import { CLAIM_IN_FLIGHT_MS, DIGEST_COOLDOWN_MS, MAX_REMINDERS_PER_SEND, REMINDER_COOLDOWN_MS, cannotEmailLabel, digestCap, digestEmail, planDigest, planReminders, reminderEmail, taskOwners } from "@/src/lib/taskReminders";
 
 const now = new Date("2026-12-01T15:00:00Z");
 const today = "2026-12-01";
@@ -143,5 +143,115 @@ describe("cannotEmailLabel", () => {
   it("has plain words for every reason, and tells the admin to phone a phone-only member", () => {
     expect(cannotEmailLabel("no_email")).toContain("phone them");
     for (const reason of ["no_consent", "opted_out", "bounced", "inactive", "missing"] as const) expect(cannotEmailLabel(reason).length).toBeGreaterThan(5);
+  });
+});
+
+describe("digestCap", () => {
+  it("is half the daily limit at most, 50 at most, and never more than what is left", () => {
+    expect(digestCap({ dailyLimit: 100, sentToday: 0 })).toBe(50);
+    expect(digestCap({ dailyLimit: 1000, sentToday: 0 })).toBe(50);
+    expect(digestCap({ dailyLimit: 40, sentToday: 0 })).toBe(20);
+    expect(digestCap({ dailyLimit: 100, sentToday: 90 })).toBe(10);
+    expect(digestCap({ dailyLimit: 100, sentToday: 100 })).toBe(0);
+    expect(digestCap({ dailyLimit: 0, sentToday: 0 })).toBe(0);
+  });
+});
+
+describe("planDigest", () => {
+  const events = [
+    { id: "soon", title: "Dashain celebration", day: "2026-12-12" },
+    { id: "recent", title: "Last week's meeting", day: "2026-11-27" },
+    { id: "old", title: "Old gathering", day: "2026-10-01" },
+    { id: "undated", title: "Someday", day: null }
+  ];
+  const dtask = (eventId: string, id: string, title: string, over: Partial<{ dueOn: string | null; status: "open" | "done"; groupId: string | null; memberIds: string[] }> = {}) => ({
+    eventId,
+    id,
+    title,
+    dueOn: "2026-11-20",
+    status: "open" as const,
+    groupId: null,
+    memberIds: [],
+    order: 10,
+    ...over
+  });
+  const base = { events, groups: [], history: new Map(), today, now, cap: 50 };
+
+  it("gives each person one entry with their overdue tasks grouped by event, soonest event first", () => {
+    const result = planDigest({
+      ...base,
+      tasks: [dtask("soon", "a", "Cook", { memberIds: ["asha"] }), dtask("recent", "b", "Clean hall", { memberIds: ["asha"] }), dtask("soon", "c", "Shop", { memberIds: ["bina"] })],
+      members: new Map([["asha", ready("Asha Rai")], ["bina", ready("Bina Thapa")]])
+    });
+    expect(result.recipients.map(r => [r.name, r.overdueCount, r.sections.map(s => s.eventTitle)])).toEqual([
+      ["Asha Rai", 2, ["Last week's meeting", "Dashain celebration"]],
+      ["Bina Thapa", 1, ["Dashain celebration"]]
+    ]);
+  });
+
+  it("ignores tasks that are not overdue, are done, or belong to events that ended more than a week ago", () => {
+    const result = planDigest({
+      ...base,
+      tasks: [
+        dtask("soon", "a", "Not due yet", { memberIds: ["asha"], dueOn: "2026-12-05" }),
+        dtask("soon", "b", "Due today", { memberIds: ["asha"], dueOn: "2026-12-01" }),
+        dtask("soon", "c", "No date", { memberIds: ["asha"], dueOn: null }),
+        dtask("soon", "d", "Done", { memberIds: ["asha"], status: "done" }),
+        dtask("old", "e", "Long ago", { memberIds: ["asha"] }),
+        dtask("undated", "f", "Event without a date", { memberIds: ["asha"] })
+      ],
+      members: new Map([["asha", ready("Asha Rai")]])
+    });
+    expect(result.recipients).toHaveLength(1);
+    expect(result.recipients[0].sections.map(s => s.lines.map(l => l.title))).toEqual([["Event without a date"]]);
+  });
+
+  it("sends group tasks to the lead, counts tasks nobody owns, and counts people who can't be emailed", () => {
+    const result = planDigest({
+      ...base,
+      groups: [{ id: "cooking", leadMemberId: "lead" }],
+      tasks: [dtask("soon", "a", "Serve", { groupId: "cooking" }), dtask("soon", "b", "Orphan"), dtask("soon", "c", "Call", { memberIds: ["phone", "gone"] })],
+      members: new Map<string, ReturnType<typeof ready> | Record<string, unknown>>([["lead", ready("Lena Rai")], ["phone", { name: "Phone Only", emailLower: "", status: "active" }]])
+    });
+    expect(result.recipients.map(r => r.memberId)).toEqual(["lead"]);
+    expect(result.cannotEmail).toBe(2);
+    expect(result.unassigned).toBe(1);
+  });
+
+  it("skips someone sent a digest in the last 20 hours or with a send under way", () => {
+    const members = new Map([["a", ready("A One")], ["b", ready("B Two")], ["c", ready("C Three")]]);
+    const tasks = [dtask("soon", "t", "Job", { memberIds: ["a", "b", "c"] })];
+    const history = new Map([
+      ["a", { lastSentAt: new Date(now.getTime() - DIGEST_COOLDOWN_MS + 60_000) }],
+      ["b", { lastSentAt: new Date(now.getTime() - DIGEST_COOLDOWN_MS - 60_000) }],
+      ["c", { claimedAt: new Date(now.getTime() - CLAIM_IN_FLIGHT_MS + 1000) }]
+    ]);
+    expect(planDigest({ ...base, tasks, members, history }).recipients.map(r => r.memberId)).toEqual(["b"]);
+  });
+
+  it("cuts at the cap, keeping the people with the most overdue tasks, and says how many wait for tomorrow", () => {
+    const members = new Map([["a", ready("A One")], ["b", ready("B Two")], ["c", ready("C Three")]]);
+    const tasks = [dtask("soon", "1", "T1", { memberIds: ["c"] }), dtask("soon", "2", "T2", { memberIds: ["c"] }), dtask("soon", "3", "T3", { memberIds: ["a"] }), dtask("soon", "4", "T4", { memberIds: ["b"] })];
+    const result = planDigest({ ...base, tasks, members, cap: 2 });
+    expect(result.recipients.map(r => r.memberId)).toEqual(["c", "a"]);
+    expect(result.deferred).toBe(1);
+    expect(planDigest({ ...base, tasks, members, cap: 0 })).toMatchObject({ recipients: [], deferred: 3 });
+  });
+});
+
+describe("digestEmail", () => {
+  it("lists overdue tasks under each event with their old due dates", () => {
+    const mail = digestEmail({
+      recipientName: "Asha Rai",
+      sections: [
+        { eventId: "e1", eventTitle: "Dashain celebration", eventDay: "2026-12-12", lines: [{ title: "Cook dal bhat", dueOn: "2026-11-20", overdue: true }] },
+        { eventId: "e2", eventTitle: "Meeting", eventDay: null, lines: [{ title: "Print agenda", dueOn: null, overdue: true }] }
+      ]
+    });
+    expect(mail.subject).toBe("Reminder: tasks that are overdue");
+    expect(mail.text).toContain("Hello Asha,");
+    expect(mail.text).toContain("Dashain celebration (Dec 12, 2026)\n- Cook dal bhat (was due Nov 20, 2026)");
+    expect(mail.text).toContain("Meeting\n- Print agenda (no due date)");
+    expect(mail.text).toContain("tell the person who gave it to you");
   });
 });

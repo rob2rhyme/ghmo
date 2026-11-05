@@ -82,6 +82,9 @@ export const listTasksForEvent = async (eventId: string): Promise<EventTask[]> =
 export const listTasksForGroup = async (groupId: string): Promise<EventTask[]> =>
   sortTasks((await tasksCol().where("groupId", "==", groupId).get()).docs.map(doc => mapTask(doc.id, doc.data())));
 
+/** Every open task of every event, for the daily digest (one read of the open tasks). */
+export const listOpenTasks = async (): Promise<EventTask[]> => (await tasksCol().where("status", "==", "open").get()).docs.map(doc => mapTask(doc.id, doc.data()));
+
 /** Open-task counts per group, for the Groups list (one read of the open tasks). */
 export async function openTaskCountsByGroup(): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
