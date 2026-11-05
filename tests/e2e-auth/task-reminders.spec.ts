@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { Timestamp } from "firebase-admin/firestore";
 import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent } from "./helpers";
 
@@ -40,7 +40,6 @@ test.afterAll(() => new Promise(resolve => stub.close(() => resolve(undefined)))
 
 const ORG = "organizations/ghmo";
 const DAY = 24 * 3600 * 1000;
-const main = (page: Page) => page.locator("#admin-main");
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
 test.beforeEach(async () => {
