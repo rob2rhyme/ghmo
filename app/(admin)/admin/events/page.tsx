@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { listAdminEvents } from "@/src/lib/adminData.server";
+import { taskCountsByEvent } from "@/src/lib/eventTasks.server";
+import { POSITION_TIME_ZONE, todayIn } from "@/src/lib/positions";
 import Link from "next/link";
 import type { Route } from "next";
 import { CalendarDays, ClipboardList, Plus } from "lucide-react";
@@ -44,12 +46,16 @@ export default async function AdminEventsPage() {
       announcementDocTemplate?: string | null;
   }[];
 
+  // Task counts only add a line to each row; if they can't be read the list still works.
+  const taskCounts = await taskCountsByEvent(todayIn(new Date(), POSITION_TIME_ZONE)).catch(() => ({}) as Awaited<ReturnType<typeof taskCountsByEvent>>);
+
   type AdminEvent = (typeof events)[number];
   const { upcoming, past } = splitByTime(events);
 
   const row = (evt: AdminEvent) => {
     const status = statusBadge("event", evt.status);
     const when = eventDate(evt.startsAt, evt.timezone);
+    const tasks = taskCounts[evt.id];
     return (
       <AdminListRow
         key={evt.id}
@@ -59,11 +65,15 @@ export default async function AdminEventsPage() {
           <>
             <Badge variant={status.variant}>{status.label}</Badge>
             {evt.featured ? <Badge variant="outline">Featured</Badge> : null}
+            {tasks && tasks.overdue > 0 ? <Badge variant="destructive">{tasks.overdue} overdue</Badge> : null}
           </>
         }
         meta={
           <>
-            <span>{when || "No date set"}</span>
+            <span>
+              {when || "No date set"}
+              {tasks && tasks.total > 0 ? ` · ${tasks.done} of ${tasks.total} ${tasks.total === 1 ? "task" : "tasks"} done` : ""}
+            </span>
             {evt.summary ? <span className="mt-0.5 line-clamp-2 block">{evt.summary}</span> : null}
           </>
         }

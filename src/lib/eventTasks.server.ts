@@ -9,6 +9,7 @@ import { toDate } from "./format";
 import {
   MAX_TASKS_PER_EVENT,
   checkTaskFields,
+  countTasks,
   cleanTaskNotes,
   cleanTaskTitle,
   cleanTemplateDescription,
@@ -20,6 +21,7 @@ import {
   taskTitleKey,
   templateItemsFromTasks,
   type EventTask,
+  type TaskCounts,
   type TaskStatus,
   type TaskTemplate,
   type TemplateItem
@@ -88,6 +90,20 @@ export async function openTaskCountsByGroup(): Promise<Map<string, number>> {
     if (typeof groupId === "string" && groupId) counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
   }
   return counts;
+}
+
+/** Task counts for every event that has tasks, from one read of the tasks' status, due date and event (for the Events list). */
+export async function taskCountsByEvent(today: string): Promise<Record<string, TaskCounts>> {
+  const byEvent = new Map<string, { status: TaskStatus; dueOn: string | null }[]>();
+  for (const doc of (await tasksCol().select("eventId", "status", "dueOn").get()).docs) {
+    const eventId = doc.get("eventId");
+    if (typeof eventId !== "string" || !eventId) continue;
+    const dueOn = doc.get("dueOn");
+    const list = byEvent.get(eventId) ?? [];
+    list.push({ status: doc.get("status") === "done" ? "done" : "open", dueOn: typeof dueOn === "string" && dueOn ? dueOn : null });
+    byEvent.set(eventId, list);
+  }
+  return Object.fromEntries([...byEvent].map(([eventId, tasks]) => [eventId, countTasks(tasks, today)]));
 }
 
 /** A task's group must exist and be switched on; its people must exist. Returns an error sentence or null. */
