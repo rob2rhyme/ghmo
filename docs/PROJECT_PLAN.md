@@ -931,7 +931,7 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 
 ---
 
-## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A built 2026-11-05)
+## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A and 11-B built 2026-11-05)
 
 **Goal.** The member list gains the organisation's structure: who holds which officer position (president, treasurer, secretary, board member…), which working groups people belong to (a phone-tree group that calls members about events, and event teams such as cooking, marketing and shopping), and a task checklist per event so each group knows what it owns. Admins only: members have no usable sign-in today (§15.1), so group leads who are admins coordinate their people in the app, and member self-service is a later phase.
 
@@ -1012,4 +1012,12 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 - Rules: `positions`, `positionTerms` and `groups` are admin-read and server-write only (new block in `tests/rules/firestore.rules.test.ts`, also proving `groupIds` on a member cannot be written from a browser).
 - Pages: Positions (Current and Past terms, set holder, end term, add and edit a position), Groups and Group (create, add people, make lead, remove, edit, delete), nav items, and on Members the group and officer badges, a group filter and a Groups dialog. Browser spec `tests/e2e-auth/positions-groups.spec.ts`.
 - Differences from the design above: the term route is `/api/admin/position-terms/[termId]` and group membership is a POST; the Positions page has Current and Past terms only (a past term can be removed if entered by mistake); Members shows every badge rather than three plus "+n"; "End term" sets the end date to today, so the person still holds the seat through today. Open-task counts on group rows and the group page's task section arrive with 11-B.
-- Still to do: 11-B event tasks and templates, 11-C calling-tree suggestions (the callers group page already notes that callers need admin access), 11-D task counts and the go-live line.
+- Still to do: 11-C calling-tree suggestions (the callers group page already notes that callers need admin access), 11-D task counts on the Events list and the go-live line.
+
+**11-B built (2026-11-05).**
+- Pure rules and tests: `src/lib/eventTasks.ts` (cleaning, the event's calendar day, due dates from template offsets counted in calendar days so a daylight-saving change cannot shift them, overdue, counts, sorting, `planTemplateApplication` that skips titles already present, template items from an event's tasks) with 17 unit tests.
+- Storage: `src/lib/eventTasks.server.ts`. Tasks need a real group (switched on) and real people; a title can appear once per event; at most 100 tasks per event and 20 people per task. Deleting an event deletes its tasks; deleting a group clears the group from its tasks and keeps them.
+- Routes: `/api/admin/organizations/ghmo/events/[eventId]/tasks` (GET, POST), `…/tasks/[taskId]` (PATCH incl. done and reopen, DELETE), `…/tasks/apply-template` (POST), `/api/admin/task-templates` (GET, POST typed items or copy from an event), `/api/admin/task-templates/[templateId]` (PATCH; DELETE super admin), `/api/admin/groups/[groupId]/tasks` (GET). Nine new activity sentences; the log holds titles and counts, never notes or people's names.
+- Rules: `eventTasks` and `eventTaskTemplates` are admin-read and server-write only (rules test also proves visitors and members cannot read them, so task notes never reach the public site).
+- Pages: a Tasks section on the event edit page (add, edit, mark done, overdue badge, Use a template, Save as template, saves as you go), creating an event now lands on its edit page, `/admin/events/templates` (linked from Events), a Tasks section on the Group page, and open-task counts on the Groups list. Browser spec `tests/e2e-auth/event-tasks.spec.ts`.
+- Differences from the design: a template item whose due date is more than a year from the event day keeps no due date; "Save as template" does not keep assigned people (only groups); the Events list task counts stay in 11-D.

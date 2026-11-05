@@ -78,6 +78,17 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 - The **Members** page shows each person's officer positions and groups. Use the group box above the list to show one team, only officers, or people in no group. **Groups** on a row ticks which teams that person is in.
 - People in the phone tree callers group still need admin access to use My Calls. Nothing is added to the calling tree automatically.
 
+## 1f. Event tasks and templates (Admin → Events)
+
+Open an event to edit it and scroll to **Tasks**. This is the checklist for who does what: cook, shopping, marketing, setting up the hall.
+- **Add task** takes a title, an optional group, optional named people (up to 20), a due date and notes. Keep notes about the work, not about people. Phone numbers stay on the member's contact card. Tasks save the moment you press **Save task**, separately from **Save changes** for the event itself.
+- Tick the box to mark a task done, and untick it to reopen it. A task past its due date that is still open shows **Overdue**.
+- A group's page lists every task given to that group across all events, and the Groups list shows how many are still open.
+- **Save as template** keeps this event's tasks, with their groups and with due dates counted from the event day (for example "3 days before"). Assigned people are not kept. **Use a template** on another event adds those tasks with new due dates and skips any task whose title is already there, so pressing it twice changes nothing.
+- **Task templates** (button on the Events page) lets you write a template by hand and edit it. Only a super admin can delete one. Events keep the tasks they already got.
+- If an event has no date yet, template tasks get no due dates. Set the date, save, then use the template.
+- Deleting an event deletes its tasks. Deleting a group keeps its tasks and takes the group off them.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

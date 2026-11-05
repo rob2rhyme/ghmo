@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -16,28 +17,40 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
+import { Segmented } from "@/src/components/ui/segmented";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Textarea } from "@/src/components/ui/textarea";
 import { GROUP_DESCRIPTION_MAX, GROUP_NAME_MAX, type Group } from "@/src/lib/groups";
+import { dueLabel } from "@/src/components/admin/events/EventTasksPanel";
+import { isOverdue, type EventTask } from "@/src/lib/eventTasks";
 import { memberDisplayName } from "@/src/lib/members";
 
 type Detail = { group: Group; memberIds: string[]; superAdmin: boolean };
+type GroupTask = EventTask & { eventTitle: string; eventDay: string | null };
+type TaskList = { tasks: GroupTask[]; today: string };
 
 export default function GroupClient({ groupId }: { groupId: string }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [members, setMembers] = useState<MemberLite[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [taskList, setTaskList] = useState<TaskList | null>(null);
+  const [taskView, setTaskView] = useState<"open" | "done">("open");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = () =>
-    Promise.all([peopleApi<Detail>(`/api/admin/groups/${groupId}`), peopleApi<{ members: MemberLite[] }>("/api/organizations/ghmo/members")])
-      .then(([group, people]) => {
+    Promise.all([
+      peopleApi<Detail>(`/api/admin/groups/${groupId}`),
+      peopleApi<{ members: MemberLite[] }>("/api/organizations/ghmo/members"),
+      peopleApi<TaskList>(`/api/admin/groups/${groupId}/tasks`)
+    ])
+      .then(([group, people, tasks]) => {
         setDetail(group);
         setMembers(people.members);
+        setTaskList(tasks);
         setError(null);
       })
       .catch((err: unknown) => setError(errorMessage(err, "Could not load this group")));
@@ -169,6 +182,37 @@ export default function GroupClient({ groupId }: { groupId: string }) {
               );
             })}
           </AdminList>
+        )}
+      </AdminSectionCard>
+
+      <AdminSectionCard title="Tasks" description="Event jobs given to this group, across all events.">
+        {!taskList || taskList.tasks.length === 0 ? (
+          <EmptyState title="No tasks for this group yet" description="Give this group a job from an event's Tasks section." />
+        ) : (
+          <>
+            <Segmented
+              label="Show"
+              value={taskView}
+              onChange={setTaskView}
+              options={[
+                { value: "open", label: "Open", count: taskList.tasks.filter(t => t.status === "open").length },
+                { value: "done", label: "Done", count: taskList.tasks.filter(t => t.status === "done").length }
+              ]}
+            />
+            <AdminList bare label="Group tasks">
+              {taskList.tasks
+                .filter(t => t.status === taskView)
+                .map(task => (
+                  <AdminListRow
+                    key={task.id}
+                    href={`/admin/events/${task.eventId}/edit` as Route}
+                    title={task.title}
+                    badges={isOverdue(task, taskList.today) ? <Badge variant="destructive">Overdue</Badge> : undefined}
+                    meta={`${task.eventTitle}${task.dueOn ? ` · Due ${dueLabel(task.dueOn)}` : ""}`}
+                  />
+                ))}
+            </AdminList>
+          </>
         )}
       </AdminSectionCard>
 

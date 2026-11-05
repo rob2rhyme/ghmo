@@ -5,6 +5,7 @@ import { COMMUNITY_SLUG } from "./community";
 import { getAdminDb } from "./firebaseAdmin";
 import { orgGroupsCollectionPath, orgMembersCollectionPath } from "./firestorePaths";
 import { fail, type Failure } from "./adminRoute.server";
+import { clearGroupFromTasks, openTaskCountsByGroup } from "./eventTasks.server";
 import {
   CALLERS_KIND,
   PHONE_TREE_GROUP_DESCRIPTION,
@@ -60,19 +61,19 @@ export async function ensureBuiltInGroups(now: Date = new Date()): Promise<void>
   }
 }
 
-export type GroupWithCount = Group & { memberCount: number };
+export type GroupWithCount = Group & { memberCount: number; openTaskCount: number };
 
 /** Every group with how many members it has (counted from one read of the members' `groupIds`). */
 export async function listGroupsWithCounts(): Promise<GroupWithCount[]> {
   await ensureBuiltInGroups();
-  const [groupSnap, memberSnap] = await Promise.all([groupsCol().get(), membersCol().select("groupIds").get()]);
+  const [groupSnap, memberSnap, openTasks] = await Promise.all([groupsCol().get(), membersCol().select("groupIds").get(), openTaskCountsByGroup()]);
   const counts = new Map<string, number>();
   for (const doc of memberSnap.docs) {
     const ids = doc.get("groupIds");
     if (Array.isArray(ids)) for (const id of ids) counts.set(String(id), (counts.get(String(id)) ?? 0) + 1);
   }
   return groupSnap.docs
-    .map(doc => ({ ...mapGroup(doc.id, doc.data()), memberCount: counts.get(doc.id) ?? 0 }))
+    .map(doc => ({ ...mapGroup(doc.id, doc.data()), memberCount: counts.get(doc.id) ?? 0, openTaskCount: openTasks.get(doc.id) ?? 0 }))
     .sort((a, b) => Number(b.builtIn) - Number(a.builtIn) || a.name.localeCompare(b.name));
 }
 
@@ -150,6 +151,7 @@ export async function deleteGroup(id: string): Promise<{ ok: true; before: Group
     for (const memberId of memberIds.slice(i, i + BATCH_LIMIT)) batch.update(membersCol().doc(memberId), { groupIds: FieldValue.arrayRemove(id) });
     await batch.commit();
   }
+  await clearGroupFromTasks(id);
   await ref.delete();
   return { ok: true, before, removedFrom: memberIds.length };
 }
