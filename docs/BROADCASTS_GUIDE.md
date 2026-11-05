@@ -66,6 +66,18 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 - Each caller opens **My Calls**: the script, their people, **Call** to dial, then **Log call**: what happened (reached, voicemail, no answer, wrong number, call back, declined), whether they are coming, and an encrypted note. Every logged call is in the audit trail with your name, the person and the outcome, never the number or the note.
 - The board opens the campaign page: reached and attempted totals, progress per caller, who is still not reached, the full call log, **Remind callers** (an email to those with people left), **Export CSV** (names and outcomes only) and **Close campaign** when done. A closed campaign takes no more calls.
 
+## 1e. Officers and groups (Admin → Positions, Admin → Groups)
+
+**Positions** lists the president, treasurer, secretary, board members and the rest, with who holds each one and since when. Anyone on the board can look. Only a super admin changes it.
+- **Set holder** picks a member and the day the term starts. If someone holds a single seat, leave "End … the day before" ticked and their term closes for you.
+- **End term** stops a term after today. It moves to **Past terms** once the end date has passed, so the history stays.
+- **Remove** (in Past terms) is only for a term entered by mistake. To record that someone left, end the term instead.
+- **Add a position** or **Edit** changes the list itself, for example a "Kitchen coordinator" seat. Untick "In use" to hide a position without losing its history.
+
+**Groups** are teams of members: the phone tree callers, cooks, marketing, shopping. Any admin can make a group, add people and choose a lead. The lead has to be in the group, so add them first. To remove the lead, choose another lead first. Only a super admin can delete a group, which takes it off every member. The phone tree callers group is built in and cannot be deleted.
+- The **Members** page shows each person's officer positions and groups. Use the group box above the list to show one team, only officers, or people in no group. **Groups** on a row ticks which teams that person is in.
+- People in the phone tree callers group still need admin access to use My Calls. Nothing is added to the calling tree automatically.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
