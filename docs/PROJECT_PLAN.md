@@ -931,7 +931,7 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 
 ---
 
-## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A to 11-C built 2026-11-05)
+## 15. Phase 11 — Officer positions, member groups and event tasks (planned 2026-11-05; 11-A to 11-D built 2026-11-05)
 
 **Goal.** The member list gains the organisation's structure: who holds which officer position (president, treasurer, secretary, board member…), which working groups people belong to (a phone-tree group that calls members about events, and event teams such as cooking, marketing and shopping), and a task checklist per event so each group knows what it owns. Admins only: members have no usable sign-in today (§15.1), so group leads who are admins coordinate their people in the app, and member self-service is a later phase.
 
@@ -1012,7 +1012,6 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 - Rules: `positions`, `positionTerms` and `groups` are admin-read and server-write only (new block in `tests/rules/firestore.rules.test.ts`, also proving `groupIds` on a member cannot be written from a browser).
 - Pages: Positions (Current and Past terms, set holder, end term, add and edit a position), Groups and Group (create, add people, make lead, remove, edit, delete), nav items, and on Members the group and officer badges, a group filter and a Groups dialog. Browser spec `tests/e2e-auth/positions-groups.spec.ts`.
 - Differences from the design above: the term route is `/api/admin/position-terms/[termId]` and group membership is a POST; the Positions page has Current and Past terms only (a past term can be removed if entered by mistake); Members shows every badge rather than three plus "+n"; "End term" sets the end date to today, so the person still holds the seat through today. Open-task counts on group rows and the group page's task section arrive with 11-B.
-- Still to do: 11-D task counts on the Events list and the go-live line.
 
 **11-B built (2026-11-05).**
 - Pure rules and tests: `src/lib/eventTasks.ts` (cleaning, the event's calendar day, due dates from template offsets counted in calendar days so a daylight-saving change cannot shift them, overdue, counts, sorting, `planTemplateApplication` that skips titles already present, template items from an event's tasks) with 17 unit tests.
@@ -1027,3 +1026,8 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 - Server: `findCallersGroup` and `callerLinksForGroup` in `src/lib/groups.server.ts`; `listCallerCandidates` in `src/lib/callingTree.server.ts` now returns each admin with a `suggested` flag plus a `callersGroup` summary (null when the group is switched off). `GET /api/admin/calling-tree` passes both through; `GET /api/admin/groups/[groupId]` adds `adminAccess` (who is an admin) for the callers group. `saveTree` and decision D15 are untouched: the server still accepts only active admins as callers.
 - Pages: on the Calling Tree page suggested admins are listed first with an "In Phone tree callers" badge; an info note names the members who need admin access (with a link to the group); a super admin gets **Check everyone in the group**, which only ticks the boxes, and nothing is saved until Save calling tree. With no group, or the group switched off, the page is as before. On the callers group page each active person shows **Admin** or **Needs admin access to use My Calls**. Browser spec `tests/e2e-auth/calling-tree-groups.spec.ts`.
 - Matching is by email (members added by an admin have no sign-in id), so a person whose member email differs from their admin email will show as needing access until the emails agree.
+
+**11-D built (2026-11-05).**
+- `taskCountsByEvent` in `src/lib/eventTasks.server.ts` (one read of every task's event, status and due date, counted with `countTasks`). The Events list shows "3 of 7 tasks done" under each event's date, and a red "2 overdue" badge when open tasks are past due. If the counts can't be read the list still loads without them.
+- Go-live checklist (`docs/GO_LIVE_CHECKLIST.md`): enter the current officers with start dates, fill the callers group, make event groups with leads, write a general-meeting template, and publish the Firestore rules again. Admin guide §1e and §1f, README routes and data model, and this section were written with each step.
+- Phase 11 is complete. Not built, as listed in §15.6: member sign-in and "my tasks" pages, reminders to team members, a public board page, task comments, merging with minutes action items.

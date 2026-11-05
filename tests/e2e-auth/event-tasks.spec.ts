@@ -114,6 +114,21 @@ test("tasks: add, give to a group and people, finish, see overdue, save as a tem
   await expect(page.getByText(/0 tasks added, 2 already there/)).toBeVisible();
   expect((await db.collection(`${ORG}/eventTasks`).where("eventId", "==", "ev2").get()).size).toBe(2);
 
+  // The Events list shows how far each checklist is, and flags overdue work.
+  await page.goto("/admin/events");
+  await waitForStreamedContent(page);
+  const dashain = main(page).getByRole("listitem").filter({ hasText: "Dashain celebration" });
+  const meeting = main(page).getByRole("listitem").filter({ hasText: "General meeting" });
+  await expect(dashain.getByText(/1 of 2 tasks done/)).toBeVisible();
+  await expect(meeting.getByText(/0 of 2 tasks done/)).toBeVisible();
+  await expect(dashain.getByText(/overdue/)).toHaveCount(0);
+  const late = await page.request.post("/api/admin/organizations/ghmo/events/ev2/tasks", { data: { title: "Print the agenda", dueOn: "2020-02-02" } });
+  expect(late.status()).toBe(201);
+  await page.reload();
+  await waitForStreamedContent(page);
+  await expect(meeting.getByText(/0 of 3 tasks done/)).toBeVisible();
+  await expect(meeting.getByText("1 overdue")).toBeVisible();
+
   // The group page lists its tasks across events, with the event name.
   await page.goto("/admin/groups/cooking");
   await waitForStreamedContent(page);
@@ -129,7 +144,7 @@ test("tasks: add, give to a group and people, finish, see overdue, save as a tem
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete group" }).click();
   await expect.poll(async () => (await db.collection(`${ORG}/eventTasks`).where("groupId", "==", "cooking").get()).size).toBe(0);
-  expect((await db.collection(`${ORG}/eventTasks`).get()).size).toBe(4);
+  expect((await db.collection(`${ORG}/eventTasks`).get()).size).toBe(5);
 
   // Deleting an event deletes its tasks.
   const removed = await page.request.delete("/api/admin/organizations/ghmo/events/ev2");

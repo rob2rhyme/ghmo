@@ -54,6 +54,7 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [ ] **Penetration test** of sign-in (passkeys, magic link), sessions and public pages on the real deployment.
 - [ ] **Key-rotation drill** (`docs/KEY_ROTATION_DRILL.md`) and **recovery-key test** with both trustees; record the dates here: ____________.
 - [ ] Fill in names and phone numbers in `docs/RUNBOOK_INCIDENT.md`, print it, and keep it with the recovery keys.
+- [ ] **Officers, groups and event tasks (Phase 11):** under Admin → Positions a super admin enters the current officers with their start dates (the standard positions are created the first time the page opens). Put the people who will phone others in the built-in **Phone tree callers** group (Admin → Groups) and give each an admin account with the same email as their member record; then on Calling Tree press **Check everyone in the group** and save. Make a group and choose a lead for each event team (cooking, marketing, shopping). Under Events → Task templates write one checklist for a general meeting, and add it to the next event. Publish the Firestore rules again after this release: positions, terms, groups, event tasks and templates each have a new rules block. Steps: `docs/BROADCASTS_GUIDE.md` §1e and §1f.
 - [ ] Calendar reminder: test the recovery key every year (Admin → Encryption → Test).
 
 ## 6. UI layout upgrade (Phase 10, code work; see `docs/PROJECT_PLAN.md` §13)
