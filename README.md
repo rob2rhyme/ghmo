@@ -61,6 +61,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
+- Scheduled: `GET /api/cron/task-digest` (Vercel Cron, once a day, needs `CRON_SECRET`; plan §16). `GET/PUT /api/admin/task-digest` is its switch.
 - Auth: `/admin/login` (admin magic link) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (always disabled in production). `/login` is the member magic-link page.
 - API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
 
@@ -99,6 +100,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `positions/{id}` and `positionTerms/{id}`: officer positions (title, Nepali title, order, active, several-holders flag) and who held each from which date to which (`startsOn`, `endsOn` or null). `groups/{id}`: name, description, `leadMemberId`, `kind` (`callers` for the phone tree group). Group membership is `members/{id}.groupIds[]`. All plaintext, admin-read, server-written (plan §15).
   - `eventTasks/{id}`: one task of an event (`eventId`, title, notes, `groupId`, `memberIds[]`, `dueOn`, `status` open or done, `order`, `doneAt`, `doneBy`). `eventTaskTemplates/{id}`: name, description and `items[]` (title, notes, `groupId`, `dueOffsetDays` from the event day). Plaintext, admin-read, server-written, outside the event documents so they never reach the public site (plan §15, 11-B).
   - `eventTaskReminders/{eventId}~{memberId}`: the last time a person was reminded about an event's tasks (`lastSentAt`, `lastSentBy`, `count`) and any send in progress (`claimId`, `claimedAt`); keeps the 24-hour limit. Server-only, admin-read (plan §16).
+  - `taskDigest/settings`: whether the daily overdue-task digest is on (off by default), who changed it, the day it last ran and a summary of the last run. The per-person digest record is `eventTaskReminders/digest~{memberId}` with `kind: "digest"`. Admin-read, server-written (plan §16, 12-B).
   - `auditLogs/{logId}`.
 - Communication log collections (all under `organizations/ghmo`):
   - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.

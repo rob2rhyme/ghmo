@@ -101,6 +101,12 @@ On an event's **Tasks** section, **Send reminders** emails the people who own ta
 - Every email has an unsubscribe link, and unsubscribing stops reminders as well as broadcasts. The audit log records who sent reminders and how many, never the names or task text.
 - If the email service is down, nothing is lost: the window says so and you can send again straight away.
 
+**The daily digest (Admin → Events, top of the page).** A super admin can switch on a **Daily overdue digest**. Every morning, around 8 or 9 AM Eastern, each person with overdue tasks gets one email listing them, grouped by event. It is **off** until someone switches it on, and any super admin can switch it off again.
+- It covers events that are coming up or ended in the last week. Same rules as manual reminders: only members who agreed to emails, with the unsubscribe link, and a task's group goes to its lead.
+- At most 50 people a day, and never more than half of the day's email limit, so broadcasts always have room. People with the most overdue tasks come first; the rest get theirs the next day.
+- The card shows the last run, for example "2 people emailed". If it says nothing was sent, the reason is shown. A red note means the schedule secret or the email set-up is missing.
+- A reminder sent by hand and the digest are separate, so someone you reminded in the morning can still get the digest.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
