@@ -258,13 +258,14 @@ describe("positions, terms and groups (plan §15)", () => {
   });
 });
 
-describe("event tasks and task templates (plan §15, 11-B)", () => {
-  const paths = ["eventTasks/t1", "eventTaskTemplates/tpl1"];
+describe("event tasks, task templates and reminder records (plan §15 and §16)", () => {
+  const paths = ["eventTasks/t1", "eventTaskTemplates/tpl1", "eventTaskReminders/ev1~m1"];
 
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async ctx => {
       await setDoc(doc(ctx.firestore(), `${ORG}/eventTasks/t1`), { eventId: "e1", title: "Book hall", status: "open" });
       await setDoc(doc(ctx.firestore(), `${ORG}/eventTaskTemplates/tpl1`), { name: "General meeting", items: [] });
+      await setDoc(doc(ctx.firestore(), `${ORG}/eventTaskReminders/ev1~m1`), { eventId: "ev1", memberId: "m1", count: 1 });
     });
   });
 

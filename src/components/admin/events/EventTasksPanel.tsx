@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { toast } from "sonner";
-import { ClipboardList, LayoutTemplate, Pencil, Plus, Save } from "lucide-react";
+import { ClipboardList, LayoutTemplate, Mail, Pencil, Plus, Save } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { errorMessage, peopleApi, type MemberLite } from "@/src/components/admin/people/api";
@@ -22,6 +22,7 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { MAX_ASSIGNEES, TASK_NOTES_MAX, TASK_TITLE_MAX, TEMPLATE_NAME_MAX, isOverdue, type EventTask, type TaskCounts, type TaskTemplate } from "@/src/lib/eventTasks";
 import { formatShortDate } from "@/src/lib/format";
 import { memberDisplayName } from "@/src/lib/members";
+import { cannotEmailLabel, type ReminderMode, type ReminderPlan } from "@/src/lib/taskReminders";
 
 type GroupLite = { id: string; name: string; active: boolean };
 type TasksResponse = { tasks: EventTask[]; today: string; counts: TaskCounts; eventDay: string | null };
@@ -38,6 +39,7 @@ export default function EventTasksPanel({ eventId }: { eventId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<EventTask | "new" | null>(null);
   const [picking, setPicking] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<EventTask | null>(null);
   const [busy, setBusy] = useState(false);
@@ -124,6 +126,9 @@ export default function EventTasksPanel({ eventId }: { eventId: string }) {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="row" onClick={() => setPicking(true)} disabled={templates.length === 0} title={templates.length === 0 ? "No templates yet. Save this event's tasks as one, or make one on the templates page." : undefined}>
             <LayoutTemplate aria-hidden="true" /> Use a template
+          </Button>
+          <Button variant="outline" size="row" onClick={() => setReminding(true)} disabled={counts.open === 0}>
+            <Mail aria-hidden="true" /> Send reminders
           </Button>
           <Button variant="outline" size="row" onClick={() => setSaving(true)} disabled={tasks.length === 0}>
             <Save aria-hidden="true" /> Save as template
@@ -229,6 +234,7 @@ export default function EventTasksPanel({ eventId }: { eventId: string }) {
           }}
         />
       ) : null}
+      {reminding ? <RemindDialog eventId={eventId} onClose={() => setReminding(false)} /> : null}
       {saving ? (
         <SaveTemplateDialog
           busy={busy}
@@ -463,6 +469,135 @@ function SaveTemplateDialog({ busy, count, onClose, onSave }: { busy: boolean; c
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type ReminderPreview = { plan: ReminderPlan; event: { id: string; title: string; day: string | null }; blocker: string | null; quotaLeft: number; mode: ReminderMode };
+
+/** Emails the people who own tasks. Shows exactly who would get an email, and who can't, before anything is sent. */
+function RemindDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+  const [mode, setMode] = useState<ReminderMode>("all");
+  const [preview, setPreview] = useState<ReminderPreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    peopleApi<ReminderPreview>(`${base(eventId)}/remind`, { method: "POST", body: { mode, send: false } })
+      .then(result => {
+        if (cancelled) return;
+        setPreview(result);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setPreview(null);
+        setError(errorMessage(err, "Could not work out who to remind"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, mode]);
+
+  const plan = preview?.plan ?? null;
+  const count = plan?.recipients.length ?? 0;
+  const tooFewLeft = preview !== null && count > preview.quotaLeft;
+  const send = async () => {
+    setSending(true);
+    try {
+      const result = await peopleApi<{ emailed: number; failed: number; skippedAtSend: number }>(`${base(eventId)}/remind`, { method: "POST", body: { mode, send: true } });
+      if (result.failed > 0) toast.error(`The email service didn't accept ${result.failed} ${result.failed === 1 ? "reminder" : "reminders"}. Nothing was lost; try again in a moment.`);
+      else toast.success(`${result.emailed} ${result.emailed === 1 ? "reminder" : "reminders"} sent${result.skippedAtSend ? `, ${result.skippedAtSend} skipped` : ""}`);
+      onClose();
+    } catch (err) {
+      toast.error(errorMessage(err));
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={open => !open && !sending && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Send reminders</DialogTitle>
+          <DialogDescription>
+            Each person gets one email listing only their own open tasks for this event, with an unsubscribe link. Task notes are never sent. Only people who agreed to emails are included.
+          </DialogDescription>
+        </DialogHeader>
+        <Field label="Remind about">
+          <Select value={mode} onChange={e => setMode(e.target.value as ReminderMode)} disabled={sending}>
+            <option value="all">All open tasks</option>
+            <option value="overdue">Only overdue tasks</option>
+          </Select>
+        </Field>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        {!plan && !error ? <Skeleton className="h-24 w-full" /> : null}
+        {preview?.blocker ? (
+          <Alert variant="destructive">
+            <AlertDescription>{preview.blocker}</AlertDescription>
+          </Alert>
+        ) : null}
+        {plan ? (
+          <div className="grid gap-4 text-sm">
+            <section aria-label="Will be emailed">
+              <h3 className="font-semibold">Will be emailed ({count})</h3>
+              {count === 0 ? (
+                <p className="text-muted-foreground">No one to email for this choice.</p>
+              ) : (
+                <ul className="mt-1 list-disc pl-5">
+                  {plan.recipients.map(person => (
+                    <li key={person.memberId}>
+                      {person.name}: {person.lines.length} {person.lines.length === 1 ? "task" : "tasks"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {plan.more > 0 ? <p className="mt-1 text-muted-foreground">{plan.more} more can be reminded in the next send; one send reaches at most 50 people.</p> : null}
+            </section>
+            {plan.cannotEmail.length > 0 ? (
+              <section aria-label="Can't be emailed">
+                <h3 className="font-semibold">Can&apos;t be emailed ({plan.cannotEmail.length})</h3>
+                <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                  {plan.cannotEmail.map(person => (
+                    <li key={person.memberId}>
+                      {person.name} {cannotEmailLabel(person.reason)}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {plan.recentlyReminded.length > 0 ? (
+              <section aria-label="Reminded recently">
+                <h3 className="font-semibold">Reminded in the last 24 hours ({plan.recentlyReminded.length})</h3>
+                <p className="text-muted-foreground">{plan.recentlyReminded.map(person => person.name).join(", ")}</p>
+              </section>
+            ) : null}
+            {plan.unassigned > 0 ? (
+              <p className="text-muted-foreground">
+                {plan.unassigned} {plan.unassigned === 1 ? "task has" : "tasks have"} no named person and no group lead, so no one can be reminded about {plan.unassigned === 1 ? "it" : "them"}.
+              </p>
+            ) : null}
+            {tooFewLeft ? (
+              <Alert variant="destructive">
+                <AlertDescription>Only {preview?.quotaLeft} {preview?.quotaLeft === 1 ? "email is" : "emails are"} left in today&apos;s sending limit, and {count} are needed. Try again tomorrow.</AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={sending}>
+            Cancel
+          </Button>
+          <Button loading={sending} disabled={!plan || count === 0 || Boolean(preview?.blocker) || tooFewLeft} onClick={() => void send()}>
+            {count === 1 ? "Send 1 reminder" : `Send ${count} reminders`}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

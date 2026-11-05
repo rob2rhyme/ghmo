@@ -3,7 +3,7 @@ import "server-only";
 import { COMMUNITY_SLUG } from "./community";
 import { findEventDoc, normalizeEvent } from "./events";
 import { getAdminDb } from "./firebaseAdmin";
-import { orgEventTaskTemplatesCollectionPath, orgEventTasksCollectionPath, orgGroupsCollectionPath, orgMembersCollectionPath } from "./firestorePaths";
+import { orgEventTaskRemindersCollectionPath, orgEventTaskTemplatesCollectionPath, orgEventTasksCollectionPath, orgGroupsCollectionPath, orgMembersCollectionPath } from "./firestorePaths";
 import { fail, type Failure } from "./adminRoute.server";
 import { toDate } from "./format";
 import {
@@ -224,6 +224,9 @@ async function inBatches<T>(items: T[], apply: (batch: FirebaseFirestore.WriteBa
 export async function deleteTasksForEvent(eventId: string): Promise<number> {
   const docs = (await tasksCol().where("eventId", "==", eventId).select().get()).docs;
   await inBatches(docs, (batch, doc) => batch.delete(doc.ref));
+  // Its reminder records (plan §16) go too.
+  const reminders = (await db().collection(orgEventTaskRemindersCollectionPath(COMMUNITY_SLUG)).where("eventId", "==", eventId).select().get()).docs;
+  await inBatches(reminders, (batch, doc) => batch.delete(doc.ref));
   return docs.length;
 }
 

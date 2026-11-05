@@ -90,6 +90,17 @@ Open an event to edit it and scroll to **Tasks**. This is the checklist for who 
 - If an event has no date yet, template tasks get no due dates. Set the date, save, then use the template.
 - Deleting an event deletes its tasks. Deleting a group keeps its tasks and takes the group off them.
 
+## 1g. Reminding people about their tasks (Admin → Events)
+
+On an event's **Tasks** section, **Send reminders** emails the people who own tasks. It needs the same email set-up as broadcasts (sending switched on, the email service, and the organization's name and address).
+- A window first shows **exactly who would be emailed** and how many tasks each has, **who can't be emailed and why**, and who was reminded in the last 24 hours. Nothing is sent until you press **Send N reminders**.
+- **Who is reminded:** the people named on a task, and the lead of the task's group (not the whole group). A person gets one email listing only their own open tasks, with due dates. Task notes are never sent.
+- **Who is not:** people with no email (phone-only members: phone them, or use the calling tree), who haven't agreed to emails, who asked to stop, or whose address bounced. They are listed in the window so you know to call.
+- **Choices:** **All open tasks**, or **Only overdue tasks**.
+- **Limits:** a person is reminded at most once every 24 hours per event; one send reaches up to 50 people (send again for the rest); sends count towards the same daily email limit as broadcasts; ten sends per admin per hour.
+- Every email has an unsubscribe link, and unsubscribing stops reminders as well as broadcasts. The audit log records who sent reminders and how many, never the names or task text.
+- If the email service is down, nothing is lost: the window says so and you can send again straight away.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
