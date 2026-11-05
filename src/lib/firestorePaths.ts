@@ -23,3 +23,4 @@ export const orgGroupsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlu
 export const orgEventTasksCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTasks`;
 export const orgEventTaskTemplatesCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTaskTemplates`;
 export const orgEventTaskRemindersCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTaskReminders`;
+export const orgTaskDigestCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/taskDigest`;

@@ -114,6 +114,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 2. **Someone does not want these emails:** open **Admin → Members** and press **They asked to stop** for them (or ask them to use the unsubscribe link in the email). They are never reminded or broadcast to again.
 3. **Who got it:** the audit log shows who sent reminders for which event and how many; the reminder records (Firestore `eventTaskReminders`) show who was emailed and when. Reminders list only a person's own task titles and due dates, never notes or other people's names.
 4. **If many complain or the provider warns:** follow case I (spam complaints), and switch sending off with `FEATURE_BROADCASTS=false`, which also stops reminders.
+5. **The daily digest emailed people it should not have:** under **Admin → Events**, press **Switch off** on the Daily overdue digest card (any super admin), then fix the tasks and who they are given to. Removing `CRON_SECRET` in Vercel also stops the schedule from calling the site at all.
 
 ## After any incident
 

@@ -1055,6 +1055,8 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 | D22 | Who may send, and is there an approval step? | Any active admin; no approval step; fixed template. | Same openness as assigning tasks (D18). The risk a second approver guards against in broadcasts (free text to everyone) is absent. |
 | D23 | Limits | One reminder per person per event every 24 hours; at most 50 people per send; shares the broadcast daily quota, kill switch and footer; ten sends per admin per hour. | Repeated clicks cannot spam; the free tier is protected. |
 | D24 | Manual or automatic? | Manual first (12-A). An automatic daily digest of overdue tasks is 12-B, off by default. | No cron secret or schedule to get wrong before the manual flow is proven. |
+| D25 | What does the automatic digest cover, and how much of the email limit may it use? | One email a day per person listing their overdue open tasks, grouped by event, for events that are upcoming or ended in the last 7 days. At most 50 people a day and never more than half of the day's shared limit; the people with the most overdue tasks go first and the rest wait for tomorrow. A person sent a digest in the last 20 hours is skipped. | A busy day of overdue tasks cannot starve a broadcast on the free tier; old events do not nag. |
+| D26 | Who controls it, and how is it called? | Off until a super admin switches it on (and any super admin can switch it off). Vercel Cron calls `GET /api/cron/task-digest` once a day at 13:00 UTC (8 or 9 AM Eastern) with `CRON_SECRET`; with no secret, nobody can call it. A claim on the settings document means it runs at most once a day even if called twice. | Nothing sends by accident; the schedule is one line in `vercel.json`. |
 
 ### 16.3 Design
 
@@ -1070,7 +1072,7 @@ Member sign-in and "my tasks" pages, reminders to team members (email, SMS, push
 | Step | Scope | Exit criteria |
 |---|---|---|
 | **12-A** | Planner, email, claim and send, route, rules, the dialog, tests, docs | A reminder reaches only consented people with their own tasks; a second click within 24 hours sends nothing; a failed provider call leaves no block; phone-only people are listed, not emailed; unsubscribe link present |
-| **12-B** | Automatic daily digest of overdue tasks (Vercel Cron, secret, an on/off switch in settings, off by default) | Owner approves the schedule; one digest per person per day |
+| **12-B** | Automatic daily digest of overdue tasks (Vercel Cron, secret, an on/off switch on the Events page, off by default) | Off by default; once on, one digest per person per day, consent and the shared limit respected; a failed send can be retried the same day |
 | **12-C** | Docs: admin guide, go-live line, runbook case for a wrong reminder or a complaint | Docs merged |
 
 ### 16.5 Risks and out of scope
@@ -1094,3 +1096,11 @@ Out of scope: SMS, voice or Messenger reminders (decided in Phase 8–9), remind
 - Docs: admin guide §1g, go-live checklist line, runbook case N, README data model.
 - Notes: a group's task goes to the group's lead only. A send reaches at most 50 people; the rest are picked up by the next send because the first 50 are then in their 24-hour window. The provider is never given a person's other tasks, notes or other recipients.
 - Still to do: 12-B (automatic daily digest, needs the owner's go-ahead on a schedule and a secret) and 12-C items beyond those already written.
+
+**12-B built (2026-11-05).**
+- Pure rules and tests: `planDigest`, `digestCap` and `digestEmail` in `src/lib/taskReminders.ts` (7 new unit tests): overdue open tasks of upcoming or recently ended events, grouped by event for each person; the lead gets the group's tasks; the same consent rules as 12-A; 20-hour per-person cooldown; the cap and who waits.
+- Server: `src/lib/taskDigest.server.ts`. `runTaskDigest` does nothing while the switch is off, claims the day on the settings document (a second call, or one while a run is under 10 minutes old, does nothing), re-reads consent, each person's digest record (`eventTaskReminders/digest~{memberId}`) and the quota in one transaction, sends one provider batch with an idempotency key, and records a summary of the run. A failed send releases the claims and the quota and does not use up the day, so a retry works.
+- Routes: `GET /api/cron/task-digest` (needs `Authorization: Bearer <CRON_SECRET>` of at least 16 characters; compared in constant time; refuses everyone when no secret is set; audited as `task_digest_run`, counts only), and `GET/PUT /api/admin/task-digest` (any admin reads; super admin switches; audited as `task_digest_switched`). The schedule is `crons` in `vercel.json` (`0 13 * * *`).
+- Rules: `taskDigest` is admin-read, server-write only (rules test extended).
+- UI: a **Daily overdue digest** card on the Events page with the On/Off state, the last run, warnings when the schedule secret or email set-up is missing, and Switch on (with a confirmation) or Switch off for super admins. Browser spec `tests/e2e-auth/task-digest.spec.ts` (3 tests, mail stub).
+- Notes: Vercel Hobby runs a cron once a day and may start it anywhere in the hour; crons run only on the production deployment. A manual reminder and the digest are independent, so someone reminded by hand in the morning can still get the digest. 12-C (docs) was written along with 12-A and 12-B.

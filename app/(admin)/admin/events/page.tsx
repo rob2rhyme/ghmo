@@ -9,6 +9,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { CalendarDays, ClipboardList, Plus } from "lucide-react";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
+import DigestCard from "@/src/components/admin/events/DigestCard";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { Badge } from "@/src/components/ui/badge";
@@ -103,6 +104,8 @@ export default async function AdminEventsPage() {
           </>
         }
       />
+
+      <DigestCard />
 
       {events.length === 0 ? (
         <EmptyState
