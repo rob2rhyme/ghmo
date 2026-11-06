@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent, memberAction, firstMemberAction } from "./helpers";
 
 /**
  * Phase 9-A (plan §12): a member's phone number is encrypted in the admin's browser, stored as an
@@ -54,7 +54,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
   expect(createdJson).toContain("[encrypted]");
 
   // --- Edit the contact: a language is added, the number stays ---
-  await page.getByRole("button", { name: "Edit contact for Sam Lee" }).click();
+  await memberAction(page, "Sam Lee", /^(Edit contact|Add phone)$/);
   await expect(page.getByRole("dialog").getByLabel("Phone", { exact: true })).toHaveValue("+17175550100");
   await page.getByLabel("Preferred language (optional)").fill("Nepali");
   await page.getByRole("button", { name: "Save contact" }).click();
@@ -84,7 +84,7 @@ test("numbers are ciphertext in Firestore and the audit log, masked on screen, i
   await expect(shown(page, "•••-•••-0101")).toBeVisible();
 
   // --- A call opt-out is recorded and shown ---
-  await page.getByRole("button", { name: "They asked not to be called" }).first().click();
+  await firstMemberAction(page, "They asked not to be called");
   await expect(shown(page, "Asked not to be called")).toBeVisible();
   const optedOut = (await members().where("callOptOutAt", "!=", null).get()).docs;
   expect(optedOut).toHaveLength(1);
@@ -194,7 +194,7 @@ test("a member without an email is saved with a name and phone, keeps their numb
   expect((await members().doc(mayaDoc.id).get()).data()).toMatchObject({ hasPhone: true });
 
   // Clearing the number in the dialog is refused too.
-  await page.getByRole("button", { name: "Edit contact for Maya Gurung" }).click();
+  await memberAction(page, "Maya Gurung", /^(Edit contact|Add phone)$/);
   await page.getByRole("dialog").getByLabel("Phone", { exact: true }).fill("");
   await page.getByRole("button", { name: "Save contact" }).click();
   await expect(page.getByText(/Someone without an email needs a phone number/)).toBeVisible();

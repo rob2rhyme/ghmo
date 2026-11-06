@@ -13,4 +13,4 @@ export async function peopleApi<T>(url: string, init?: { method?: string; body?:
 
 export const errorMessage = (error: unknown, fallback = "Something went wrong. Try again.") => (error instanceof Error ? error.message : fallback);
 
-export type MemberLite = { id: string; name?: string | null; emailLower: string; status: "active" | "disabled"; groupIds?: string[] };
+export type MemberLite = { id: string; name?: string | null; emailLower: string; status: "active" | "disabled"; groupIds?: string[]; hasPhone?: boolean; contact?: unknown };

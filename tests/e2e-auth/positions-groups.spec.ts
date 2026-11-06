@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent, memberAction } from "./helpers";
 
 /**
  * Phase 11-A (plan §15): officer positions with term dates, and member groups with a lead. A super admin
@@ -160,7 +160,7 @@ test("groups: create, add people, choose a lead, and see them on the Members pag
   await main(page).getByLabel("Filter by group").selectOption("none");
   await expect(main(page).getByRole("listitem").filter({ hasText: "Asha Rai" })).toHaveCount(0);
   await expect(main(page).getByRole("listitem").filter({ hasText: "Bina Thapa" })).toBeVisible();
-  await page.getByRole("button", { name: "Groups for Bina Thapa" }).click();
+  await memberAction(page, "Bina Thapa", "Groups");
   await page.getByRole("dialog").getByLabel("Cooking team").check();
   await page.getByRole("dialog").getByRole("button", { name: "Save groups" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

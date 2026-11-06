@@ -4,7 +4,8 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Download, Eye, EyeOff, Lock, Mail, Pencil, Phone, PhoneCall, PhoneOff, SearchX, ShieldOff, Upload, UserCheck, UserPlus, UserRound, UserX, Users } from "lucide-react";
+import { Download, Eye, EyeOff, Lock, Mail, MoreHorizontal, Pencil, Phone, PhoneCall, PhoneOff, SearchX, ShieldOff, Upload, UserCheck, UserPlus, UserRound, UserX, Users } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -22,6 +23,7 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
 import MemberGroupsDialog, { type GroupChoice } from "@/src/components/admin/people/MemberGroupsDialog";
+import { BulkActionBar, BulkGroupDialog } from "@/src/components/admin/members/MembersBulk";
 import RenameMemberDialog from "@/src/components/admin/people/RenameMemberDialog";
 import ExportMembersDialog, { type ExportChoice } from "@/src/components/admin/members/ExportMembersDialog";
 import { exportFileName, membersCsv, type ExportMember } from "@/src/lib/memberExport";
@@ -136,6 +138,11 @@ export default function MembersClient({
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
   const [disabling, setDisabling] = useState<MemberRow | null>(null);
+  // Several members at once (plan §28, D78): the ticked ids, and which bulk dialog is open.
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkGroup, setBulkGroup] = useState<"add" | "remove" | null>(null);
+  const [bulkTurningOff, setBulkTurningOff] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   /** Which form is open above the list, at every width. An empty list starts with the Add form open. */
   const [panel, setPanel] = useState<"add" | "import" | null>(initialMembers.length === 0 ? "add" : null);
 
@@ -203,6 +210,63 @@ export default function MembersClient({
       })
       .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
   }, [members, query, filter, groupFilter, officers]);
+
+  // The first 50 of whatever the search and filters match, then 50 more at a time (plan §28, D77). A new search or
+  // filter starts again from 50; export and the counts always use the whole list.
+  const PAGE = 50;
+  const pageKey = `${query}|${filter}|${groupFilter}`;
+  const [paging, setPaging] = useState({ key: pageKey, count: PAGE });
+  const shownCount = paging.key === pageKey ? paging.count : PAGE;
+  const shown = visible.slice(0, shownCount);
+
+  const toggleSelected = (id: string) =>
+    setSelected(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const allShownSelected = shown.length > 0 && shown.every(member => selected.has(member.id));
+  const selectedIds = [...selected].filter(id => members.some(member => member.id === id));
+
+  const bulkGroupChange = async (mode: "add" | "remove", groupId: string) => {
+    setBulkBusy(true);
+    try {
+      const result = await call<{ added: string[]; removed: string[] }>(`/api/admin/groups/${groupId}/members`, "POST", mode === "add" ? { add: selectedIds } : { remove: selectedIds });
+      const changed = mode === "add" ? result.added : result.removed;
+      setMembers(list =>
+        list.map(member =>
+          changed.includes(member.id)
+            ? { ...member, groupIds: mode === "add" ? [...(member.groupIds ?? []), groupId] : (member.groupIds ?? []).filter(id => id !== groupId) }
+            : member
+        )
+      );
+      const name = groups.find(group => group.id === groupId)?.name ?? "the group";
+      toast.success(`${changed.length} ${mode === "add" ? "added to" : "removed from"} ${name}${changed.length < selectedIds.length ? `; ${selectedIds.length - changed.length} already ${mode === "add" ? "in it" : "not in it"}` : ""}`);
+      setSelected(new Set());
+      setBulkGroup(null);
+    } catch (error) {
+      toast.error(errorText(error, "Could not change the group"));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkStatus = async (status: "active" | "disabled") => {
+    setBulkBusy(true);
+    try {
+      const result = await call<{ changed: number; skipped: number; ids: string[] }>("/api/organizations/ghmo/members/bulk-status", "POST", { ids: selectedIds, status });
+      setMembers(list => list.map(member => (result.ids.includes(member.id) ? { ...member, status } : member)));
+      const verb = status === "disabled" ? "turned off" : "turned on";
+      toast.success(`${result.changed} ${verb}${result.skipped ? `; ${result.skipped} already ${status === "disabled" ? "off" : "on"}` : ""}`);
+      setSelected(new Set());
+      setBulkTurningOff(false);
+    } catch (error) {
+      toast.error(errorText(error, "Could not save"));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const replace = (updated: MemberRow) => setMembers(list => list.map(m => (m.id === updated.id ? updated : m)));
 
@@ -652,8 +716,27 @@ export default function MembersClient({
             }
           />
         ) : (
+          <>
+          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={allShownSelected}
+              onChange={() =>
+                setSelected(current => {
+                  const next = new Set(current);
+                  for (const member of shown) {
+                    if (allShownSelected) next.delete(member.id);
+                    else next.add(member.id);
+                  }
+                  return next;
+                })
+              }
+            />
+            Select all shown
+          </label>
           <AdminList bare label="Members">
-            {visible.map(member => {
+            {shown.map(member => {
               const state = memberEmailState(member);
               const meta = STATE_LABEL[state];
               const source = member.emailConsent?.source;
@@ -665,6 +748,15 @@ export default function MembersClient({
               return (
                 <AdminListRow
                   key={member.id}
+                  leading={
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-5 accent-primary"
+                      aria-label={`Select ${displayName}`}
+                      checked={selected.has(member.id)}
+                      onChange={() => toggleSelected(member.id)}
+                    />
+                  }
                   title={<span className="break-all">{displayName}</span>}
                   meta={
                     member.name && hasEmail(member) ? (
@@ -695,84 +787,76 @@ export default function MembersClient({
                   }
                   actions={
                     <>
-                      {state === "no_consent" || state === "opted_out" ? (
-                        <Button
-                          size="row"
-                          variant="outline"
-                          loading={busy}
-                          onClick={() => update(member, { emailConsent: { source: "admin_on_request" } }, "Consent recorded")}
-                        >
-                          <Mail aria-hidden="true" />
-                          {state === "opted_out" ? "They asked to be added back" : "Record consent"}
-                        </Button>
-                      ) : null}
-                      {state === "ready" ? (
-                        <Button size="row" variant="outline" loading={busy} title="Record that they asked to stop getting email" onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
-                          <ShieldOff aria-hidden="true" />
-                          They asked to stop
-                        </Button>
-                      ) : null}
-                      {member.hasPhone && (callState === "no_consent" || callState === "opted_out") ? (
-                        <Button
-                          size="row"
-                          variant="outline"
-                          loading={busy}
-                          onClick={() => update(member, { phoneConsent: { source: "admin_on_request" } }, "Call consent recorded")}
-                        >
-                          <PhoneCall aria-hidden="true" />
-                          {callState === "opted_out" ? "They asked to be called again" : "Record call consent"}
-                        </Button>
-                      ) : null}
-                      {callState === "ready" ? (
-                        <Button size="row" variant="outline" loading={busy} title="Record that they asked not to be called" onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
-                          <PhoneOff aria-hidden="true" />
-                          They asked not to be called
-                        </Button>
-                      ) : null}
-                      {phonesReady ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`} title="Phone numbers, language, household and family">
-                          <Phone aria-hidden="true" />
-                          {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
-                        </Button>
-                      ) : null}
                       <Button asChild size="row" variant="outline">
                         <Link href={`/admin/members/${member.id}` as Route} aria-label={`Profile of ${displayName}`} title="Open the profile: membership, family, notes and calls">
                           <UserRound aria-hidden="true" />
                           Profile
                         </Link>
                       </Button>
-                      {superAdmin ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => setRenaming(member)} aria-label={`Edit name of ${displayName}`} title="Fix a typo in the name (super admin)">
-                          <Pencil aria-hidden="true" />
-                          Edit name
-                        </Button>
-                      ) : null}
-                      {groups.length > 0 ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => setGroupsFor(member)} aria-label={`Groups for ${displayName}`} title="Choose the groups they belong to">
-                          <Users aria-hidden="true" />
-                          Groups
-                        </Button>
-                      ) : null}
-                      {/* Set apart at the row end: a divider before it, ghost red, and a confirmation. */}
-                      <span aria-hidden="true" className="hidden h-6 w-px bg-border sm:block" />
-                      {member.status === "active" ? (
-                        <Button
-                          size="row"
-                          variant="ghost"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          loading={busy}
-                          title="Turn this member off (asks first)"
-                          onClick={() => setDisabling(member)}
-                        >
-                          <UserX aria-hidden="true" />
-                          Turn off…
-                        </Button>
-                      ) : (
-                        <Button size="row" variant="ghost" loading={busy} title="Turn this member back on" onClick={() => update(member, { status: "active" }, "Member turned on")}>
-                          <UserCheck aria-hidden="true" />
-                          Turn on
-                        </Button>
-                      )}
+                      {/* Everything else for this member sits in one menu, so a row stays two controls wide on a phone (plan §28, D76). */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="row" variant="outline" loading={busy} aria-label={`More actions for ${displayName}`} title="More actions">
+                            <MoreHorizontal aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          {state === "no_consent" || state === "opted_out" ? (
+                            <DropdownMenuItem onSelect={() => void update(member, { emailConsent: { source: "admin_on_request" } }, "Consent recorded")}>
+                              <Mail aria-hidden="true" />
+                              {state === "opted_out" ? "They asked to be added back" : "Record consent"}
+                            </DropdownMenuItem>
+                          ) : null}
+                          {state === "ready" ? (
+                            <DropdownMenuItem onSelect={() => void update(member, { emailOptOut: true }, "Opt-out recorded")}>
+                              <ShieldOff aria-hidden="true" />
+                              They asked to stop
+                            </DropdownMenuItem>
+                          ) : null}
+                          {member.hasPhone && (callState === "no_consent" || callState === "opted_out") ? (
+                            <DropdownMenuItem onSelect={() => void update(member, { phoneConsent: { source: "admin_on_request" } }, "Call consent recorded")}>
+                              <PhoneCall aria-hidden="true" />
+                              {callState === "opted_out" ? "They asked to be called again" : "Record call consent"}
+                            </DropdownMenuItem>
+                          ) : null}
+                          {callState === "ready" ? (
+                            <DropdownMenuItem onSelect={() => void update(member, { callOptOut: true }, "Call opt-out recorded")}>
+                              <PhoneOff aria-hidden="true" />
+                              They asked not to be called
+                            </DropdownMenuItem>
+                          ) : null}
+                          {phonesReady ? (
+                            <DropdownMenuItem onSelect={() => setEditing(member)}>
+                              <Phone aria-hidden="true" />
+                              {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
+                            </DropdownMenuItem>
+                          ) : null}
+                          {superAdmin ? (
+                            <DropdownMenuItem onSelect={() => setRenaming(member)}>
+                              <Pencil aria-hidden="true" />
+                              Edit name
+                            </DropdownMenuItem>
+                          ) : null}
+                          {groups.length > 0 ? (
+                            <DropdownMenuItem onSelect={() => setGroupsFor(member)}>
+                              <Users aria-hidden="true" />
+                              Groups
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuSeparator />
+                          {member.status === "active" ? (
+                            <DropdownMenuItem destructive onSelect={() => setDisabling(member)}>
+                              <UserX aria-hidden="true" />
+                              Turn off…
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onSelect={() => void update(member, { status: "active" }, "Member turned on")}>
+                              <UserCheck aria-hidden="true" />
+                              Turn on
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </>
                   }
                 >
@@ -783,7 +867,30 @@ export default function MembersClient({
               );
             })}
           </AdminList>
+          </>
         )}
+        {visible.length > shown.length ? (
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button variant="outline" onClick={() => setPaging({ key: pageKey, count: shownCount + PAGE })}>
+              Show {Math.min(PAGE, visible.length - shown.length)} more
+            </Button>
+            <p className="text-sm text-muted-foreground" role="status">
+              Showing {shown.length} of {visible.length}
+            </p>
+          </div>
+        ) : null}
+        {selectedIds.length > 0 ? (
+          <BulkActionBar
+            count={selectedIds.length}
+            hasGroups={groups.length > 0}
+            busy={bulkBusy}
+            onAddToGroup={() => setBulkGroup("add")}
+            onRemoveFromGroup={() => setBulkGroup("remove")}
+            onTurnOff={() => setBulkTurningOff(true)}
+            onTurnOn={() => void bulkStatus("active")}
+            onClear={() => setSelected(new Set())}
+          />
+        ) : null}
       </AdminSectionCard>
 
       {exporting ? (
@@ -811,6 +918,20 @@ export default function MembersClient({
           }}
         />
       ) : null}
+
+      {bulkGroup ? (
+        <BulkGroupDialog mode={bulkGroup} groups={groups} count={selectedIds.length} busy={bulkBusy} onClose={() => setBulkGroup(null)} onSave={groupId => bulkGroupChange(bulkGroup, groupId)} />
+      ) : null}
+      <ConfirmDialog
+        open={bulkTurningOff}
+        onOpenChange={setBulkTurningOff}
+        title={`Turn off ${selectedIds.length} member${selectedIds.length === 1 ? "" : "s"}?`}
+        description="They get no emails or calls from the site until someone turns them on again. Nothing else about them changes."
+        confirmLabel={`Turn off ${selectedIds.length}`}
+        destructive
+        busy={bulkBusy}
+        onConfirm={() => bulkStatus("disabled")}
+      />
 
       {groupsFor ? (
         <MemberGroupsDialog

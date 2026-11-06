@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "./helpers";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, memberAction } from "./helpers";
 
 const members = () => admin().db.collection("organizations/ghmo/members");
 /**
@@ -38,17 +38,17 @@ test("an admin can record consent, an opt-out, and disable a member", async ({ p
   await page.getByLabel("Email", { exact: true }).fill("sam@example.org");
   await page.getByRole("button", { name: "Add member" }).click();
 
-  await page.getByRole("button", { name: "Record consent" }).click();
+  await memberAction(page, "sam@example.org", "Record consent");
   await expect(shown(page, "Asked to be added")).toBeVisible();
-  await page.getByRole("button", { name: "They asked to stop" }).click();
+  await memberAction(page, "sam@example.org", "They asked to stop");
   await expect(shown(page, "Opted out").first()).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeTruthy();
 
-  await page.getByRole("button", { name: "They asked to be added back" }).click();
+  await memberAction(page, "sam@example.org", "They asked to be added back");
   await expect(shown(page, "Can be emailed").first()).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeNull();
 
-  await page.getByRole("button", { name: "Turn off…", exact: true }).click();
+  await memberAction(page, "sam@example.org", "Turn off…");
   await page.getByRole("dialog").getByRole("button", { name: "Turn off", exact: true }).click();
   await expect(shown(page, "Turned off").first()).toBeVisible();
 });
@@ -91,4 +91,98 @@ test("the import API refuses a request without the attestation", async ({ page }
   });
   expect(status).toBe(400);
   expect((await members().get()).size).toBe(0);
+});
+
+test("each row shows Profile and a More menu with only what applies, and the list shows 50 at a time", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const batch = admin().db.batch();
+  for (let i = 1; i <= 120; i += 1) {
+    const n = String(i).padStart(3, "0");
+    batch.set(members().doc(`p${n}`), { name: `Person ${n}`, email: `p${n}@example.org`, emailLower: `p${n}@example.org`, status: "active", roles: ["member"], ...(i === 1 ? { emailConsent: { source: "signed_up", at: new Date() } } : {}) });
+  }
+  await batch.commit();
+
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signInWithNewPasskey(page, "alice", "/admin/members");
+  const list = page.getByRole("list", { name: "Members" });
+  await expect(list.getByRole("listitem")).toHaveCount(50);
+  await expect(page.getByText("Showing 50 of 120")).toBeVisible();
+
+  // On a phone, a row has just two controls.
+  const first = list.getByRole("listitem").filter({ hasText: "Person 001" });
+  await expect(first.getByRole("link")).toHaveCount(1);
+  await expect(first.getByRole("button")).toHaveCount(1);
+
+  // Person 001 can be emailed, so the menu offers the opt-out and not consent; Turn off… is last.
+  await page.getByRole("button", { name: "More actions for Person 001", exact: true }).click();
+  const items = page.getByRole("menuitem");
+  await expect(items.filter({ hasText: "They asked to stop" })).toHaveCount(1);
+  await expect(items.filter({ hasText: "Record consent" })).toHaveCount(0);
+  await expect(items.last()).toHaveText(/Turn off…/);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Show 50 more" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(100);
+  await page.getByRole("button", { name: "Show 20 more" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(120);
+  await expect(page.getByRole("button", { name: /^Show \d+ more$/ })).toHaveCount(0);
+
+  // A search starts again from the top of its own matches.
+  await page.getByLabel("Search members").fill("Person 11");
+  await expect(list.getByRole("listitem")).toHaveCount(10);
+  await context.close();
+});
+
+test("several members at once: add to a group, remove from it, turn off and on; consent is never offered in bulk", async ({ page }) => {
+  test.setTimeout(120_000);
+  const db = admin().db;
+  for (const [id, name] of [["a1", "Anil"], ["b1", "Bimala"], ["c1", "Chandra"], ["d1", "Dipa"]]) {
+    await members().doc(id).set({ name, email: `${id}@example.org`, emailLower: `${id}@example.org`, status: "active", roles: ["member"], groupIds: [] });
+  }
+  await db.doc("organizations/ghmo/groups/cook").set({ name: "Cooking team", description: "", leadMemberId: null, kind: null, active: true, builtIn: false, createdAt: new Date() });
+  await signInWithNewPasskey(page, "alice", "/admin/members");
+  const bar = page.getByRole("region", { name: "Selected members" });
+  await expect(bar).toHaveCount(0);
+
+  for (const name of ["Anil", "Bimala", "Chandra"]) await page.getByRole("checkbox", { name: `Select ${name}` }).check();
+  await expect(bar.getByRole("status")).toHaveText("3 members selected");
+  await expect(bar.getByRole("button", { name: /consent/i })).toHaveCount(0);
+
+  // Add three to the cooking team: one request, one activity entry.
+  await bar.getByRole("button", { name: "Add to group…" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Group").selectOption({ label: "Cooking team" });
+  await dialog.getByRole("button", { name: "Add to group" }).click();
+  await expect(page.getByText("3 added to Cooking team")).toBeVisible();
+  await expect(bar).toHaveCount(0);
+  for (const id of ["a1", "b1", "c1"]) expect((await members().doc(id).get()).get("groupIds")).toEqual(["cook"]);
+
+  // Take two out again; one of the two isn't in it.
+  await page.getByRole("checkbox", { name: "Select Anil" }).check();
+  await page.getByRole("checkbox", { name: "Select Dipa" }).check();
+  await bar.getByRole("button", { name: "Remove from group…" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Group").selectOption({ label: "Cooking team" });
+  await dialog.getByRole("button", { name: "Remove from group" }).click();
+  await expect(page.getByText("1 removed from Cooking team; 1 already not in it")).toBeVisible();
+  expect((await members().doc("a1").get()).get("groupIds")).toEqual([]);
+
+  // Turn two off (asks first, naming the count), then on again.
+  await page.getByRole("checkbox", { name: "Select Bimala" }).check();
+  await page.getByRole("checkbox", { name: "Select Chandra" }).check();
+  await bar.getByRole("button", { name: "Turn off…" }).click();
+  dialog = page.getByRole("dialog", { name: "Turn off 2 members?" });
+  await dialog.getByRole("button", { name: "Turn off 2" }).click();
+  await expect(page.getByText("2 turned off")).toBeVisible();
+  for (const id of ["b1", "c1"]) expect((await members().doc(id).get()).get("status")).toBe("disabled");
+  await page.getByRole("checkbox", { name: "Select all shown" }).check();
+  await bar.getByRole("button", { name: "Turn on" }).click();
+  await expect(page.getByText(/^2 turned on; 2 already on$/)).toBeVisible();
+
+  const actions = (await db.collection("organizations/ghmo/auditLogs").get()).docs.map(d => d.get("action"));
+  expect(actions.filter(a => a === "members_status_bulk")).toHaveLength(2);
+  expect(actions.filter(a => a === "group_members_changed")).toHaveLength(2);
+  // The server caps a bulk change and refuses an empty one.
+  expect((await page.request.post("/api/organizations/ghmo/members/bulk-status", { data: { ids: [], status: "disabled" } })).status()).toBe(400);
 });

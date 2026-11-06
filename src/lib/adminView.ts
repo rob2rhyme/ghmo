@@ -86,6 +86,7 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   event_deleted: { verb: "deleted an event", detail: true },
   member_created: { verb: "added a member" },
   member_updated: { verb: "updated a member" },
+  members_status_bulk: { verb: "changed several members at once", detail: true },
   member_email_changed: { verb: "changed a member's email" },
   member_note_added: { verb: "added a note to a member profile", detail: true },
   member_note_deleted: { verb: "deleted a note from a member profile", detail: true },
