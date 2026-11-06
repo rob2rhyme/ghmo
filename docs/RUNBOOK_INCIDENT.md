@@ -116,6 +116,19 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 4. **If many complain or the provider warns:** follow case I (spam complaints), and switch sending off with `FEATURE_BROADCASTS=false`, which also stops reminders.
 5. **The daily digest emailed people it should not have:** under **Admin → Events**, press **Switch off** on the Daily overdue digest card (any super admin), then fix the tasks and who they are given to. Removing `CRON_SECRET` in Vercel also stops the schedule from calling the site at all.
 
+## O. A member asks what is held about them, or asks to have it removed
+
+This is for a person's profile (plan §17). It is not legal advice: if you are unsure what you must share or delete, ask the board or the attorney first.
+
+1. **Check who is asking.** Call them back on a number you already have, or ask in person. A super admin handles the request.
+2. **What is held.** Open **Admin → Members → Profile** for them. The page shows the member since date, city and state; the family list; every note (with who wrote it and when); and the calls made to them with their outcomes and any ratings. Also held, but not on the profile: their name, email and consent records on the member record, and activity-log entries that name what changed. Phone numbers, family, notes and ratings are encrypted and readable only on an admin's unlocked device. Notes are other admins' words about them, so decide with the board what to share, and share the facts held rather than other admins' opinions unless you are required to.
+3. **If they only want contact to stop:** press **They asked to stop** (email) and **They asked not to be called** (calls), or **Disable** them. This is case M for numbers.
+4. **If they want the information removed, in the app (super admin):** clear **Member since**, **City** and **State** on the profile; **Remove** each family member; **Edit contact** and clear every field (case M); **Delete** each note; **Clear rating** on each rated call; then **Disable** the member.
+5. **What stays after step 4, and why:** the member record itself (name, email and the consent history, which proves they were asked), the call history rows (when a call was made and its outcome, with the member's id), and activity-log entries. The app has no button to delete a member.
+6. **If they require full deletion and the board agrees:** a super admin with Firebase console access deletes that member's document under `organizations/ghmo/members` **together with its `notes` collection**. Leave the call records alone: they hold only the member's id, so once the member document is gone they cannot be tied to a person, and deleting them would make a campaign's stored counts disagree with its rows. If they were a group's lead, choose another lead first. Then open **Calling tree** and save, which drops their assignment.
+7. **Record it.** Because a console deletion is not in the activity log, write a line in Plans & Issues (the date, who asked, what was removed, who did it). Backups and exports made earlier still hold the old data, as ciphertext for everything encrypted, until they expire; delete old backups you no longer need.
+8. **Tell them what was done**, and what could not be removed and why. Aim to answer within 30 days.
+
 ## After any incident
 
 - Write down what happened, what you did and what you'll change. Keep it with this runbook.

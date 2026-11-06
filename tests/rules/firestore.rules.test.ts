@@ -291,6 +291,25 @@ describe("event tasks, templates, reminder records and the digest switch (plan �
   });
 });
 
+describe("push notification devices (plan §18)", () => {
+  const path = `${ORG}/pushSubscriptions/d1`;
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), path), { uid: "active-admin", endpoint: "https://fcm.googleapis.com/fcm/send/x", p256dh: "k", auth: "a", kinds: ["chat"] });
+    });
+  });
+
+  it("is closed to everyone from a browser, including an admin reading their own device", async () => {
+    const disabled = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
+    for (const db of [admin(), disabled, env.authenticatedContext("someone").firestore(), env.unauthenticatedContext().firestore()]) {
+      await assertFails(getDoc(doc(db, path)));
+      await assertFails(setDoc(doc(db, `${ORG}/pushSubscriptions/d2`), { uid: "active-admin", endpoint: "https://evil.example.com/x" }));
+      await assertFails(setDoc(doc(db, path), { kinds: [] }, { merge: true }));
+    }
+  });
+});
+
 describe("notes on a member's profile (plan §17, 13-B)", () => {
   const path = `${ORG}/members/m1/notes/n1`;
 

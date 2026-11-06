@@ -9,6 +9,8 @@
  *  - When a page can't load because the device is offline, a static offline page is shown instead.
  *  - Navigation preload is on: the browser starts the page request while the worker is still starting, so a
  *    return visit doesn't wait for the worker before the network. The preloaded answer is used as-is.
+ *  - Push notifications (plan §18) are shown and tapped here. A push carries only a title, one fixed line, a tag and a
+ *    path on this site; nothing from the community is in it, and a tap can only open a page of this site.
  * Bump VERSION when this file's caching rules change; old caches are deleted on activate.
  */
 const VERSION = "v2";
@@ -100,4 +102,70 @@ self.addEventListener("fetch", event => {
     );
   }
   // Everything else (API calls, Firebase, third-party) goes straight to the network untouched.
+});
+
+/** Push: show a content-free notification. A push that can't be read still shows a plain one (browsers require it). */
+const NOTIFICATION_ICON = "/icons/icon-192.png";
+
+function readPush(event) {
+  try {
+    const data = event.data ? event.data.json() : null;
+    if (data && typeof data === "object") {
+      const text = (value, fallback, max) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback);
+      return {
+        title: text(data.title, "GHMO", 80),
+        body: text(data.body, "There is something new in the admin area.", 160),
+        tag: text(data.tag, "ghmo", 64),
+        url: typeof data.url === "string" && data.url.startsWith("/") && !data.url.startsWith("//") ? data.url.slice(0, 200) : "/admin"
+      };
+    }
+  } catch {
+    // fall through to the plain notification
+  }
+  return { title: "GHMO", body: "There is something new in the admin area.", tag: "ghmo", url: "/admin" };
+}
+
+self.addEventListener("push", event => {
+  const note = readPush(event);
+  event.waitUntil(
+    self.registration.showNotification(note.title, {
+      body: note.body,
+      tag: note.tag,
+      // A newer push of the same kind replaces the older one in the tray and still alerts once.
+      renotify: true,
+      icon: NOTIFICATION_ICON,
+      badge: NOTIFICATION_ICON,
+      data: { url: note.url }
+    })
+  );
+});
+
+/** Tap: focus a window of this site and open the page, or open a new one. Only paths on this origin are ever opened. */
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const raw = event.notification.data && typeof event.notification.data.url === "string" ? event.notification.data.url : "/admin";
+  let target = new URL("/admin", self.location.origin);
+  try {
+    const candidate = new URL(raw, self.location.origin);
+    if (candidate.origin === self.location.origin) target = candidate;
+  } catch {
+    // keep /admin
+  }
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async windows => {
+      const open = windows.find(client => new URL(client.url).origin === self.location.origin);
+      if (open) {
+        await open.focus();
+        if ("navigate" in open) {
+          try {
+            await open.navigate(target.href);
+          } catch {
+            // the page stays where it was
+          }
+        }
+        return;
+      }
+      await self.clients.openWindow(target.href);
+    })
+  );
 });

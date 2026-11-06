@@ -19,6 +19,9 @@ const COPY: Record<NotificationKind, { subject: string; line: string; path: stri
   }
 };
 
+/** The fixed wording and page for a kind, shared by the email and the push notification. */
+export const notificationCopy = (kind: NotificationKind) => COPY[kind];
+
 export function notificationMessage(kind: NotificationKind, origin: string) {
   const copy = COPY[kind];
   return {

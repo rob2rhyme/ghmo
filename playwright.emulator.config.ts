@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
+import webpush from "web-push";
 
 // Full sign-in flows against the Firebase emulators. Run with `npm run test:e2e:auth`
 // (wraps this in `firebase emulators:exec` and builds the app with emulator settings first).
@@ -10,6 +11,11 @@ const { privateKey } = crypto.generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
   publicKeyEncoding: { type: "spki", format: "pem" }
 });
+
+// Push notifications (plan §18): a fresh VAPID pair for every run, shared with the test workers the same way. The push
+// tests start a local HTTPS stub that stands in for a browser's push service; this flag lets the server call it (it is
+// honoured only in this emulator build, never on a production deployment).
+const vapid = process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY ? { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY } : webpush.generateVAPIDKeys();
 
 export const EMULATOR_ENV = {
   FIREBASE_ADMIN_PROJECT_ID: "demo-ghmo",
@@ -38,6 +44,10 @@ export const EMULATOR_ENV = {
   // The daily digest's schedule calls /api/cron/task-digest with this secret. A fresh throwaway value every run
   // (the test workers reuse what the first load put in the environment), so no secret-looking text is committed.
   CRON_SECRET: process.env.CRON_SECRET || crypto.randomBytes(24).toString("hex"),
+  VAPID_PUBLIC_KEY: vapid.publicKey,
+  VAPID_PRIVATE_KEY: vapid.privateKey,
+  VAPID_SUBJECT: "mailto:admin@example.org",
+  PUSH_TEST_ALLOW_INSECURE: "true",
   BROADCAST_CHUNK_SIZE: "2",
   BROADCAST_POSTAL_ADDRESS: "1 Main Street, Springfield",
   RESEND_WEBHOOK_SECRET: "whsec_" + Buffer.from("test-webhook-secret-bytes").toString("base64")
