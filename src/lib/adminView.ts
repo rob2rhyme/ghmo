@@ -159,7 +159,7 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   e2ee_roster_sealed: { verb: "sealed the device list" },
   e2ee_record_migrated: { verb: "encrypted existing records", detail: true },
   comms_seed_created: { verb: "added sample topics to Plans & Issues" },
-  // Legacy timeline routes (no page calls them any more; kept until the board decides).
+  // The timeline routes, the sample-topic seed and the home-blocks route were removed (2026-11-06); these keep older log entries readable.
   edit_timeline: { verb: "edited a timeline entry", detail: true },
   timeline_update: { verb: "updated the timeline", detail: true }
 };

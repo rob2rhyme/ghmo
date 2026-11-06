@@ -19,7 +19,7 @@ The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_
 
 ## Meeting Minutes
 - Meeting Minutes are the official governance record; the legacy Timeline feature is deprecated and has no page.
-- The Timeline API routes (`/api/admin/timeline`, `/api/admin/organizations/[orgSlug]/timeline/[entryId]`, `/api/organizations/[orgSlug]/gumba/timeline`) are legacy, have no caller in the UI, and are kept for now.
+- The Timeline API routes, the sample-topic seed route and the home-blocks route were removed on 2026-11-06 (they had no caller); older activity entries from them still read correctly.
 - Documents live at `organizations/{orgSlug}/minutes`, one per past event (the API enforces uniqueness) and surface on public event pages once approved while admins can still view drafts and submissions.
 - Each record stores structured agenda items, discussion summary, decisions, action items, and attendance split into present/absent/guest lists, giving the Admin dashboard/public view a consistent, searchable format.
 - Minutes export as Letter-size PDFs on the GHMO letterhead so the preview and the final file are identical.
@@ -97,9 +97,8 @@ The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_
   - `members/{memberId}`: `emailLower` (`""` for a member who doesn't use email; such a member has a `name` and an encrypted phone number, and is called but never emailed), optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
     Email consent (Phase 8): optional `emailConsent` {`at`, `source` (`admin_on_request` / `signed_up` / `imported`), `byUid`}, `emailOptOutAt`, `emailBounced`. Only members who are active, have a recorded consent and have not opted out or bounced can be emailed. Members are written only by the server (`/api/organizations/ghmo/members`, `/members/[id]`, `/members/import`); Firestore rules let admins read the list but never write it.
     Phone and call contact (Phase 9-A, plan §12): `contact` is one end-to-end encrypted envelope (phone, second phone, language, household, notes) made in the admin's browser and bound to the member id, so the server never sees a number; beside it `hasPhone`, `phoneConsent` {`at`, `source`, `byUid`} and `callOptOutAt` are plaintext flags for filtering. Numbers can only be stored once encryption is on and are shown masked until tapped.
-  - `home/blocks`: `{ blocks[] }`. Anyone can read; admins write.
   - `minutes/{id}`: structured meeting minutes tied to published events, with a `versions/{n}` subcollection (one immutable copy per approval). Admin-read; written only through `/api/admin/minutes`.
-  - `docgen/{templateId}` (Document Generator templates).
+  - `docgen/{templateId}` (Document Generator templates). Read only by the server; closed to browsers.
   - Seed templates by writing documents under `organizations/{orgSlug}/docgen` (e.g., `{ name: "Default Letter", letterhead: {...}, fields: ["Recipient", "Body"] }`) so the admin UI has options.
   - `documents/{id}`: saved generated documents (Document Gallery); encrypted once encryption is on. Server-only.
   - `donations/stats` + `donations/webhookEvents/events/{eventId}`. Admin-only.
@@ -111,7 +110,6 @@ The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_
   - `e2ee/**`: public keys, wrapped keys and the signed device list (see End-to-End Encryption). Server-only.
   - `broadcasts/{id}` with `deliveries/{memberId}`: member emails and per-member delivery rows. Admin-read, server-written. `broadcastQuota/{day}`: emails sent per UTC day (shared by broadcasts, task reminders and the digest). Server-only.
   - `actionItemStatus/{key}`: private status and note for each action item from approved minutes (key = minutes id + task hash). Admins read and write; encrypted once encryption is on.
-  - `timeline/**` (admin read/write) and `gumba/**` (members and admins read, admins write): legacy, kept for now.
   - `callingTree/current` (`callers[]`, `version`, `updatedAt`, `updatedBy`) and `callingTree/current/assignments/{memberId}` (`callerUid`, `assignedAt`, `assignedBy`): the calling tree (plan §12), server-only; no client may read or write it.
   - `callCampaigns/{id}` and `callCampaigns/{id}/calls/{memberId}`: call campaigns (plan §12): title, event, encrypted script, counts; per member the caller, outcome, RSVP and append-only attempts with encrypted notes. Server-only.
   - `positions/{id}` and `positionTerms/{id}`: officer positions (title, Nepali title, order, active, several-holders flag) and who held each from which date to which (`startsOn`, `endsOn` or null). `groups/{id}`: name, description, `leadMemberId`, `kind` (`callers` for the phone tree group). Group membership is `members/{id}.groupIds[]`. All plaintext, admin-read, server-written (plan §15).
