@@ -46,6 +46,8 @@ describe("admin access requires an active admin record", () => {
 
   it("keeps minutes server-written: admins can read them but not write them directly", async () => {
     await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m1`), { title: "Tampered" }));
+    // Phase 19: moving minutes to another meeting goes through the server, which checks status and duplicates.
+    await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m1`), { eventId: "other", eventTitle: "Other" }, { merge: true }));
     await assertFails(setDoc(doc(admin(), `${ORG}/minutes/m2`), { title: "New" }));
   });
 

@@ -35,6 +35,7 @@ import { hashContent } from "@/src/lib/minutesContent";
 import { useEncryptedDraft } from "@/src/lib/e2ee/client/useEncryptedDraft";
 import { DraftBanner } from "@/src/components/admin/encryption/DraftBanner";
 import { useUnpackedMinutes } from "./useUnpackedMinutes";
+import { ChangeMeetingDialog, MeetingSelect, RecordMeetingDialog } from "./MeetingPicker";
 
 type AdminActor = {
   uid: string;
@@ -119,6 +120,8 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
     value: formState,
     hasContent: hasText && JSON.stringify(formState) !== baseline
   });
+  const [recordingMeeting, setRecordingMeeting] = useState(false);
+  const [changingMeeting, setChangingMeeting] = useState(false);
   const [attendanceExpanded, setAttendanceExpanded] = useState(false);
   const [signaturesExpanded, setSignaturesExpanded] = useState(false);
   const [previewZoomMode, setPreviewZoomMode] = useState<PreviewZoomMode>("fit");
@@ -442,6 +445,19 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       .sort((a, b) => b.startsAtMs - a.startsAtMs);
   }, [events]);
 
+  // Meetings that already have minutes (other than the ones open here) can't be picked again (plan §26, D66).
+  const takenIds = useMemo(() => new Set(minutesEntries.filter(entry => entry.id !== editingId).map(entry => entry.eventId)), [minutesEntries, editingId]);
+
+  // A brand-new site has no past meetings: "Write minutes" opens the form to record one straight away (D69).
+  const [firstMeetingDismissed, setFirstMeetingDismissed] = useState(false);
+  const offerFirstMeeting =
+    !firstMeetingDismissed && !eventsLoading && !eventsError && !editingId && pastEvents.length === 0 && searchParams.get("mode") === "new" && !searchParams.get("minutesId");
+  const showRecordMeeting = recordingMeeting || offerFirstMeeting;
+  const closeRecordMeeting = () => {
+    setRecordingMeeting(false);
+    setFirstMeetingDismissed(true);
+  };
+
   const selectedEvent = useMemo(
     () => pastEvents.find(evt => evt.id === formState.eventId) ?? null,
     [pastEvents, formState.eventId]
@@ -590,9 +606,9 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                     "Loading past meetings…"
                   ) : eventsError ? undefined : pastEvents.length === 0 ? (
                     <>
-                      Minutes are added after a meeting has happened. No past meetings yet:{" "}
+                      No past meetings yet. Record the meeting below, or add it on{" "}
                       <Link href="/admin/events" className="font-medium text-primary underline-offset-4 hover:underline">
-                        open Events
+                        Events
                       </Link>
                       .
                     </>
@@ -600,19 +616,60 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
                 }
                 error={eventsError ?? undefined}
               >
-                <Select
+                <MeetingSelect
+                  meetings={pastEvents}
                   value={formState.eventId}
-                  onChange={e => setFormState(prev => ({ ...prev, eventId: e.target.value }))}
+                  onChange={eventId => setFormState(prev => ({ ...prev, eventId }))}
+                  takenIds={takenIds}
                   disabled={Boolean(editingId)}
-                >
-                  <option value="">Choose a past meeting</option>
-                  {pastEvents.map(evt => (
-                    <option key={evt.id} value={evt.id}>
-                      {evt.title || "Untitled event"} · {formatDateTime(evt.startsAtMs)}
-                    </option>
-                  ))}
-                </Select>
+                />
               </Field>
+              <div className="flex flex-wrap gap-2">
+                {!editingId ? (
+                  <Button type="button" variant="outline" size="row" onClick={() => setRecordingMeeting(true)} disabled={eventsLoading}>
+                    Record a meeting that isn&apos;t listed
+                  </Button>
+                ) : editingStatus === "draft" ? (
+                  <Button type="button" variant="outline" size="row" onClick={() => setChangingMeeting(true)}>
+                    Change meeting…
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">To move these minutes to another meeting, return them to draft first.</p>
+                )}
+              </div>
+              {showRecordMeeting ? (
+                <RecordMeetingDialog
+                  meetings={pastEvents}
+                  takenIds={takenIds}
+                  onClose={closeRecordMeeting}
+                  onUseExisting={eventId => {
+                    setFormState(prev => ({ ...prev, eventId }));
+                    closeRecordMeeting();
+                  }}
+                  onCreated={meeting => {
+                    setEvents(prev => [...prev, { id: meeting.id, title: meeting.title, startsAt: meeting.startsAtMs, timezone: meeting.timezone, location: meeting.location }]);
+                    setFormState(prev => ({ ...prev, eventId: meeting.id }));
+                    closeRecordMeeting();
+                  }}
+                />
+              ) : null}
+              {changingMeeting && editingId ? (
+                <ChangeMeetingDialog
+                  minutesId={editingId}
+                  currentEventId={formState.eventId}
+                  meetings={pastEvents}
+                  takenIds={takenIds}
+                  onClose={() => setChangingMeeting(false)}
+                  onMoved={async raw => {
+                    const updated = await unpackMinutes(unpackPrivate, raw as Parameters<typeof unpackMinutes>[1]);
+                    setSavedEntries(prev => [updated, ...prev.filter(entry => entry.id !== updated.id)]);
+                    // Only the meeting changed on the server: keep any unsaved edits in the form.
+                    setFormState(prev => ({ ...prev, eventId: updated.eventId }));
+                    setBaseline(previous => JSON.stringify({ ...JSON.parse(previous), eventId: updated.eventId }));
+                    setChangingMeeting(false);
+                  }}
+                />
+              ) : null}
               {displayEventTitle ? (
                 <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
                   <p className="font-semibold text-foreground">{displayEventTitle}</p>

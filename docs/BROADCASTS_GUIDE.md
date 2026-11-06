@@ -149,6 +149,7 @@ Press **Export list** above the list. Choose everyone, or only the people the se
 - **Every download is recorded** in the activity log (who, when, how many people, with numbers or not; never their details).
 - **Importing it again:** the first columns are `Name`, `Email` and `Phone`, so the file can go back through Import a list. Names that start with `=`, `+`, `-` or `@` get a leading apostrophe so a spreadsheet shows them as text instead of running them.
 
+
 ## 1j. Push notifications on your phone or computer (Admin → Security)
 
 A push notification is a short alert that pops up on your phone or computer when something needs you, even when the site is not open. It says only that something happened, such as "New activity in Admin chat" or "A broadcast is waiting for approval". It never shows a name, a message or a title, and tapping it opens the right page after you sign in.
@@ -197,6 +198,13 @@ The **Admins** page lists everyone who can sign in to the admin area: super admi
 - **Edit name:** for a typo. An email address can't be changed, because a wrong one would lock the person out or let someone else in: add the right address as a new admin and turn the wrong one off.
 - **What the page will not let you do:** turn yourself off or change your own role (ask another super admin), or turn off or demote the last active super admin (make someone else a super admin first). These checks are made on the server, even if two super admins act at the same moment.
 - Every change is written to the activity log, with the admin's name and what changed, never their email.
+
+## 1l. Minutes for a meeting (Admin → Meeting minutes → Write minutes)
+
+Minutes belong to a meeting that has already happened. (Added 2026-11-06, plan §26.)
+- **Pick the meeting** under **Which meeting?**. The list shows past meetings, newest first, with a search box once it is long. A meeting that already has minutes shows "has minutes" and can't be picked; open those minutes from **Records** instead.
+- **A meeting that isn't listed** (a board call, a meeting nobody added beforehand): press **Record a meeting that isn't listed**, give a title, the date and start time (today or earlier) and, if you like, the place, then **Record meeting**. It is saved as a **draft** event, so it never appears on the public Events page, and it is picked for you. If there is already a meeting on that day, the form shows it first: press **Use this meeting** instead of making a second one. On a brand-new site with no past meetings, **Write minutes** opens this form straight away.
+- **Wrong meeting?** While the minutes are a **draft**, open them and press **Change meeting…**, pick the right one and **Move minutes**. The title and date change; what you wrote stays. Submitted or approved minutes must be returned to draft first. The activity log records the move with both meeting titles. A meeting recorded here that no longer has minutes stays as a draft under **Events**, where you can delete it.
 
 ## 2. Write it (Admin → Broadcasts)
 
