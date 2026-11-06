@@ -75,7 +75,9 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 ## 1e. Officers and groups (Admin → Positions, Admin → Groups)
 
 **Positions** lists the president, treasurer, secretary, board members and the rest, with who holds each one and since when. Anyone on the board can look. Only a super admin changes it.
-- **Set holder** picks a member and the day the term starts. If someone holds a single seat, leave "End … the day before" ticked and their term closes for you.
+- **Set holder** picks a member and the day the term starts. If someone holds a single seat, choose "End … the day before" and their term closes for you, or "Keep … and add this person too" to let the seat have several people.
+- **Someone who isn't a member yet:** choose **Someone not on the member list yet…** and give their name and an email (or, on an unlocked device, a phone number). They are added to Members and seated in one step.
+- **A member's relative** (for example a husband listed in a member's family): on an unlocked device the list also shows **Family of members**, such as "Ram Rai (husband of Asha Rai)". Picking one fills in their name and number from the family list; check them, add an email if you have one, and save. They become a member (their number stays encrypted) with **no** email or call consent recorded, because a family list is not their consent. Relatives who are already members show under their own name instead. (Added 2026-11-06, plan §28.8.)
 - **End term…** stops a term after today. It moves to **Past terms** once the end date has passed, so the history stays.
 - **Delete…** (in Past terms) is only for a term entered by mistake. To record that someone left, end the term instead.
 - **Add a position** or **Edit** changes the list itself, for example a "Kitchen coordinator" seat. Untick "In use" to hide a position without losing its history.

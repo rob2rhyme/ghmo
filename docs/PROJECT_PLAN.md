@@ -220,7 +220,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
-| **21** | Members list on phones, and changing many at once | **Planned 2026-11-06 (§28).** Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
+| **21** | Members list on phones, and changing many at once | **Built 2026-11-06 (21-A, 21-B, 21-C; §28.6 to §28.8).** Also: Set holder offers members' relatives (21-C). Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1761,7 +1761,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Browser spec (`admin-search.spec.ts`): a member by part of a name with her position, Enter to the profile; an event, its minutes and a broadcast by a word; email search and the Turned off mark; See all to the Members list with the box filled; no super-admin pages for a plain admin. `admin-shell.spec.ts` follows the new names (Search, Results).
 - Admin guide §1m and the README line.
 
-## 28. Phase 21 — Members list on phones, and changing many at once (planned 2026-11-06; decisions accepted 2026-11-06)
+## 28. Phase 21 — Members list on phones, and changing many at once (planned 2026-11-06; decisions accepted; 21-A to 21-C built 2026-11-06)
 
 **Goal.** The Members page is the most used admin page and the most cramped on a phone. Each row can show up to nine buttons (consent, opt-out, call consent, call opt-out, Edit contact, Profile, Edit name, Groups, Turn off), which wrap into three or four lines; every member is drawn at once; and putting twenty people in the cooking team means opening twenty dialogs (§24.3). Phase 21 makes each row short, the list quick, and lets an admin change several members in one step.
 
@@ -1819,3 +1819,12 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Members rows get a tick box (`Select {name}`) and the list a **Select all shown** box. Group changes go through the existing group route (one activity entry each); the toast says how many changed and how many were already in that state.
 - `POST /api/organizations/ghmo/members/bulk-status` (`{ ids, status }`, 1 to 200 ids, any active admin, 30 per hour): skips unknown and unchanged members, writes in batches, and logs one `members_status_bulk` entry ("Turned off 2 members") with no names.
 - Browser spec (`members.spec.ts`): add three to a group, remove two (one wasn't in it), turn two off through the confirmation naming the count, turn all shown on (two already on), one activity entry per action, no consent button in the bar, an empty request refused. Admin guide §1 updated for the menu, paging and selection.
+
+### 28.8 21-C built (2026-11-06): seating a member's relative
+
+*Owner request with 21-B: "add the people in board member but he is not in member's list, but in the family member of the member. add smart approach."*
+
+- Family lists are part of each member's **encrypted** contact (plan §17, D29: for reference only, never contacted), so the server can't search them. The Positions page now decrypts members' contacts on an unlocked device (the same `useMemberContacts` hook as the Members page) and `src/lib/familyCandidates.ts` turns them into candidates: relatives who aren't members already (by name, ignoring case and accents), each offered once even if two members list them, labelled "Ram Rai (husband of Asha Rai)". Unit tests in `tests/unit/familyCandidates.test.ts`.
+- **Set holder** shows them under **Family of members**. Picking one fills the new-person form with the name and number (both editable). Saving creates the member, encrypting the number in the browser bound to the new member's id, and seats them. No email or call consent is recorded: listing a relative is not their consent, so they can't be emailed or called until an admin records it.
+- **Someone not on the member list yet** now also takes a phone number instead of an email on an unlocked device (encrypted the same way). On a locked device an email is still needed, with a pointer to unlock or use the Members page.
+- Browser spec `family-officer.spec.ts`: a relative with a number becomes treasurer and a member (number not in plain text, no consent); she then shows as a member, not a relative; a relative with neither email nor number can't be saved until one is given.

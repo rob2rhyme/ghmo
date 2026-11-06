@@ -20,7 +20,9 @@ import { Select } from "@/src/components/ui/select";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { NOTE_MAX, TITLE_MAX, monthYear, termStatus, type Position, type Term } from "@/src/lib/positions";
 import { REMOVED_MEMBER_LABEL } from "@/src/lib/memberDeletion";
-import { memberDisplayName } from "@/src/lib/members";
+import { formatPhone, memberContactLoc, memberDisplayName, newMemberId, normalizePhone, type FamilyMember } from "@/src/lib/members";
+import { familyCandidateLabel, familyCandidates, type FamilyCandidate } from "@/src/lib/familyCandidates";
+import { useMemberContacts } from "@/src/components/admin/members/useMemberContacts";
 
 type Data = { positions: Position[]; terms: Term[]; today: string; superAdmin: boolean };
 type View = "current" | "past";
@@ -51,6 +53,14 @@ export default function PositionsClient() {
   useEffect(() => {
     void load();
   }, [attempt]);
+
+  // Relatives listed in members' (encrypted) family lists, readable only on this unlocked device (plan §28.8).
+  const { contacts, ready: deviceUnlocked, e2ee } = useMemberContacts(members);
+  const candidates = useMemo(() => {
+    const families = new Map<string, FamilyMember[] | undefined>();
+    for (const [id, view] of contacts) if (view.ok) families.set(id, view.contact.family);
+    return familyCandidates(members.filter(m => m.status === "active"), families);
+  }, [contacts, members]);
 
   const nameOf = useMemo(() => {
     const byId = new Map(members.map(m => [m.id, m]));
@@ -227,6 +237,9 @@ export default function PositionsClient() {
         <SeatDialog
           position={seating}
           members={members}
+          candidates={candidates}
+          deviceUnlocked={deviceUnlocked}
+          sealContact={async (id, phone) => ({ enc: await e2ee.encrypt(memberContactLoc(id), { phone }), hasPhone: true })}
           holders={termsFor(seating.id).filter(live)}
           today={today}
           nameOf={nameOf}
@@ -290,12 +303,17 @@ export default function PositionsClient() {
 
 /** The member picker's value for "someone who isn't on the member list yet". */
 const NEW_PERSON = "__new";
+/** The picker's values for a relative from a member's family list. */
+const FAMILY_PREFIX = "family:";
 
 type SeatBody = { memberId: string; startsOn: string; endsOn: string | null; note: string; endPrevious: boolean; allowSeveral: boolean };
 
 function SeatDialog({
   position,
   members,
+  candidates,
+  deviceUnlocked,
+  sealContact,
   holders,
   today,
   nameOf,
@@ -306,6 +324,10 @@ function SeatDialog({
 }: {
   position: Position;
   members: MemberLite[];
+  /** Relatives of members who aren't members themselves, from this unlocked device. */
+  candidates: FamilyCandidate[];
+  deviceUnlocked: boolean;
+  sealContact: (memberId: string, phone: string) => Promise<{ enc: unknown; hasPhone: true }>;
   holders: Term[];
   today: string;
   nameOf: (id: string) => string;
@@ -319,6 +341,7 @@ function SeatDialog({
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [adding, setAdding] = useState(false);
   const [startsOn, setStartsOn] = useState(today);
   const [endsOn, setEndsOn] = useState("");
@@ -326,13 +349,17 @@ function SeatDialog({
   // A seat held by one person is normally taken over; a seat for several people (board members, advisors) normally gains
   // another person, so ending the others stays an explicit choice there.
   const [endPrevious, setEndPrevious] = useState(!position.multiple);
-  const isNew = memberId === NEW_PERSON;
+  const family = memberId.startsWith(FAMILY_PREFIX) ? (candidates.find(c => `${FAMILY_PREFIX}${c.key}` === memberId) ?? null) : null;
+  const isNew = memberId === NEW_PERSON || family !== null;
+  const phone = newPhone.trim() ? normalizePhone(newPhone) : null;
+  const phoneProblem = newPhone.trim() && !phone ? "Enter a phone number, like 717 555 0100." : null;
   const needle = search.trim().toLowerCase();
   const shownPeople = needle
     ? people.filter(m => m.id === memberId || memberDisplayName(m).toLowerCase().includes(needle) || m.emailLower.includes(needle))
     : people;
   const holderNames = holders.map(h => nameOf(h.memberId)).join(", ");
-  const ready = isNew ? newName.trim() !== "" && newEmail.trim() !== "" : memberId !== "";
+  // Someone new needs a name and a way to reach them: an email, or a phone number (stored encrypted, so only on an unlocked device).
+  const ready = isNew ? newName.trim() !== "" && !phoneProblem && (newEmail.trim() !== "" || (deviceUnlocked && phone !== null)) : memberId !== "";
 
   const submit = async () => {
     let id = memberId;
@@ -341,10 +368,15 @@ function SeatDialog({
       // again doesn't add them twice.
       setAdding(true);
       try {
-        const created = await peopleApi<{ member: MemberLite }>("/api/organizations/ghmo/members", {
-          method: "POST",
-          body: { name: newName.trim(), email: newEmail.trim(), status: "active" }
-        });
+        const body: Record<string, unknown> = { name: newName.trim(), status: "active" };
+        if (newEmail.trim()) body.email = newEmail.trim();
+        if (deviceUnlocked && phone) {
+          // The number is encrypted here, bound to the new member's id; no call consent is recorded (a family list is not consent).
+          const id = newMemberId();
+          body.id = id;
+          body.contact = await sealContact(id, phone);
+        }
+        const created = await peopleApi<{ member: MemberLite }>("/api/organizations/ghmo/members", { method: "POST", body });
         onMemberAdded(created.member);
         id = created.member.id;
         setMemberId(id);
@@ -388,33 +420,66 @@ function SeatDialog({
             </Field>
           ) : null}
           <Field label="Member">
-            <Select value={memberId} onChange={e => setMemberId(e.target.value)} required>
+            <Select
+              value={memberId}
+              onChange={e => {
+                const value = e.target.value;
+                setMemberId(value);
+                const picked = value.startsWith(FAMILY_PREFIX) ? candidates.find(c => `${FAMILY_PREFIX}${c.key}` === value) : null;
+                if (picked) {
+                  // Start from what the family list says; the admin can correct it before saving.
+                  setNewName(picked.name);
+                  setNewPhone(picked.phone ? formatPhone(picked.phone) : "");
+                  setNewEmail("");
+                }
+              }}
+              required
+            >
               <option value="">Choose a member…</option>
               {shownPeople.map(m => (
                 <option key={m.id} value={m.id}>
                   {memberDisplayName(m)}
                 </option>
               ))}
+              {candidates.length > 0 ? (
+                <optgroup label="Family of members">
+                  {candidates.map(candidate => (
+                    <option key={candidate.key} value={`${FAMILY_PREFIX}${candidate.key}`}>
+                      {familyCandidateLabel(candidate)}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
               <option value={NEW_PERSON}>Someone not on the member list yet…</option>
             </Select>
           </Field>
           {isNew ? (
             <div className="grid gap-4 rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                They are added to the member list as well. For someone with only a phone number, add them on the{" "}
-                <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
-                  Members page
-                </Link>{" "}
-                first.
+                {family ? `From ${family.ofMemberName}'s family list. ` : ""}They are added to the member list as well, with no email or call consent recorded.{" "}
+                {deviceUnlocked ? "Give an email or a phone number." : (
+                  <>
+                    Give an email. For someone with only a phone number, unlock this device, or add them on the{" "}
+                    <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+                      Members page
+                    </Link>
+                    .
+                  </>
+                )}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Full name">
                   <Input value={newName} maxLength={120} autoComplete="off" onChange={e => setNewName(e.target.value)} required />
                 </Field>
-                <Field label="Email">
-                  <Input type="email" value={newEmail} maxLength={320} autoComplete="off" onChange={e => setNewEmail(e.target.value)} required />
+                <Field label={deviceUnlocked ? "Email (or a phone below)" : "Email"}>
+                  <Input type="email" value={newEmail} maxLength={320} autoComplete="off" onChange={e => setNewEmail(e.target.value)} required={!deviceUnlocked} />
                 </Field>
               </div>
+              {deviceUnlocked ? (
+                <Field label="Phone (optional with an email)" error={phoneProblem}>
+                  <Input type="tel" value={newPhone} maxLength={30} autoComplete="off" onChange={e => setNewPhone(e.target.value)} />
+                </Field>
+              ) : null}
             </div>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
