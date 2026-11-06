@@ -87,6 +87,7 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   member_created: { verb: "added a member" },
   member_updated: { verb: "updated a member" },
   members_status_bulk: { verb: "changed several members at once", detail: true },
+  activity_exported: { verb: "downloaded the activity log", detail: true },
   member_email_changed: { verb: "changed a member's email" },
   member_note_added: { verb: "added a note to a member profile", detail: true },
   member_note_deleted: { verb: "deleted a note from a member profile", detail: true },
@@ -180,6 +181,9 @@ const SYSTEM_ACTIVITY: Record<string, string> = {
 
 /** True when the dashboard has its own words for this action (a unit test checks every action the code logs). */
 export const hasActivityLabel = (action: string): boolean => action === "login" || action in ACTIVITY || action in SYSTEM_ACTIVITY;
+
+/** Every action the activity log has words for (the activity page groups them into areas, plan §29). */
+export const LABELLED_ACTIONS: string[] = [...new Set(["login", ...Object.keys(ACTIVITY), ...Object.keys(SYSTEM_ACTIVITY)])];
 
 function signInVerb(summary: string): string {
   if (/recovery code/i.test(summary)) return "signed in with a recovery code";

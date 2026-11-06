@@ -72,6 +72,8 @@ Everything here needs a person with access to Firebase, Vercel or GitHub setting
 - [x] **Audit 2** done and findings reviewed by the owner. *Audit done 2026-11-02 (`docs/UI_AUDIT_2.md`); reviewed and fixes approved by the owner.*
 - [x] Upgrade 2 fixes merged. *2026-11-03, PR #77.*
 
+- [ ] **Activity page (Phase 22):** run `npx firebase deploy --only firestore` once more so the two new activity indexes exist (the person and area filters need them; Firestore → Indexes shows them Enabled). Then open **Admin → Activity**, filter by yourself, open an entry, and as a super admin press **Download CSV** once and check the download itself appears in the list. From now on, "check the activity log" in this checklist means **Admin → Activity**.
+
 ## 7. After going live
 
 - [ ] Open `/admin/login`, `/admin`, `/admin/encryption`, `/minutes` and a public page in a normal browser window with the console open. There should be no red errors.

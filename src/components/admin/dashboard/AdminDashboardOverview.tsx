@@ -261,7 +261,15 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
           )}
         </AdminSectionCard>
 
-        <AdminSectionCard title="Recent activity" description="Who did what, most recent first.">
+        <AdminSectionCard
+          title="Recent activity"
+          description="Who did what, most recent first."
+          actions={
+            <Button asChild variant="ghost" size="row">
+              <Link href={"/admin/activity" as Route}>See all activity</Link>
+            </Button>
+          }
+        >
           {recentAuditLogs.length === 0 ? (
             <EmptyNote>No activity yet.</EmptyNote>
           ) : (
