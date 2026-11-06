@@ -62,6 +62,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
+- Deleting a member (plan §20, Phase 15): `GET /api/organizations/ghmo/members/[memberId]/deletion` (what would be removed and kept) and `DELETE /api/organizations/ghmo/members/[memberId]` with `{ confirm }` (the member's name). Super admin only.
 - Member list export (plan §19): `POST /api/admin/member-export` only records the download (the CSV is built in the browser); the **Export list** button is on `/admin/members`.
 - Scheduled: `GET /api/cron/task-digest` (Vercel Cron, once a day, needs `CRON_SECRET`; plan §16). `GET/PUT /api/admin/task-digest` is its switch.
 - Auth: `/admin/login` (admin magic link) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (always disabled in production). `/login` is the member magic-link page.
@@ -103,6 +104,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `eventTasks/{id}`: one task of an event (`eventId`, title, notes, `groupId`, `memberIds[]`, `dueOn`, `status` open or done, `order`, `doneAt`, `doneBy`). `eventTaskTemplates/{id}`: name, description and `items[]` (title, notes, `groupId`, `dueOffsetDays` from the event day). Plaintext, admin-read, server-written, outside the event documents so they never reach the public site (plan §15, 11-B).
   - `eventTaskReminders/{eventId}~{memberId}`: the last time a person was reminded about an event's tasks (`lastSentAt`, `lastSentBy`, `count`) and any send in progress (`claimId`, `claimedAt`); keeps the 24-hour limit. Server-only, admin-read (plan §16).
   - `taskDigest/settings`: whether the daily overdue-task digest is on (off by default), who changed it, the day it last ran and a summary of the last run. The per-person digest record is `eventTaskReminders/digest~{memberId}` with `kind: "digest"`. Admin-read, server-written (plan §16, 12-B).
+  - `emailSuppressions/{hash}`: a "do not email" record kept when a member who opted out (or whose address bounced) is deleted: a keyed hash of the address (never the address), the reason and the date. Closed to every browser; the add and import routes read it so the address starts out opted out again (plan §20).
   - `pushSubscriptions/{id}`: one record per device that switched push on (`uid`, secret push `endpoint`, `p256dh`, `auth`, `label`, `kinds[]`, `createdAt`, `lastSentAt`); the id is a hash of the address. Closed to every browser, even an admin's; the API shows a person only their own devices and never the address or keys (plan §18).
   - On each member document (plan §17): `memberSince` ("YYYY-MM-DD"), `city` and `state` (plain; no street address is kept). Family members (`family[]` of name, relationship, phone) live inside the encrypted `contact` envelope.
   - On each call attempt inside `callCampaigns/{id}/calls/{memberId}.attempts[]` (plan §17, 13-C): an optional encrypted `manner` envelope (polite, neutral or rude), never returned to the campaign dashboard.

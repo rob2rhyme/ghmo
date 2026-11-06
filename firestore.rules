@@ -133,6 +133,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // "Do not email" records kept when a member who opted out is deleted (plan §20): a keyed hash of the address, the
+    // reason and the date. Written and read only by the server.
+    match /organizations/{orgSlug}/emailSuppressions/{doc=**} {
+      allow read, write: if false;
+    }
+
     // Call campaigns and their per-member call records (plan §12): written only through
     // /api/admin/call-campaigns, so attempts stay append-only and audited.
     match /organizations/{orgSlug}/callCampaigns/{doc=**} {

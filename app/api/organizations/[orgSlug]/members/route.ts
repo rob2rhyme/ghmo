@@ -12,6 +12,8 @@ import { parseJsonBody } from "@/src/lib/validation";
 import { envelopeChecker } from "@/src/lib/e2eeEnvelope.server";
 import { MEMBER_ID_PATTERN, PHONE_CONSENT_INPUT, contactInputSchema, memberAuditView } from "@/src/lib/memberContact.server";
 import { z } from "zod";
+import { newMemberSuppression } from "@/src/lib/memberDeletion";
+import { suppressionsFor } from "@/src/lib/memberDeletion.server";
 import { listMembers } from "@/src/lib/adminData.server";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +114,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const collection = db.collection(orgMembersCollectionPath(COMMUNITY_SLUG));
     if (body.contact && !body.id) return NextResponse.json({ error: "id is required with an encrypted contact" }, { status: 400 });
     const docRef = body.id ? collection.doc(body.id) : collection.doc();
+    // An address that opted out (or bounced) before its member was deleted starts out that way again (plan §20, D44).
+    const suppression = emailLower ? (await suppressionsFor([emailLower])).get(emailLower) : undefined;
     const payload: Record<string, unknown> = {
       ...(emailInput ? { email: emailInput } : {}),
       // "" rather than missing, so the member list (ordered by this field) still includes phone-only members.
@@ -124,6 +128,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       updatedAt: now
     };
     if (name) payload.name = name;
+    Object.assign(payload, newMemberSuppression(suppression));
     if (body.emailConsent) payload.emailConsent = { at: now, source: body.emailConsent.source, byUid: actor.uid };
     if (body.phoneConsent) payload.phoneConsent = { at: now, source: body.phoneConsent.source, byUid: actor.uid };
     if (body.contact) {

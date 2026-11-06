@@ -3,7 +3,10 @@ import { getClientIp } from "@/src/lib/security/clientIp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
-import { isSuperAdmin } from "@/src/lib/admin";
+import { isSuperAdmin, requireSuperAdmin } from "@/src/lib/admin";
+import { auditActor, auditMeta, routeError } from "@/src/lib/adminRoute.server";
+import { deleteMember } from "@/src/lib/memberDeletion.server";
+import { checkRateLimit } from "@/src/lib/rateLimit";
 import { logAuditEvent } from "@/src/lib/audit";
 import { orgMembersCollectionPath } from "@/src/lib/firestorePaths";
 import { checkMemberSince, cleanCity, normalizeState } from "@/src/lib/memberProfile";
@@ -209,5 +212,42 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
       );
     }
     throw error;
+  }
+}
+
+const deleteSchema = z.object({ confirm: z.string().max(400) }).strict();
+
+/**
+ * Deletes a member and what points at them (plan §20, Phase 15). Super admin only, one member at a time, and the body
+ * must carry the member's name (or email) typed to confirm. The member document is deleted last, after the activity
+ * log entry, so a failure part way is finished by trying again. The entry holds the member's id and counts, never their
+ * name, email or numbers.
+ */
+export async function DELETE(req: NextRequest, context: { params: Promise<{ orgSlug: string; memberId: string }> }) {
+  const params = await context.params;
+  if (!getAdminEnvStatus().ok) return NextResponse.json({ error: "The site isn't set up to do this yet. Ask the site administrator." }, { status: 503 });
+  try {
+    if (params.orgSlug !== COMMUNITY_SLUG || !MEMBER_ID_PATTERN.test(params.memberId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { actor, admin } = await requireSuperAdmin(req, COMMUNITY_SLUG);
+    const parsed = await parseJsonBody(req, deleteSchema);
+    if (!parsed.ok) return parsed.response;
+    if (!(await checkRateLimit(`member-delete:${actor.uid}`, 20, 60 * 60 * 1000)).success) {
+      return NextResponse.json({ error: "That's a lot of deletions in an hour. Wait a little and try again." }, { status: 429 });
+    }
+    const outcome = await deleteMember({ memberId: params.memberId, confirm: parsed.data.confirm, now: new Date() });
+    if (!outcome.ok) return NextResponse.json({ error: outcome.error }, { status: outcome.status });
+    const { counts, suppressionKept } = outcome.result;
+    await logAuditEvent({
+      orgSlug: COMMUNITY_SLUG,
+      action: "member_deleted",
+      actor: auditActor(actor, admin),
+      resource: { type: "member", id: params.memberId, summary: `Member deleted (${counts.notes} notes, ${counts.callRows} call records${suppressionKept ? ", do-not-email record kept" : ""})` },
+      after: { ...counts, suppressionKept },
+      meta: auditMeta(req, MEMBER_PATCH_ROUTE)
+    });
+    await outcome.finish();
+    return NextResponse.json({ ok: true, counts, suppressionKept });
+  } catch (error) {
+    return routeError(error);
   }
 }

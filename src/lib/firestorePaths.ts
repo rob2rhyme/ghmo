@@ -26,3 +26,5 @@ export const orgEventTaskRemindersCollectionPath = (orgSlug: string) => `${orgDo
 export const orgTaskDigestCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/taskDigest`;
 // Phase 14 (plan §18): one server-only record per device that switched push notifications on.
 export const orgPushSubscriptionsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/pushSubscriptions`;
+// Phase 15 (plan §20): "do not email" records kept when a member who opted out is deleted. Server-only.
+export const orgEmailSuppressionsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/emailSuppressions`;

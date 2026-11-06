@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { newMemberSuppression } from "@/src/lib/memberDeletion";
+import { suppressionsFor } from "@/src/lib/memberDeletion.server";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -94,6 +96,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
     const collection = db.collection(orgMembersCollectionPath(COMMUNITY_SLUG));
     const existing = new Set((await collection.select("emailLower").get()).docs.map(doc => doc.get("emailLower") as string));
 
+    // Addresses that opted out (or bounced) before their member was deleted start out that way again (plan §20, D44).
+    const suppressed = await suppressionsFor(parsed.data.rows.map(row => normalizeMemberEmail(row.email)).filter(Boolean));
     const now = new Date();
     const batch = db.batch();
     const seen = new Set<string>();
@@ -120,6 +124,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
         uid: null,
         roles: ["member"],
         ...(emailLower ? { emailConsent: { at: now, source: "imported", byUid: actor.uid } } : {}),
+        ...newMemberSuppression(suppressed.get(emailLower)),
         hasPhone: row.contact?.hasPhone ?? false,
         ...(row.contact ? { contact: row.contact.enc, phoneConsent: { at: now, source: "imported", byUid: actor.uid } } : {}),
         createdAt: now,
