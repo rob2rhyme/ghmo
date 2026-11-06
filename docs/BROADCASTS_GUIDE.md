@@ -122,13 +122,20 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
 
   | Item | Kept | Who can read it | Who can remove it |
   |---|---|---|---|
-  | Name, email, consent history, groups | Plain, on the member record | Every admin | A super admin can correct the name. The record can be disabled, not deleted, in the app |
+  | Name, email, consent history, groups | Plain, on the member record | Every admin | A super admin can correct the name, and can delete the whole member (see "Deleting a member" below). Any admin can disable them |
   | Member since, city, state | Plain | Every admin | Any admin (clear the field) |
   | Phone numbers, language, household, contact note, family | Encrypted | Admins on an approved, unlocked device | Any admin (Edit contact, Remove) |
   | Notes | Encrypted text; author and date plain | Admins on an approved, unlocked device | The author, or a super admin |
-  | Calls: campaign, time, outcome, RSVP, caller | Plain | Every admin | Not removable (the record of who was called) |
+  | Calls: campaign, time, outcome, RSVP, caller | Plain | Every admin | Removed when a super admin deletes the member; otherwise not removable (the record of who was called) |
   | Call notes and ratings (polite, neutral, rude) | Encrypted | Admins on an approved, unlocked device | A super admin can clear a rating; a call note stays |
-  | The activity log | Plain, never the text of a note, rating or number | Every admin | Not removable |
+  | The activity log | Plain, never the text of a note, rating or number | Every admin | Not removable, even when a member is deleted |
+
+- **Deleting a member (super admin only).** At the bottom of a profile, **Delete this member** is for a removal request or a record made by mistake. If you only want to stop contacting someone, use **Disable** on the Members list: it can be undone, and deleting cannot.
+  1. Press **Delete member…**. The dialog lists what will be removed (their record with phone numbers and family, notes, call records and ratings, their place in the calling tree, broadcast delivery records, reminder records, and their name on tasks and as a group lead) and what will stay.
+  2. Type the member's name exactly as shown (capitals and spacing don't matter) and press **Delete member**. You land back on the Members list.
+  3. **What stays:** officer terms stay in the history and show "Removed member"; the activity log is never edited, so older entries may still name them (the deletion itself is a new entry with the member's id and counts, never their name or email); names written in minutes or Plans & Issues text; and earlier exports and backups.
+  4. **If they had unsubscribed, complained, or their address bounced,** the app keeps a "do not email" record: a scrambled code made from the address, never the address itself. If the address is added or imported again, that member starts out opted out until an admin records new consent. This is on purpose: deleting must not undo an unsubscribe.
+  5. A deletion that stops part way (for example the internet drops) can be run again: the member is deleted last, so they still appear on the list until it has finished.
 
 - **Keep notes useful and safe.** Write what the community needs: how to reach someone, when they prefer calls, what they offered to help with. Every admin with an approved device can read every note, so don't record health, immigration, money or family problems, and don't write opinions you wouldn't say to the person. A person who asks what is held about them, or to have it removed, is handled as in the runbook (case O; case M for numbers).
 
