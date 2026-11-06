@@ -129,6 +129,16 @@ This is for a person's profile (plan §17). It is not legal advice: if you are u
 7. **Record it.** Because a console deletion is not in the activity log, write a line in Plans & Issues (the date, who asked, what was removed, who did it). Backups and exports made earlier still hold the old data, as ciphertext for everything encrypted, until they expire; delete old backups you no longer need.
 8. **Tell them what was done**, and what could not be removed and why. Aim to answer within 30 days.
 
+## P. An exported member file was lost, shared too widely or left somewhere it should not be
+
+This is for a file made with **Admin → Members → Export list** (plan §19). The file is a plain spreadsheet: anyone who has it can read it.
+
+1. **Find out what it holds.** Open the activity log and look for "downloaded the member list": it shows who, when, how many people and whether phone numbers were included. It never shows the people themselves.
+2. **Get it back or deleted.** Ask the person who exported it where the file went (their downloads folder, email, a chat, a shared drive, a phone) and have every copy deleted, including cloud sync copies and email attachments. Ask whoever received it to delete it and tell you they did.
+3. **If it had phone numbers, or it reached someone it should not have:** treat it as a lost list of private details. Tell the board the same day. People on it have not been told that anything was wrong with the app, but their numbers may be known, so decide together whether to tell them (the list has the names and the dates).
+4. **Close the gap.** If the person should not be exporting, a super admin disables their admin access (case B step 2). If a device was lost, follow case L. Agree who may keep exported files and for how long, and write it down.
+5. **Record it** in Plans & Issues: the date, which download, what happened, what was done.
+
 ## After any incident
 
 - Write down what happened, what you did and what you'll change. Keep it with this runbook.

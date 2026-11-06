@@ -8,12 +8,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Skeleton } from "@/src/components/ui/skeleton";
+import { notificationCopy } from "@/src/lib/notifications";
+import { isPushKind } from "@/src/lib/push";
 
 type Device = { id: string; label: string; kinds: string[]; createdAt: number | null; lastSentAt: number | null };
 type PushState = { configured: boolean; publicKey: string | null; kinds: string[]; devices: Device[] };
 
-/** What each kind says, in the same words as the email list on this page. */
-const KIND_LABELS: Record<string, string> = { chat: "New activity in Admin chat", thread: "New activity in Plans & Issues" };
+/** What each kind says: the very words the notification shows, from the one place that holds them. */
+const kindLabel = (kind: string) => (isPushKind(kind) ? notificationCopy(kind).subject : kind);
 
 const supported = () => typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
@@ -244,7 +246,7 @@ export default function PushPanel() {
                           disabled={busy}
                           onChange={event => void setKind(device, kind, event.target.checked)}
                         />
-                        {KIND_LABELS[kind] ?? kind}
+                        {kindLabel(kind)}
                       </label>
                     ))}
                   </div>

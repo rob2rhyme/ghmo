@@ -184,7 +184,7 @@ test("the device routes keep to your own devices, refuse forged addresses and ke
   expect(added.status()).toBe(200);
   const body = await added.json();
   expect(body.devices).toHaveLength(1);
-  expect(body.devices[0]).toMatchObject({ kinds: ["chat"] }); // only kinds that can push are kept
+  expect(body.devices[0]).toMatchObject({ kinds: ["chat", "calls"] }); // only kinds that can push are kept
   expect(JSON.stringify(body)).not.toContain(mine.keys.p256dh);
   expect(JSON.stringify(body)).not.toContain(mine.endpoint);
   const id = body.devices[0].id as string;
@@ -192,11 +192,11 @@ test("the device routes keep to your own devices, refuse forged addresses and ke
   // Adding the same device again is the same record.
   const again = await (await api.post("/api/admin/push", { data: { subscription: { endpoint: mine.endpoint, keys: mine.keys } } })).json();
   expect(again.devices).toHaveLength(1);
-  expect(again.devices[0].kinds).toEqual(["chat", "thread"]);
+  expect(again.devices[0].kinds).toEqual(["chat", "thread", "minutes_submitted", "broadcast_review", "calls", "security"]);
 
   // Changing kinds works on your own device and 404s on someone else's.
-  const patched = await (await api.patch("/api/admin/push", { data: { id, kinds: ["thread", "security"] } })).json();
-  expect(patched.devices[0].kinds).toEqual(["thread"]);
+  const patched = await (await api.patch("/api/admin/push", { data: { id, kinds: ["security", "thread", "members"] } })).json();
+  expect(patched.devices[0].kinds).toEqual(["thread", "security"]); // "members" is not an alert, so it would be dropped
   expect((await api.patch("/api/admin/push", { data: { id: "b".repeat(32), kinds: [] } })).status()).toBe(404);
   expect((await api.delete("/api/admin/push", { data: { id: "b".repeat(32) } })).status()).toBe(404);
   expect((await admin().db.doc(`organizations/ghmo/pushSubscriptions/${"b".repeat(32)}`).get()).exists).toBe(true);
@@ -235,4 +235,33 @@ test("an admin who is turned off stops getting pushes", async ({ page }) => {
   await expect(page.locator("p", { hasText: "Hello" })).toBeVisible();
   await page.waitForTimeout(2000);
   expect(received).toHaveLength(0);
+});
+
+test("14-B: a submitted broadcast pushes a content-free approval alert, and a device with that kind off gets nothing", async ({ page }) => {
+  const SUBJECT = "Hall closed for repairs";
+  const phone = makeDevice("/bob-phone");
+  const laptop = makeDevice("/bob-laptop");
+  await seedDevice("b".repeat(32), "bob", phone, ["chat", "broadcast_review"]);
+  await seedDevice("c".repeat(32), "bob", laptop, ["chat"]); // the approval alert is switched off here
+  await seedDevice("a".repeat(32), "alice", makeDevice("/alice-phone"), ["broadcast_review"]); // the submitter: never
+  await signInWithNewPasskey(page, "alice", "/admin/broadcasts");
+
+  const created = await page.request.post("/api/admin/broadcasts", { data: { subject: SUBJECT, body: "The hall is closed on Saturday for repairs." } });
+  expect(created.status()).toBe(201);
+  const id = (await created.json()).broadcast.id as string;
+  const submitted = await page.request.patch(`/api/admin/broadcasts/${id}`, { data: { action: "submit" } });
+  expect(submitted.status()).toBe(200);
+
+  await expect.poll(() => received.length, { timeout: 15_000 }).toBe(1);
+  expect(received[0].path).toBe("/bob-phone");
+  expect(received[0].headers.topic).toBe("broadcast_review");
+  expect(received[0].body.toString("utf8")).not.toMatch(/Hall|repairs|Saturday/);
+  expect(JSON.parse(decrypt(phone, received[0].body))).toEqual({
+    title: "GHMO",
+    body: "A broadcast is waiting for approval",
+    url: "/admin/broadcasts",
+    tag: "ghmo-broadcast_review"
+  });
+  await page.waitForTimeout(1500);
+  expect(received).toHaveLength(1);
 });

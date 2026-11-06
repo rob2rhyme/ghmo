@@ -132,6 +132,15 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
 
 - **Keep notes useful and safe.** Write what the community needs: how to reach someone, when they prefer calls, what they offered to help with. Every admin with an approved device can read every note, so don't record health, immigration, money or family problems, and don't write opinions you wouldn't say to the person. A person who asks what is held about them, or to have it removed, is handled as in the runbook (case O; case M for numbers).
 
+## 1i. Exporting the member list (Admin → Members → Export list)
+
+Press **Export list** above the list. Choose everyone, or only the people the search and filters show right now (for example one group), and then **Download**. You get a spreadsheet file (CSV) with each member's name, email, status, member since, city and state, groups, officer positions, and whether they can be emailed or called. Notes, family members and call history are never in it.
+
+- **Phone numbers are optional.** Tick "Include phone numbers…" to add the number, alternate number, language and household. This works only on an unlocked device, because the numbers are encrypted until your browser opens them. With the device locked the box is greyed out and says so.
+- **The file is not encrypted.** Share it only with people who need it, do not put it in a chat or an open folder, and delete it when you are done. If a file with numbers is lost, tell the board and see `docs/RUNBOOK_INCIDENT.md` case P.
+- **Every download is recorded** in the activity log (who, when, how many people, with numbers or not; never their details).
+- **Importing it again:** the first columns are `Name`, `Email` and `Phone`, so the file can go back through Import a list. Names that start with `=`, `+`, `-` or `@` get a leading apostrophe so a spreadsheet shows them as text instead of running them.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

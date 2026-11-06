@@ -2,7 +2,7 @@
  * Notification emails say that something happened, never what. No titles, names, message text or
  * minutes content: email passes through providers and inboxes we don't control.
  */
-export type NotificationKind = "chat" | "thread" | "minutes_submitted" | "calls" | "security";
+export type NotificationKind = "chat" | "thread" | "minutes_submitted" | "calls" | "security" | "broadcast_review";
 
 /** Kinds a browser may trigger (the server triggers the rest itself). */
 export const CLIENT_NOTIFICATION_KINDS = ["chat", "thread"] as const;
@@ -11,6 +11,11 @@ const COPY: Record<NotificationKind, { subject: string; line: string; path: stri
   chat: { subject: "New activity in Admin chat", line: "There is new activity in Admin chat.", path: "/admin/chat" },
   thread: { subject: "New activity in Plans & Issues", line: "There is new activity in Plans & Issues.", path: "/admin/comms" },
   minutes_submitted: { subject: "Minutes are waiting for approval", line: "Meeting minutes were submitted and need an approver.", path: "/admin/minutes?mode=records" },
+  broadcast_review: {
+    subject: "A broadcast is waiting for approval",
+    line: "A broadcast to members was submitted and needs a second admin to approve it.",
+    path: "/admin/broadcasts"
+  },
   calls: { subject: "You have calls to make", line: "A call campaign is open and some of your people have not been reached yet.", path: "/admin/my-calls" },
   security: {
     subject: "An admin's authenticator was locked",

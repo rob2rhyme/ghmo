@@ -3,8 +3,10 @@ import { z } from "zod";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { normalizeBroadcastContent, planBroadcastTransition, planContentEdit } from "@/src/lib/broadcast";
+import { getAppOrigin } from "@/src/lib/appUrl";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
+import { notifyAdmins } from "@/src/lib/notify.server";
 import { toPlain } from "@/src/lib/serialize.server";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { parseJsonBody } from "@/src/lib/validation";
@@ -78,5 +80,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ broad
     after: { status: after.status, contentHash: after.contentHash },
     meta: { ip: getClientIp(req.headers), userAgent: req.headers.get("user-agent") ?? null, route: ROUTE }
   });
+  // A submitted broadcast waits for a second admin: tell the others, content-free, by email and push (plan §18, 14-B).
+  if (plan.audit === "broadcast_submitted") void notifyAdmins("broadcast_review", actor.uid, getAppOrigin(req));
   return NextResponse.json({ ok: true, broadcast: toPlain({ id: found.ref.id, ...after }), recipientCount: await broadcastRecipientCount(guard) });
 }

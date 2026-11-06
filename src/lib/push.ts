@@ -7,8 +7,12 @@ import { notificationCopy, type NotificationKind } from "./notifications";
  * A push says that something happened, never what (D33): the same fixed words as the email, and a page to open.
  */
 
-/** Kinds that can push. 14-A covers chat and Plans & Issues; 14-B adds the rest (each is already an email kind). */
-export const PUSH_KINDS = ["chat", "thread"] as const satisfies readonly NotificationKind[];
+/**
+ * Every alert can push, in the order the Security card lists them. A device switches each kind on or off on its own
+ * (plan §18, 14-B). A device that was switched on before a kind existed keeps its own list, so a new kind is off for it
+ * until its owner switches it on.
+ */
+export const PUSH_KINDS = ["chat", "thread", "minutes_submitted", "broadcast_review", "calls", "security"] as const satisfies readonly NotificationKind[];
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 export const isPushKind = (kind: string): kind is PushKind => (PUSH_KINDS as readonly string[]).includes(kind);

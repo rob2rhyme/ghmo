@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, Lock, Mail, Pencil, Phone, PhoneCall, PhoneOff, SearchX, ShieldOff, Upload, UserCheck, UserPlus, UserRound, UserX, Users } from "lucide-react";
+import { Download, Eye, EyeOff, Lock, Mail, Pencil, Phone, PhoneCall, PhoneOff, SearchX, ShieldOff, Upload, UserCheck, UserPlus, UserRound, UserX, Users } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -23,6 +23,8 @@ import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
 import MemberGroupsDialog, { type GroupChoice } from "@/src/components/admin/people/MemberGroupsDialog";
 import RenameMemberDialog from "@/src/components/admin/people/RenameMemberDialog";
+import ExportMembersDialog, { type ExportChoice } from "@/src/components/admin/members/ExportMembersDialog";
+import { exportFileName, membersCsv, type ExportMember } from "@/src/lib/memberExport";
 import type { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import {
   CONTACT_LIMITS,
@@ -125,6 +127,8 @@ export default function MembersClient({
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("any");
   const [groupsFor, setGroupsFor] = useState<MemberRow | null>(null);
   const [renaming, setRenaming] = useState<MemberRow | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
@@ -202,6 +206,50 @@ export default function MembersClient({
   const refresh = async () => {
     const res = await fetch("/api/organizations/ghmo/members", { cache: "no-store" });
     if (res.ok) setMembers(((await res.json()) as { members: MemberRow[] }).members);
+  };
+
+  /**
+   * Builds the CSV in this browser and downloads it. The activity log is written first, and the file is made only if that
+   * worked, so no download goes unrecorded. Numbers come from contacts this device has already decrypted.
+   */
+  const downloadExport = async ({ scope, includePhones }: ExportChoice) => {
+    setExportBusy(true);
+    try {
+      const list = scope === "all" ? [...members].sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b))) : visible;
+      await call("/api/admin/member-export", "POST", { count: list.length, scope, includesPhones: includePhones });
+      const groupName = new Map(groups.map(group => [group.id, group.name]));
+      const rows: ExportMember[] = list.map(member => {
+        const view = includePhones ? contacts.get(member.id) : undefined;
+        return {
+          name: member.name ?? "",
+          email: member.emailLower ?? "",
+          status: member.status,
+          memberSince: member.memberSince ?? null,
+          city: member.city ?? null,
+          state: member.state ?? null,
+          groups: (member.groupIds ?? []).map(id => groupName.get(id)).filter((name): name is string => Boolean(name)),
+          positions: officers[member.id] ?? [],
+          emailState: memberEmailState(member),
+          callState: memberCallState(member),
+          contact: view?.ok ? view.contact : null
+        };
+      });
+      const blob = new Blob([membersCsv(rows, { includePhones })], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exportFileName(new Date().toISOString().slice(0, 10));
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${rows.length} ${rows.length === 1 ? "member" : "members"}`);
+      setExporting(false);
+    } catch (error) {
+      toast.error(errorText(error, "Could not download the list"));
+    } finally {
+      setExportBusy(false);
+    }
   };
 
   /** Encrypts a contact for a member id in this browser; the server only ever sees the envelope. */
@@ -377,6 +425,9 @@ export default function MembersClient({
           onClick={() => togglePanel("import")}
         >
           <Upload aria-hidden="true" /> Import a list
+        </Button>
+        <Button variant="outline" size="row" disabled={members.length === 0} onClick={() => setExporting(true)} title="Download the member list as a spreadsheet (CSV)">
+          <Download aria-hidden="true" /> Export list
         </Button>
       </div>
 
@@ -731,6 +782,19 @@ export default function MembersClient({
           </AdminList>
         )}
       </AdminSectionCard>
+
+      {exporting ? (
+        <ExportMembersDialog
+          total={members.length}
+          shown={visible.length}
+          filtered={visible.length !== members.length}
+          phonesReady={phonesReady}
+          phoneHint={!e2ee.enabled ? "Phone numbers can be included once encryption is on." : "Unlock this device to include phone numbers."}
+          busy={exportBusy}
+          onClose={() => setExporting(false)}
+          onDownload={downloadExport}
+        />
+      ) : null}
 
       {renaming ? (
         <RenameMemberDialog
