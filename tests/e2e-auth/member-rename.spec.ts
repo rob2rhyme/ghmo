@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, waitForStreamedContent, memberAction } from "./helpers";
 
 /**
  * A super admin can fix a typo in a member's name. Nobody else can, and the rest of the record (email, consent,
@@ -32,7 +32,7 @@ test("a super admin fixes a typo in a name without touching anything else; the a
   await signInWithNewPasskey(page, "alice", "/admin/members");
   await waitForStreamedContent(page);
 
-  await page.getByRole("button", { name: "Edit name of Mongal Puwrt" }).click();
+  await memberAction(page, "Mongal Puwrt", "Edit name");
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: "Save name" })).toBeDisabled();
   await dialog.getByLabel("Name").fill("Mongal Puwart");
@@ -50,7 +50,7 @@ test("a super admin fixes a typo in a name without touching anything else; the a
   expect(audit[0].actor).toMatchObject({ uid: "alice" });
 
   // Someone without an email is known by name and number, so the name can't be emptied.
-  await page.getByRole("button", { name: "Edit name of Dinesh Gurung" }).click();
+  await memberAction(page, "Dinesh Gurung", "Edit name");
   const second = page.getByRole("dialog");
   await second.getByLabel("Name").fill("   ");
   await expect(second.getByRole("button", { name: "Save name" })).toBeDisabled();
@@ -71,7 +71,10 @@ test("a plain admin sees no Edit name button and the server refuses a name chang
   await signInWithNewPasskey(page, "bob", "/admin/members");
   await waitForStreamedContent(page);
   await expect(main(page).getByText("Mongal Puwrt", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Edit name of/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "More actions for Mongal Puwrt", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Groups" }).or(page.getByRole("menuitem", { name: "Turn off…" })).first()).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Edit name" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   const refused = await page.request.patch("/api/organizations/ghmo/members/m1", { data: { name: "Someone Else" } });
   expect(refused.status()).toBe(403);

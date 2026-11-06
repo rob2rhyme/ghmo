@@ -171,3 +171,26 @@ export async function enrollAndApprove(approver: Page, newAdmin: Page, newAdminN
 export function plainJson(value: unknown): string {
   return JSON.stringify(value, (key, item) => (key === "_seconds" || key === "_nanoseconds" ? "time" : item));
 }
+
+/** Opens a member row's More… menu on the Members page and picks an item (plan §28: rows show Profile and More…). */
+export async function memberAction(page: Page, memberName: string, item: string | RegExp) {
+  await page.getByRole("button", { name: `More actions for ${memberName}`, exact: true }).click();
+  await page.getByRole("menuitem", typeof item === "string" ? { name: item, exact: true } : { name: item }).click();
+}
+
+/** Picks an item from the first member row (top of the list) whose More… menu offers it. */
+export async function firstMemberAction(page: Page, item: string) {
+  const triggers = page.getByRole("button", { name: /^More actions for / });
+  await expect(triggers.first()).toBeVisible();
+  const count = await triggers.count();
+  for (let i = 0; i < count; i += 1) {
+    await triggers.nth(i).click();
+    const entry = page.getByRole("menuitem", { name: item, exact: true });
+    if (await entry.count()) {
+      await entry.click();
+      return;
+    }
+    await page.keyboard.press("Escape");
+  }
+  throw new Error(`No member row offers "${item}"`);
+}

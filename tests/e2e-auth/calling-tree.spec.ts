@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent, firstMemberAction } from "./helpers";
 
 /**
  * Phase 9-B (plan §12): a super admin picks the callers and plans an equal split in the browser (the
@@ -170,7 +170,7 @@ test("removing a caller moves only that caller's people, and a call opt-out drop
 
   // Someone asks not to be called: the next plan drops them and My Calls skips them straight away.
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "Members" }).click();
-  await page.getByRole("button", { name: "They asked not to be called" }).first().click();
+  await firstMemberAction(page, "They asked not to be called");
   await expect(shown(page, "Asked not to be called")).toBeVisible();
   await page.getByRole("navigation", { name: "Admin" }).first().getByRole("link", { name: "My calls" }).click();
   await expect(page.getByText(/1 left out \(asked not to be called, or no number\)/)).toBeVisible();

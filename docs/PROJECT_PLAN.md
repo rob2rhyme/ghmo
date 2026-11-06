@@ -220,7 +220,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
-| **21** | Members list on phones, and changing many at once | **Planned 2026-11-06 (§28).** Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 proposed. | Owner reads §28.2 and accepts or changes D76–D81 before 21-A. |
+| **21** | Members list on phones, and changing many at once | **Planned 2026-11-06 (§28).** Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1761,7 +1761,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Browser spec (`admin-search.spec.ts`): a member by part of a name with her position, Enter to the profile; an event, its minutes and a broadcast by a word; email search and the Turned off mark; See all to the Members list with the box filled; no super-admin pages for a plain admin. `admin-shell.spec.ts` follows the new names (Search, Results).
 - Admin guide §1m and the README line.
 
-## 28. Phase 21 — Members list on phones, and changing many at once (planned 2026-11-06)
+## 28. Phase 21 — Members list on phones, and changing many at once (planned 2026-11-06; decisions accepted 2026-11-06)
 
 **Goal.** The Members page is the most used admin page and the most cramped on a phone. Each row can show up to nine buttons (consent, opt-out, call consent, call opt-out, Edit contact, Profile, Edit name, Groups, Turn off), which wrap into three or four lines; every member is drawn at once; and putting twenty people in the cooking team means opening twenty dialogs (§24.3). Phase 21 makes each row short, the list quick, and lets an admin change several members in one step.
 
@@ -1777,7 +1777,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 | The radix-ui package (already a dependency) has an accessible dropdown menu; no menu component exists yet in `src/components/ui`. | `package.json` | Add a small `dropdown-menu.tsx` in the same style as the other UI pieces. |
 | Several browser specs press row buttons by name (members, member contact, rename, delete UI, positions/groups). | `tests/e2e-auth/*` | They move to "open More…, then the item"; a shared test helper keeps them short. |
 
-### 28.2 Decisions (proposed; accept or change before 21-A)
+### 28.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1805,3 +1805,10 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **One more click** for consent and contact edits; worth it for a list that is usable on a phone. If the board misses one-click consent on computers, a later change can show the first action beside **Profile** on wide screens.
 - **Bulk delete** stays out of scope (D45 kept deletion one member at a time).
 - **Very long lists:** paging is in the browser; all members are still loaded once, as today. Loading pages from the server is the next step only if the list reaches the thousands.
+
+### 28.6 21-A built (2026-11-06)
+
+- `src/components/ui/dropdown-menu.tsx`: the radix menu in the site's style (44 px items on touch, red for **Turn off…**).
+- Member rows show **Profile** and **More actions for {name}** (⋯); the menu holds the same actions as before, under the same conditions and handlers, with **Turn off…** / **Turn on** last after a divider.
+- The list shows the first 50 of what the search and filters match, then **Show N more** with "Showing 50 of 120"; a new search or filter starts again from 50. Export and the counts still use the whole list.
+- Specs press row actions through `memberAction` / `firstMemberAction` (in `tests/e2e-auth/helpers.ts`); a new test checks two controls per row on a phone, a menu with only what applies, and paging with 120 members.

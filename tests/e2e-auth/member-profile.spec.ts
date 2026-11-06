@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent, memberAction } from "./helpers";
 
 /**
  * Phase 13-A (plan §17): a profile page per member. Member since, city and state are plain facts any admin can set;
@@ -121,7 +121,7 @@ test("family members are ciphertext, masked until shown, validated, and kept whe
 
   // Editing the contact on the Members page keeps the family list.
   await page.getByRole("link", { name: "Members", exact: true }).first().click();
-  await page.getByRole("button", { name: "Edit contact for Sam Lee" }).click();
+  await memberAction(page, "Sam Lee", /^(Edit contact|Add phone)$/);
   await page.getByRole("dialog").getByLabel("Language").fill("Nepali");
   await page.getByRole("dialog").getByRole("button", { name: "Save contact" }).click();
   await expect(page.getByText("Contact saved")).toBeVisible();
