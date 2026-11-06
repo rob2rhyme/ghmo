@@ -221,7 +221,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 | **21** | Members list on phones, and changing many at once | **Built 2026-11-06 (21-A, 21-B, 21-C; §28.6 to §28.8).** Also: Set holder offers members' relatives (21-C). Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
-| **22** | Activity log page | **Planned 2026-11-06 (§29).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 proposed. | Owner reads §29.2 and accepts or changes D82–D87 before 22-A. |
+| **22** | Activity log page | **Planned 2026-11-06 (§29).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 accepted 2026-11-06. | Owner runs the Firestore deploy for the two new indexes after it ships. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1830,7 +1830,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **Someone not on the member list yet** now also takes a phone number instead of an email on an unlocked device (encrypted the same way). On a locked device an email is still needed, with a pointer to unlock or use the Members page.
 - Browser spec `family-officer.spec.ts`: a relative with a number becomes treasurer and a member (number not in plain text, no consent); she then shows as a member, not a relative; a relative with neither email nor number can't be saved until one is given.
 
-## 29. Phase 22 — Activity log page (planned 2026-11-06)
+## 29. Phase 22 — Activity log page (planned 2026-11-06; decisions accepted 2026-11-06)
 
 **Goal.** Every change in the admin area writes a line to the activity log (who, what, when, the internet address and browser), but the only place to read it is the dashboard's **Recent activity**, which shows the last 8 entries. The go-live checklist, the runbook and the admin guide keep saying "check the activity log", and after an incident the board needs to answer "who changed this, and when?". Phase 22 adds a page that reads the whole log.
 
@@ -1845,7 +1845,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 | Firestore needs a composite index for "one person, newest first" and "these actions, newest first"; a date window alone needs none. | `firestore.indexes.json` | Two new indexes: `actor.uid` + `createdAt` desc, and `action` + `createdAt` desc. |
 | The log is never trimmed today (§24.3 item 4). | | Out of scope here; the page pages backwards with "Load older" so size doesn't matter. |
 
-### 29.2 Decisions (proposed; accept or change before 22-A)
+### 29.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1873,3 +1873,11 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **Older entries** written by the legacy `logAudit` helper have a slightly different shape; the page reads both, as the dashboard does.
 - **Trimming the log** (a retention policy) is a separate decision (§24.3 item 4); this page only reads.
 - **Searching inside every entry** server-side is out of scope; the text box narrows what is loaded, and the filters do the heavy lifting.
+
+### 29.6 22-A built (2026-11-06)
+
+- `src/lib/activityLog.ts`: areas by action name (`areaOf`, `actionsInArea`; every labelled action has one, and no area has more than 30), `changedFields` (plain fields only, nested objects left out, 20 at most, long text cut), `recordHref` (no link for deleted records; Admins only for super admins) and `activityCsv` (spreadsheet-safe cells; address and browser columns only when asked). `LABELLED_ACTIONS` is exported from `adminView.ts`. Unit tests in `tests/unit/activityLog.test.ts`.
+- `src/lib/activityLog.server.ts`: `readActivity` (newest first, 50 per page, "Load older" by time; an area alone uses `action in [...]`, a person and an area together read that person's entries and keep the area's; device details only for super admins), `activityPeople` and `activityFilters` (dates as days in the community's time zone; plain-words refusals).
+- `GET /api/admin/activity` (any active admin, rate limited, not logged; the list of people on the first page) and `POST /api/admin/activity/export` (super admins, up to 5,000 rows with device details, logged as `activity_exported`: "downloaded the activity log").
+- `firestore.indexes.json`: `auditLogs` (`actor.uid`, `createdAt` desc) and (`action`, `createdAt` desc). **Run `npx firebase deploy --only firestore` once this ships.**
+- Browser spec `activity-log.spec.ts`: paging 50 + 12, each filter, bad filters refused, no device details or download for a plain admin; a super admin's device details and CSV (61 lines), the download logged, and the log untouched.
