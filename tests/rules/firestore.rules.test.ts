@@ -136,6 +136,9 @@ describe("members and email consent", () => {
 
   it("keeps the encrypted contact and its flags server-written too (plan §12)", async () => {
     await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { hasPhone: true, callOptOutAt: null }, { merge: true }));
+    // Phase 18: an address changes only through the server, which checks duplicates and the do-not-email list.
+    await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { email: "new@example.org", emailLower: "new@example.org", uid: null }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/emailSuppressions/${"a".repeat(64)}`), { reason: "opted_out", at: new Date() }));
     await assertFails(setDoc(doc(admin(), `${ORG}/members/m1`), { contact: { v: 1, epoch: 1, dev: "d".repeat(24), iv: "a".repeat(16), ct: "b".repeat(40), sig: "c".repeat(80) } }, { merge: true }));
   });
 
