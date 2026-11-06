@@ -307,7 +307,7 @@ export default function BroadcastDetailClient({
             </Button>
           ) : null}
           {broadcast.status === "draft" ? (
-            <Button onClick={() => act("submit", "Submitted for approval")} loading={busy === "submit"} disabled={dirty}>
+            <Button onClick={() => act("submit", "Submitted for approval")} loading={busy === "submit"} disabled={dirty} title={dirty ? "Save your changes first." : undefined}>
               Submit for approval
             </Button>
           ) : null}
@@ -322,7 +322,7 @@ export default function BroadcastDetailClient({
             </Button>
           ) : null}
           {broadcast.status === "draft" || broadcast.status === "pending_approval" || broadcast.status === "approved" ? (
-            <Button variant="outline" onClick={test} loading={busy === "test"} disabled={dirty || !footer}>
+            <Button variant="outline" onClick={test} loading={busy === "test"} disabled={dirty || !footer} title={dirty ? "Save your changes first." : !footer ? "The email footer isn't set up yet." : undefined}>
               Send a test to me
             </Button>
           ) : null}

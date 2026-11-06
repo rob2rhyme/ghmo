@@ -159,8 +159,18 @@ export default function AdminsClient() {
       toast.success("Name updated");
     });
 
+  const activeSuperAdmins = admins.filter(item => item.active && item.role === "super_admin").length;
+
   return (
     <div className="flex flex-col gap-6">
+      {activeSuperAdmins < 2 ? (
+        <Alert>
+          <AlertTitle>Add a second super admin</AlertTitle>
+          <AlertDescription>
+            Only one person can manage admins and encryption keys right now. If they are away or lose their phone, nobody can. Make a trusted admin a super admin, or add one.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {offNotice ? (
         <Alert>
           <AlertTitle>{offNotice.name} is turned off</AlertTitle>

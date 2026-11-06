@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import "./globals.css";
 
 /**
@@ -18,9 +19,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             <button type="button" onClick={reset} className="min-h-11 rounded-md bg-primary px-4 font-medium text-primary-foreground">
               Try again
             </button>
-            <a href="/" className="inline-flex min-h-11 items-center rounded-md border px-4 font-medium">
+            <Link href="/" className="inline-flex min-h-11 items-center rounded-md border px-4 font-medium">
               Go to the home page
-            </a>
+            </Link>
           </div>
         </main>
       </body>

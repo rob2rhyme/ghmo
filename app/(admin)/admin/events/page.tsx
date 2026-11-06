@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
-import { listAdminEvents } from "@/src/lib/adminData.server";
+import { ADMIN_EVENTS_LIMIT, listAdminEvents } from "@/src/lib/adminData.server";
 import { taskCountsByEvent } from "@/src/lib/eventTasks.server";
 import { POSITION_TIME_ZONE, todayIn } from "@/src/lib/positions";
 import Link from "next/link";
@@ -106,6 +106,8 @@ export default async function AdminEventsPage() {
       />
 
       <DigestCard />
+
+      {events.length >= ADMIN_EVENTS_LIMIT ? <p className="text-sm text-muted-foreground">Showing the newest {ADMIN_EVENTS_LIMIT} events by date.</p> : null}
 
       {events.length === 0 ? (
         <EmptyState

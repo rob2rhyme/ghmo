@@ -126,8 +126,13 @@ export async function loadAdminDashboard(_check: AdminCheck) {
 // ---- Events ----
 
 /** Every event in every status, newest first (the admin Events page). */
+/** How many records the admin lists read at most; the pages say so when a list reaches it. */
+export const ADMIN_EVENTS_LIMIT = 200;
+export const ADMIN_MINUTES_LIMIT = 100;
+export const ADMIN_BROADCASTS_LIMIT = 100;
+
 export async function listAdminEvents(_check: AdminCheck) {
-  const docs = await queryAllEvents(getAdminDb(), q => q.orderBy("startsAt", "desc").limit(200));
+  const docs = await queryAllEvents(getAdminDb(), q => q.orderBy("startsAt", "desc").limit(ADMIN_EVENTS_LIMIT));
   return asJson(toPlainJson(docs.map(normalizeEvent))) as JsonRecord[];
 }
 
@@ -151,14 +156,25 @@ export async function getMember(_check: AdminCheck, memberId: string) {
 export async function listAdminMinutes(_check: AdminCheck, { eventId }: { eventId?: string | null } = {}) {
   let query: FirebaseFirestore.Query = getAdminDb().collection(orgMinutesCollectionPath(COMMUNITY_SLUG));
   if (eventId) query = query.where("eventId", "==", eventId);
-  const snap = await query.orderBy("eventDate", "desc").limit(100).get();
+  const snap = await query.orderBy("eventDate", "desc").limit(ADMIN_MINUTES_LIMIT).get();
   return asJson(snap.docs.map(doc => toPlain(adminView({ id: doc.id, ...doc.data() })))) as JsonRecord[];
+}
+
+/**
+ * Every approved minutes record, newest meeting first, for the Action items page. Not capped like the list above,
+ * so open items from older meetings never drop off; an equality filter needs no composite index.
+ */
+export async function listApprovedMinutes(_check: AdminCheck) {
+  const snap = await getAdminDb().collection(orgMinutesCollectionPath(COMMUNITY_SLUG)).where("status", "==", "approved").get();
+  const records = snap.docs.map(doc => toPlain(adminView({ id: doc.id, ...doc.data() }))) as JsonRecord[];
+  records.sort((a, b) => Number(b.eventDate ?? 0) - Number(a.eventDate ?? 0));
+  return asJson(records) as JsonRecord[];
 }
 
 // ---- Broadcasts ----
 
 export async function listBroadcasts(_check: AdminCheck) {
-  const snap = await getAdminDb().collection(orgBroadcastsCollectionPath(COMMUNITY_SLUG)).orderBy("updatedAt", "desc").limit(100).get();
+  const snap = await getAdminDb().collection(orgBroadcastsCollectionPath(COMMUNITY_SLUG)).orderBy("updatedAt", "desc").limit(ADMIN_BROADCASTS_LIMIT).get();
   return asJson(snap.docs.map(doc => toPlain({ id: doc.id, ...doc.data() }))) as JsonRecord[];
 }
 

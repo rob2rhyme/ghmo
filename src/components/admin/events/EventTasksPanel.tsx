@@ -135,10 +135,10 @@ export default function EventTasksPanel({ eventId }: { eventId: string }) {
           <Button variant="outline" size="row" onClick={() => setPicking(true)} disabled={templates.length === 0} title={templates.length === 0 ? "No templates yet. Save this event's tasks as one, or make one on the templates page." : undefined}>
             <LayoutTemplate aria-hidden="true" /> Use a template
           </Button>
-          <Button variant="outline" size="row" onClick={() => setReminding(true)} disabled={counts.open === 0}>
+          <Button variant="outline" size="row" onClick={() => setReminding(true)} disabled={counts.open === 0} title={counts.open === 0 ? "No open tasks to remind anyone about." : undefined}>
             <Mail aria-hidden="true" /> Send reminders
           </Button>
-          <Button variant="outline" size="row" onClick={() => setSaving(true)} disabled={tasks.length === 0}>
+          <Button variant="outline" size="row" onClick={() => setSaving(true)} disabled={tasks.length === 0} title={tasks.length === 0 ? "Add a task first." : undefined}>
             <Save aria-hidden="true" /> Save as template
           </Button>
           <Button size="row" onClick={() => setEditing("new")}>
