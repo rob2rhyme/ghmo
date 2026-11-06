@@ -219,6 +219,14 @@ Press **Ctrl K** (on a Mac **⌘ K**), or **Search…** at the top of any admin 
 - Use the arrow keys and **Enter**, or click. A member opens their profile, an event its edit page, minutes the editor, a group its page, a broadcast its page. When there are more than five members or minutes, **See all … matching** opens that list with your words already in its search box.
 - It never searches encrypted things: phone numbers, family, notes, the text of minutes, Plans & Issues or chat. Searching isn't recorded in the activity log. The list it searches is fetched when you first open it and kept for 10 minutes, so something added in the last few minutes may only show after that; the list pages are always up to date.
 
+## 1n. The activity log (Admin → Activity)
+
+Every change in the admin area is written down: who, what and when. **Admin → Activity** (or **See all activity** on the dashboard) shows all of it, newest first, 50 at a time; press **Load older** for more. (Added 2026-11-06, plan §29.)
+- **Filters:** a **Person**, an **Area** (members, events and tasks, minutes, broadcasts, positions and groups, calls, admins and security, other) and **From** / **To** dates. The search box narrows what is already on screen by a word.
+- **Open an entry** to see **what changed** (before → after, for plain fields such as a name or a status; phone numbers, notes and other encrypted things are never stored in the log) and **Open the record** while it still exists.
+- **Super admins** also see the internet address and browser of each entry, and can press **Download CSV** for a copy of what the filters show (up to 5,000 lines). The download is itself recorded.
+- Nothing here can be changed or deleted, by anyone. Reading the page is not recorded.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

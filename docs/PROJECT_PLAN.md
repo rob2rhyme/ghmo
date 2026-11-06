@@ -221,7 +221,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 | **21** | Members list on phones, and changing many at once | **Built 2026-11-06 (21-A, 21-B, 21-C; §28.6 to §28.8).** Also: Set holder offers members' relatives (21-C). Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
-| **22** | Activity log page | **Planned 2026-11-06 (§29).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 accepted 2026-11-06. | Owner runs the Firestore deploy for the two new indexes after it ships. |
+| **22** | Activity log page | **Built 2026-11-06 (22-A, 22-B; §29.6, §29.7).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 accepted 2026-11-06. | Owner runs the Firestore deploy for the two new indexes after it ships. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1830,7 +1830,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **Someone not on the member list yet** now also takes a phone number instead of an email on an unlocked device (encrypted the same way). On a locked device an email is still needed, with a pointer to unlock or use the Members page.
 - Browser spec `family-officer.spec.ts`: a relative with a number becomes treasurer and a member (number not in plain text, no consent); she then shows as a member, not a relative; a relative with neither email nor number can't be saved until one is given.
 
-## 29. Phase 22 — Activity log page (planned 2026-11-06; decisions accepted 2026-11-06)
+## 29. Phase 22 — Activity log page (planned 2026-11-06; decisions accepted; 22-A and 22-B built 2026-11-06)
 
 **Goal.** Every change in the admin area writes a line to the activity log (who, what, when, the internet address and browser), but the only place to read it is the dashboard's **Recent activity**, which shows the last 8 entries. The go-live checklist, the runbook and the admin guide keep saying "check the activity log", and after an incident the board needs to answer "who changed this, and when?". Phase 22 adds a page that reads the whole log.
 
@@ -1881,3 +1881,10 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - `GET /api/admin/activity` (any active admin, rate limited, not logged; the list of people on the first page) and `POST /api/admin/activity/export` (super admins, up to 5,000 rows with device details, logged as `activity_exported`: "downloaded the activity log").
 - `firestore.indexes.json`: `auditLogs` (`actor.uid`, `createdAt` desc) and (`action`, `createdAt` desc). **Run `npx firebase deploy --only firestore` once this ships.**
 - Browser spec `activity-log.spec.ts`: paging 50 + 12, each filter, bad filters refused, no device details or download for a plain admin; a super admin's device details and CSV (61 lines), the download logged, and the log untouched.
+
+### 29.7 22-B built (2026-11-06)
+
+- `/admin/activity` (`ActivityClient.tsx`): Person, Area, From and To filters (a change reloads from the newest), a box that narrows what's on screen, entries that open to **What changed** (a small table), **Open the record** and, for super admins, the address and browser; **Load older**; **Download CSV** for super admins. Empty and failed states in plain words.
+- **Activity** in the admin menu under Account (and so in Search), and **See all activity** on the dashboard's Recent activity card.
+- Browser spec (`activity-log.spec.ts`, third test): from the dashboard link to 50 entries, an entry's changes and record link, Load older to 62, the Minutes area, a person, a word; a plain admin has no device line or Download; a super admin's device line and a CSV download that is logged as "1 entry (Minutes)".
+- Docs: admin guide §1n, a runbook section on reading the log in an incident (and case P points to it), and a go-live checklist step for the new indexes.

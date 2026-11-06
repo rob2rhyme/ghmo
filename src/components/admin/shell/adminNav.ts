@@ -1,26 +1,5 @@
 import type { Route } from "next";
-import {
-  CalendarDays,
-  FileSignature,
-  FolderOpen,
-  ListChecks,
-  Landmark,
-  Medal,
-  LayoutDashboard,
-  LockKeyhole,
-  Mail,
-  MessagesSquare,
-  Megaphone,
-  Network,
-  PhoneCall,
-  NotebookPen,
-  ScrollText,
-  ShieldCheck,
-  Users,
-  UserCog,
-  UsersRound,
-  type LucideIcon
-} from "lucide-react";
+import { CalendarDays, FileSignature, FolderOpen, History, Landmark, LayoutDashboard, ListChecks, LockKeyhole, Mail, Medal, Megaphone, MessagesSquare, Network, NotebookPen, PhoneCall, ScrollText, ShieldCheck, UserCog, Users, UsersRound, type LucideIcon } from "lucide-react";
 
 export type AdminNavItem = {
   href: Route;
@@ -74,6 +53,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/admins", label: "Admins", icon: UserCog, keywords: "add an admin, turn off, turn on, remove access, super admin, role, who is an admin", superAdminOnly: true },
       { href: "/admin/security", label: "Security", icon: ShieldCheck, keywords: "passkey, authenticator, sign-in, password, two-step, notifications" },
+      { href: "/admin/activity", label: "Activity", icon: History, keywords: "activity log, audit, who changed, history, record, download" },
       { href: "/admin/encryption", label: "Encryption", icon: LockKeyhole, keywords: "devices, unlock, recovery key, approve device, lock" }
     ]
   }

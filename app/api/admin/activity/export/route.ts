@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       orgSlug: COMMUNITY_SLUG,
       action: "activity_exported",
       actor: auditActor(actor, admin),
-      resource: { type: "activity", id: "export", summary: `${rows.length} entries${filterWords ? ` (${filterWords})` : ""}` },
+      resource: { type: "activity", id: "export", summary: `${rows.length} ${rows.length === 1 ? "entry" : "entries"}${filterWords ? ` (${filterWords})` : ""}` },
       after: { rows: rows.length },
       meta: auditMeta(req, ROUTE)
     });

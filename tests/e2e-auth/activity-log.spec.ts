@@ -102,3 +102,55 @@ test("a super admin sees device details and downloads the filtered log, and the 
   // Nothing in the log was changed or removed.
   expect((await db.collection(`${ORG}/auditLogs`).where("action", "==", "member_updated").get()).size).toBe(60);
 });
+
+test("the Activity page: filters, Load older, what changed and the record link; device details and Download only for a super admin", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const bobPage = await browser.newPage();
+  await signInWithNewPasskey(bobPage, "bob", "/admin");
+  await seedLog();
+  await bobPage.getByRole("link", { name: "See all activity" }).click();
+  await bobPage.waitForURL(/\/admin\/activity$/);
+  const list = bobPage.getByRole("list", { name: "Activity" });
+  const entries = list.getByTestId("activity-entry");
+  await expect(entries).toHaveCount(50);
+  await expect(bobPage.getByRole("button", { name: "Download CSV" })).toHaveCount(0);
+
+  // Open an entry: what changed, and a link to the member.
+  await entries.first().getByRole("button").click();
+  const table = entries.first().getByRole("table", { name: "What changed" });
+  await expect(table.getByRole("row", { name: /name Asha Asha Rai/ })).toBeVisible();
+  await expect(entries.first().getByRole("link", { name: "Open the record" })).toHaveAttribute("href", "/admin/members/mem1");
+  await expect(entries.first().getByTestId("activity-device")).toHaveCount(0);
+
+  await bobPage.getByRole("button", { name: "Load older" }).click();
+  await expect(entries).toHaveCount(62);
+  await expect(bobPage.getByRole("button", { name: "Load older" })).toHaveCount(0);
+
+  // Filters: an area, then a person, then a word on screen.
+  await bobPage.getByLabel("Area").selectOption({ label: "Minutes" });
+  await expect(entries).toHaveCount(1);
+  await expect(entries.first()).toContainText("Alice");
+  await bobPage.getByRole("button", { name: "Clear filters" }).click();
+  await bobPage.getByLabel("Person").selectOption({ label: "Alice" });
+  await expect(entries).toHaveCount(2);
+  await bobPage.getByLabel("Narrow what's shown").fill("approved");
+  await expect(entries).toHaveCount(1);
+  await bobPage.close();
+
+  const alicePage = await browser.newPage();
+  await signInWithNewPasskey(alicePage, "alice", "/admin/activity");
+  await seedLog();
+  await alicePage.reload();
+  await alicePage.getByLabel("Area").selectOption({ label: "Minutes" });
+  const aliceEntries = alicePage.getByRole("list", { name: "Activity" }).getByTestId("activity-entry");
+  await expect(aliceEntries).toHaveCount(1);
+  await aliceEntries.first().getByRole("button").click();
+  await expect(aliceEntries.first().getByTestId("activity-device")).toHaveText("From 198.51.100.7");
+  const downloading = alicePage.waitForEvent("download");
+  await alicePage.getByRole("button", { name: "Download CSV" }).click();
+  const file = await downloading;
+  expect(file.suggestedFilename()).toMatch(/^ghmo-activity-\d{4}-\d{2}-\d{2}\.csv$/);
+  await expect(alicePage.getByText("Downloaded. The download is recorded in the activity log.")).toBeVisible();
+  expect((await db.collection(`${ORG}/auditLogs`).where("action", "==", "activity_exported").get()).docs[0].get("resource.summary")).toBe("1 entry (Minutes)");
+  await alicePage.close();
+});

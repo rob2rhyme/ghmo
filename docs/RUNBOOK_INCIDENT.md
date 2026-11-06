@@ -135,7 +135,7 @@ This is for a person's profile (plan §17). It is not legal advice: if you are u
 
 This is for a file made with **Admin → Members → Export list** (plan §19). The file is a plain spreadsheet: anyone who has it can read it.
 
-1. **Find out what it holds.** Open the activity log and look for "downloaded the member list": it shows who, when, how many people and whether phone numbers were included. It never shows the people themselves.
+1. **Find out what it holds.** Open **Admin → Activity** (Area: Members) and look for "downloaded the member list": it shows who, when, how many people and whether phone numbers were included. It never shows the people themselves.
 2. **Get it back or deleted.** Ask the person who exported it where the file went (their downloads folder, email, a chat, a shared drive, a phone) and have every copy deleted, including cloud sync copies and email attachments. Ask whoever received it to delete it and tell you they did.
 3. **If it had phone numbers, or it reached someone it should not have:** treat it as a lost list of private details. Tell the board the same day. People on it have not been told that anything was wrong with the app, but their numbers may be known, so decide together whether to tell them (the list has the names and the dates).
 4. **Close the gap.** If the person should not be exporting, a super admin turns their admin access off (Admin → Admins, case B step 2). If a device was lost, follow case L. Agree who may keep exported files and for how long, and write it down.
@@ -165,6 +165,10 @@ This is for a file made with **Admin → Members → Export list** (plan §19). 
 5. **Settings missing:** when every admin page says "The site isn't set up to do this yet" or "This can't be loaded right now", a Firebase admin variable is usually missing or wrong in Vercel. A super admin who can still sign in sees what is missing on the dashboard's **Site setup** card; otherwise compare Vercel's variables with `.env.example`, fix, and redeploy.
 6. **Data deleted by mistake:** stop further changes to that area. If scheduled backups are on (go-live checklist §2), restore the latest backup **into a new database** (`gcloud firestore backups list`, then `gcloud firestore databases restore --source-backup=… --destination-database=restore-YYYYMMDD`), copy back only what was lost, then delete the restored database. With point-in-time recovery on, a read at a time in the last 7 days can do the same. Never restore over the live database.
 7. **Record it** in Plans & Issues: what broke, the Ref code, what fixed it.
+
+## Reading the activity log in an incident
+
+Open **Admin → Activity**. Filter by **Person** (the account you are worried about), the **Area**, and the **dates**, then open entries to see what changed. A **super admin** also sees the internet address and browser of each entry, and can press **Download CSV** to keep a copy of exactly what the filters show (the download is itself recorded). Nothing in the log can be changed or deleted from the site. Added 2026-11-06 (plan §29).
 
 ## After any incident
 
