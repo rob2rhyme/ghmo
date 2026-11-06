@@ -186,6 +186,17 @@ If the button says this browser cannot receive push, you opened the site in Safa
 - The card says push is not set up on this site: the site's push keys have not been added yet. Tell whoever manages the website; the steps are in the go-live checklist.
 - A device that has not been sent an alert yet says so under its name; send a test by asking another admin to post in Admin chat.
 
+## 1k. Who can sign in (Admin → Admins, super admins only)
+
+The **Admins** page lists everyone who can sign in to the admin area: super admins first, you marked **You**, each person's role (**Super admin** or **Admin**), whether they are **Active** or **Turned off**, their email and when they last signed in. Only super admins see the page and its link.
+
+- **Add an admin:** enter their name and email and choose the role, then **Add admin**. Nothing is emailed. Tell them to open the admin sign-in page and enter that email; they then set up their authenticator app as usual. An address already on the list is refused (if that person is turned off, turn them back on instead).
+- **Turn off…:** they can no longer sign in, and any open session ends within about a minute. Nothing they wrote is removed, and you can **Turn on** again at any time. Keep "Also turn off their push notification devices" ticked unless you have a reason not to. Afterwards the page reminds you to revoke their encryption devices under **Admin → Encryption** if they used encryption; that needs your own unlocked device, so it is a separate step.
+- **Make super admin / Make admin:** a super admin can also manage admins, delete members, set officers, edit the calling tree and control push for the whole site. Only give it to someone the board trusts with that.
+- **Fix name:** for a typo. An email address can't be changed, because a wrong one would lock the person out or let someone else in: add the right address as a new admin and turn the wrong one off.
+- **What the page will not let you do:** turn yourself off or change your own role (ask another super admin), or turn off or demote the last active super admin (make someone else a super admin first). These checks are made on the server, even if two super admins act at the same moment.
+- Every change is written to the activity log, with the admin's name and what changed, never their email.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
