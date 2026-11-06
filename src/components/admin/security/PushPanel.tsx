@@ -8,14 +8,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Skeleton } from "@/src/components/ui/skeleton";
-import { notificationCopy } from "@/src/lib/notifications";
-import { isPushKind } from "@/src/lib/push";
+import { pushKindLabel } from "@/src/lib/push";
 
 type Device = { id: string; label: string; kinds: string[]; createdAt: number | null; lastSentAt: number | null };
-type PushState = { configured: boolean; publicKey: string | null; kinds: string[]; devices: Device[] };
-
-/** What each kind says: the very words the notification shows, from the one place that holds them. */
-const kindLabel = (kind: string) => (isPushKind(kind) ? notificationCopy(kind).subject : kind);
+type PushState = { configured: boolean; siteEnabled: boolean; publicKey: string | null; kinds: string[]; devices: Device[] };
 
 const supported = () => typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
@@ -189,6 +185,11 @@ export default function PushPanel() {
       description="A short alert on your phone or computer when something needs you. It never shows names, messages or titles, only that there is something new, and you get at most one of each kind a minute."
     >
       <div className="flex flex-col gap-3">
+        {state.configured && !state.siteEnabled ? (
+          <Alert>
+            <AlertDescription>Push notifications are switched off for the whole site by a super admin, so none are being sent right now. Your devices stay as they are and start again when it is switched back on.</AlertDescription>
+          </Alert>
+        ) : null}
         {!state.configured ? (
           <Alert>
             <AlertDescription>Push notifications aren&apos;t set up on this site yet, so nothing can be sent. Ask whoever manages the website to add the push keys.</AlertDescription>
@@ -246,7 +247,7 @@ export default function PushPanel() {
                           disabled={busy}
                           onChange={event => void setKind(device, kind, event.target.checked)}
                         />
-                        {kindLabel(kind)}
+                        {pushKindLabel(kind)}
                       </label>
                     ))}
                   </div>

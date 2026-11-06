@@ -111,3 +111,6 @@ export function cleanKinds(input: unknown): PushKind[] {
   if (!Array.isArray(input)) return [...PUSH_KINDS];
   return PUSH_KINDS.filter(kind => input.includes(kind));
 }
+
+/** What an alert says, for lists on the Security page: the very words the notification shows. */
+export const pushKindLabel = (kind: string): string => (isPushKind(kind) ? notificationCopy(kind).subject : kind);

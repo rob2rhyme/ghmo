@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isSuperAdmin, requireActiveAdmin, requireSuperAdmin } from "@/src/lib/admin";
+import { isSuperAdmin, listAdmins, requireActiveAdmin, requireSuperAdmin } from "@/src/lib/admin";
 import { auditActor, auditMeta, envUnavailable, routeError } from "@/src/lib/adminRoute.server";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -11,13 +11,19 @@ export const dynamic = "force-dynamic";
 
 const ROUTE = "/api/admin/push-settings";
 
+async function settingsView(canChange: boolean) {
+  const settings = await readPushSettings();
+  const by = settings.updatedBy ? (await listAdmins(COMMUNITY_SLUG)).find(admin => admin.id === settings.updatedBy) : undefined;
+  return { ...settings, updatedByName: by?.name ?? null, configured: Boolean(pushConfig()), canChange };
+}
+
 /** Whether push is on for the whole site (plan §21, D49). Any admin may read it; only a super admin may change it. */
 export async function GET(req: NextRequest) {
   const unavailable = envUnavailable();
   if (unavailable) return unavailable;
   try {
     const { admin } = await requireActiveAdmin(req, COMMUNITY_SLUG);
-    return NextResponse.json({ ...(await readPushSettings()), configured: Boolean(pushConfig()), canChange: isSuperAdmin(admin) });
+    return NextResponse.json(await settingsView(isSuperAdmin(admin)));
   } catch (error) {
     return routeError(error);
   }
@@ -43,7 +49,7 @@ export async function PUT(req: NextRequest) {
       after: { enabled: parsed.data.enabled },
       meta: auditMeta(req, ROUTE)
     });
-    return NextResponse.json({ ok: true, ...(await readPushSettings()), configured: Boolean(pushConfig()), canChange: true });
+    return NextResponse.json({ ok: true, ...(await settingsView(true)) });
   } catch (error) {
     return routeError(error);
   }
