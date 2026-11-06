@@ -153,6 +153,18 @@ This is for a file made with **Admin → Members → Export list** (plan §19). 
 7. **A device that never receives anything:** its record says "No alert has been sent to it yet". If a push service reports the device as gone, the site deletes it, and the admin turns it on again. Notifications also stop if the browser's site data was cleared; turn it on again.
 8. **Record it** in Plans & Issues: the date, what happened and what was changed.
 
+## R. The site is down, shows "Something went wrong", or data was lost
+
+*Added 2026-11-06. Error pages show a short "Ref" code; it matches a line in the Vercel logs, which the free plan keeps for about an hour, so look soon.*
+
+1. **Find out how wide it is:** does the home page open? The admin area? One page only? Ask the person for the "Ref" code and the time.
+2. **Read the log:** in Vercel open the project → **Logs**, filter by the time (and the Ref code if you have one). "FAILED_PRECONDITION … index" means an index is missing: run the Firestore deploy from the go-live checklist §2. "PERMISSION_DENIED" from the browser side means the rules were not published after a release. "Notification email refused 401/403" means the Resend key or domain is wrong; "429" means the email allowance ran out.
+3. **Sign-in refused for everyone:** the sign-in limits are kept in Firestore and refuse sign-ins when Firestore can't be reached (to be safe). Check the Firebase console for an outage or a used-up free quota (Usage and billing). It recovers by itself when Firestore is back.
+4. **A bad release:** in Vercel open **Deployments**, pick the last one that worked and press **Promote to Production** (instant, no build). Then fix forward.
+5. **Settings missing:** when every admin page says "The site isn't set up to do this yet" or "This can't be loaded right now", a Firebase admin variable is usually missing or wrong in Vercel. A super admin who can still sign in sees what is missing on the dashboard's **Site setup** card; otherwise compare Vercel's variables with `.env.example`, fix, and redeploy.
+6. **Data deleted by mistake:** stop further changes to that area. If scheduled backups are on (go-live checklist §2), restore the latest backup **into a new database** (`gcloud firestore backups list`, then `gcloud firestore databases restore --source-backup=… --destination-database=restore-YYYYMMDD`), copy back only what was lost, then delete the restored database. With point-in-time recovery on, a read at a time in the last 7 days can do the same. Never restore over the live database.
+7. **Record it** in Plans & Issues: what broke, the Ref code, what fixed it.
+
 ## After any incident
 
 - Write down what happened, what you did and what you'll change. Keep it with this runbook.
