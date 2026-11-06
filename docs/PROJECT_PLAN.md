@@ -219,7 +219,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 accepted 2026-11-06. | Owner reads §22.2 before 17-A is used. |
 | **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
-| **20** | Search people and records | **Planned 2026-11-06 (§27).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 proposed. | Owner reads §27.2 and accepts or changes D70–D75 before 20-A. |
+| **20** | Search people and records | **Planned 2026-11-06 (§27).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1705,7 +1705,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Browser spec `minutes-meeting.spec.ts` (two new tests): the first-run path end to end (the meeting is a draft, absent from the public Events page, and the minutes save against it); "has minutes" disabled; the same-day offer; moving a draft from the editor with its content kept; no move button on approved minutes.
 - Admin guide §1l.
 
-## 27. Phase 20 — Search people and records (planned 2026-11-06)
+## 27. Phase 20 — Search people and records (planned 2026-11-06; decisions accepted 2026-11-06)
 
 **Goal.** The page search (Ctrl/⌘ K, or the search button in the header on phones) only finds pages. To open a member, an event or a set of minutes, an admin goes to the right list and searches there, and some lists have no search at all (Events, Broadcasts, §24.3). Phase 20 makes the same box find records by name, so "Asha" or "picnic" is two keystrokes and Enter away.
 
@@ -1719,7 +1719,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 | Firestore has no text search, and each document read counts against the free daily quota (about 50,000). The Members page already reads every member on each visit. | Firestore | Load one compact index (names, titles and dates only) when the palette first opens, keep it in the page's memory for 10 minutes, and match in the browser as the admin types. No query per keystroke, and no new index or stored search field. |
 | The Members and minutes lists have their own search box, but nothing can link to a search. | `MembersClient.tsx`, `MinutesSearchClient.tsx` | "See all matching members" opens the Members page with the words already in its search box (`?q=`). |
 
-### 27.2 Decisions (proposed; accept or change before 20-A)
+### 27.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1747,3 +1747,8 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **Database reads:** each first opening reads every member, event, minutes record, group, position term and broadcast once (a few hundred documents for this community). If the lists grow into the thousands, a stored, cached index would be the next step.
 - **Stale results:** something added in the last 10 minutes may not show until the palette is reopened after that; the list pages are always current.
 - **Searching encrypted text** (notes, minutes text, Plans & Issues) is out of scope: it could only work in the browser after unlocking, one record at a time.
+
+### 27.6 20-A built (2026-11-06)
+
+- `src/lib/adminSearch.ts`: `normalizeForSearch` (capitals, accents and punctuation ignored; email characters kept), `scoreEntry` and `matchRecords` (every word must match; title starts, then word starts, then the rest, then the second line; newer first on a tie; fixed kind order; up to 5 per kind with the total), `searchHref` and `seeAllHref`. Unit tests in `tests/unit/adminSearch.test.ts`.
+- `src/lib/adminSearch.server.ts` and `GET /api/admin/search-index`: any active admin, rate limited (30 per 10 minutes per admin), not logged. Every read uses `select()` with only names, titles, dates and statuses; position holders come from current terms by member name. Browser spec `admin-search.spec.ts` seeds encrypted contacts, notes, minutes text, event bodies, group descriptions, term notes and broadcast bodies with one marker and checks that the marker never appears in the response.
