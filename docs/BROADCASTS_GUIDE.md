@@ -173,7 +173,12 @@ If the button says this browser cannot receive push, you opened the site in Safa
 - If your admin account is turned off, you get nothing.
 - Only people on the admin list ever get these. Members do not.
 
-**Turn it off.** Press **Turn off** next to a device (or untick one alert). Do this on any device you sell, give away or lose. You can switch off any of your own devices from any signed-in device. If you cannot sign in anywhere, ask a super admin to turn off your admin account (the runbook, case B).
+**Turn it off.** Press **Turn off** next to a device (or untick one alert). Do this on any device you sell, give away or lose. You can switch off any of your own devices from any signed-in device. If you cannot sign in anywhere, ask a super admin: they can turn off that one device (see "For super admins" below), or turn off your admin account (the runbook, case B).
+
+**For super admins** (Admin → Security, below the push card; plain admins do not see these two cards)
+- **Push for the whole site** shows whether push is on, and who last changed it and when. **Switch push off…** stops every push on every phone and computer at once, for example if something is wrong. It asks first. Email alerts are not affected, devices stay as they are, and nothing has to be set up again: **Switch push on** resumes everything. While it is off, every admin's own push card says so.
+- **Everyone's push devices** lists each admin's devices: whose it is (and "Account turned off" if that admin is off), its name, which alerts are on, when it was added and when it last got an alert. You never see a device's address. **Turn off** (it asks first) stops that device getting alerts, for example a lost phone; it does not change the person's admin access, and they can switch the device on again from that device. If you turn a disabled admin back on, check this list first: their old devices are still there.
+- Both actions are written to the activity log.
 
 **If it does not work**
 - Nothing arrives: check that your phone or computer is not in Do Not Disturb or Focus mode, that notifications are allowed for the browser (or the Home Screen app) in the device settings, and that the card says **On** for this device.
