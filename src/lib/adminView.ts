@@ -80,6 +80,7 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   minutes_approved: { verb: "approved minutes" },
   minutes_reopened: { verb: "reopened approved minutes" },
   minutes_returned_to_draft: { verb: "returned minutes to draft" },
+  minutes_moved: { verb: "moved minutes to another meeting", detail: true },
   event_created: { verb: "created an event", detail: true },
   event_updated: { verb: "updated an event", detail: true },
   event_deleted: { verb: "deleted an event", detail: true },
