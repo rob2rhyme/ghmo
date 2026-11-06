@@ -53,3 +53,74 @@ test("draft minutes move to the right meeting; every guard holds", async ({ page
   const entries = (await db.collection(`${ORG}/auditLogs`).where("action", "==", "minutes_moved").get()).docs.map(d => d.get("resource.summary"));
   expect(entries).toEqual(expect.arrayContaining(["Moved minutes from Wrong meeting to Board call", "Moved minutes from Board call to Wrong meeting"]));
 });
+
+const yesterdayInNewYork = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() - 24 * 3600_000));
+
+test("on a new site, Write minutes offers to record the meeting; it stays a draft and the minutes save against it", async ({ page }) => {
+  test.setTimeout(120_000);
+  for (const doc of (await db.collection(`${ORG}/events`).get()).docs) await doc.ref.delete();
+  for (const doc of (await db.collection(`${ORG}/minutes`).get()).docs) await doc.ref.delete();
+  await signInWithNewPasskey(page, "alice", "/admin/minutes");
+  await page.goto("/admin/minutes?mode=new");
+
+  const dialog = page.getByRole("dialog", { name: "Record a meeting that isn't listed" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Record meeting" })).toBeDisabled();
+  await dialog.getByLabel("Meeting title").fill("Board call");
+  await dialog.getByLabel("Date").fill(yesterdayInNewYork());
+  await dialog.getByLabel("Start time").fill("18:30");
+  await dialog.getByLabel("Place (optional)").fill("Phone");
+  await dialog.getByRole("button", { name: "Record meeting" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const events = (await db.collection(`${ORG}/events`).get()).docs;
+  expect(events).toHaveLength(1);
+  expect(events[0].data()).toMatchObject({ title: "Board call", status: "draft", location: "Phone" });
+  await expect(page.locator("select").first()).toHaveValue(events[0].id);
+
+  await page.getByPlaceholder("Summarize the discussion").fill("Agreed the hall booking.");
+  await page.getByRole("button", { name: "Save Minutes" }).click();
+  await expect(page.getByText("Meeting minutes saved")).toBeVisible();
+  const [minutes] = (await db.collection(`${ORG}/minutes`).get()).docs;
+  expect(minutes.data()).toMatchObject({ eventId: events[0].id, eventTitle: "Board call", status: "draft" });
+
+  // A draft meeting never reaches the public Events page.
+  await page.goto("/c/ghmo/events");
+  await expect(page.getByText("Board call")).toHaveCount(0);
+});
+
+test("the picker marks meetings with minutes, offers a meeting on the same day, and moves a draft", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signInWithNewPasskey(page, "alice", "/admin/minutes");
+  await page.goto("/admin/minutes?mode=new");
+  const picker = page.locator("select").first();
+  await expect(picker.locator('option[value="e3"]')).toHaveText(/has minutes$/);
+  await expect(picker.locator('option[value="e3"]')).toBeDisabled();
+  await expect(picker.locator('option[value="e2"]')).toBeEnabled();
+  await expect(picker.locator('option[value="e4"]')).toHaveCount(0);
+
+  // Recording a meeting on a day that already has one offers that one instead.
+  await page.getByRole("button", { name: "Record a meeting that isn't listed" }).click();
+  const dialog = page.getByRole("dialog", { name: "Record a meeting that isn't listed" });
+  await dialog.getByLabel("Date").fill("2026-10-05");
+  await expect(dialog.getByTestId("same-day")).toContainText("Board call");
+  await dialog.getByRole("button", { name: "Use this meeting" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(picker).toHaveValue("e2");
+  expect((await db.collection(`${ORG}/events`).get()).size).toBe(4);
+
+  // Draft minutes on the wrong meeting are moved without losing what was written.
+  await page.goto("/admin/minutes?mode=new&minutesId=m1");
+  await page.getByRole("button", { name: "Change meeting…" }).click();
+  const change = page.getByRole("dialog", { name: "Change meeting" });
+  await change.getByLabel("Move to").selectOption("e2");
+  await change.getByRole("button", { name: "Move minutes" }).click();
+  await expect(change).toHaveCount(0);
+  await expect(page.getByText("Minutes moved to the other meeting.")).toBeVisible();
+  expect((await db.doc(`${ORG}/minutes/m1`).get()).data()).toMatchObject({ eventId: "e2", eventTitle: "Board call", agenda: ["Budget"] });
+
+  // Approved minutes can't be moved from here.
+  await page.goto("/admin/minutes?mode=new&minutesId=m3");
+  await expect(page.getByText("To move these minutes to another meeting, return them to draft first.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change meeting…" })).toHaveCount(0);
+});
