@@ -48,9 +48,9 @@ test("an admin can record consent, an opt-out, and disable a member", async ({ p
   await expect(shown(page, "Can be emailed").first()).toBeVisible();
   expect((await byEmail("sam@example.org"))?.emailOptOutAt).toBeNull();
 
-  await page.getByRole("button", { name: "Disable", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Disable member" }).click();
-  await expect(shown(page, "Disabled").first()).toBeVisible();
+  await page.getByRole("button", { name: "Turn off…", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Turn off", exact: true }).click();
+  await expect(shown(page, "Turned off").first()).toBeVisible();
 });
 
 test("importing needs the consent attestation, skips existing people and never re-subscribes an opt-out", async ({ page }) => {

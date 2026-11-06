@@ -221,23 +221,12 @@ describe("server-only collections", () => {
   });
 });
 
-describe("blocks found untested by the 2026-11-06 audit", () => {
-  it("home blocks: anyone may read, only an admin may write", async () => {
-    await env.withSecurityRulesDisabled(async ctx => {
-      await setDoc(doc(ctx.firestore(), `${ORG}/home/blocks`), { blocks: [] });
-    });
-    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/home/blocks`)));
-    await assertSucceeds(setDoc(doc(admin(), `${ORG}/home/blocks`), { blocks: [{ type: "text" }] }));
-    await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/home/blocks`), { blocks: [] }));
-    await assertFails(setDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/home/blocks`), { blocks: [] }));
-  });
-
-  it("docgen and the legacy timeline: admins only", async () => {
-    for (const path of ["docgen/templates", "timeline/t1"]) {
-      await assertSucceeds(setDoc(doc(admin(), `${ORG}/${path}`), { x: 1 }));
-      await assertSucceeds(getDoc(doc(admin(), `${ORG}/${path}`)));
+describe("blocks found by the 2026-11-06 audit", () => {
+  it("home blocks, docgen, gumba and the old timeline are closed now that nothing uses them", async () => {
+    for (const path of ["home/blocks", "docgen/templates", "gumba/g1", "timeline/t1"]) {
+      await assertFails(getDoc(doc(admin(), `${ORG}/${path}`)));
+      await assertFails(setDoc(doc(admin(), `${ORG}/${path}`), { x: 1 }));
       await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/${path}`)));
-      await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/${path}`)));
     }
   });
 

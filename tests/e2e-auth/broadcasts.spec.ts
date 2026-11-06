@@ -141,7 +141,7 @@ test("a test email goes only to the signed-in admin, marked TEST, with the foote
 test("a cancelled broadcast cannot be edited, submitted or tested; the API refuses bad content", async ({ page }) => {
   await signInWithNewPasskey(page, "alice", "/admin/broadcasts");
   const id = await startDraft(page);
-  await page.getByRole("button", { name: "Cancel broadcast" }).click();
+  await page.getByRole("button", { name: "Cancel broadcast…" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel broadcast" }).click();
   await expect(page.locator('[data-slot="badge"]', { hasText: "Canceled" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Submit for approval" })).toHaveCount(0);

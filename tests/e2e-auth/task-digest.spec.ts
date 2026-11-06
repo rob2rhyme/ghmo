@@ -161,8 +161,8 @@ test("a super admin switches it on from the Events page and sees the last run; a
   const card = page.locator("#admin-main").locator("section", { has: page.getByRole("heading", { name: "Daily overdue digest" }) });
   await expect(card.getByText("Off", { exact: true })).toBeVisible();
   await expect(card.getByText("It has not run yet.")).toBeVisible();
-  await card.getByRole("button", { name: "Switch on" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Switch on" }).click();
+  await card.getByRole("button", { name: "Turn on" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Turn on" }).click();
   await expect(card.getByText("On", { exact: true })).toBeVisible();
   expect((await db.doc(`${ORG}/taskDigest/settings`).get()).get("enabled")).toBe(true);
   expect((await db.collection(`${ORG}/auditLogs`).where("action", "==", "task_digest_switched").get()).size).toBe(1);
@@ -171,7 +171,7 @@ test("a super admin switches it on from the Events page and sees the last run; a
   await page.reload();
   await waitForStreamedContent(page);
   await expect(card.getByText(/Last run .*: 2 people emailed/)).toBeVisible();
-  await card.getByRole("button", { name: "Switch off" }).click();
+  await card.getByRole("button", { name: "Turn off" }).click();
   await expect(card.getByText("Off", { exact: true })).toBeVisible();
   expect((await db.doc(`${ORG}/taskDigest/settings`).get()).get("enabled")).toBe(false);
 
@@ -180,7 +180,7 @@ test("a super admin switches it on from the Events page and sees the last run; a
   await signInWithNewPasskey(bob, "bob", "/admin/events");
   await waitForStreamedContent(bob);
   const bobCard = bob.locator("#admin-main").locator("section", { has: bob.getByRole("heading", { name: "Daily overdue digest" }) });
-  await expect(bobCard.getByText("Only a super admin can switch it on or off.")).toBeVisible();
+  await expect(bobCard.getByText("Only a super admin can turn it on or off.")).toBeVisible();
   await expect(bobCard.getByRole("button", { name: /Switch/ })).toHaveCount(0);
   expect((await bob.request.put("/api/admin/task-digest", { data: { enabled: true } })).status()).toBe(403);
   await bobContext.close();

@@ -49,7 +49,7 @@ export default function MemberGroupsDialog({
                   <input type="checkbox" className="size-4 shrink-0 accent-primary" checked={picked.has(group.id)} onChange={() => toggle(group.id)} />
                   <span>
                     {group.name}
-                    {!group.active ? <span className="ml-2 text-muted-foreground">(switched off)</span> : null}
+                    {!group.active ? <span className="ml-2 text-muted-foreground">(turned off)</span> : null}
                   </span>
                 </label>
               </li>

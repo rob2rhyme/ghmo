@@ -51,7 +51,7 @@ test("the callers group suggests admins as callers, flags people who need admin 
   await expect(dineshRow.getByText("Needs admin access to use My Calls")).toBeVisible();
   // A disabled member gets neither badge.
   const eshaRow = main(page).getByRole("listitem").filter({ hasText: "Esha Gurung" });
-  await expect(eshaRow.getByText("Disabled")).toBeVisible();
+  await expect(eshaRow.getByText("Turned off")).toBeVisible();
   await expect(eshaRow.getByText("Admin", { exact: true })).toHaveCount(0);
   await expect(eshaRow.getByText(/Needs admin access/)).toHaveCount(0);
 

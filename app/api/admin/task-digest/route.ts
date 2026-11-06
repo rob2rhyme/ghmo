@@ -46,7 +46,7 @@ export async function PUT(req: NextRequest) {
       orgSlug: COMMUNITY_SLUG,
       action: "task_digest_switched",
       actor: auditActor(actor, admin),
-      resource: { type: "taskDigest", id: "settings", summary: `Switched the daily task digest ${result.enabled ? "on" : "off"}` },
+      resource: { type: "taskDigest", id: "settings", summary: `Turned the daily task digest ${result.enabled ? "on" : "off"}` },
       before: { enabled: result.before },
       after: { enabled: result.enabled },
       meta: auditMeta(req, ROUTE)

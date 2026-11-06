@@ -88,7 +88,7 @@ export async function addDevice(input: { uid: string; keys: PushKeys; label: str
   const ref = subsCol().doc(id);
   const mine = await subsCol().where("uid", "==", input.uid).get();
   if (!mine.docs.some(doc => doc.id === id) && mine.size >= MAX_DEVICES_PER_ADMIN) {
-    return fail(409, `You already have ${MAX_DEVICES_PER_ADMIN} devices switched on. Turn one off first.`);
+    return fail(409, `You already have ${MAX_DEVICES_PER_ADMIN} devices turned on. Turn one off first.`);
   }
   const existing = await ref.get();
   await ref.set({
@@ -109,7 +109,7 @@ export async function addDevice(input: { uid: string; keys: PushKeys; label: str
 export async function updateDeviceKinds(uid: string, id: string, kinds: string[], now: Date = new Date()): Promise<{ ok: true } | Failure> {
   const ref = subsCol().doc(id);
   const snap = await ref.get();
-  if (!snap.exists || snap.get("uid") !== uid) return fail(404, "That device isn't switched on.");
+  if (!snap.exists || snap.get("uid") !== uid) return fail(404, "That device isn't turned on.");
   await ref.update({ kinds, updatedAt: now });
   return { ok: true };
 }
@@ -118,7 +118,7 @@ export async function updateDeviceKinds(uid: string, id: string, kinds: string[]
 export async function removeDevice(uid: string, id: string): Promise<{ ok: true } | Failure> {
   const ref = subsCol().doc(id);
   const snap = await ref.get();
-  if (!snap.exists || snap.get("uid") !== uid) return fail(404, "That device isn't switched on.");
+  if (!snap.exists || snap.get("uid") !== uid) return fail(404, "That device isn't turned on.");
   await ref.delete();
   return { ok: true };
 }
@@ -236,7 +236,7 @@ export async function listAllDevices(): Promise<AdminDeviceRow[]> {
 export async function removeAnyDevice(id: string): Promise<{ ok: true; uid: string; label: string } | Failure> {
   const ref = subsCol().doc(id);
   const snap = await ref.get();
-  if (!snap.exists) return fail(404, "That device isn't switched on.");
+  if (!snap.exists) return fail(404, "That device isn't turned on.");
   const uid = String(snap.get("uid") ?? "");
   const label = (snap.get("label") as string | undefined) || "This device";
   await ref.delete();

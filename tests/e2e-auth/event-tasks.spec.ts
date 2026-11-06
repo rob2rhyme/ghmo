@@ -141,7 +141,7 @@ test("tasks: add, give to a group and people, finish, see overdue, save as a tem
   // Deleting a group keeps its tasks but takes the group off them.
   await page.goto("/admin/groups/cooking");
   await waitForStreamedContent(page);
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete…", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete group" }).click();
   await expect.poll(async () => (await db.collection(`${ORG}/eventTasks`).where("groupId", "==", "cooking").get()).size).toBe(0);
   expect((await db.collection(`${ORG}/eventTasks`).get()).size).toBe(5);

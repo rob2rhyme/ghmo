@@ -34,9 +34,9 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 
 **If something goes wrong: the recovery plan**
 1. **A forgotten passphrase or one lost device.** Set the device up again. Another admin approves it after comparing the safety code. This is why every community should have at least three admins with approved devices.
-2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Remove selected and make new keys**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
+2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Remove selected and make new keys…**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
 3. **Every admin device is gone.** The **paper recovery key** is the way back. On the Encryption page, "Lost every device?" lets a trustee's paper copy activate a new device. You still have to sign in as an admin, so the paper alone is not enough. Treat it as highly sensitive anyway.
-4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key** with both trustees present, then **Make new keys now**. Everyone destroys the old copies.
+4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key…** with both trustees present, then **Make new keys now…**. Everyone destroys the old copies.
 5. **The worst case.** If every device is lost and no working paper key exists, the encrypted data is gone for good. That means phone numbers, admin chat and drafts. Names and emails are not encrypted, so they survive, and the numbers would have to be collected again.
 
 **Habits that make recovery work**
@@ -67,14 +67,14 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 
 - Open a campaign: pick the event (or type a title), a date the calls should be done by, and what to say. The script is encrypted; callers read it on their own devices. Everyone on the calling tree who can be called is copied in with their caller.
 - Each caller opens **My Calls**: the script, their people, **Call** to dial, then **Log call**: what happened (reached, voicemail, no answer, wrong number, call back, declined), whether they are coming, and an encrypted note. Every logged call is in the audit trail with your name, the person and the outcome, never the number or the note.
-- The board opens the campaign page: reached and attempted totals, progress per caller, who is still not reached, the full call log, **Remind callers** (an email to those with people left), **Export CSV** (names and outcomes only) and **Close campaign** when done. A closed campaign takes no more calls.
+- The board opens the campaign page: reached and attempted totals, progress per caller, who is still not reached, the full call log, **Remind callers** (an email to those with people left), **Export CSV** (names and outcomes only) and **Close campaign…** when done. A closed campaign takes no more calls.
 
 ## 1e. Officers and groups (Admin → Positions, Admin → Groups)
 
 **Positions** lists the president, treasurer, secretary, board members and the rest, with who holds each one and since when. Anyone on the board can look. Only a super admin changes it.
 - **Set holder** picks a member and the day the term starts. If someone holds a single seat, leave "End … the day before" ticked and their term closes for you.
-- **End term** stops a term after today. It moves to **Past terms** once the end date has passed, so the history stays.
-- **Remove** (in Past terms) is only for a term entered by mistake. To record that someone left, end the term instead.
+- **End term…** stops a term after today. It moves to **Past terms** once the end date has passed, so the history stays.
+- **Delete…** (in Past terms) is only for a term entered by mistake. To record that someone left, end the term instead.
 - **Add a position** or **Edit** changes the list itself, for example a "Kitchen coordinator" seat. Untick "In use" to hide a position without losing its history.
 
 **Groups** are teams of members: the phone tree callers, cooks, marketing, shopping. Any admin can make a group, add people and choose a lead. The lead has to be in the group, so add them first. To remove the lead, choose another lead first. Only a super admin can delete a group, which takes it off every member. The phone tree callers group is built in and cannot be deleted.
@@ -94,7 +94,7 @@ Open an event to edit it and scroll to **Tasks**. This is the checklist for who 
 
 ## 1g. Reminding people about their tasks (Admin → Events)
 
-On an event's **Tasks** section, **Send reminders** emails the people who own tasks. It needs the same email set-up as broadcasts (sending switched on, the email service, and the organization's name and address).
+On an event's **Tasks** section, **Send reminders** emails the people who own tasks. It needs the same email set-up as broadcasts (sending turned on, the email service, and the organization's name and address).
 - A window first shows **exactly who would be emailed** and how many tasks each has, **who can't be emailed and why**, and who was reminded in the last 24 hours. Nothing is sent until you press **Send N reminders**.
 - **Who is reminded:** the people named on a task, and the lead of the task's group (not the whole group). A person gets one email listing only their own open tasks, with due dates. Task notes are never sent.
 - **Who is not:** people with no email (phone-only members: phone them, or use the calling tree), who haven't agreed to emails, who asked to stop, or whose address bounced. They are listed in the window so you know to call.
@@ -103,7 +103,7 @@ On an event's **Tasks** section, **Send reminders** emails the people who own ta
 - Every email has an unsubscribe link, and unsubscribing stops reminders as well as broadcasts. The audit log records who sent reminders and how many, never the names or task text.
 - If the email service is down, nothing is lost: the window says so and you can send again straight away.
 
-**The daily digest (Admin → Events, top of the page).** A super admin can switch on a **Daily overdue digest**. Every morning, around 8 or 9 AM Eastern, each person with overdue tasks gets one email listing them, grouped by event. It is **off** until someone switches it on, and any super admin can switch it off again.
+**The daily digest (Admin → Events, top of the page).** A super admin can turn on a **Daily overdue digest** (**Turn on**, which asks first). Every morning, around 8 or 9 AM Eastern, each person with overdue tasks gets one email listing them, grouped by event. It is **off** until someone turns it on, and any super admin can press **Turn off** to stop it again.
 - It covers events that are coming up or ended in the last week. Same rules as manual reminders: only members who agreed to emails, with the unsubscribe link, and a task's group goes to its lead.
 - At most 50 people a day, and never more than half of the day's email limit, so broadcasts always have room. People with the most overdue tasks come first; the rest get theirs the next day.
 - The card shows the last run, for example "2 people emailed". If it says nothing was sent, the reason is shown. A red note means the schedule secret or the email set-up is missing.
@@ -117,7 +117,7 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
 - **Edit contact** on the Members page keeps the family list.
 - **Notes:** write what happened or what you were told, then **Add note**. Each note shows your name and the date, newest first. Notes are encrypted like phone numbers, so you need this device unlocked to write or read them. A note can't be edited. You can delete your own note, and a super admin can delete anyone's. Keep notes to facts, because other admins read them. The activity log records that a note was added or deleted, never what it said. A member can have up to 200 notes.
 - **Calls:** the profile lists every call made to them for an announcement: the campaign, when, what happened (reached, voicemail, no answer…), who called and the caller's note. Above the list: how many campaigns they were in, how many attempts, and in how many they were reached.
-- **How the call went:** when a caller logs a call where the person was reached, they may choose **Polite**, **Neutral** or **Rude** (or leave it not recorded). Say how the call went, not what you think of the person. It is encrypted like notes, shows only on this profile (never in lists, exports, the campaign dashboard or the activity log), and the profile adds up the ratings: for example "1 polite · 1 rude". A super admin can press **Clear rating** if one was a mistake; the call and its note stay.
+- **How the call went:** when a caller logs a call where the person was reached, they may choose **Polite**, **Neutral** or **Rude** (or leave it not recorded). Say how the call went, not what you think of the person. It is encrypted like notes, shows only on this profile (never in lists, exports, the campaign dashboard or the activity log), and the profile adds up the ratings: for example "1 polite · 1 rude". A super admin can press **Clear rating…** if one was a mistake; the call and its note stay.
 - **What a profile holds, and who can see it:**
 
   | Item | Kept | Who can read it | Who can remove it |
@@ -130,7 +130,7 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
   | Call notes and ratings (polite, neutral, rude) | Encrypted | Admins on an approved, unlocked device | A super admin can clear a rating; a call note stays |
   | The activity log | Plain, never the text of a note, rating or number | Every admin | Not removable, even when a member is deleted |
 
-- **Deleting a member (super admin only).** At the bottom of a profile, **Delete this member** is for a removal request or a record made by mistake. If you only want to stop contacting someone, use **Disable** on the Members list: it can be undone, and deleting cannot.
+- **Deleting a member (super admin only).** At the bottom of a profile, **Delete this member** is for a removal request or a record made by mistake. If you only want to stop contacting someone, use **Turn off…** on the Members list: it can be undone, and deleting cannot.
   1. Press **Delete member…**. The dialog lists what will be removed (their record with phone numbers and family, notes, call records and ratings, their place in the calling tree, broadcast delivery records, reminder records, and their name on tasks and as a group lead) and what will stay.
   2. Type the member's name exactly as shown (capitals and spacing don't matter) and press **Delete member**. You land back on the Members list.
   3. **What stays:** officer terms stay in the history and show "Removed member"; the activity log is never edited, so older entries may still name them (the deletion itself is a new entry with the member's id and counts, never their name or email); names written in minutes or Plans & Issues text; and earlier exports and backups.
@@ -173,11 +173,11 @@ If the button says this browser cannot receive push, you opened the site in Safa
 - If your admin account is turned off, you get nothing.
 - Only people on the admin list ever get these. Members do not.
 
-**Turn it off.** Press **Turn off** next to a device (or untick one alert). Do this on any device you sell, give away or lose. You can switch off any of your own devices from any signed-in device. If you cannot sign in anywhere, ask a super admin: they can turn off that one device (see "For super admins" below), or turn off your admin account (the runbook, case B).
+**Turn it off.** Press **Turn off** next to a device (or untick one alert). Do this on any device you sell, give away or lose. You can turn off any of your own devices from any signed-in device. If you cannot sign in anywhere, ask a super admin: they can turn off that one device (see "For super admins" below), or turn off your admin account (the runbook, case B).
 
 **For super admins** (Admin → Security, below the push card; plain admins do not see these two cards)
-- **Push for the whole site** shows whether push is on, and who last changed it and when. **Switch push off…** stops every push on every phone and computer at once, for example if something is wrong. It asks first. Email alerts are not affected, devices stay as they are, and nothing has to be set up again: **Switch push on** resumes everything. While it is off, every admin's own push card says so.
-- **Everyone's push devices** lists each admin's devices: whose it is (and "Account turned off" if that admin is off), its name, which alerts are on, when it was added and when it last got an alert. You never see a device's address. **Turn off** (it asks first) stops that device getting alerts, for example a lost phone; it does not change the person's admin access, and they can switch the device on again from that device. If you turn a disabled admin back on, check this list first: their old devices are still there.
+- **Push for the whole site** shows whether push is on, and who last changed it and when. **Turn push off…** stops every push on every phone and computer at once, for example if something is wrong. It asks first. Email alerts are not affected, devices stay as they are, and nothing has to be set up again: **Turn push on** resumes everything. While it is off, every admin's own push card says so.
+- **Everyone's push devices** lists each admin's devices: whose it is (and "Account turned off" if that admin is off), its name, which alerts are on, when it was added and when it last got an alert. You never see a device's address. **Turn off…** (it asks first) stops that device getting alerts, for example a lost phone; it does not change the person's admin access, and they can turn the device on again from that device. Before you turn an admin back on, check this list first: their old devices are still there.
 - Both actions are written to the activity log.
 
 **If it does not work**
@@ -192,8 +192,8 @@ The **Admins** page lists everyone who can sign in to the admin area: super admi
 
 - **Add an admin:** enter their name and email and choose the role, then **Add admin**. Nothing is emailed. Tell them to open the admin sign-in page and enter that email; they then set up their authenticator app as usual. An address already on the list is refused (if that person is turned off, turn them back on instead).
 - **Turn off…:** they can no longer sign in, and any open session ends within about a minute. Nothing they wrote is removed, and you can **Turn on** again at any time. Keep "Also turn off their push notification devices" ticked unless you have a reason not to. Afterwards the page reminds you to revoke their encryption devices under **Admin → Encryption** if they used encryption; that needs your own unlocked device, so it is a separate step.
-- **Make super admin / Make admin:** a super admin can also manage admins, delete members, set officers, edit the calling tree and control push for the whole site. Only give it to someone the board trusts with that.
-- **Fix name:** for a typo. An email address can't be changed, because a wrong one would lock the person out or let someone else in: add the right address as a new admin and turn the wrong one off.
+- **Make super admin… / Make admin…:** a super admin can also manage admins, delete members, set officers, edit the calling tree and control push for the whole site. Only give it to someone the board trusts with that.
+- **Edit name:** for a typo. An email address can't be changed, because a wrong one would lock the person out or let someone else in: add the right address as a new admin and turn the wrong one off.
 - **What the page will not let you do:** turn yourself off or change your own role (ask another super admin), or turn off or demote the last active super admin (make someone else a super admin first). These checks are made on the server, even if two super admins act at the same moment.
 - Every change is written to the activity log, with the admin's name and what changed, never their email.
 
@@ -214,7 +214,7 @@ The **Admins** page lists everyone who can sign in to the admin area: super admi
 - On the approved broadcast, press **Send to N members**, then **Yes, send it now**.
 - It goes out in small batches with a progress bar. Keep the page open. If you close it, sending pauses; you or another admin can press **Resume sending** later. Nobody gets it twice.
 - If the day's limit is reached, the page says when it can continue (after midnight UTC, which is evening in Pennsylvania).
-- **Pause** stops after the current batch. **Cancel broadcast** stops it for good.
+- **Pause** stops after the current batch. **Cancel broadcast…** stops it for good.
 - If some deliveries failed, press **Retry N failed**.
 
 ## 5. Post it to the Messenger group chats

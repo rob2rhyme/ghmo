@@ -176,7 +176,7 @@ export default function EditEventPage() {
         </Button>
         <Button variant="ghost" className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>
           <Trash2 aria-hidden="true" />
-          Delete event
+          Delete event…
         </Button>
       </div>
       <EventTasksPanel eventId={eventId} />

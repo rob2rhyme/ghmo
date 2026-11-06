@@ -151,7 +151,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ orgSl
 
     // A member without an email is reached by phone only, so their number can't be removed.
     if (!memberHasEmail && body.contact !== undefined && !body.contact?.hasPhone) {
-      return NextResponse.json({ error: "Someone without an email needs a phone number. Disable them instead if they should no longer be contacted." }, { status: 400 });
+      return NextResponse.json({ error: "Someone without an email needs a phone number. Turn them off instead if they should no longer be contacted." }, { status: 400 });
     }
 
     if (body.contact !== undefined) {

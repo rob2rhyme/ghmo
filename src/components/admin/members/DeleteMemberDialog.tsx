@@ -65,7 +65,7 @@ export default function DeleteMemberDialog({
         >
           <DialogHeader>
             <DialogTitle>Delete {label}?</DialogTitle>
-            <DialogDescription>This cannot be undone. If you only want to stop contacting them, use Disable on the Members list instead.</DialogDescription>
+            <DialogDescription>This cannot be undone. If you only want to stop contacting them, use Turn off on the Members list instead.</DialogDescription>
           </DialogHeader>
 
           {failed ? (

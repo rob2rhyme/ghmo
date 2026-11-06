@@ -61,7 +61,7 @@ const quotaRef = (db: Firestore, day: string) => db.doc(`${orgDocPath(COMMUNITY_
 
 /** Why sending can't happen right now, or null when everything needed is in place. */
 export function sendingBlocker(config: SendingConfig, mailConfigured: boolean): string | null {
-  if (!config.enabled) return "Sending is switched off on this site. Ask whoever manages the website to turn it on.";
+  if (!config.enabled) return "Sending is turned off on this site. Ask whoever manages the website to turn it on.";
   if (!mailConfigured) return "Email sending isn't set up on this site yet.";
   if (!footerFromEnv()) return "Every broadcast needs the organization's name and postal address in its footer. Ask whoever manages the website to add them.";
   if (config.dailyLimit <= 0) return "The daily sending limit is set to zero, so nothing can be sent. Ask whoever manages the website to raise it.";
@@ -168,7 +168,7 @@ export async function sendNextChunk(deps: SenderDeps, broadcastId: string): Prom
   const data = snap.data() as Record<string, unknown>;
   if (data.status === "sent") return { ok: true, progress: await progressOf(ref) };
   if (data.status !== "sending") return fail(409, data.status === "cancelled" ? "This broadcast was canceled." : "This broadcast is not being sent.");
-  if (!deps.config.enabled) return fail(409, "Sending is switched off on this site. Ask whoever manages the website to turn it on.");
+  if (!deps.config.enabled) return fail(409, "Sending is turned off on this site. Ask whoever manages the website to turn it on.");
   if (!approvedTextMatches(data)) return fail(409, "The text no longer matches what was approved.", "CONTENT_CHANGED");
   const footer = footerFromEnv();
   if (!footer) return fail(409, "Every broadcast needs the organization's name and postal address in its footer. Ask whoever manages the website to add them.");

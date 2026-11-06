@@ -187,7 +187,7 @@ export default function PushPanel() {
       <div className="flex flex-col gap-3">
         {state.configured && !state.siteEnabled ? (
           <Alert>
-            <AlertDescription>Push notifications are switched off for the whole site by a super admin, so none are being sent right now. Your devices stay as they are and start again when it is switched back on.</AlertDescription>
+            <AlertDescription>Push notifications are turned off for the whole site by a super admin, so none are being sent right now. Your devices stay as they are and start again when it is turned back on.</AlertDescription>
           </Alert>
         ) : null}
         {!state.configured ? (

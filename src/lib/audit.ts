@@ -3,22 +3,8 @@ import { getAdminDb } from "./firebaseAdmin";
 import { COMMUNITY_ID, COMMUNITY_SLUG } from "./community";
 import { orgAuditLogsCollectionPath } from "./firestorePaths";
 
-type AuditType =
-  | "pin_login"
-  | "auth_attempt"
-  | "admin_pin_created"
-  | "admin_pin_deleted"
-  | "event_created"
-  | "event_updated"
-  | "event_deleted"
-  | "timeline_created"
-  | "timeline_updated"
-  | "timeline_deleted"
-  | "home_blocks_updated"
-  | "doc_generated"
-  | "webhook_received"
-  | "reconcile"
-  | "admin_action";
+/** The legacy `logAudit` entry kinds still written (the GoFundMe webhook). Everything else uses logAuditEvent's `action`. */
+type AuditType = "webhook_received";
 
 type AuditActor = {
   uid?: string;

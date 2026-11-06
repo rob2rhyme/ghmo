@@ -78,9 +78,9 @@ const EMAIL_STATE: Record<string, string> = {
   opted_out: "Opted out of email",
   bounced: "Email bounced",
   no_email: "No email (phone only)",
-  inactive: "Disabled"
+  inactive: "Turned off"
 };
-const CALL_STATE: Record<string, string> = { ready: "Can be called", no_consent: "No call consent", opted_out: "Asked not to be called", no_phone: "No phone number", inactive: "Disabled" };
+const CALL_STATE: Record<string, string> = { ready: "Can be called", no_consent: "No call consent", opted_out: "Asked not to be called", no_phone: "No phone number", inactive: "Turned off" };
 
 export default function MemberProfileClient({
   initialMember,
@@ -102,7 +102,7 @@ export default function MemberProfileClient({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2" aria-label="Summary">
-        <Badge variant={member.status === "active" ? "success" : "secondary"}>{member.status === "active" ? "Active" : "Disabled"}</Badge>
+        <Badge variant={member.status === "active" ? "success" : "secondary"}>{member.status === "active" ? "Active" : "Turned off"}</Badge>
         <Badge variant="secondary">{EMAIL_STATE[emailState] ?? emailState}</Badge>
         {member.hasPhone ? <Badge variant="secondary">{CALL_STATE[callState] ?? callState}</Badge> : null}
         {officerTitles.map(title => (
@@ -160,7 +160,7 @@ function DeleteMemberCard({ member }: { member: ProfileMember }) {
       as="h3"
       icon={<Trash2 aria-hidden="true" />}
       title="Delete this member"
-      description="For a removal request or a record made by mistake. It removes this person and what is held about them, and cannot be undone. To stop contacting someone, use Disable instead."
+      description="For a removal request or a record made by mistake. It removes this person and what is held about them, and cannot be undone. To stop contacting someone, use Turn off instead."
       actions={
         <Button variant="outline" size="row" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setOpen(true)}>
           <Trash2 aria-hidden="true" />
@@ -345,7 +345,7 @@ function FamilyCard({ member, onSaved }: { member: ProfileMember; onSaved: (memb
                 <Pencil aria-hidden="true" /> Edit
               </Button>
               <Button size="row" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setRemoving(index)} aria-label={`Remove ${person.name}`}>
-                Remove
+                Remove…
               </Button>
             </>
           }
@@ -641,7 +641,7 @@ function NotesCard({ member, me }: { member: ProfileMember; me: { uid: string; s
                 actions={
                   canDeleteNote(note, me) ? (
                     <Button size="row" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleting(note)} aria-label={`Delete the note from ${note.authorName || "an admin"}`}>
-                      Delete
+                      Delete…
                     </Button>
                   ) : undefined
                 }
@@ -846,7 +846,7 @@ function CallsCard({ member, me }: { member: ProfileMember; me: { uid: string; s
                             {attempt.manner && ready && manner ? <Badge variant={MANNER_VARIANT[manner]}>{MANNER_LABELS[manner]}</Badge> : null}
                             {attempt.manner && me.superAdmin ? (
                               <Button size="sm" variant="ghost" onClick={() => setClearing({ campaignId: entry.campaign.id, attemptId: attempt.id })} aria-label={`Clear the rating on the ${OUTCOME_LABELS[attempt.outcome].toLowerCase()} call by ${data.callerNames[attempt.byUid] ?? "an admin"}`}>
-                                Clear rating
+                                Clear rating…
                               </Button>
                             ) : null}
                           </span>

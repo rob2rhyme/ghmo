@@ -98,12 +98,12 @@ test("editing an event loads it, missing events say so, and delete asks first", 
   await expect(page.getByLabel("Place")).toHaveValue("Community hall");
 
   // Delete opens a confirmation; cancelling keeps the event.
-  await page.getByRole("button", { name: "Delete event" }).click();
+  await page.getByRole("button", { name: "Delete event…" }).click();
   await expect(page.getByRole("dialog", { name: "Delete this event?" })).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
   expect((await admin().db.doc("organizations/ghmo/events/ev1").get()).exists).toBe(true);
 
-  await page.getByRole("button", { name: "Delete event" }).click();
+  await page.getByRole("button", { name: "Delete event…" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete event" }).click();
   await page.waitForURL(/\/admin\/events$/);
   expect((await admin().db.doc("organizations/ghmo/events/ev1").get()).exists).toBe(false);

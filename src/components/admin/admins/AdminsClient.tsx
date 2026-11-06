@@ -156,7 +156,7 @@ export default function AdminsClient() {
       const data = await call<ListAnswer>(`/api/admin/admins/${encodeURIComponent(target.id)}`, "PATCH", { name: nextName });
       setAdmins(data.admins);
       setRenaming(null);
-      toast.success("Name saved");
+      toast.success("Name updated");
     });
 
   return (
@@ -205,8 +205,8 @@ export default function AdminsClient() {
               meta={`${item.email} · ${item.lastLoginAt ? `Last signed in ${dayText(item.lastLoginAt)}` : "Has not signed in yet"}`}
               actions={
                 <>
-                  <Button variant="outline" size="row" disabled={busy} onClick={() => setRenaming(item)} aria-label={`Fix the name of ${item.name}`}>
-                    Fix name
+                  <Button variant="outline" size="row" disabled={busy} onClick={() => setRenaming(item)} aria-label={`Edit name of ${item.name}`}>
+                    Edit name
                   </Button>
                   {!item.isYou ? (
                     <>
@@ -218,7 +218,7 @@ export default function AdminsClient() {
                         aria-label={item.role === "super_admin" ? `Make ${item.name} an ordinary admin` : `Make ${item.name} a super admin`}
                       >
                         <ShieldCheck aria-hidden="true" />
-                        {item.role === "super_admin" ? "Make admin" : "Make super admin"}
+                        {item.role === "super_admin" ? "Make admin…" : "Make super admin…"}
                       </Button>
                       {item.active ? (
                         <Button
@@ -327,7 +327,7 @@ function RenameDialog({ admin, busy, onClose, onSave }: { admin: AdminView; busy
           }}
         >
           <DialogHeader>
-            <DialogTitle>Fix the name of {admin.name}</DialogTitle>
+            <DialogTitle>Edit name: {admin.name}</DialogTitle>
             <DialogDescription>For a typo. Their email address can&apos;t be changed: add the right address as a new admin and turn this one off.</DialogDescription>
           </DialogHeader>
           <Field label="Name">

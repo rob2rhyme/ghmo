@@ -1537,7 +1537,15 @@ Four read-only reviews ran in parallel (docs against code; API routes, rules and
 ### 23.2 For the owner to decide (not changed)
 
 1. **Decisions still marked "proposed":** D32–D36 (§18.2), D41–D46 (§20.2), D47–D50 (§21.2), D51–D56 (§22.2). They were built as recommended; mark them accepted or say what to change.
-2. **Code with no caller** (kept until you decide): the three timeline routes and their rules block, `POST /api/admin/comms/seed`, `POST /api/admin/content` (writes home blocks, which the rules make world-readable, with little validation; no page shows them), the `gumba` rules block (no code uses it), the `docgen` rules block (admins may write from the browser), two unused path helpers, unused entries in the `AuditType` list and three unused `NEXT_PUBLIC_*` flags in `env.client.ts`. Removing them is small; it needs the rules published again.
+2. **Code with no caller:** *done 2026-11-06, see §23.3.* Was: the three timeline routes and their rules block, `POST /api/admin/comms/seed`, `POST /api/admin/content` (writes home blocks, which the rules make world-readable, with little validation; no page shows them), the `gumba` rules block (no code uses it), the `docgen` rules block (admins may write from the browser), two unused path helpers, unused entries in the `AuditType` list and three unused `NEXT_PUBLIC_*` flags in `env.client.ts`. Removing them is small; it needs the rules published again.
 3. **Older activity entries** still hold member and admin emails, and the dashboard returns full entries (with IP addresses) and raw GoFundMe webhook payloads to admins. Admin-only, but worth knowing.
-4. **Wording:** members use Disable/Enable, admins use Turn off/Turn on, groups say Switched off; records are "deleted" in some places and "removed" in others. Harmless; can be made consistent in one pass if wanted.
+4. **Wording:** *done 2026-11-06, see §23.3.* Was: members use Disable/Enable, admins use Turn off/Turn on, groups say Switched off; records are "deleted" in some places and "removed" in others. Harmless; can be made consistent in one pass if wanted.
 5. **Not covered by a browser test:** the GoFundMe webhook (signature-checked; covered by unit tests of its parts) and a few routes that are only driven through other pages.
+
+### 23.3 Follow-up (2026-11-06): dead code removed, wording made consistent
+
+**Dead code removed** (the owner chose §23.2 items 2 and 4):
+- **Routes with no caller:** `app/api/admin/timeline`, `app/api/admin/organizations/[orgSlug]/timeline/[entryId]`, `app/api/organizations/[orgSlug]/gumba/timeline`, `POST /api/admin/comms/seed`, `GET/POST /api/admin/content` (the home-blocks route, whose data the rules made world-readable with no page showing it), and `src/lib/adminCommunity.ts`, which only that route used.
+- **Firestore rules:** the `home/blocks`, `gumba`, `docgen` and `timeline` blocks and the `isMember()` function, which only the gumba block used. Those paths now fall to the default deny; the server's admin SDK, which is not subject to rules, still reads `docgen` for the document templates. Rules tests check that all four are closed to browsers. **The rules must be published again.**
+- **Small leftovers:** the unused `docgen/templates`, `docgen/generations`, `timeline` and `home/blocks` path helpers, the legacy `AuditType` entries nothing writes any more (only `webhook_received` remains), and three `NEXT_PUBLIC_*` flags in `env.client.ts` that nothing read.
+- The dashboard keeps its words for the removed actions, so older activity entries still read correctly.
