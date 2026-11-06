@@ -310,6 +310,25 @@ describe("push notification devices (plan §18)", () => {
   });
 });
 
+describe("do-not-email records (plan §20)", () => {
+  const path = `${ORG}/emailSuppressions/abc123`;
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), path), { reason: "opted_out", at: new Date() });
+    });
+  });
+
+  it("is closed to every browser, an admin included", async () => {
+    const disabled = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
+    for (const db of [admin(), disabled, env.authenticatedContext("someone").firestore(), env.unauthenticatedContext().firestore()]) {
+      await assertFails(getDoc(doc(db, path)));
+      await assertFails(setDoc(doc(db, `${ORG}/emailSuppressions/new`), { reason: "opted_out" }));
+      await assertFails(setDoc(doc(db, path), { reason: "bounced" }, { merge: true }));
+    }
+  });
+});
+
 describe("notes on a member's profile (plan §17, 13-B)", () => {
   const path = `${ORG}/members/m1/notes/n1`;
 

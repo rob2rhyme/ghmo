@@ -213,6 +213,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **12** | Reminders to team members | **Built and merged 2026-11-05 (12-A to 12-C, §16.6; PRs #95 and #96).** Email reminders about the tasks a person owns: sent by an admin from the event page (12-A), and an optional automatic daily digest of overdue tasks that is off until a super admin switches it on (12-B). Consented members only, with the unsubscribe link and the shared daily email limit. Admins only trigger it. Decisions D21–D26 taken as recommended. | Owner adds `CRON_SECRET` in Vercel if they want the digest, publishes the Firestore rules again, and sends one test reminder (go-live checklist). |
 | **13** | Member profile | **Built 2026-11-05 (13-A to 13-D, §17.6).** A page per member with how long they have been a member, city and state (no street address), family members with optional phone numbers, a log of notes admins add, the history of calls to them, and how polite or rude each call was. Admins only. Decisions D27–D31 taken as recommended. | Owner reads §17.2 (what is encrypted, who can write notes and ratings) and §17.5 (privacy). |
 | **14** | Push notifications | **Built 2026-11-06 (14-A, 14-B, 14-C; §18.6 to §18.8).** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner sets the three `VAPID_*` variables in Vercel and publishes the Firestore rules (go-live checklist) before push is used. |
+| **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 proposed. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1245,7 +1246,7 @@ Out of scope: pushes to members, notification text with content, SMS or voice al
 - Admin guide §1h now has a table of what a profile holds, where each item is kept (plain or encrypted), who can read it and who can remove it, and advice on what to write in a note.
 - Runbook case O: a member asks what is held about them or to have it removed (verify who is asking, what is held, stopping contact, removal in the app by a super admin, what stays and why, and a manual console step for full deletion with a line recorded in Plans & Issues).
 - Go-live checklist: the Phase 13 line (rules, agreeing what notes and ratings are for, a test on a test member, knowing case O).
-- **A gap to decide:** the app has no "Delete member" for a super admin. A member record can only be disabled; full erasure is a manual Firebase console step (case O step 6) that is not in the activity log. If requests become common, a super-admin Delete member (removing the member document and its notes, keeping the call rows as anonymous records, and logging the deletion) would be a small follow-up.
+- **A gap, closed by Phase 15 (§20):** the app had no "Delete member" for a super admin; full erasure was a manual Firebase console step. A super admin can now delete a member from the profile, with a preview, a typed confirmation and an activity-log entry.
 - Phase 13 is complete. Not built, as listed in §17.5: a street address, photos, member self-service or a member-facing profile, scoring or ranking members, exporting profiles, and any automatic use of manner ratings.
 
 ### 18.6 14-A built (2026-11-06)
@@ -1286,3 +1287,81 @@ Built: `src/lib/memberExport.ts` (pure; formulas such as `=HYPERLINK(...)` are m
 - **Go-live checklist:** the keys line from 14-A already covers the three `VAPID_*` variables, the Firestore rules, per-device turn-on and a two-admin test; it now points at the per-alert switches and the broadcast test.
 - **Runbook case Q:** a push to the wrong person (disable the admin; a disabled admin gets nothing), too many alerts (untick kinds), a lost or sold phone (turn the device off from another device; an admin cannot see anyone else's devices, so ask the owner or disable the account), content that should not be there (a bug), stopping all pushes at once (remove a `VAPID_*` variable and redeploy; email is unaffected), a leaked key (new pair, every device switched on again), and a device that never receives anything. Case L (a caller's lost device) now points to it.
 - **Known gaps, not built:** a super admin cannot list or remove another admin's push devices (the data is server-only and per person); there is no site-wide switch besides removing a key; devices that never answer are not cleaned up automatically, only ones a push service reports as gone. Each is small if the board wants it.
+
+## 20. Phase 15 — Delete a member (planned 2026-11-06)
+
+**Goal.** Today the app can only **disable** a member. A person who asks to be removed, or a record added by mistake, needs a manual step in the Firebase console (runbook case O step 6), which is easy to get wrong and is not in the activity log. Phase 15 lets a **super admin** remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record.
+
+### 20.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| A member is one document, with a `notes` subcollection, and group membership is an array on it. | `members/{id}`, `members/{id}/notes/*` | Deleting the document alone would leave the notes behind: both go. |
+| Other collections point at a member by id: the calling-tree assignment (`callingTree/current/assignments/{memberId}`), call rows (`callCampaigns/{id}/calls/{memberId}` with attempts, encrypted notes and ratings), broadcast delivery rows (`broadcasts/{id}/deliveries/{memberId}`), task reminder records (`eventTaskReminders/{eventId}~{memberId}`, `digest~{memberId}`), task assignee lists (`eventTasks.memberIds[]`), group leads (`groups.leadMemberId`) and officer terms (`positionTerms.memberId`). | `*.server.ts` | Each is cleaned up, except officer terms (D43). |
+| A member's email opt-out, bounce and complaint live on the member document. | `memberSuppression.server.ts` | Deleting that document would silently erase the opt-out, and re-adding the address would make them emailable again. A small record is kept (D44). |
+| The broadcast sender already skips a recipient whose member document is gone. | `broadcastSender.server.ts` | A broadcast in the middle of sending is safe. |
+| The activity log is append-only and its entries are written by the server. | rules, `audit.ts` | It is not edited (D43), and the deletion itself is recorded. |
+
+### 20.2 Decisions (proposed; accept or change before 15-A is used)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D41 | Who, and how? | A super admin only, one member at a time. The dialog first shows what will be removed and kept (with counts), and the person types the member's name (or their email, when there is no name) to confirm. 20 deletions an hour. | No bulk delete and no accidental click. |
+| D42 | What is removed? | The member record (name, email, status, consent history, member since, city and state, the encrypted contact with phone numbers and family), all their notes, their calling-tree assignment, their call rows in every campaign (attempts, notes and ratings), their broadcast delivery rows, their reminder records, and their id from task assignee lists, group leads and group membership. | Nothing about the person is left that points to them by id except the items in D43. |
+| D43 | What is kept? | (a) Officer terms stay as history; they show "Removed member" instead of a name. (b) The activity log is never rewritten, so older entries may still name them; the deletion is added as a new entry that records the member's id and counts, not their name or email. (c) Minutes attendance lists and Plans & Issues text are free text and are not touched. (d) Earlier exports and backups. | The runbook says so plainly, so a board does not promise more than the app does. |
+| D44 | What if they had opted out of email, or the address bounced or complained? | A "do not email" record is kept: a one-way hash of the address (never the address), the reason and the date. Adding or importing that address again creates the member already opted out, until an admin records new consent. | Deleting cannot be used to get around an unsubscribe. |
+| D45 | How is a half-finished deletion handled? | The member document is deleted last. Every earlier step is safe to repeat, so a failure part way can be retried and finishes the job. | No half-deleted member who looks whole. |
+| D46 | Delete or disable? | Disable stays the normal way to stop contact. Delete is for a removal request or a record made by mistake. The dialog says so. | Fewer irreversible actions. |
+
+### 20.3 Design
+
+- **Pure rules** (`src/lib/memberDeletion.ts`): whether the typed text confirms (case and spacing ignored), the plain-words list of what is removed and kept from the counts, whether a "do not email" record is needed, and the hash id for it.
+- **Server** (`memberDeletion.server.ts`): `previewMemberDeletion` counts what points at the member; `deleteMember` runs the steps in order, with the member document last, and writes one audit entry (`member_deleted`: id and counts, never a name, email or number).
+- **Routes:** `GET /api/organizations/ghmo/members/[memberId]/deletion` (the preview) and `DELETE /api/organizations/ghmo/members/[memberId]` with `{ confirm }`, both super admin only.
+- **Do-not-email records:** `organizations/ghmo/emailSuppressions/{hash}`, server-only (closed to every browser). The member add route and the import check it.
+- **Officer terms** show "Removed member" when the member id no longer resolves (15-B).
+- **UI (15-B):** a **Delete member** action on the profile page (super admin only), a dialog with the preview and the typed confirmation, and the list updating afterwards.
+
+### 20.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **15-A** | Pure rules, deletion and preview on the server, the two routes, the do-not-email record and its check on add and import, rules for the new collection | Deleting a member removes the record, notes, assignment, call rows, delivery rows, reminder records and assignee ids; a plain admin and a stranger are refused; a wrong confirmation does nothing; an opted-out member's address stays suppressed when re-added; the activity log holds no name |
+| **15-B** | Delete member on the profile, the dialog, "Removed member" in officer history | A super admin deletes from the page; a plain admin never sees the button |
+| **15-C** | Docs: runbook case O (step 6 now uses the app), admin guide, go-live checklist | Docs merged |
+
+### 20.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| Deleting the wrong person | Preview, typed name, super admin only, one at a time, recorded |
+| A deletion stops part way | Member document last; every step repeatable |
+| Re-adding an address that opted out | The do-not-email record (D44) |
+| Older log entries still name the person | Stated in D43 and in the runbook; the log is the security record and is not edited |
+
+Out of scope: bulk deletion, undoing a deletion, deleting an admin account (separate; see runbook case C), scrubbing old log entries, and removing names from minutes.
+
+### 20.6 15-A built (2026-11-06)
+
+- **Pure rules** (`src/lib/memberDeletion.ts`, 8 unit tests): the typed confirmation (the member's name, or their email when there is no name; case and spacing ignored; nothing else), the plain-words removed and kept lists from the counts, whether a do-not-email record is needed, and how a re-added address starts out.
+- **Server** (`memberDeletion.server.ts`): `previewMemberDeletion` and `deleteMember`. Order: the do-not-email record, then notes, calling-tree assignment, call rows in every campaign, broadcast delivery rows, reminder records, the id from task assignee lists and from group leads, then (after the activity entry) the member document last. Every step can be repeated. Officer terms are not touched.
+- **Do-not-email record:** `emailSuppressions/{hmac}` holds `reason` and `at` (the time they opted out; the deletion time for a bounce). The id is a keyed hash (HMAC-SHA256 with the server key, looked up under every current and previous key), so the collection holds no address. The member add route and the import route look addresses up and start a matching member opted out (or bounced) until an admin records consent again.
+- **Routes:** `GET .../members/[memberId]/deletion` (preview with counts and the text to type) and `DELETE .../members/[memberId]` with `{ confirm }`, super admin only, 20 an hour. The activity entry `member_deleted` holds the member id and counts, never a name, email or number.
+- **Rules:** `emailSuppressions` is closed to every browser (rules test added).
+- **Tests:** a browser spec against the routes: a plain admin is refused and nothing changes; the preview matches what is seeded; a wrong, empty or missing confirmation does nothing; the right name (case and spacing ignored) removes the record, notes, assignment, call row, delivery row, reminders, assignee id and group lead while other people's rows, and the officer term, stay; the do-not-email record holds a 64-character hash with no name in it; the activity entry holds no name or email; deleting again is a 404; adding or importing the address again starts it opted out or bounced, and an unrelated address is normal.
+- **Left for 15-B and 15-C:** the **Delete member** button and dialog on the profile, "Removed member" in officer history, and the docs.
+
+### 20.7 15-B built (2026-11-06)
+
+- **Delete member on the profile** (`/admin/members/[memberId]`): a card at the bottom, shown only to a super admin (a plain admin never sees it, and the server refuses them anyway). It sits outside the encryption gate, because the server removes the encrypted records without opening them, so a locked device can still delete.
+- **The dialog** (`DeleteMemberDialog`): asks the server for the preview, then lists what will be removed (with counts) and what will be kept, in plain words, and asks for the member's name to be typed. The red **Delete member** button stays disabled until the typed text matches (case and spacing ignored; the server checks it again). On success the page returns to the Members list with a "Member deleted" message; a failure shows the server's message and changes nothing.
+- **Officer history:** a term whose member is gone shows "Removed member" (the Positions page already did this for a missing id; it now uses the one shared label, `REMOVED_MEMBER_LABEL`).
+- **Tests:** `member-delete-ui.spec.ts` (2): a plain admin sees no card; a super admin sees the preview ("2 notes", the officer-term and activity-log lines), cannot delete with a wrong or partial name, deletes with the right one, lands on the list without the person, the notes are gone, one `member_deleted` entry exists, Positions shows the term as "Removed member", and the profile no longer opens.
+- **Left for 15-C:** runbook case O (step 6 now uses the app), the admin guide and the go-live checklist.
+
+### 20.8 15-C built (2026-11-06)
+
+- **Runbook case O** now uses the app: step 4 is the **Delete member…** button (the partial clean-up steps are kept for someone who wants only part of it gone), step 5 lists what stays and why (officer terms, the activity log, free-text names, backups and exports, and the do-not-email record, which the member should be told protects them), step 6 replaces the console deletion with "run it again, and do not delete in the console, because that leaves the notes behind", and step 7 notes the app now writes the log entry.
+- **Admin guide §1h:** the table says who can remove what now that a super admin can delete a member, and a new "Deleting a member" list explains the dialog, what stays, the do-not-email record and retrying.
+- **Go-live checklist:** a Phase 15 line: publish the rules, try a delete on a test member, check Positions shows "Removed member" and the log has one entry without a name, test that an opted-out address stays opted out when re-added, and check a plain admin sees no card.
+- **Known gaps, not built:** no bulk delete, no undo, no way to scrub older activity-log entries or minutes text, and a group whose lead was deleted is left without a lead (choose another on Admin → Groups). Each is small if the board wants it.
