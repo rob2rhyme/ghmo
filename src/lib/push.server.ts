@@ -242,3 +242,14 @@ export async function removeAnyDevice(id: string): Promise<{ ok: true; uid: stri
   await ref.delete();
   return { ok: true, uid, label };
 }
+
+/** Turns off every push device of one admin (used when a super admin turns that admin off, plan §22). Returns how many. */
+export async function removeDevicesOfAdmin(uid: string): Promise<number> {
+  const snap = await subsCol().where("uid", "==", uid).get();
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = getAdminDb().batch();
+    for (const doc of snap.docs.slice(i, i + 400)) batch.delete(doc.ref);
+    await batch.commit();
+  }
+  return snap.size;
+}

@@ -62,6 +62,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/gumba-project`
   - `/admin/document-generator`
   - `/admin/document-gallery`
+- Managing admins (plan §22, Phase 17), super admin only: `GET/POST /api/admin/admins` (list and add) and `PATCH /api/admin/admins/[adminId]` (turn off or on, change role, fix a name). You cannot turn yourself off or change your own role, and the last active super admin can never be turned off or demoted (checked inside a transaction). Turning off can also turn off that admin's push devices.
 - Deleting a member (plan §20, Phase 15): `GET /api/organizations/ghmo/members/[memberId]/deletion` (what would be removed and kept) and `DELETE /api/organizations/ghmo/members/[memberId]` with `{ confirm }` (the member's name). Super admin only.
 - Member list export (plan §19): `POST /api/admin/member-export` only records the download (the CSV is built in the browser); the **Export list** button is on `/admin/members`.
 - Scheduled: `GET /api/cron/task-digest` (Vercel Cron, once a day, needs `CRON_SECRET`; plan §16). `GET/PUT /api/admin/task-digest` is its switch.
