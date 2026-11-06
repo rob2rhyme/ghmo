@@ -101,6 +101,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 2. A super admin opens **Admin → Calling Tree**, unticks that caller, presses **Plan assignments** and saves: only that caller's people move to the others.
 3. Open campaigns keep the old caller's rows (they were copied in when the campaign opened). Close such a campaign and open a new one for the same event from the updated tree; the closed one keeps its call log.
 4. If the device may be in someone else's hands unlocked, consider telling the people on that caller's list that their number may have been seen.
+5. If the caller had push notifications on that device, turn them off too (case Q step 3).
 
 ## M. A member asks for their number to be removed, or not to be called
 
@@ -138,6 +139,19 @@ This is for a file made with **Admin → Members → Export list** (plan §19). 
 3. **If it had phone numbers, or it reached someone it should not have:** treat it as a lost list of private details. Tell the board the same day. People on it have not been told that anything was wrong with the app, but their numbers may be known, so decide together whether to tell them (the list has the names and the dates).
 4. **Close the gap.** If the person should not be exporting, a super admin disables their admin access (case B step 2). If a device was lost, follow case L. Agree who may keep exported files and for how long, and write it down.
 5. **Record it** in Plans & Issues: the date, which download, what happened, what was done.
+
+## Q. A push notification went to the wrong person, arrived too often, or a lost device still gets them
+
+*Push notifications say only that something happened and never what (plan §18), so a wrong or extra alert shows nobody anything private. The aim is to stop it and find the cause.*
+
+1. **Someone who should not get them:** a push goes only to an **active admin** on a device where they turned it on. If that person should not be an admin, a super admin disables their admin account (case B step 2): a disabled admin gets no push, even from a device that is still switched on. If they should be an admin but not get alerts, they turn push off for the device under **Admin → Security**.
+2. **Too many alerts:** each person gets at most one push of each kind a minute, and a newer one replaces the old one. If someone still gets too many, ask them to untick the kinds they do not want under **Admin → Security → Your devices**. If it is one kind across everyone (for example Plans & Issues in a busy week), the board can agree to switch that kind off on their devices; there is no site-wide switch other than step 5.
+3. **A lost, sold or stolen phone still gets alerts:** a push on a locked phone shows only the fixed words, so no content leaks. Still turn it off: sign in on another device, open **Admin → Security → Your devices** and press **Turn off** on the lost one. Then follow case **A** (revoke the device and rotate keys) if the phone could open the admin area. An admin cannot see or remove someone else's devices, so ask the owner to do it, or disable their admin account (step 1) until they have.
+4. **"It showed something it should not have":** a push contains only a fixed title and one fixed line. If you ever see a name, a message or a title in one, treat it as a bug: turn off push (step 5), keep a screenshot, and tell whoever manages the website.
+5. **Stop all pushes at once:** in Vercel, remove `VAPID_PRIVATE_KEY` (or any of the three `VAPID_*` variables) from the Production environment variables and redeploy. With a key missing, the site sends nothing, and the Security card says push is not set up. Emails are not affected. To bring push back, put the same keys back; devices stay switched on.
+6. **A push key may have leaked:** generate a new pair (`npx web-push generate-vapid-keys`), replace all three variables and redeploy. Every device must then be switched on again (old subscriptions stop working), so tell the admins to press **Turn off** then **Turn on** under **Admin → Security**.
+7. **A device that never receives anything:** its record says "No alert has been sent to it yet". If a push service reports the device as gone, the site deletes it, and the admin turns it on again. Notifications also stop if the browser's site data was cleared; turn it on again.
+8. **Record it** in Plans & Issues: the date, what happened and what was changed.
 
 ## After any incident
 
