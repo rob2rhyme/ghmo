@@ -63,7 +63,7 @@ describe("links", () => {
     expect(searchHref({ kind: "position", id: "treasurer" })).toBe("/admin/positions");
     expect(searchHref({ kind: "broadcast", id: "b1" })).toBe("/admin/broadcasts/b1");
     expect(seeAllHref("member", " asha rai ")).toBe("/admin/members?q=asha%20rai");
-    expect(seeAllHref("minutes", "picnic")).toBe("/admin/minutes?q=picnic");
+    expect(seeAllHref("minutes", "picnic")).toBe("/admin/minutes?mode=records&q=picnic");
     expect(seeAllHref("event", "picnic")).toBeNull();
   });
 });

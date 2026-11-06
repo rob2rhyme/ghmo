@@ -109,7 +109,8 @@ export default function MembersClient({
   initialMembers,
   groups = [],
   officers = {},
-  superAdmin = false
+  superAdmin = false,
+  initialQuery = ""
 }: {
   initialMembers: MemberRow[];
   /** Every group, for the filter, the badges and the Groups dialog. */
@@ -118,11 +119,13 @@ export default function MembersClient({
   officers?: Record<string, string[]>;
   /** Only a super admin may fix a member's name (a typo), so only they get the Edit name button. */
   superAdmin?: boolean;
+  /** A search to start with, from the admin search's "See all matching" (plan §27). */
+  initialQuery?: string;
 }) {
   const [members, setMembers] = useState(initialMembers);
   const { contacts, ready: phonesReady, remember: rememberContact, e2ee } = useMemberContacts(members);
   const { encrypt } = e2ee;
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<Filter>("all");
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("any");
   const [groupsFor, setGroupsFor] = useState<MemberRow | null>(null);

@@ -143,7 +143,7 @@ function JumpButton({ onClick, mac, className }: { onClick: () => void; mac: boo
       )}
     >
       <Search className="size-4" aria-hidden="true" />
-      <span className="flex-1 text-left">Jump to a page…</span>
+      <span className="flex-1 text-left">Search…</span>
       {/* The shortcut is announced through aria-keyshortcuts; the visible hint is decoration. */}
       <kbd aria-hidden="true" className="hidden rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-xs font-medium text-muted-foreground sm:inline">
         {mac ? "⌘ K" : "Ctrl K"}
@@ -199,7 +199,7 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
           <header className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-sm lg:hidden">
             <Brand />
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" aria-label="Jump to a page" onClick={() => setJumpOpen(true)}>
+              <Button variant="outline" size="icon" aria-label="Search" onClick={() => setJumpOpen(true)}>
                 <Search aria-hidden="true" />
               </Button>
               <Sheet open={menuOpen} onOpenChange={setMenuOpen}>

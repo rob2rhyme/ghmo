@@ -102,6 +102,6 @@ export function searchHref(entry: Pick<SearchEntry, "kind" | "id">): string {
 export function seeAllHref(kind: SearchKind, query: string): string | null {
   const q = encodeURIComponent(query.trim());
   if (kind === "member") return `/admin/members?q=${q}`;
-  if (kind === "minutes") return `/admin/minutes?q=${q}`;
+  if (kind === "minutes") return `/admin/minutes?mode=records&q=${q}`;
   return null;
 }

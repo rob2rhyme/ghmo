@@ -42,3 +42,53 @@ test("the search index lists people and records by name only", async ({ page }) 
   // Reading it is not an activity-log entry.
   expect((await db.collection(`${ORG}/auditLogs`).where("route", "==", "/api/admin/search-index").get()).size).toBe(0);
 });
+
+test("Ctrl+K finds members, events, minutes and broadcasts by name, and Enter opens them", async ({ page }) => {
+  test.setTimeout(120_000);
+  for (let i = 1; i <= 6; i += 1) await db.doc(`${ORG}/members/tp${i}`).set({ name: `Test Person ${i}`, emailLower: `tp${i}@example.org`, status: "active", roles: ["member"] });
+  await signInWithNewPasskey(page, "bob", "/admin");
+  await page.waitForLoadState("networkidle");
+  const search = page.getByRole("combobox", { name: "Search" });
+  const results = page.getByRole("listbox", { name: "Results" });
+  const open = async (text: string) => {
+    await page.waitForLoadState("networkidle");
+    await page.mouse.move(0, 0);
+    await page.keyboard.press("Control+k");
+    // fill() puts the cursor in the box, so keys after it go to the search even if the page moved focus on load.
+    await expect(search).toBeVisible();
+    await search.fill(text);
+  };
+
+  // A member by part of a name: the Members group lists her, and her position shows under Positions.
+  await open("asha");
+  await expect(results.getByRole("group", { name: "Members" }).getByRole("option", { name: /Asha Rai/ })).toBeVisible();
+  await expect(results.getByRole("group", { name: "Positions" }).getByRole("option", { name: /Treasurer/ })).toBeVisible();
+  await expect(results.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/admin\/members\/mem1$/);
+  await page.goto("/admin");
+
+  // A word in an event's title finds the event, its minutes and a broadcast; a click opens the broadcast.
+  await open("picnic");
+  await expect(results.getByRole("group", { name: "Events" }).getByRole("option", { name: /Summer picnic/ })).toBeVisible();
+  await expect(results.getByRole("group", { name: "Minutes" }).getByRole("option", { name: /Summer picnic.*Draft/ })).toBeVisible();
+  await results.getByRole("group", { name: "Broadcasts" }).getByRole("option", { name: /Picnic invitation/ }).click();
+  await expect(page).toHaveURL(/\/admin\/broadcasts\/b1$/);
+  await page.goto("/admin");
+
+  // By email, and a turned-off member is marked.
+  await open("bina@");
+  await expect(results.getByRole("option", { name: /Bina Thapa.*Turned off/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // More than five matches: "See all" opens the Members list with the search filled in.
+  await open("test person");
+  await expect(results.getByRole("group", { name: "Members" }).getByRole("option")).toHaveCount(6);
+  await results.getByRole("option", { name: "See all 6 matching members" }).click();
+  await expect(page).toHaveURL(/\/admin\/members\?q=test%20person$/);
+  await expect(page.getByRole("searchbox", { name: "Search members" }).or(page.getByLabel("Search members"))).toHaveValue("test person");
+
+  // A plain admin never sees super-admin pages in the results.
+  await open("admins");
+  await expect(results.getByRole("group", { name: "Pages" }).getByRole("option", { name: /^Admins/ })).toHaveCount(0);
+});

@@ -75,7 +75,7 @@ The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_
   - Tests only: `/api/test/expire-public-cache` (emulator only)
 
 ## Admin Jump to a Page
-- Ctrl K / ⌘ K opens "Jump to a page" from anywhere in the admin area (`src/components/admin/shell/AdminShell.tsx`, `AdminJumpDialog.tsx`).
+- Ctrl K / ⌘ K (or **Search…** in the header) opens the admin search from anywhere in the admin area: pages, and from two letters members, events, minutes, groups, positions and broadcasts by name (plan §27; `AdminJumpDialog.tsx`, `src/lib/adminSearch.ts`, `/api/admin/search-index`, which never returns encrypted content).
 
 ## Authentication
 - Admins request magic links via `/admin/login`. The allowlist is the `organizations/ghmo/admins` collection: each doc has `emailLower` and `status: "active"`. Magic-link login only works when `FEATURE_EMAIL_ADMIN_LOGIN=true`. Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.

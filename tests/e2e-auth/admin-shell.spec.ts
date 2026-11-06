@@ -40,13 +40,13 @@ test("Ctrl+K opens the page search; typing and Enter jump to a page, arrow keys 
   await page.waitForLoadState("networkidle");
 
   await page.keyboard.press("Control+k");
-  const search = page.getByRole("combobox", { name: "Jump to a page" });
+  const search = page.getByRole("combobox", { name: "Search" });
   await expect(search).toBeVisible();
   await expect(search).toBeFocused();
 
   // Scope to the dialog's list: pages such as Meeting minutes have their own <select> options, which
   // come earlier in the page and would otherwise be picked up as "the first option".
-  const options = page.getByRole("listbox", { name: "Pages" }).getByRole("option");
+  const options = page.getByRole("listbox", { name: "Results" }).getByRole("option");
   await search.fill("minu");
   await expect(options).toHaveCount(1);
   await expect(options.filter({ hasText: "Meeting minutes" })).toHaveAttribute("aria-selected", "true");
@@ -66,7 +66,7 @@ test("Ctrl+K opens the page search; typing and Enter jump to a page, arrow keys 
   // Nothing matches: say so, and Escape closes it.
   await page.keyboard.press("Control+k");
   await search.fill("zzzz");
-  await expect(page.getByText("No page matches")).toBeVisible();
+  await expect(page.getByText("Nothing matches")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(search).toBeHidden();
 });

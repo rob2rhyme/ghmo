@@ -206,6 +206,14 @@ Minutes belong to a meeting that has already happened. (Added 2026-11-06, plan �
 - **A meeting that isn't listed** (a board call, a meeting nobody added beforehand): press **Record a meeting that isn't listed**, give a title, the date and start time (today or earlier) and, if you like, the place, then **Record meeting**. It is saved as a **draft** event, so it never appears on the public Events page, and it is picked for you. If there is already a meeting on that day, the form shows it first: press **Use this meeting** instead of making a second one. On a brand-new site with no past meetings, **Write minutes** opens this form straight away.
 - **Wrong meeting?** While the minutes are a **draft**, open them and press **Change meeting…**, pick the right one and **Move minutes**. The title and date change; what you wrote stays. Submitted or approved minutes must be returned to draft first. The activity log records the move with both meeting titles. A meeting recorded here that no longer has minutes stays as a draft under **Events**, where you can delete it.
 
+## 1m. Finding anything (Ctrl K, or Search… at the top)
+
+Press **Ctrl K** (on a Mac **⌘ K**), or **Search…** at the top of any admin page (the magnifying glass on a phone), and type. (Added 2026-11-06, plan §27.)
+- **Pages** match by name or task ("passkey", "donations").
+- From two letters it also finds **members** (name or email; turned-off members are marked), **events**, **minutes** (by meeting title, with their status), **groups**, **positions** (with who holds them) and **broadcasts** (by subject). Capitals and accents don't matter, and every word you type must match, so "asha rai" narrows it down.
+- Use the arrow keys and **Enter**, or click. A member opens their profile, an event its edit page, minutes the editor, a group its page, a broadcast its page. When there are more than five members or minutes, **See all … matching** opens that list with your words already in its search box.
+- It never searches encrypted things: phone numbers, family, notes, the text of minutes, Plans & Issues or chat. Searching isn't recorded in the activity log. The list it searches is fetched when you first open it and kept for 10 minutes, so something added in the last few minutes may only show after that; the list pages are always up to date.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

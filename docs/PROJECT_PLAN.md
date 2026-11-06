@@ -219,7 +219,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 accepted 2026-11-06. | Owner reads §22.2 before 17-A is used. |
 | **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
-| **20** | Search people and records | **Planned 2026-11-06 (§27).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
+| **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1705,7 +1705,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Browser spec `minutes-meeting.spec.ts` (two new tests): the first-run path end to end (the meeting is a draft, absent from the public Events page, and the minutes save against it); "has minutes" disabled; the same-day offer; moving a draft from the editor with its content kept; no move button on approved minutes.
 - Admin guide §1l.
 
-## 27. Phase 20 — Search people and records (planned 2026-11-06; decisions accepted 2026-11-06)
+## 27. Phase 20 — Search people and records (planned 2026-11-06; decisions accepted; 20-A and 20-B built 2026-11-06)
 
 **Goal.** The page search (Ctrl/⌘ K, or the search button in the header on phones) only finds pages. To open a member, an event or a set of minutes, an admin goes to the right list and searches there, and some lists have no search at all (Events, Broadcasts, §24.3). Phase 20 makes the same box find records by name, so "Asha" or "picnic" is two keystrokes and Enter away.
 
@@ -1752,3 +1752,10 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 
 - `src/lib/adminSearch.ts`: `normalizeForSearch` (capitals, accents and punctuation ignored; email characters kept), `scoreEntry` and `matchRecords` (every word must match; title starts, then word starts, then the rest, then the second line; newer first on a tie; fixed kind order; up to 5 per kind with the total), `searchHref` and `seeAllHref`. Unit tests in `tests/unit/adminSearch.test.ts`.
 - `src/lib/adminSearch.server.ts` and `GET /api/admin/search-index`: any active admin, rate limited (30 per 10 minutes per admin), not logged. Every read uses `select()` with only names, titles, dates and statuses; position holders come from current terms by member name. Browser spec `admin-search.spec.ts` seeds encrypted contacts, notes, minutes text, event bodies, group descriptions, term notes and broadcast bodies with one marker and checks that the marker never appears in the response.
+
+### 27.7 20-B built (2026-11-06)
+
+- `AdminJumpDialog.tsx` is now **Search** (Ctrl/⌘ K, **Search…** in the header): pages as before, then from two letters the record groups from `matchRecords`, each row with its icon, a second line (email, date, status, holders) and a badge (Turned off, Draft). One listbox with a labelled group per kind, so arrow keys run through everything. The index is fetched on first open and kept in module memory for 10 minutes; a plain-words line shows while it loads or if it fails (pages still work).
+- **See all N matching** for members and minutes opens `/admin/members?q=` and `/admin/minutes?mode=records&q=` with the search box filled in.
+- Browser spec (`admin-search.spec.ts`): a member by part of a name with her position, Enter to the profile; an event, its minutes and a broadcast by a word; email search and the Turned off mark; See all to the Members list with the box filled; no super-admin pages for a plain admin. `admin-shell.spec.ts` follows the new names (Search, Results).
+- Admin guide §1m and the README line.
