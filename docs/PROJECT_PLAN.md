@@ -1549,3 +1549,36 @@ Four read-only reviews ran in parallel (docs against code; API routes, rules and
 - **Firestore rules:** the `home/blocks`, `gumba`, `docgen` and `timeline` blocks and the `isMember()` function, which only the gumba block used. Those paths now fall to the default deny; the server's admin SDK, which is not subject to rules, still reads `docgen` for the document templates. Rules tests check that all four are closed to browsers. **The rules must be published again.**
 - **Small leftovers:** the unused `docgen/templates`, `docgen/generations`, `timeline` and `home/blocks` path helpers, the legacy `AuditType` entries nothing writes any more (only `webhook_received` remains), and three `NEXT_PUBLIC_*` flags in `env.client.ts` that nothing read.
 - The dashboard keeps its words for the removed actions, so older activity entries still read correctly.
+
+## 24. Enhancement audit (2026-11-06)
+
+The owner reported that adding board members and other officers "is not enabled", accepted D32–D56, and asked for a full-site look for enhancement gaps. Three read-only reviews (public site, admin workflows, operations) were run; the clear, low-risk items were fixed and the rest are listed in §24.3.
+
+### 24.1 Officer positions
+
+- **Cause:** **Set holder** only listed people already on the member list as active. On a site with no members imported yet, or when an officer wasn't a member, the list was empty or missing them and **Save holder** stayed greyed out with no reason given. Separately, a one-person seat (President, Vice President, Secretary…) refused a second holder unless "Several people" was ticked under **Edit**, which the dialog never mentioned.
+- **Fixed:** the picker has **Someone not on the member list yet…** (name and email; the person is added to Members and seated in one step), a search box for long lists, and a note with a link to Members when the list is empty. For a one-person seat that already has a holder it offers **End … the day before** (default) or **Keep … and add this person too**, which makes the seat one for several people. Only super admins see **Set holder** and **Add a position**; other admins see a note saying so.
+- **Live site:** the earlier fix for adding several board members on the same day (#100) and this one reach the live site only when Vercel deploys the latest `main`.
+
+### 24.2 Fixed
+
+- **Admin:** a **Site setup** card on the dashboard for super admins (missing site address, email, broadcast settings, contact address, donate link, push keys, cron secret, test-only switches on the live site, fewer than two super admins, encryption off; setting names only, never values); the dashboard says when part of it failed to load instead of showing it empty; the Admins page warns about a single super admin; Action items read every approved record (they stopped at the newest 100); minutes search, Events and Broadcasts say when a list reaches its limit; greyed-out buttons say why; no more "The server answered 500" messages.
+- **Public site:** sitemap and robots files; schema.org Event data on event pages and Organization data on the home page; per-page link previews and canonical addresses; a plain-words **Privacy** page in the footer (for the board to read, §24.3); `/verify` without a code shows the form; member sign-in no longer reports success when sending failed; unsubscribe says which emails stop and explains failures; small accessibility fixes (flyer links, calendar chips, theme button, footer nav, offline page); 5.4 MB of unused original PNGs moved out of `public/` to `design/originals/`.
+- **Operations:** the `minutes (eventId, eventDate desc)` index the event page's minutes card needs (it failed in production without it) and the two TTL policies are now in `firestore.indexes.json`; refused emails log their status; a site-wide error page and error pages for the docs and signing areas; `vercel-ignore-build.sh` compares with the last successful deployment and skips docs-only merges to `main`; Dependabot groups minor and patch updates; a weekly dependency audit; unused packages and `check-env.cjs` removed; go-live checklist §2 adds Firestore backups; runbook case R covers outages and restores.
+
+### 24.3 Not changed: for the owner to decide
+
+1. **Read the Privacy page** (`/privacy`) and the donate page's "about your gift" gap: legal status (registered nonprofit? 501(c)(3)? tax-deductible?), who organizes the GoFundMe and holds the money, and whom to ask about a donation. The donate page also still has the board-confirm note on what a Gumba is.
+2. **Turn on Firestore backups** (go-live checklist §2; needs the pay-as-you-go plan) and run `npx firebase deploy --only firestore` to publish the new index and TTL policies.
+3. **Vercel "wait for checks"**, so `main` only deploys after CI passes (Vercel → Settings → Git); and `CONTACT_EMAIL`, `NEXT_PUBLIC_APP_URL` in production (the Site setup card lists anything missing).
+4. **Bigger admin features found, not built** (each is a phase of its own; say which to plan):
+   - change a member's **email** (today: delete and re-add, which loses history);
+   - **minutes for a meeting that isn't an event yet**, and changing the meeting while minutes are a draft;
+   - **Ctrl/⌘ K finds people, events and minutes**, not only pages;
+   - a **phone-friendly member list** (a "More…" menu per row, paging) and **bulk actions** (add to a group, record consent);
+   - a full **activity log page** with paging and filters (the dashboard shows the latest 8);
+   - **duplicate** an event or a broadcast, and **email one group** instead of everyone;
+   - **delete a saved document**; filter Action items by person;
+   - a server-side **error log** admins can read (today errors live in Vercel's logs for about an hour), and a record of the last email or push failure;
+   - a **retention policy** for records that grow forever (activity log with internet addresses, broadcast deliveries, reminders).
+5. **Public site, smaller:** a per-event share image, linking an event's place to a map and a Share button, a Contact/About page, optimising the Media page's thumbnails and moving its Facebook feed off Graph v18, and making the donate page's "time left" count in the browser.
