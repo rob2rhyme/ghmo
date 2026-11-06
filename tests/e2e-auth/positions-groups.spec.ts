@@ -145,6 +145,8 @@ test("groups: create, add people, choose a lead, and see them on the Members pag
   expect((await db.doc(`${ORG}/members/asha`).get()).get("groupIds")).toEqual([groupId]);
 
   await page.getByRole("button", { name: "Remove Bina Thapa from the group" }).click();
+  // Removing someone asks first (audit 2026-11-06).
+  await page.getByRole("dialog").getByRole("button", { name: "Remove from group" }).click();
   await expect(main(page).getByRole("heading", { name: "People (1)" })).toBeVisible();
   expect((await db.doc(`${ORG}/members/bina`).get()).get("groupIds") ?? []).toEqual([]);
 

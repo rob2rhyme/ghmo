@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, UsersRound } from "lucide-react";
+import { Plus, RefreshCw, UsersRound } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { errorMessage, peopleApi, type MemberLite } from "@/src/components/admin/people/api";
@@ -29,6 +29,7 @@ export default function GroupsClient() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +45,7 @@ export default function GroupsClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const leadName = useMemo(() => {
     const byId = new Map(members.map(m => [m.id, m]));
@@ -54,11 +55,32 @@ export default function GroupsClient() {
   if (error && !groups) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
+        <AlertDescription>
+          <p>{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setAttempt(n => n + 1);
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   }
-  if (!groups) return <Skeleton className="h-64 w-full" />;
+  if (!groups) {
+    return (
+      <div role="status">
+        <span className="sr-only">Loading groups…</span>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   const create = async (body: { name: string; description: string }) => {
     setBusy(true);

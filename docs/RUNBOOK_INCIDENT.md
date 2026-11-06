@@ -11,7 +11,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 ## 0. First 15 minutes (any incident)
 
 1. Write down what you saw, when, and who noticed. Don't delete anything.
-2. Decide which case below fits. If unsure, treat it as case A. Email problems are cases H to J.
+2. Decide which case below fits. If unsure, treat it as case A. Email problems are cases H to J, and N for task reminders.
 3. Tell the other admins by phone or in person, not in Admin Chat (it may be what's compromised).
 
 ## A. A device was lost, stolen or is suspected compromised
@@ -19,7 +19,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 *The data on the device is protected by the admin's passkey or encryption passphrase, but assume the worst.*
 
 1. The owner signs in on another device and goes to **Admin → Security**. If the lost device was a phone with their **authenticator app**, they sign in with a recovery code and move the app to a new phone (a super admin can **reset** it from Admin → Security; the owner is signed out everywhere and sets up a new app at their next email-link sign-in). If it held a passkey, they remove that passkey.
-2. A **super admin** opens **Admin → Encryption**, ticks the lost device, and clicks **Revoke selected and rotate keys**. This stops it reading anything written from now on. It keeps whatever it already decrypted; that can't be undone.
+2. A **super admin** opens **Admin → Encryption**, ticks the lost device, and clicks **Remove selected and make new keys**. This stops it reading anything written from now on. It keeps whatever it already decrypted; that can't be undone.
 3. Everything written **before** the rotation was readable by that device. If it held sensitive material (minutes drafts, documents), treat that as exposed and decide whether to tell the people concerned.
 4. The owner sets up encryption on their new device; another admin approves it after comparing the 20-digit safety code **by phone or in person**.
 5. Check the audit log (Firestore console: `organizations/ghmo/auditLogs`) for activity from the lost device after it went missing.
@@ -39,7 +39,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 ## D. Paper recovery key lost or exposed
 
 1. Do not panic: the key only matters if every admin device is lost, or if someone with the paper can also reach the database.
-2. If it was **exposed** (someone else may have seen it): a super admin goes to **Admin → Encryption → Replace recovery key** immediately, with both trustees present to take new paper copies, and then **Rotate keys now**. Destroy all old copies.
+2. If it was **exposed** (someone else may have seen it): a super admin goes to **Admin → Encryption → Replace recovery key** immediately, with both trustees present to take new paper copies, and then **Make new keys now**. Destroy all old copies.
 3. If it was only **lost**: replace it at the next convenient time with both trustees present.
 
 ## E. The database or hosting account may have been accessed (Google account compromise, leaked service-account key)

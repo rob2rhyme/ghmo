@@ -6,7 +6,9 @@ const options = { name: "GHMO Events", host: "ghmo.example", now: Date.UTC(2026,
 
 describe("ics", () => {
   it("escapes characters that have meaning in iCalendar", () => {
-    expect(escapeText("a, b; c\\d\ne")).toBe("a\\, b\; c\\\\d\\ne");
+    expect(escapeText("a, b; c\\d\ne")).toBe("a\\, b\\; c\\\\d\\ne");
+    // RFC 5545: a semicolon in text needs a real backslash before it (this test once expected "\;", which is just ";").
+    expect(escapeText("x;y")).toBe("x\\;y");
   });
 
   it("folds long lines at 75 octets without splitting a character", () => {
@@ -23,7 +25,7 @@ describe("ics", () => {
     expect(ics).toContain("DTSTART:20260606T183000Z\r\n");
     expect(ics).toContain("DTEND:20260606T193000Z\r\n");
     expect(ics).toContain("SUMMARY:Bhajan\\, evening\r\n");
-    expect(ics).toContain("LOCATION:Hall\; Main St\r\n");
+    expect(ics).toContain("LOCATION:Hall\\; Main St\r\n");
     expect(ics.split("\n").every(line => line === "" || line.endsWith("\r"))).toBe(true);
   });
 

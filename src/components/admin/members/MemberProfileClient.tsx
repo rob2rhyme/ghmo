@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, NotebookPen, PhoneCall, Pencil, Plus, Trash2, UsersRound } from "lucide-react";
+import { Eye, EyeOff, NotebookPen, PhoneCall, Pencil, Plus, RefreshCw, Trash2, UsersRound } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
@@ -595,10 +595,27 @@ function NotesCard({ member, me }: { member: ProfileMember; me: { uid: string; s
       )}
       {loadError ? (
         <Alert variant="destructive">
-          <AlertDescription>{loadError}</AlertDescription>
+          <AlertDescription>
+            <p>{loadError}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLoadError(null);
+                  refresh();
+                }}
+              >
+                <RefreshCw aria-hidden="true" />
+                Try again
+              </Button>
+            </div>
+          </AlertDescription>
         </Alert>
       ) : !notes ? (
-        <Skeleton className="h-16 w-full" />
+        <div role="status">
+          <span className="sr-only">Loading notes…</span>
+          <Skeleton className="h-16 w-full" />
+        </div>
       ) : notes.length === 0 ? (
         <EmptyState icon={<NotebookPen aria-hidden="true" />} title="No notes yet" description="Notes you add show here with your name and the date." />
       ) : (
@@ -769,10 +786,27 @@ function CallsCard({ member, me }: { member: ProfileMember; me: { uid: string; s
     >
       {loadError ? (
         <Alert variant="destructive">
-          <AlertDescription>{loadError}</AlertDescription>
+          <AlertDescription>
+            <p>{loadError}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLoadError(null);
+                  setReload(count => count + 1);
+                }}
+              >
+                <RefreshCw aria-hidden="true" />
+                Try again
+              </Button>
+            </div>
+          </AlertDescription>
         </Alert>
       ) : !data ? (
-        <Skeleton className="h-16 w-full" />
+        <div role="status">
+          <span className="sr-only">Loading call history…</span>
+          <Skeleton className="h-16 w-full" />
+        </div>
       ) : history.length === 0 ? (
         <EmptyState icon={<PhoneCall aria-hidden="true" />} title="No calls yet" description="Calls made to this member in a call campaign show here." />
       ) : (

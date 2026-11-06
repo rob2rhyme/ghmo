@@ -541,8 +541,49 @@ function RecoverySection() {
 }
 
 /** Admin → Encryption: device keys, approvals, new keys and recovery (plan Phase 3). */
+/** Withdraw a pending device or clear a removed one's keys, after saying what that means for this browser. */
+function ForgetDeviceButton({ mode }: { mode: "withdraw" | "remove" }) {
+  const { forgetThisDevice } = useE2ee();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const withdraw = mode === "withdraw";
+
+  return (
+    <>
+      <Button variant={withdraw ? "ghost" : "outline"} onClick={() => setOpen(true)}>
+        {withdraw ? "Withdraw this device" : "Remove keys from this browser"}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={withdraw ? "Withdraw this device?" : "Remove the keys from this browser?"}
+        description={
+          <>
+            {withdraw ? "This cancels the approval request and deletes the encryption keys in this browser. " : "This deletes the encryption keys in this browser. "}
+            This browser won&apos;t be able to read encrypted data until it is set up and approved again. Any unsent drafts on this browser are lost.
+          </>
+        }
+        confirmLabel={withdraw ? "Withdraw device" : "Remove keys"}
+        destructive
+        busy={busy}
+        onConfirm={async () => {
+          setBusy(true);
+          try {
+            await forgetThisDevice();
+            setOpen(false);
+          } catch (err) {
+            toast.error(errorText(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    </>
+  );
+}
+
 export default function EncryptionPanel() {
-  const { status, error, overview, thisDevice, refresh, forgetThisDevice, lock, integrity } = useE2ee();
+  const { status, error, overview, thisDevice, refresh, lock, integrity } = useE2ee();
 
   if (status === "loading") {
     return (
@@ -649,9 +690,7 @@ export default function EncryptionPanel() {
               <RefreshCw aria-hidden="true" />
               Check again
             </Button>
-            <Button variant="ghost" onClick={forgetThisDevice}>
-              Withdraw this device
-            </Button>
+            <ForgetDeviceButton mode="withdraw" />
           </div>
         </AdminSectionCard>
         <AdminSectionCard title="Lost every device?" description="Use the paper recovery key held by a trustee to activate this device yourself.">
@@ -668,9 +707,7 @@ export default function EncryptionPanel() {
         description="It no longer gets new keys, so nothing written since then opens here. Clear its keys from this browser, then set the device up again if you still use it."
       >
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={forgetThisDevice}>
-            Remove keys from this browser
-          </Button>
+          <ForgetDeviceButton mode="remove" />
         </div>
       </AdminSectionCard>
     );

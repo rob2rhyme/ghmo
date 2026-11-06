@@ -14,7 +14,7 @@ export type IcsEvent = {
 const CRLF = "\r\n";
 
 export function escapeText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
+  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
 }
 
 /** Lines may not exceed 75 octets; continuation lines start with a space. Never splits a UTF-8 character. */

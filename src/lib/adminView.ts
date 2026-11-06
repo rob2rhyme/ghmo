@@ -133,6 +133,8 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   broadcast_withdrawn: { verb: "withdrew a broadcast" },
   broadcast_cancelled: { verb: "canceled a broadcast" },
   broadcast_sending_started: { verb: "started sending a broadcast" },
+  broadcast_sent: { verb: "finished sending a broadcast" },
+  broadcast_retry_failed: { verb: "retried the failed emails of a broadcast" },
   broadcast_test_sent: { verb: "sent a test broadcast" },
   broadcast_posted_manually: { verb: "posted a broadcast by hand", detail: true },
   comms_thread_created: { verb: "started a topic in Plans & Issues" },
@@ -155,14 +157,26 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   e2ee_rotated: { verb: "made new encryption keys" },
   e2ee_recovery_replaced: { verb: "replaced the recovery key" },
   e2ee_roster_sealed: { verb: "sealed the device list" },
-  e2ee_record_migrated: { verb: "encrypted existing records", detail: true }
+  e2ee_record_migrated: { verb: "encrypted existing records", detail: true },
+  comms_seed_created: { verb: "added sample topics to Plans & Issues" },
+  // Legacy timeline routes (no page calls them any more; kept until the board decides).
+  edit_timeline: { verb: "edited a timeline entry", detail: true },
+  timeline_update: { verb: "updated the timeline", detail: true }
 };
 
 /** Whole sentences for things nobody in particular did. */
 const SYSTEM_ACTIVITY: Record<string, string> = {
   webhook_received: "A donation update arrived from GoFundMe",
-  reconcile: "Donations were synced"
+  reconcile: "Donations were synced",
+  // Written with no actor: the member used the unsubscribe link, or the email service reported a complaint or a bounce.
+  member_email_opt_out: "A member stopped email (unsubscribe link or spam complaint)",
+  member_email_bounced: "A member's email address bounced",
+  // The daily schedule runs it, not a person.
+  task_digest_run: "The daily task digest ran"
 };
+
+/** True when the dashboard has its own words for this action (a unit test checks every action the code logs). */
+export const hasActivityLabel = (action: string): boolean => action === "login" || action in ACTIVITY || action in SYSTEM_ACTIVITY;
 
 function signInVerb(summary: string): string {
   if (/recovery code/i.test(summary)) return "signed in with a recovery code";

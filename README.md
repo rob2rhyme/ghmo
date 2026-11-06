@@ -1,14 +1,9 @@
 # Greater Harrisburg Magar Organization (Next.js + Firebase + GoFundMe Pro)
 
-Single-community App Router site for GHMO with admin-only magic-link authentication, structured meeting minutes governance, document generation, fundraising, and a multimedia hub.
+Single-community App Router site for GHMO: an admin area (email link plus an authenticator-app code, passkeys optional) with structured meeting minutes governance, end-to-end encrypted member records, outreach and push alerts, document generation, fundraising, a multimedia hub, and a separate member login at `/login`.
 
 ## Current Focus
-The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
-1. **Phase 0:** fix the React/Next version mismatch; add ESLint, tests and CI.
-2. **Phase 1:** security hardening (security headers, revocable sessions, durable rate limits, remove PIN login, keep third-party scripts off admin pages).
-3. **Phase 2:** required passkeys for admins; new UI on shadcn/ui + Tailwind v4.
-4. **Phases 3–4:** end-to-end encryption for admin chat, Plans & Issues, draft minutes, signatures and document history.
-5. **Phases 5–7:** governance features, public archive and integrations, external security review.
+The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §6. Admin sign-in is an email link plus an authenticator-app code; passkeys are optional (decision D6).
 
 ## Highlights
 - One community (`ghmo-site`) backed by Firebase + GoFundMe Pro; no multi-tenant routing.
@@ -23,7 +18,8 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - Cross-device signing links require `NEXT_PUBLIC_APP_URL` during local dev (set to `http://<LAN_IP>:3000` so phones can open QR/sign links).
 
 ## Meeting Minutes
-- Meeting Minutes are the official governance record; the legacy Timeline feature is deprecated and no longer used.
+- Meeting Minutes are the official governance record; the legacy Timeline feature is deprecated and has no page.
+- The Timeline API routes (`/api/admin/timeline`, `/api/admin/organizations/[orgSlug]/timeline/[entryId]`, `/api/organizations/[orgSlug]/gumba/timeline`) are legacy, have no caller in the UI, and are kept for now.
 - Documents live at `organizations/{orgSlug}/minutes`, one per past event (the API enforces uniqueness) and surface on public event pages once approved while admins can still view drafts and submissions.
 - Each record stores structured agenda items, discussion summary, decisions, action items, and attendance split into present/absent/guest lists, giving the Admin dashboard/public view a consistent, searchable format.
 - Minutes export as Letter-size PDFs on the GHMO letterhead so the preview and the final file are identical.
@@ -33,7 +29,6 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - Threads require a conclusion to close and become read-only once closed; comments are append-only for audit clarity.
 - Conclusion voting is isolated to the close workflow and retains full auditability.
 - Admin Chat (`/admin/chat`) is the WhatsApp-style channel for quick coordination and day-to-day updates, not for decisions.
-- A “Create sample threads” button appears when there are no existing threads to help onboard new admins.
 - No third-party UI dependencies were added for the communication log UI.
 
 ## Stack
@@ -47,13 +42,17 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - @react-pdf/renderer + html-to-image for exports
 
 ## Routes
-- Public: `/`, `/donate`, `/multimedia`
+- Public: `/`, `/donate`, `/multimedia`, `/c/[orgSlug]/events` and `/c/[orgSlug]/events/[eventId]` (published events), `/minutes` and `/minutes/[id]` (approved minutes), `/verify/[code]` (certificate check), `/document-generator`, `/sign/[sessionId]` (signing link), `/unsubscribe`, `/docs/onboarding`
 - Admin-only:
   - `/admin` (overview-only: KPIs, quick actions, recents, system status)
-  - `/admin/comms` (Plans & Issues)
+  - `/admin/comms` (Plans & Issues) and `/admin/comms/[threadId]` (one thread)
   - `/admin/chat` (Admin Chat)
   - `/admin/minutes` (Create/Edit + Records tabs)
-  - `/admin/events`
+  - `/admin/action-items` (tasks from approved minutes)
+  - `/admin/broadcasts` and `/admin/broadcasts/[broadcastId]` (member emails)
+  - `/admin/events`, `/admin/events/new`, `/admin/events/[eventId]/edit`
+  - `/admin/members` (member list)
+  - `/admin/encryption` (end-to-end encryption keys) and `/admin/security` (passkeys, authenticator app, notifications)
   - `/admin/calling-tree` (who calls whom; super admins plan and save, plan §12) and `/admin/my-calls` (a caller's own people)
   - `/admin/call-campaigns` and `/admin/call-campaigns/[id]` (one campaign per announcement: who was reached, RSVPs, call log, CSV export; plan §12)
   - `/admin/positions` (who holds each officer position and since when; super admins change it, plan §15) and `/admin/groups`, `/admin/groups/[groupId]` (teams of members with a lead, including the phone tree callers; any admin)
@@ -68,22 +67,25 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - Member list export (plan §19): `POST /api/admin/member-export` only records the download (the CSV is built in the browser); the **Export list** button is on `/admin/members`.
 - Scheduled: `GET /api/cron/task-digest` (Vercel Cron, once a day, needs `CRON_SECRET`; plan §16). `GET/PUT /api/admin/task-digest` is its switch.
 - Auth: `/admin/login` (admin magic link) with `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `POST /api/auth/session`, and the dev-only `/api/auth/dev/admin-session` (always disabled in production). `/login` is the member magic-link page.
-- API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/admin/*`, `/api/docgen/log`, `/api/gfmpro/*`
+- API: `/api/auth/send-login-link`, `/api/auth/post-auth`, `/api/admin/*`, `/api/gfmpro/*`, and:
+  - Sign-in: `/api/auth/me`, `/api/auth/firebase-custom-token`, `/api/auth/passkey/{login,register}/{options,verify}`, `/api/auth/totp` (plus `/setup`, `/confirm`, `/verify`, `/recovery-codes`)
+  - Public data: `/api/calendar`, `/api/calendar/[eventId]`, `/api/media/youtube`, `/api/organizations/[orgSlug]/events`, `/api/organizations/[orgSlug]/donations/stats`
+  - Admin data under the organization: `/api/organizations/[orgSlug]/admin/dashboard`, `/api/organizations/[orgSlug]/admin/events`, `/api/organizations/[orgSlug]/docgen/templates`, `/api/organizations/[orgSlug]/members/[memberId]/calls`, `/notes` and `/notes/[noteId]`
+  - Signing links: `/api/signing-sessions/[sessionId]` and `/api/signing-sessions/[sessionId]/sign`
+  - Tests only: `/api/test/expire-public-cache` (emulator only)
 
-## Admin Dashboard Search
-- The admin dashboard includes an inline command-palette style search bar that filters quick actions, recent minutes, and audit activity.
-- Shortcut: Cmd+K / Ctrl+K focuses the search input; Esc clears the query (or blurs if empty).
+## Admin Jump to a Page
+- Ctrl K / ⌘ K opens "Jump to a page" from anywhere in the admin area (`src/components/admin/shell/AdminShell.tsx`, `AdminJumpDialog.tsx`).
 
 ## Authentication
 - Admins request magic links via `/admin/login`. The allowlist is the `organizations/ghmo/admins` collection: each doc has `emailLower` and `status: "active"`. Magic-link login only works when `FEATURE_EMAIL_ADMIN_LOGIN=true`. Every admin route goes through `requireActiveAdmin`, so only those whitelist entries can perform writes.
 - Session state lives in one `__session` cookie: a Firebase **session cookie** (HttpOnly, Secure in production, SameSite=Lax, 8 hours), checked for revocation on every request. `/api/auth/session` only issues it to active admins or allowlisted members. Signing out revokes all of the user's tokens (every device) and signs the browser's Firebase client out.
 - Firestore rules require an active `admins/{uid}` record in addition to the admin claim, so setting an admin's `status` to anything but `active` cuts off their database access immediately.
-- The dev helper `/api/auth/dev/admin-session` is disabled unless `NODE_ENV !== "production"` plus explicit flags (`NEXT_PUBLIC_DEV_LOGIN`, `DEV_LOGIN_SECRET`) are present.
-- The magic-link workflow is the only supported login path; there is no member login option.
+- The dev helper `/api/auth/dev/admin-session` is disabled unless the build is not production and `ALLOW_DEV_ADMIN_LOGIN=true` and `DEV_ADMIN_LOGIN_TOKEN` (32+ characters) are set (`src/lib/security/devLogin.ts`).
 - **PIN login has been removed** (plan decision D3). The PIN routes, the `pins` collection rules and `FEATURE_PIN_LOGIN` no longer exist; any old `organizations/ghmo/pins` documents can be deleted.
 - **First admin:** set `BOOTSTRAP_ADMIN_SECRET` (32+ random characters) and call `POST /api/admin/bootstrap` with `{ "secret", "email", "name" }`. It creates one `super_admin` in `organizations/ghmo/admins` and then locks itself permanently. Remove the secret afterwards.
 - **Strong sign-in is required** for every admin: an authenticator-app code after the email link (decision D6, the default), or a passkey (optional, decision D2). The sections below about passkeys apply to admins who choose them.
-- **Passkeys** (decision D2). Admins sign in at `/admin/login` with a passkey (fingerprint, face or device PIN). The email magic link only starts a limited session that can create a passkey; it cannot open admin pages, admin APIs or admin data in Firestore.
+- **Passkeys** (decision D2, optional since D6). An admin who sets one up can sign in at `/admin/login` with it (fingerprint, face or device PIN). On its own, the email magic link only starts a limited session: it cannot open admin pages, admin APIs or admin data in Firestore until the second step (an authenticator-app code, or creating or using a passkey) is done.
 - **Recovery:** if an admin who already has a passkey adds a new one through a magic link, the new passkey stays *pending* until **another** admin approves it under Admin → Security, so access to someone's email alone is not enough. If no other admin with a passkey exists, it activates immediately (audited).
 - **Security page** (`/admin/security`): list, add and remove your passkeys (you can't remove your last one), and approve other admins' pending passkeys. Super admins can remove another admin's passkey (lost device).
 - Sessions record how they were created (`authMethod` claim: `passkey`, `totp`, `magic_link` or local-only `dev`); `requireActiveAdmin` and the Firestore rules both require `passkey` or `totp`.
@@ -95,11 +97,21 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `members/{memberId}`: `emailLower` (`""` for a member who doesn't use email; such a member has a `name` and an encrypted phone number, and is called but never emailed), optional `email`, optional `name`, `status` (active/disabled), `uid` (nullable until member auth is added), `roles`, `createdAt`, `updatedAt`.
     Email consent (Phase 8): optional `emailConsent` {`at`, `source` (`admin_on_request` / `signed_up` / `imported`), `byUid`}, `emailOptOutAt`, `emailBounced`. Only members who are active, have a recorded consent and have not opted out or bounced can be emailed. Members are written only by the server (`/api/organizations/ghmo/members`, `/members/[id]`, `/members/import`); Firestore rules let admins read the list but never write it.
     Phone and call contact (Phase 9-A, plan §12): `contact` is one end-to-end encrypted envelope (phone, second phone, language, household, notes) made in the admin's browser and bound to the member id, so the server never sees a number; beside it `hasPhone`, `phoneConsent` {`at`, `source`, `byUid`} and `callOptOutAt` are plaintext flags for filtering. Numbers can only be stored once encryption is on and are shown masked until tapped.
-  - `content/pages/home`: `{ blocks[] }`.
-  - `admin/minutes`: structured meeting minutes tied to published events (admin-only).
-  - `docgen/{templateId}` (Document Generator templates) and `docgen/generations/{genId}`.
+  - `home/blocks`: `{ blocks[] }`. Anyone can read; admins write.
+  - `minutes/{id}`: structured meeting minutes tied to published events, with a `versions/{n}` subcollection (one immutable copy per approval). Admin-read; written only through `/api/admin/minutes`.
+  - `docgen/{templateId}` (Document Generator templates).
   - Seed templates by writing documents under `organizations/{orgSlug}/docgen` (e.g., `{ name: "Default Letter", letterhead: {...}, fields: ["Recipient", "Body"] }`) so the admin UI has options.
-  - `donations/stats` + `donations/webhookEvents/{eventId}`.
+  - `documents/{id}`: saved generated documents (Document Gallery); encrypted once encryption is on. Server-only.
+  - `donations/stats` + `donations/webhookEvents/events/{eventId}`. Admin-only.
+  - `events/{id}`: events. Server-only; the public site reads published events through the server.
+  - `admins/{id}`: who can sign in (`emailLower`, `status`, `roles`, `name`), with `passkeys/{credentialId}` and `totp/main` (the encrypted authenticator-app seed). Server-only; the rules only check that the admin record is active.
+  - `passkeyIndex/{credentialId}` (passkey to admin lookup) and `webauthnChallenges/{id}` (single-use, 5-minute challenges). Server-only.
+  - `rateLimits/{key}`: rate-limit windows (see Security Notes). Server-only.
+  - `config/bootstrap`: marker written by `/api/admin/bootstrap`; once it exists the route is locked. Server-only.
+  - `e2ee/**`: public keys, wrapped keys and the signed device list (see End-to-End Encryption). Server-only.
+  - `broadcasts/{id}` with `deliveries/{memberId}`: member emails and per-member delivery rows. Admin-read, server-written. `broadcastQuota/{day}`: emails sent per UTC day (shared by broadcasts, task reminders and the digest). Server-only.
+  - `actionItemStatus/{key}`: private status and note for each action item from approved minutes (key = minutes id + task hash). Admins read and write; encrypted once encryption is on.
+  - `timeline/**` (admin read/write) and `gumba/**` (members and admins read, admins write): legacy, kept for now.
   - `callingTree/current` (`callers[]`, `version`, `updatedAt`, `updatedBy`) and `callingTree/current/assignments/{memberId}` (`callerUid`, `assignedAt`, `assignedBy`): the calling tree (plan §12), server-only; no client may read or write it.
   - `callCampaigns/{id}` and `callCampaigns/{id}/calls/{memberId}`: call campaigns (plan §12): title, event, encrypted script, counts; per member the caller, outcome, RSVP and append-only attempts with encrypted notes. Server-only.
   - `positions/{id}` and `positionTerms/{id}`: officer positions (title, Nepali title, order, active, several-holders flag) and who held each from which date to which (`startsOn`, `endsOn` or null). `groups/{id}`: name, description, `leadMemberId`, `kind` (`callers` for the phone tree group). Group membership is `members/{id}.groupIds[]`. All plaintext, admin-read, server-written (plan §15).
@@ -116,13 +128,16 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
 - Communication log collections (all under `organizations/ghmo`):
   - `commsThreads/{threadId}`: `title`, `body`, `status`, `priority`, `pinned`, `createdBy`, `createdAt`, `lastActivityAt`, `conclusion`, `closedBy`, `closedAt`.
     - `comments/{commentId}`: append-only comment records.
-    - `votes/{uid}`: used only for conclusion voting when closing.
+      - `likes/{uid}`: one like per admin on a comment.
+    - `conclusionVotes/{voteId}`: used only for conclusion voting when closing (the id is the voter's uid).
   - `adminChatMessages/{messageId}`: `body`, `createdBy`, `createdAt`.
-Legacy community paths are no longer supported; please migrate any old data into `organizations/{orgSlug}`.
+- Root-level collections (server-only):
+  - `signingSessions/{id}`: signing-link sessions and their sealed signatures.
+  - `certificates/{code}`: issued certificate records, checked by `/verify/{code}`.
+- Legacy paths are still read as fallbacks: `community/ghmo-site/...` (events, members, donation stats) and `organizations/ghmo-site/events` (`src/lib/events.ts`, `app/api/admin/minutes/route.ts`, `app/api/auth/send-login-link/route.ts`, `src/lib/publicData.server.ts`). New data is written only under `organizations/ghmo`; an old event is edited or deleted where it is.
 
 ## GoFundMe Pro
 - Donations go through GoFundMe's own campaign page (`GOFUNDME_PUBLIC_URL`); no GoFundMe script runs on this site.
-- Configure campaign IDs under `community.gofundmePro.campaignIds[]`; `/donate` and `/` render the embed.
 - Webhook: point GoFundMe Pro to `/api/gfmpro/webhook` with `GOFUNDME_PRO_WEBHOOK_SECRET`.
 - Reconcile: call `/api/gfmpro/reconcile` (admin-only) manually or via scheduler.
 
@@ -131,8 +146,8 @@ Legacy community paths are no longer supported; please migrate any old data into
 - Env placeholders:
   - Facebook: `FACEBOOK_PAGE_ID`, `FACEBOOK_GRAPH_TOKEN`, `FACEBOOK_PAGE_URL`
   - YouTube: `YOUTUBE_API_KEY`, `YOUTUBE_CHANNEL_ID`, `YOUTUBE_CHANNEL_URL`
-  - TikTok: `TIKTOK_PROFILE_URL`, `TIKTOK_FEATURE_THUMBNAIL`
-  - Instagram: `INSTAGRAM_PROFILE_URL`, `INSTAGRAM_FEATURE_THUMBNAIL`
+  - TikTok: `TIKTOK_PROFILE_URL`
+  - Instagram: `INSTAGRAM_PROFILE_URL`
 - Without tokens, the page renders embeds/profile links and curated placeholder cards.
 
 ## Upcoming Roadmap
@@ -169,7 +184,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 2) Copy envs: `cp .env.example .env.local` and fill Firebase client config, Admin service account fields, GoFundMe secrets, social handles.
 3) Run dev server: `npm run dev`
 4) Set `FEATURE_EMAIL_ADMIN_LOGIN=true`. For a brand-new project, create the first admin with `POST /api/admin/bootstrap` (see Authentication).
-5) Allowlist admin emails by creating documents under `organizations/ghmo/admins` (set `emailLower`, `status: "active"`, `roles`, and optional `name`) so the magic-link flow recognizes them.
+5) The first super admin is created once with the bootstrap route (`app/api/admin/bootstrap`). After that, a super admin adds admins under Admin → Admins → **Add admin**.
 6) Configure GoFundMe Pro webhook + reconcile schedule when ready.
 
 ## End-to-End Encryption
@@ -187,7 +202,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 ## Governance workflow (Phase 5)
 - **Minutes:** the admin who submits minutes can't approve them. Approval is tied to a fingerprint of the submitted content, so nothing can change during approval; editing submitted minutes sends them back to draft. Each approval keeps an immutable version, and reopening approved minutes needs a written reason and is audited.
 - **Action items:** Admin → Action Items tracks tasks from approved minutes. Status and notes are private (encrypted once encryption is on).
-- **Attendance:** Meeting Minutes → Records → "Export attendance (CSV)" exports what the filters show.
+- **Attendance:** Meeting Minutes → Records → "Download attendance (CSV)" exports what the filters show.
 - **Certificates:** issuing a signed certificate prints a QR code that leads to `/verify/{code}`. The page shows the certificate number, type and issue date (never names) and lets anyone check a PDF copy against the issued file in their browser. Records are HMAC-signed with `CERTIFICATE_SIGNING_KEY_BASE64`, which you must set to issue certificates. The issued PDF downloads when you finalize; keep that file, since re-exported copies won't match its fingerprint.
 - **Templates:** each document template has a version; saved documents remember it.
 
@@ -225,7 +240,7 @@ Legacy community paths are no longer supported; please migrate any old data into
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push to `main`, and fails on critical production advisories from `npm audit`. Dependabot opens weekly update PRs.
 
 ## Security Notes
-> The full threat model, the 17 known findings (S-01 to S-17) and the end-to-end encryption design are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §2–§4. Notable open issues until Phase 1 ships: the GoFundMe script loads on admin pages, disabling an admin does not end their session, and the rate limiter is in-memory only.
+> The full threat model, the known findings (S-01 to S-21) and the end-to-end encryption design are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) §2–§4.
 
 - Magic-link auth endpoints are rate-limited, return generic responses, and only honor allowlisted emails in Firestore so the attacker cannot enumerate addresses.
 - Rate limits are stored in Firestore (`organizations/ghmo/rateLimits`, keys SHA-256 hashed) so they hold across serverless instances, and fail closed if Firestore is unavailable. **Owner action:** in the Firebase console, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.

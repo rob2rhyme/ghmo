@@ -11,6 +11,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Segmented } from "@/src/components/ui/segmented";
+import { Skeleton } from "@/src/components/ui/skeleton";
 import { DUE_DATE, formatShortDate } from "@/src/lib/format";
 import { firestore } from "@/src/lib/firebaseFirestore";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
@@ -31,6 +32,8 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
   const { unpackPrivate, packPrivate } = useE2ee();
   const [statuses, setStatuses] = useState<Map<string, StatusRecord>>(new Map());
   const [items, setItems] = useState<TrackedItem[]>([]);
+  // False until the list is first built, so "No action items yet" never shows while it is still loading.
+  const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<Filter>("open");
   const [busy, setBusy] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -66,7 +69,9 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
   useEffect(() => {
     let cancelled = false;
     void buildItems(minutes, statuses).then(next => {
-      if (!cancelled) setItems(next);
+      if (cancelled) return;
+      setItems(next);
+      setLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -121,7 +126,12 @@ export default function ActionItemsClient({ minutes, uid }: { minutes: MeetingMi
           {overdueCount && filter !== "done" ? <Badge variant="destructive">{overdueCount} overdue</Badge> : null}
         </div>
       ) : null}
-      {visible.length === 0 ? (
+      {!loaded ? (
+        <div role="status">
+          <span className="sr-only">Loading action items…</span>
+          <Skeleton className="h-40 w-full rounded-xl" />
+        </div>
+      ) : visible.length === 0 ? (
         items.length === 0 ? (
           <EmptyState
             icon={<ListChecks aria-hidden="true" />}

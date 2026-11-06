@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { BellRing } from "lucide-react";
+import { BellRing, RefreshCw } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { errorMessage, peopleApi } from "@/src/components/admin/people/api";
-import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
@@ -33,6 +33,7 @@ export default function DigestCard() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,10 +47,39 @@ export default function DigestCard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  if (error) return null;
-  if (!data) return <Skeleton className="h-24 w-full" />;
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Couldn&apos;t load the daily digest settings</AlertTitle>
+        <AlertDescription>
+          <p>{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="row"
+              onClick={() => {
+                setError(null);
+                setAttempt(n => n + 1);
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (!data) {
+    return (
+      <div role="status">
+        <span className="sr-only">Loading the daily digest settings…</span>
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
   const { settings, superAdmin, scheduleReady, blocker } = data;
 
   const change = async (enabled: boolean) => {

@@ -34,9 +34,9 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 
 **If something goes wrong: the recovery plan**
 1. **A forgotten passphrase or one lost device.** Set the device up again. Another admin approves it after comparing the safety code. This is why every community should have at least three admins with approved devices.
-2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Revoke selected and rotate keys**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
+2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Remove selected and make new keys**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
 3. **Every admin device is gone.** The **paper recovery key** is the way back. On the Encryption page, "Lost every device?" lets a trustee's paper copy activate a new device. You still have to sign in as an admin, so the paper alone is not enough. Treat it as highly sensitive anyway.
-4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key** with both trustees present, then **Rotate keys now**. Everyone destroys the old copies.
+4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key** with both trustees present, then **Make new keys now**. Everyone destroys the old copies.
 5. **The worst case.** If every device is lost and no working paper key exists, the encrypted data is gone for good. That means phone numbers, admin chat and drafts. Names and emails are not encrypted, so they survive, and the numbers would have to be collected again.
 
 **Habits that make recovery work**
@@ -225,4 +225,4 @@ The **Admins** page lists everyone who can sign in to the admin area: super admi
 
 ## If something goes wrong
 
-A lost device or recovery key: see §1a and `docs/RUNBOOK_INCIDENT.md`, cases A and D. Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M.
+A lost device or recovery key: see §1a and `docs/RUNBOOK_INCIDENT.md`, cases A and D. Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M. A stolen admin session or an admin who left: cases B and C (use Admin → Admins). A wrong task reminder: case N. A member who asks what is held or to be deleted: case O. A lost or over-shared member export: case P. A push notification problem or a lost phone that still gets alerts: case Q.
