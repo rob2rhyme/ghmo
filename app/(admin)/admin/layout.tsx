@@ -3,7 +3,7 @@ import type { Route } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminShell from "@/src/components/admin/shell/AdminShell";
-import { AdminAccessError, requireActiveAdmin } from "@/src/lib/admin";
+import { AdminAccessError, isSuperAdmin, requireActiveAdmin } from "@/src/lib/admin";
 import { roleLabel } from "@/src/lib/adminView";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { safeRedirectPath } from "@/src/lib/security/redirect";
@@ -15,10 +15,10 @@ import { safeRedirectPath } from "@/src/lib/security/redirect";
  * still check access themselves; this is the first line, not the only one.
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  let user = { name: "Admin", email: undefined as string | undefined, roleLabel: "Admin" };
+  let user = { name: "Admin", email: undefined as string | undefined, roleLabel: "Admin", superAdmin: false };
   try {
     const { actor, admin } = await requireActiveAdmin(undefined, COMMUNITY_SLUG);
-    user = { name: actor.name || admin.email || "Admin", email: actor.email, roleLabel: roleLabel(actor.roles) };
+    user = { name: actor.name || admin.email || "Admin", email: actor.email, roleLabel: roleLabel(actor.roles), superAdmin: isSuperAdmin(admin) };
   } catch (error) {
     if (!(error instanceof AdminAccessError)) throw error;
     const current = safeRedirectPath((await headers()).get("x-pathname"), "/admin");
