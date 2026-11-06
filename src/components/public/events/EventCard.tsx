@@ -104,6 +104,7 @@ export function EventCard({ evt, orgSlug, compact = false, flyer = true, heading
             <a href={eventFlyerHref(orgSlug, evt.id)}>
               <FileText aria-hidden="true" />
               Download flyer (PDF)
+              <span className="sr-only"> for {evt.title}</span>
             </a>
           </Button>
         ) : null}

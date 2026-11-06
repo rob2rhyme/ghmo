@@ -5,7 +5,7 @@ const DESCRIPTION =
   "The Magar community of Greater Harrisburg, Pennsylvania: events, meeting minutes, videos and the Gumba Project.";
 
 /** Absolute links in link previews (Open Graph) need the site's address; only set when it is configured. */
-function siteUrl(): URL | undefined {
+export function siteUrl(): URL | undefined {
   const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_PUBLIC_URL;
   if (!configured) return undefined;
   try {
@@ -40,6 +40,7 @@ export const siteMetadata: Metadata = {
       }
     ]
   },
+  twitter: { card: "summary_large_image" },
   // Installed on iPhone/iPad: open full screen with the GHMO name under the icon.
   appleWebApp: { capable: true, title: "GHMO", statusBarStyle: "default" }
 };
@@ -47,6 +48,20 @@ export const siteMetadata: Metadata = {
 /** Open Graph for a page with its own title: keeps the site's preview image and name. */
 export function pageOpenGraph(title: string, description?: string): Metadata["openGraph"] {
   return { ...siteMetadata.openGraph, title, ...(description ? { description } : {}) };
+}
+
+/**
+ * Title, description, link preview and canonical address for a public page in one go, so a shared link shows the
+ * page's own title rather than the site's. `path` is the page's address on this site, for example "/minutes".
+ */
+export function pageMetadata(title: string, description: string, path: string): Metadata {
+  return { title, description, openGraph: pageOpenGraph(title, description), alternates: { canonical: path } };
+}
+
+/** The full address of a page on this site, or null when the site's address isn't configured. */
+export function absoluteUrl(path: string): string | null {
+  const base = siteUrl();
+  return base ? new URL(path, base).toString() : null;
 }
 
 export const siteViewport: Viewport = {

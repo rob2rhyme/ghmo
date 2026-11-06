@@ -14,7 +14,7 @@ The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_
 ## Document Generator
 - Single `/admin/document-generator` page hosts tab-based GHMO letter templates (no landing cards); desktop layouts pair the form on the left with the live preview on the right, and mobile stacks the panels responsively.
 - Current tabs: General Meeting Invitation (renamed from Member Meeting Invitation), Board Meeting Invitation, Community Leader Invitation (external leader outreach), and Bhajan Program.
-- Letter-size (8.5×11) PDF/JPEG exports reuse `/public/assets/docgen/ghmo-letterhead.png`, ensuring the preview and saved asset match the same branded background.
+- Letter-size (8.5×11) PDF/JPEG exports reuse `/public/assets/docgen/ghmo-letterhead.webp` (full-size originals of the letterhead, seal and building artwork are in `design/originals/`, outside `public/` so they are not served), ensuring the preview and saved asset match the same branded background.
 - Cross-device signing links require `NEXT_PUBLIC_APP_URL` during local dev (set to `http://<LAN_IP>:3000` so phones can open QR/sign links).
 
 ## Meeting Minutes

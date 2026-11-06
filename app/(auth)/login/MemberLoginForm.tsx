@@ -140,6 +140,10 @@ export function MemberLoginForm({ next: nextParam }: MemberLoginFormProps) {
       setEmailError("Enter your email");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setEmailError("Enter an email address like name@example.com");
+      return;
+    }
     setEmailError(null);
     setLoading(true);
     setError(null);
@@ -150,12 +154,17 @@ export function MemberLoginForm({ next: nextParam }: MemberLoginFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
       });
-      await res.json();
-      localStorage.setItem("magiclink-email", email.trim());
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      // The server answers the same way whether or not the address is a member; a failure here means it couldn't try.
+      if (!res.ok) throw new Error(data.error || "Could not send sign-in link. Please try again.");
+      try {
+        localStorage.setItem("magiclink-email", email.trim());
+      } catch {
+        // Private browsing can refuse storage; the link then asks for the email again.
+      }
       setStatus("If your access is enabled, you'll receive a sign-in email.");
     } catch (err) {
-      console.error(err);
-      setError("Could not send sign-in link. Please try again.");
+      setError(err instanceof Error && err.message ? err.message : "Could not send sign-in link. Please try again.");
     } finally {
       setLoading(false);
     }

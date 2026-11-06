@@ -10,13 +10,11 @@ import { getContactEmail } from "@/src/lib/contact";
 import { formatDate } from "@/src/lib/format";
 import { cachedPageData } from "@/src/lib/publicCache.server";
 import { listArchive } from "@/src/lib/publicData.server";
+import { pageMetadata } from "@/src/lib/siteMetadata";
 
 // Built on first visit and refreshed every 5 minutes, or at once when minutes are approved (publicCache.server.ts).
 export const revalidate = 300;
-export const metadata: Metadata = {
-  title: "Meeting minutes · GHMO",
-  description: "Approved meeting minutes of the Greater Harrisburg Magar Organization."
-};
+export const metadata: Metadata = pageMetadata("Meeting minutes · GHMO", "Approved meeting minutes of the Greater Harrisburg Magar Organization.", "/minutes");
 
 export default async function MinutesArchivePage() {
   const loaded = cachedPageData(await listArchive(), "Meeting minutes");

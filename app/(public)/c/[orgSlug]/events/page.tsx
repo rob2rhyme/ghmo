@@ -5,13 +5,11 @@ import { getContactEmail } from "@/src/lib/contact";
 import { cachedPageData } from "@/src/lib/publicCache.server";
 import { getPublishedEventCards } from "@/src/lib/publicData.server";
 import EventsClient from "./EventsClient";
+import { pageMetadata } from "@/src/lib/siteMetadata";
 
 // Built on first visit and refreshed every 5 minutes, or at once when an event changes (publicCache.server.ts).
 export const revalidate = 300;
-export const metadata: Metadata = {
-  title: "Events · GHMO",
-  description: "Gatherings, festivals and meetings of the Greater Harrisburg Magar Organization."
-};
+export const metadata: Metadata = pageMetadata("Events · GHMO", "Gatherings, festivals and meetings of the Greater Harrisburg Magar Organization.", "/c/ghmo/events");
 
 /** No copies at build time: the page is built on its first visit, then served from the cache. */
 export function generateStaticParams(): { orgSlug: string }[] {

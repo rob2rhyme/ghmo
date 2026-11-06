@@ -11,7 +11,8 @@ const EXPLORE_LINKS: { href: Route; label: string }[] = [
   { href: "/c/ghmo/events" as Route, label: "Events" },
   { href: "/minutes", label: "Minutes" },
   { href: "/donate", label: "Gumba Project" },
-  { href: "/multimedia", label: "Media" }
+  { href: "/multimedia", label: "Media" },
+  { href: "/privacy", label: "Privacy" }
 ];
 
 // The sign-in page and the guide sit in other root layouts and render per request, so prefetching them from
@@ -68,8 +69,8 @@ export function SiteFooter({ name, contactEmail = null, secure = false }: { name
           ) : null}
         </div>
 
-        <div className={cn("grid grid-cols-2 gap-6", contactEmail ? "md:col-span-3 md:grid-cols-3" : "md:col-span-2")}>
-          <nav aria-label="Footer" className="flex min-w-0 flex-col gap-1">
+        <nav aria-label="Footer" className={cn("grid grid-cols-2 gap-6", contactEmail ? "md:col-span-3 md:grid-cols-3" : "md:col-span-2")}>
+          <div className="flex min-w-0 flex-col gap-1">
             <h2 className="text-sm font-semibold">Explore</h2>
             <ul className="flex flex-col">
               {EXPLORE_LINKS.map(link => (
@@ -81,7 +82,7 @@ export function SiteFooter({ name, contactEmail = null, secure = false }: { name
                 </li>
               ))}
             </ul>
-          </nav>
+          </div>
           <div className="flex min-w-0 flex-col gap-1">
             <h2 className="text-sm font-semibold">For board members</h2>
             <ul className="flex flex-col">
@@ -103,7 +104,7 @@ export function SiteFooter({ name, contactEmail = null, secure = false }: { name
               </a>
             </div>
           ) : null}
-        </div>
+        </nav>
       </div>
 
       <div className="border-t border-border">

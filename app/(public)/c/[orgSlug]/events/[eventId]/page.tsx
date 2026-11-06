@@ -8,10 +8,11 @@ import { Card } from "@/src/components/ui/card";
 import { EventActions, EventPassedNote } from "@/src/components/public/events/EventActions";
 import { eventsHref as eventsListHref } from "@/src/components/public/events/EventCard";
 import { EventMinutesCard } from "@/src/components/public/events/EventMinutesCard";
-import { eventWhenLong } from "@/src/components/public/events/eventDates";
-import { COMMUNITY_SLUG } from "@/src/lib/community";
+import { eventEnd, eventStart, eventWhenLong } from "@/src/components/public/events/eventDates";
+import { COMMUNITY_NAME, COMMUNITY_SLUG } from "@/src/lib/community";
 import { getApprovedMinutesForEvent, getPublishedEvent } from "@/src/lib/publicData.server";
-import { pageOpenGraph } from "@/src/lib/siteMetadata";
+import { absoluteUrl, pageOpenGraph } from "@/src/lib/siteMetadata";
+import { eventJsonLd, jsonLdText } from "@/src/lib/structuredData";
 
 // Built on first visit and refreshed every 5 minutes, or at once when the event or its minutes change
 // (publicCache.server.ts). Nothing here depends on who is looking: admin extras load in the browser.
@@ -40,7 +41,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const fallback = [when ? `${when.date}, ${when.time}` : null, event.location].filter(Boolean).join(" · ");
   const description = event.summary?.trim() || fallback || undefined;
   // Link previews (Facebook, Viber, WhatsApp) show the event's own title and summary.
-  return { title: `${event.title} · GHMO`, description, openGraph: pageOpenGraph(event.title, description) };
+  return { title: `${event.title} · GHMO`, description, openGraph: pageOpenGraph(event.title, description), alternates: { canonical: `/c/${COMMUNITY_SLUG}/events/${encodeURIComponent(event.id)}` } };
 }
 
 export default async function EventDetailPage({ params }: Params) {
@@ -71,9 +72,15 @@ export default async function EventDetailPage({ params }: Params) {
   // eslint-disable-next-line react-hooks/purity -- when this cached copy was built; the browser switches to its own clock (useNow)
   const renderedAt = Date.now();
   const timing = { id: event.id, startsAt: event.startsAt, endsAt: event.endsAt };
+  const structured = eventJsonLd(
+    { title: event.title, summary: event.summary, location: event.location, start: eventStart(event), end: eventEnd(event), url: absoluteUrl(`/c/${COMMUNITY_SLUG}/events/${encodeURIComponent(event.id)}`) },
+    { name: COMMUNITY_NAME, url: absoluteUrl("/") }
+  );
 
   return (
     <PublicPage width="reading" className="gap-6">
+      {/* For search engines: the event's date and place. */}
+      {structured ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(structured) }} /> : null}
       <PublicPageHeader back={{ href: eventsHref, label: "All events" }} title={<span className="break-words">{event.title}</span>} />
 
       <EventPassedNote event={timing} renderedAt={renderedAt} />

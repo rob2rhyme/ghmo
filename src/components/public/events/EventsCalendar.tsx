@@ -110,6 +110,7 @@ export function EventsCalendar({ events, orgSlug }: { events: EventCardRecord[];
                     className="line-clamp-2 rounded-md bg-primary/10 px-1.5 py-1 text-xs font-medium break-words text-primary hover:bg-primary/15"
                   >
                     {item.evt.title}
+                    <span className="sr-only">, {monthName.replace(/ \d{4}$/, "")} {day}</span>
                   </Link>
                 ))}
               </div>

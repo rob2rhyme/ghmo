@@ -5,7 +5,11 @@ import type { LucideIcon } from "lucide-react";
 import { PublicPage, PublicPageHeader } from "@/src/components/public/PublicPage";
 import { Button } from "@/src/components/ui/button";
 
-export const metadata: Metadata = { title: "Board member guide · GHMO" };
+export const metadata: Metadata = {
+  title: "Board member guide · GHMO",
+  description: "How GHMO board members sign in, set up their passkey and authenticator, and get help.",
+  robots: { index: false, follow: true }
+};
 
 type Section = { icon: LucideIcon; title: string; steps: string[]; note?: string };
 
