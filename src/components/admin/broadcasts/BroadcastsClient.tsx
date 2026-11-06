@@ -89,21 +89,24 @@ export default function BroadcastsClient({
           description="Your first announcement, written above, shows here. It stays a draft until another admin approves it, and nothing is emailed before you press Send."
         />
       ) : (
-        <AdminList label="Broadcasts">
-          {initial.map(item => {
-            const badge = statusBadge("broadcast", item.status);
-            const meta = [item.createdByName ? `Started by ${item.createdByName}` : "", item.updatedAt ? `updated ${formatShortDate(item.updatedAt)}` : ""].filter(Boolean).join(" · ");
-            return (
-              <AdminListRow
-                key={item.id}
-                href={`/admin/broadcasts/${item.id}` as Route}
-                title={item.subject}
-                meta={meta || undefined}
-                badges={<Badge variant={badge.variant}>{badge.label}</Badge>}
-              />
-            );
-          })}
-        </AdminList>
+        <div className="flex flex-col gap-2">
+          {initial.length >= 100 ? <p className="text-sm text-muted-foreground">Showing the 100 most recently changed broadcasts.</p> : null}
+          <AdminList label="Broadcasts">
+            {initial.map(item => {
+              const badge = statusBadge("broadcast", item.status);
+              const meta = [item.createdByName ? `Started by ${item.createdByName}` : "", item.updatedAt ? `updated ${formatShortDate(item.updatedAt)}` : ""].filter(Boolean).join(" · ");
+              return (
+                <AdminListRow
+                  key={item.id}
+                  href={`/admin/broadcasts/${item.id}` as Route}
+                  title={item.subject}
+                  meta={meta || undefined}
+                  badges={<Badge variant={badge.variant}>{badge.label}</Badge>}
+                />
+              );
+            })}
+          </AdminList>
+        </div>
       )}
     </div>
   );

@@ -102,6 +102,7 @@ export default function MinutesSearchClient({ initialMinutes: rawMinutes }: Minu
         description={
           <span role="status">
             {count} {count === 1 ? "result" : "results"}, newest meeting first.
+            {rawMinutes.length >= 100 ? " Only the newest 100 meetings are searched here." : ""}
           </span>
         }
         actions={

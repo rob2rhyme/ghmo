@@ -130,7 +130,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
       setEventsLoading(true);
       try {
         const res = await fetch(`/api/admin/organizations/${COMMUNITY_SLUG}/events?status=all`);
-        if (!res.ok) throw new Error(`The server answered ${res.status}.`);
+        if (!res.ok) throw new Error("The list of meetings couldn't be loaded. Check your connection and try again.");
         const data = await res.json();
         if (!isActive) return;
         setEvents(Array.isArray(data.events) ? data.events : []);

@@ -5,7 +5,11 @@ import { MessagePage } from "@/src/components/public/MessagePage";
 import { Button } from "@/src/components/ui/button";
 import { getContactEmail } from "@/src/lib/contact";
 
-export const metadata: Metadata = { title: "Document generator · GHMO" };
+export const metadata: Metadata = {
+  title: "Document generator · GHMO",
+  description: "The document generator is for GHMO board members.",
+  robots: { index: false, follow: true }
+};
 
 /** The document generator is a board tool; visitors who follow an old link get an explanation, not a sign-in form. */
 export default function PublicDocgenPage() {

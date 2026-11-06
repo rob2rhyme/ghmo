@@ -1,0 +1,23 @@
+name: Weekly dependency audit
+
+# CI audits dependencies on every push, but a new advisory can appear while nobody is pushing.
+on:
+  schedule:
+    - cron: "41 7 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # Same bar as CI: high or critical advisories in production dependencies. A failure emails the repo owner.
+      - run: npm audit --omit=dev --audit-level=high

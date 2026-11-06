@@ -30,6 +30,9 @@ import type { MeetingMinutesRecord } from "@/src/lib/minutes";
 import { activitySentence, firstName, formatMoney, formatShortDate, percentOf, relativeTime } from "@/src/lib/adminView";
 import { formatDateTime } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
+import type { SetupItem } from "@/src/lib/siteSetup";
+import SiteSetupCard from "./SiteSetupCard";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
 
 type AuditLogView = {
   id: string;
@@ -56,6 +59,10 @@ type AdminDashboardOverviewProps = {
   minutesCounts: { submitted: number; draft: number };
   auditLogs: AuditLogView[];
   webhookEvents: WebhookEventView[];
+  /** Which parts of the page failed to load, in words, or null. */
+  loadWarning?: string | null;
+  /** Super admins only: what is missing in the site's settings (empty when all is set; null for other admins). */
+  setup?: SetupItem[] | null;
 };
 
 const QUICK_ACTIONS: { href: Route; title: string; description: string; icon: LucideIcon }[] = [
@@ -73,7 +80,7 @@ function EmptyNote({ children }: { children: ReactNode }) {
   return <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
-export default function AdminDashboardOverview({ community, adminName, stats, minutes, minutesCounts, auditLogs, webhookEvents }: AdminDashboardOverviewProps) {
+export default function AdminDashboardOverview({ community, adminName, stats, minutes, minutesCounts, auditLogs, webhookEvents, loadWarning = null, setup = null }: AdminDashboardOverviewProps) {
   const [reconciling, setReconciling] = useState(false);
   const [now] = useState(() => Date.now());
 
@@ -147,6 +154,13 @@ export default function AdminDashboardOverview({ community, adminName, stats, mi
           </>
         }
       />
+
+      {loadWarning ? (
+        <Alert variant="destructive">
+          <AlertDescription>{loadWarning}</AlertDescription>
+        </Alert>
+      ) : null}
+      {setup && setup.length > 0 ? <SiteSetupCard items={setup} /> : null}
 
       {/* Figures, with the one Donations card beside them. Before the first sync the two zero tiles fold into that card. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">

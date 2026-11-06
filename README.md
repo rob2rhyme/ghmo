@@ -14,7 +14,7 @@ The phased roadmap and the status of every phase (0–17) are in [`docs/PROJECT_
 ## Document Generator
 - Single `/admin/document-generator` page hosts tab-based GHMO letter templates (no landing cards); desktop layouts pair the form on the left with the live preview on the right, and mobile stacks the panels responsively.
 - Current tabs: General Meeting Invitation (renamed from Member Meeting Invitation), Board Meeting Invitation, Community Leader Invitation (external leader outreach), and Bhajan Program.
-- Letter-size (8.5×11) PDF/JPEG exports reuse `/public/assets/docgen/ghmo-letterhead.png`, ensuring the preview and saved asset match the same branded background.
+- Letter-size (8.5×11) PDF/JPEG exports reuse `/public/assets/docgen/ghmo-letterhead.webp` (full-size originals of the letterhead, seal and building artwork are in `design/originals/`, outside `public/` so they are not served), ensuring the preview and saved asset match the same branded background.
 - Cross-device signing links require `NEXT_PUBLIC_APP_URL` during local dev (set to `http://<LAN_IP>:3000` so phones can open QR/sign links).
 
 ## Meeting Minutes
@@ -243,7 +243,7 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and push
 - Magic-link auth endpoints are rate-limited, return generic responses, and only honor allowlisted emails in Firestore so the attacker cannot enumerate addresses.
 - Rate limits are stored in Firestore (`organizations/ghmo/rateLimits`, keys SHA-256 hashed) so they hold across serverless instances, and fail closed if Firestore is unavailable. **Owner action:** in the Firebase console, add a TTL policy on the `expiresAt` field for the `rateLimits` collection group.
 - **Going live / owner tasks:** `docs/GO_LIVE_CHECKLIST.md` lists every setting, secret, rule deployment and person-dependent step in order.
-- **Vercel deployments.** `vercel.json` runs `scripts/vercel-ignore-build.sh`, which skips preview builds for `dependabot/*` branches and for pushes that only change docs, tests or CI config, so the free plan's daily deployment limit goes to changes that can affect the site. `main` always builds.
+- **Vercel deployments.** `vercel.json` runs `scripts/vercel-ignore-build.sh`, which skips builds for `dependabot/*` branches and for changes that only touch docs, tests or CI config since the last successful deployment of that branch (`VERCEL_GIT_PREVIOUS_SHA`), so the free plan's daily deployment limit goes to changes that can affect the site. This includes docs-only merges to `main` (since 2026-11-06); `main` always builds when Vercel can't tell what it last deployed.
 - Client IPs come from the right-most `X-Forwarded-For` entry (configurable with `TRUSTED_PROXY_HOPS`), or `x-real-ip` on Vercel, so clients cannot spoof their IP to dodge limits.
 - Sessions are anchored to the revocable `__session` cookie and verified via `requireActiveAdmin` (which re-reads the admin record) before any admin page/API executes logic.
 - The dev helper `/api/auth/dev/admin-session` only works when the build is not production, `ALLOW_DEV_ADMIN_LOGIN=true`, and a 32+ character `DEV_ADMIN_LOGIN_TOKEN` is sent in the `x-dev-login-token` header. (Before Phase 1 the code did not check the environment and the token was optional.)

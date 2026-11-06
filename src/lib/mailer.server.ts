@@ -20,6 +20,8 @@ export async function sendMail(message: { to: string; subject: string; text: str
       body: JSON.stringify({ from: process.env.NOTIFY_FROM_EMAIL, to: [message.to], subject: message.subject, text: message.text, ...(message.headers ? { headers: message.headers } : {}) }),
       signal: AbortSignal.timeout(5000)
     });
+    // A refused send (bad key, unverified domain, rate limit) used to leave no trace at all. Only the status is logged.
+    if (!res.ok) console.error("Notification email refused", res.status);
     return res.ok;
   } catch (error) {
     // Never log the address or message.
@@ -53,7 +55,10 @@ export async function sendMailBatch(messages: BatchMessage[], idempotencyKey: st
       ),
       signal: AbortSignal.timeout(15_000)
     });
-    if (!res.ok) return { ok: false, status: res.status };
+    if (!res.ok) {
+      console.error("Broadcast batch refused", res.status);
+      return { ok: false, status: res.status };
+    }
     const data = (await res.json().catch(() => null)) as { data?: { id?: string }[] } | null;
     return { ok: true, ids: (data?.data ?? []).map(item => item.id ?? "") };
   } catch (error) {

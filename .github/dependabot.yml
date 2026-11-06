@@ -17,6 +17,9 @@ updates:
     groups:
       react-next:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "next", "eslint-config-next"]
+      # Every merge to main is a production deployment (100 a day on the free plan), so small updates arrive as one PR.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

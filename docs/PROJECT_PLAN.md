@@ -213,10 +213,10 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **11** | Officer positions, member groups and event tasks | **Built and merged 2026-11-05 (11-A to 11-D, §15.7; PRs #86, #87, #88, #94).** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, calling-tree suggestions from the callers group, and task counts on the Events list. Admins only. | Owner publishes the Firestore rules again and enters the officers (go-live checklist). |
 | **12** | Reminders to team members | **Built and merged 2026-11-05 (12-A to 12-C, §16.6; PRs #95 and #96).** Email reminders about the tasks a person owns: sent by an admin from the event page (12-A), and an optional automatic daily digest of overdue tasks that is off until a super admin switches it on (12-B). Consented members only, with the unsubscribe link and the shared daily email limit. Admins only trigger it. Decisions D21–D26 taken as recommended. | Owner adds `CRON_SECRET` in Vercel if they want the digest, publishes the Firestore rules again, and sends one test reminder (go-live checklist). |
 | **13** | Member profile | **Built 2026-11-05 (13-A to 13-D, §17.6).** A page per member with how long they have been a member, city and state (no street address), family members with optional phone numbers, a log of notes admins add, the history of calls to them, and how polite or rude each call was. Admins only. Decisions D27–D31 taken as recommended. | Owner reads §17.2 (what is encrypted, who can write notes and ratings) and §17.5 (privacy). |
-| **14** | Push notifications | **Built 2026-11-06 (14-A, 14-B, 14-C; §18.6 to §18.8).** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner sets the three `VAPID_*` variables in Vercel and publishes the Firestore rules (go-live checklist) before push is used. |
-| **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 proposed. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
-| **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 proposed. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
-| **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 proposed. | Owner reads §22.2 before 17-A is used. |
+| **14** | Push notifications | **Built 2026-11-06 (14-A, 14-B, 14-C; §18.6 to §18.8).** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 accepted 2026-11-06. | Owner sets the three `VAPID_*` variables in Vercel and publishes the Firestore rules (go-live checklist) before push is used. |
+| **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 accepted 2026-11-06. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
+| **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 accepted 2026-11-06. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
+| **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 accepted 2026-11-06. | Owner reads §22.2 before 17-A is used. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1199,7 +1199,7 @@ Out of scope: a street address, photos, member self-service or a member-facing p
 | There is no push library in the project and no secret for it. | `package.json` | Adds the `web-push` package (MPL-2.0, used unmodified; checked 2026-11-06, the plan first said MIT) and a VAPID key pair as environment variables. |
 | On iPhone, web push works only for an app added to the Home Screen (iOS 16.4 or later); Android and desktop browsers allow it in the browser. | platform behaviour | The Security card says so and shows the steps. |
 
-### 18.2 Decisions (proposed; accept or change before 14-A)
+### 18.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1305,7 +1305,7 @@ Built: `src/lib/memberExport.ts` (pure; formulas such as `=HYPERLINK(...)` are m
 | The broadcast sender already skips a recipient whose member document is gone. | `broadcastSender.server.ts` | A broadcast in the middle of sending is safe. |
 | The activity log is append-only and its entries are written by the server. | rules, `audit.ts` | It is not edited (D43), and the deletion itself is recorded. |
 
-### 20.2 Decisions (proposed; accept or change before 15-A is used)
+### 20.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1382,7 +1382,7 @@ Out of scope: bulk deletion, undoing a deletion, deleting an admin account (sepa
 | Turning an admin on or off is only a Firestore console step; there is no admin management page. | runbook case B | Phase 16 does not add one. Devices of a turned-off admin are shown as such, so the super admin can remove them. |
 | The only way to stop all pushes today is to remove a `VAPID_*` variable in Vercel and redeploy. | runbook case Q step 5 | A switch in the app is faster and does not need a deploy (D49). |
 
-### 21.2 Decisions (proposed; accept or change before 16-A is used)
+### 21.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1457,7 +1457,7 @@ Out of scope: admin management (turning admins on and off in the app), automatic
 | Roles are `super_admin` or `admin`. Only a super admin can do the sensitive things (positions, deleting members, the push controls). | `admin.ts` | Role changes are super-admin only, and the last active super admin must always remain. |
 | A turned-off admin keeps their push devices and their encrypted-data devices. | Phase 16, runbook case C | Turning off offers to turn off their push devices too, and reminds the super admin to revoke their encryption devices (which needs an unlocked device, so it stays a separate step). |
 
-### 22.2 Decisions (proposed; accept or change before 17-A is used)
+### 22.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1536,7 +1536,7 @@ Four read-only reviews ran in parallel (docs against code; API routes, rules and
 
 ### 23.2 For the owner to decide (not changed)
 
-1. **Decisions still marked "proposed":** D32–D36 (§18.2), D41–D46 (§20.2), D47–D50 (§21.2), D51–D56 (§22.2). They were built as recommended; mark them accepted or say what to change.
+1. **Decisions D32–D36, D41–D46, D47–D50 and D51–D56:** accepted by the owner on 2026-11-06, as built.
 2. **Code with no caller:** *done 2026-11-06, see §23.3.* Was: the three timeline routes and their rules block, `POST /api/admin/comms/seed`, `POST /api/admin/content` (writes home blocks, which the rules make world-readable, with little validation; no page shows them), the `gumba` rules block (no code uses it), the `docgen` rules block (admins may write from the browser), two unused path helpers, unused entries in the `AuditType` list and three unused `NEXT_PUBLIC_*` flags in `env.client.ts`. Removing them is small; it needs the rules published again.
 3. **Older activity entries** still hold member and admin emails, and the dashboard returns full entries (with IP addresses) and raw GoFundMe webhook payloads to admins. Admin-only, but worth knowing.
 4. **Wording:** *done 2026-11-06, see §23.3.* Was: members use Disable/Enable, admins use Turn off/Turn on, groups say Switched off; records are "deleted" in some places and "removed" in others. Harmless; can be made consistent in one pass if wanted.
@@ -1549,3 +1549,36 @@ Four read-only reviews ran in parallel (docs against code; API routes, rules and
 - **Firestore rules:** the `home/blocks`, `gumba`, `docgen` and `timeline` blocks and the `isMember()` function, which only the gumba block used. Those paths now fall to the default deny; the server's admin SDK, which is not subject to rules, still reads `docgen` for the document templates. Rules tests check that all four are closed to browsers. **The rules must be published again.**
 - **Small leftovers:** the unused `docgen/templates`, `docgen/generations`, `timeline` and `home/blocks` path helpers, the legacy `AuditType` entries nothing writes any more (only `webhook_received` remains), and three `NEXT_PUBLIC_*` flags in `env.client.ts` that nothing read.
 - The dashboard keeps its words for the removed actions, so older activity entries still read correctly.
+
+## 24. Enhancement audit (2026-11-06)
+
+The owner reported that adding board members and other officers "is not enabled", accepted D32–D56, and asked for a full-site look for enhancement gaps. Three read-only reviews (public site, admin workflows, operations) were run; the clear, low-risk items were fixed and the rest are listed in §24.3.
+
+### 24.1 Officer positions
+
+- **Cause:** **Set holder** only listed people already on the member list as active. On a site with no members imported yet, or when an officer wasn't a member, the list was empty or missing them and **Save holder** stayed greyed out with no reason given. Separately, a one-person seat (President, Vice President, Secretary…) refused a second holder unless "Several people" was ticked under **Edit**, which the dialog never mentioned.
+- **Fixed:** the picker has **Someone not on the member list yet…** (name and email; the person is added to Members and seated in one step), a search box for long lists, and a note with a link to Members when the list is empty. For a one-person seat that already has a holder it offers **End … the day before** (default) or **Keep … and add this person too**, which makes the seat one for several people. Only super admins see **Set holder** and **Add a position**; other admins see a note saying so.
+- **Live site:** the earlier fix for adding several board members on the same day (#100) and this one reach the live site only when Vercel deploys the latest `main`.
+
+### 24.2 Fixed
+
+- **Admin:** a **Site setup** card on the dashboard for super admins (missing site address, email, broadcast settings, contact address, donate link, push keys, cron secret, test-only switches on the live site, fewer than two super admins, encryption off; setting names only, never values); the dashboard says when part of it failed to load instead of showing it empty; the Admins page warns about a single super admin; Action items read every approved record (they stopped at the newest 100); minutes search, Events and Broadcasts say when a list reaches its limit; greyed-out buttons say why; no more "The server answered 500" messages.
+- **Public site:** sitemap and robots files; schema.org Event data on event pages and Organization data on the home page; per-page link previews and canonical addresses; a plain-words **Privacy** page in the footer (for the board to read, §24.3); `/verify` without a code shows the form; member sign-in no longer reports success when sending failed; unsubscribe says which emails stop and explains failures; small accessibility fixes (flyer links, calendar chips, theme button, footer nav, offline page); 5.4 MB of unused original PNGs moved out of `public/` to `design/originals/`.
+- **Operations:** the `minutes (eventId, eventDate desc)` index the event page's minutes card needs (it failed in production without it) and the two TTL policies are now in `firestore.indexes.json`; refused emails log their status; a site-wide error page and error pages for the docs and signing areas; `vercel-ignore-build.sh` compares with the last successful deployment and skips docs-only merges to `main`; Dependabot groups minor and patch updates; a weekly dependency audit; unused packages and `check-env.cjs` removed; go-live checklist §2 adds Firestore backups; runbook case R covers outages and restores.
+
+### 24.3 Not changed: for the owner to decide
+
+1. **Read the Privacy page** (`/privacy`) and the donate page's "about your gift" gap: legal status (registered nonprofit? 501(c)(3)? tax-deductible?), who organizes the GoFundMe and holds the money, and whom to ask about a donation. The donate page also still has the board-confirm note on what a Gumba is.
+2. **Turn on Firestore backups** (go-live checklist §2; needs the pay-as-you-go plan) and run `npx firebase deploy --only firestore` to publish the new index and TTL policies.
+3. **Vercel "wait for checks"**, so `main` only deploys after CI passes (Vercel → Settings → Git); and `CONTACT_EMAIL`, `NEXT_PUBLIC_APP_URL` in production (the Site setup card lists anything missing).
+4. **Bigger admin features found, not built** (each is a phase of its own; say which to plan):
+   - change a member's **email** (today: delete and re-add, which loses history);
+   - **minutes for a meeting that isn't an event yet**, and changing the meeting while minutes are a draft;
+   - **Ctrl/⌘ K finds people, events and minutes**, not only pages;
+   - a **phone-friendly member list** (a "More…" menu per row, paging) and **bulk actions** (add to a group, record consent);
+   - a full **activity log page** with paging and filters (the dashboard shows the latest 8);
+   - **duplicate** an event or a broadcast, and **email one group** instead of everyone;
+   - **delete a saved document**; filter Action items by person;
+   - a server-side **error log** admins can read (today errors live in Vercel's logs for about an hour), and a record of the last email or push failure;
+   - a **retention policy** for records that grow forever (activity log with internet addresses, broadcast deliveries, reminders).
+5. **Public site, smaller:** a per-event share image, linking an event's place to a map and a Share button, a Contact/About page, optimising the Media page's thumbnails and moving its Facebook feed off Graph v18, and making the donate page's "time left" count in the browser.

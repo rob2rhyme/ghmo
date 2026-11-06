@@ -8,6 +8,9 @@ import { PublicPage, PublicSectionTitle } from "@/src/components/public/PublicPa
 import { UpcomingEvents } from "@/src/components/public/UpcomingEvents";
 import { Button } from "@/src/components/ui/button";
 import { getDonateUrl } from "@/src/lib/donateLink";
+import { COMMUNITY_NAME } from "@/src/lib/community";
+import { absoluteUrl } from "@/src/lib/siteMetadata";
+import { jsonLdText, organizationJsonLd } from "@/src/lib/structuredData";
 
 const AKKHA_ALT = "Greater Harrisburg Magar Organization, written in Akkha script";
 
@@ -16,6 +19,10 @@ export default async function CommunityLanding() {
 
   return (
     <PublicPage className="gap-12 md:gap-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdText(organizationJsonLd({ name: COMMUNITY_NAME, alternateName: "GHMO", url: absoluteUrl("/"), logo: absoluteUrl("/icons/icon-512.png") })) }}
+      />
       {/* Hero: who we are on the left, a picture on the right from desktop width (stacked on smaller screens). */}
       <section aria-labelledby="home-title" className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
         <div className="flex min-w-0 flex-col gap-5">

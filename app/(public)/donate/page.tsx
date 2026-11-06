@@ -14,7 +14,8 @@ const DESCRIPTION = "Help build a Gumba for the Magar community in Harrisburg: a
 export const metadata: Metadata = {
   title: "Support the Gumba Project · GHMO",
   description: DESCRIPTION,
-  openGraph: pageOpenGraph("Support the Gumba Project", DESCRIPTION)
+  openGraph: pageOpenGraph("Support the Gumba Project", DESCRIPTION),
+  alternates: { canonical: "/donate" }
 };
 
 // Built once and refreshed every 5 minutes, or at once when the totals change (see publicCache.server.ts).

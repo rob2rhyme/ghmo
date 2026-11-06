@@ -211,3 +211,42 @@ test("an admin who is not a super admin runs groups but cannot change positions 
   const deleted = await page.request.delete(`/api/admin/groups/${group.id}`);
   expect(deleted.status()).toBe(403);
 });
+
+test("Set holder can add someone who isn't on the member list yet, and can keep the current holder of a one-person seat", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signInWithNewPasskey(page, "alice", "/admin/positions");
+  await waitForStreamedContent(page);
+  const { db } = admin();
+  await expect.poll(async () => (await db.collection(`${ORG}/positions`).get()).size).toBe(16);
+
+  // A treasurer who isn't a member yet is added to the member list and seated in one step.
+  await page.getByRole("button", { name: "Set holder for Treasurer" }).click();
+  let dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Save holder" })).toBeDisabled();
+  await dialog.getByLabel("Member").selectOption({ label: "Someone not on the member list yet…" });
+  await dialog.getByLabel("Full name").fill("Kamal Pun");
+  await dialog.getByLabel("Email").fill("kamal@example.org");
+  await dialog.getByLabel("Starts on").fill("2026-01-01");
+  await dialog.getByRole("button", { name: "Save holder" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(main(page).getByText("Kamal Pun", { exact: true })).toBeVisible();
+  const kamal = (await db.collection(`${ORG}/members`).where("emailLower", "==", "kamal@example.org").get()).docs;
+  expect(kamal).toHaveLength(1);
+  expect(kamal[0].get("status")).toBe("active");
+  const treasurerTerms = (await db.collection(`${ORG}/positionTerms`).where("positionId", "==", "treasurer").get()).docs;
+  expect(treasurerTerms.map(d => d.get("memberId"))).toEqual([kamal[0].id]);
+
+  // Vice President holds one person, but a second can be kept alongside the first; the seat then allows several.
+  for (const [name, keep] of [["Asha Rai", false], ["Bina Thapa", true]] as const) {
+    await page.getByRole("button", { name: "Set holder for Vice President" }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Member").selectOption({ label: name });
+    await dialog.getByLabel("Starts on").fill("2026-01-01");
+    if (keep) await dialog.getByRole("radio", { name: /Keep Asha Rai and add this person too/ }).check();
+    await dialog.getByRole("button", { name: "Save holder" }).click();
+    await expect(dialog).toHaveCount(0);
+  }
+  await expect.poll(async () => (await db.doc(`${ORG}/positions/vice_president`).get()).get("multiple")).toBe(true);
+  const vp = (await db.collection(`${ORG}/positionTerms`).where("positionId", "==", "vice_president").get()).docs;
+  expect(vp.map(d => [d.get("memberId"), d.get("endsOn")]).sort()).toEqual([["asha", null], ["bina", null]]);
+});

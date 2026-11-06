@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Landmark, Plus, RefreshCw } from "lucide-react";
@@ -231,8 +232,13 @@ export default function PositionsClient() {
           nameOf={nameOf}
           busy={busy}
           onClose={() => setSeating(null)}
-          onSave={async body => {
-            const ok = await run(() => peopleApi(`/api/admin/positions/${seating.id}/terms`, { method: "POST", body }), "Holder saved");
+          onMemberAdded={member => setMembers(list => [...list, member])}
+          onSave={async ({ allowSeveral, ...body }) => {
+            const ok = await run(async () => {
+              // Keeping the current holder on a one-person seat makes it a seat for several people first.
+              if (allowSeveral) await peopleApi(`/api/admin/positions/${seating.id}`, { method: "PATCH", body: { multiple: true } });
+              await peopleApi(`/api/admin/positions/${seating.id}/terms`, { method: "POST", body });
+            }, "Holder saved");
             if (ok) setSeating(null);
           }}
         />
@@ -282,6 +288,11 @@ export default function PositionsClient() {
   );
 }
 
+/** The member picker's value for "someone who isn't on the member list yet". */
+const NEW_PERSON = "__new";
+
+type SeatBody = { memberId: string; startsOn: string; endsOn: string | null; note: string; endPrevious: boolean; allowSeveral: boolean };
+
 function SeatDialog({
   position,
   members,
@@ -290,6 +301,7 @@ function SeatDialog({
   nameOf,
   busy,
   onClose,
+  onMemberAdded,
   onSave
 }: {
   position: Position;
@@ -299,16 +311,52 @@ function SeatDialog({
   nameOf: (id: string) => string;
   busy: boolean;
   onClose: () => void;
-  onSave: (body: { memberId: string; startsOn: string; endsOn: string | null; note: string; endPrevious: boolean }) => Promise<void>;
+  onMemberAdded: (member: MemberLite) => void;
+  onSave: (body: SeatBody) => Promise<void>;
 }) {
-  const [memberId, setMemberId] = useState("");
+  const people = members.filter(m => m.status === "active").sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
+  const [memberId, setMemberId] = useState(people.length === 0 ? NEW_PERSON : "");
+  const [search, setSearch] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [adding, setAdding] = useState(false);
   const [startsOn, setStartsOn] = useState(today);
   const [endsOn, setEndsOn] = useState("");
   const [note, setNote] = useState("");
   // A seat held by one person is normally taken over; a seat for several people (board members, advisors) normally gains
   // another person, so ending the others stays an explicit choice there.
   const [endPrevious, setEndPrevious] = useState(!position.multiple);
-  const people = members.filter(m => m.status === "active").sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
+  const isNew = memberId === NEW_PERSON;
+  const needle = search.trim().toLowerCase();
+  const shownPeople = needle
+    ? people.filter(m => m.id === memberId || memberDisplayName(m).toLowerCase().includes(needle) || m.emailLower.includes(needle))
+    : people;
+  const holderNames = holders.map(h => nameOf(h.memberId)).join(", ");
+  const ready = isNew ? newName.trim() !== "" && newEmail.trim() !== "" : memberId !== "";
+
+  const submit = async () => {
+    let id = memberId;
+    if (isNew) {
+      // Add the person to the member list first, then seat them. If seating then fails, they stay picked, so trying
+      // again doesn't add them twice.
+      setAdding(true);
+      try {
+        const created = await peopleApi<{ member: MemberLite }>("/api/organizations/ghmo/members", {
+          method: "POST",
+          body: { name: newName.trim(), email: newEmail.trim(), status: "active" }
+        });
+        onMemberAdded(created.member);
+        id = created.member.id;
+        setMemberId(id);
+      } catch (err) {
+        toast.error(errorMessage(err, "Could not add this person to the member list"));
+        return;
+      } finally {
+        setAdding(false);
+      }
+    }
+    await onSave({ memberId: id, startsOn, endsOn: endsOn || null, note, endPrevious, allowSeveral: !position.multiple && holders.length > 0 && !endPrevious });
+  };
 
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
@@ -317,23 +365,58 @@ function SeatDialog({
           className="grid gap-4"
           onSubmit={event => {
             event.preventDefault();
-            void onSave({ memberId, startsOn, endsOn: endsOn || null, note, endPrevious });
+            void submit();
           }}
         >
           <DialogHeader>
             <DialogTitle>Set holder: {position.title}</DialogTitle>
-            <DialogDescription>Pick the member and the day the term starts. Leave the end date empty if it has no set end.</DialogDescription>
+            <DialogDescription>Pick the person and the day the term starts. Leave the end date empty if it has no set end.</DialogDescription>
           </DialogHeader>
+          {people.length === 0 ? (
+            <Alert>
+              <AlertDescription>
+                No one is on the member list yet. Add the person here, or add everyone at once with Import on the{" "}
+                <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+                  Members page
+                </Link>
+                .
+              </AlertDescription>
+            </Alert>
+          ) : people.length > 8 ? (
+            <Field label="Find a member">
+              <Input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Name or email" />
+            </Field>
+          ) : null}
           <Field label="Member">
             <Select value={memberId} onChange={e => setMemberId(e.target.value)} required>
               <option value="">Choose a member…</option>
-              {people.map(m => (
+              {shownPeople.map(m => (
                 <option key={m.id} value={m.id}>
                   {memberDisplayName(m)}
                 </option>
               ))}
+              <option value={NEW_PERSON}>Someone not on the member list yet…</option>
             </Select>
           </Field>
+          {isNew ? (
+            <div className="grid gap-4 rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">
+                They are added to the member list as well. For someone with only a phone number, add them on the{" "}
+                <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+                  Members page
+                </Link>{" "}
+                first.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Full name">
+                  <Input value={newName} maxLength={120} autoComplete="off" onChange={e => setNewName(e.target.value)} required />
+                </Field>
+                <Field label="Email">
+                  <Input type="email" value={newEmail} maxLength={320} autoComplete="off" onChange={e => setNewEmail(e.target.value)} required />
+                </Field>
+              </div>
+            </div>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Starts on">
               <Input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} required />
@@ -345,20 +428,30 @@ function SeatDialog({
           <Field label="Note (optional)">
             <Input value={note} maxLength={NOTE_MAX} onChange={e => setNote(e.target.value)} placeholder="For example: elected at the annual meeting" />
           </Field>
-          {holders.length > 0 ? (
+          {holders.length > 0 && position.multiple ? (
             <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
               <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={endPrevious} onChange={e => setEndPrevious(e.target.checked)} />
-              <span>
-                End {holders.map(h => nameOf(h.memberId)).join(", ")} the day before
-                {position.multiple ? " (leave unticked to add this person alongside them)" : ""}
-              </span>
+              <span>End {holderNames} the day before (leave unticked to add this person alongside them)</span>
             </label>
+          ) : null}
+          {holders.length > 0 && !position.multiple ? (
+            <fieldset className="grid gap-1 text-sm">
+              <legend className="mb-1 font-medium">{holderNames} holds this now</legend>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1">
+                <input type="radio" name="seat-mode" className="mt-0.5 size-4 shrink-0 accent-primary" checked={endPrevious} onChange={() => setEndPrevious(true)} />
+                <span>End {holderNames} the day before, so this person takes over</span>
+              </label>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1">
+                <input type="radio" name="seat-mode" className="mt-0.5 size-4 shrink-0 accent-primary" checked={!endPrevious} onChange={() => setEndPrevious(false)} />
+                <span>Keep {holderNames} and add this person too ({position.title} will then allow several people)</span>
+              </label>
+            </fieldset>
           ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={busy} disabled={!memberId || !startsOn}>
+            <Button type="submit" loading={busy || adding} disabled={!ready || !startsOn}>
               Save holder
             </Button>
           </DialogFooter>

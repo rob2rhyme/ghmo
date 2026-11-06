@@ -154,7 +154,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
       <AdminSectionCard
         title={`People (${inGroup.length})`}
         actions={
-          <Button variant="outline" size="row" onClick={() => setAdding(true)} disabled={outside.length === 0}>
+          <Button variant="outline" size="row" onClick={() => setAdding(true)} disabled={outside.length === 0} title={outside.length === 0 ? (members.some(m => m.status === "active") ? "Everyone on the member list is already in this group." : "No one is on the member list yet. Add members on the Members page first.") : undefined}>
             <UserPlus aria-hidden="true" /> Add people
           </Button>
         }
@@ -174,7 +174,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
                     <>
                       {isLead ? <Badge>Lead</Badge> : null}
                       {adminAccess && member.status === "active" ? (
-                        adminAccess[member.id] ? <Badge variant="success">Admin</Badge> : <Badge variant="warning">Needs admin access to use My Calls</Badge>
+                        adminAccess[member.id] ? <Badge variant="success">Admin</Badge> : <Badge variant="warning" title="A super admin can add them on the Admins page.">Needs admin access to use My Calls</Badge>
                       ) : null}
                       {member.status === "disabled" ? <Badge variant="secondary">Turned off</Badge> : null}
                     </>
@@ -303,10 +303,10 @@ function AddPeopleDialog({ people, busy, onClose, onSave }: { people: MemberLite
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const needle = query.trim().toLowerCase();
-  const shown = people
+  const matches = people
     .filter(m => !needle || memberDisplayName(m).toLowerCase().includes(needle) || m.emailLower.includes(needle))
-    .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)))
-    .slice(0, 200);
+    .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
+  const shown = matches.slice(0, 200);
   const toggle = (id: string) =>
     setPicked(current => {
       const next = new Set(current);
@@ -323,7 +323,7 @@ function AddPeopleDialog({ people, busy, onClose, onSave }: { people: MemberLite
         </DialogHeader>
         <SearchInput aria-label="Search members" placeholder="Search by name or email" value={query} onChange={setQuery} />
         <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-md border border-border">
-          {shown.length === 0 ? <li className="p-3 text-sm text-muted-foreground">No one matches.</li> : null}
+          {shown.length === 0 ? <li className="p-3 text-sm text-muted-foreground">No one matches. Someone new is added on the Members page first.</li> : null}
           {shown.map(member => (
             <li key={member.id}>
               <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
@@ -333,6 +333,7 @@ function AddPeopleDialog({ people, busy, onClose, onSave }: { people: MemberLite
             </li>
           ))}
         </ul>
+        {matches.length > shown.length ? <p className="text-sm text-muted-foreground">Showing the first {shown.length} of {matches.length}. Search to find the rest.</p> : null}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel

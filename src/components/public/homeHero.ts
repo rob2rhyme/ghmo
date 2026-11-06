@@ -3,7 +3,7 @@
  * photo instead of the building artwork; nothing else needs to change.
  */
 export const HOME_HERO_IMAGE = {
-  // A 1600 px WebP made from the 3500 px original (public/assets/Ghmo-building.png, kept for print/editing):
+  // A 1600 px WebP made from the 3500 px original (design/originals/Ghmo-building.png, kept for print/editing, outside public/ so it is never served):
   // the hero is never shown wider than about 1100 px, so the original's 4 MB would only slow the first paint.
   src: "/assets/ghmo-building.webp",
   alt: "Artwork of the planned GHMO Gumba building, with children in traditional Magar dress dancing and planting flowers outside",

@@ -18,10 +18,12 @@ export default function ThemeToggle() {
       size="icon"
       className="size-11 sm:size-10"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      aria-label="Toggle light or dark theme"
     >
       <Moon className="dark:hidden" aria-hidden="true" />
       <Sun className="hidden dark:block" aria-hidden="true" />
+      {/* The name follows the theme through CSS too, so it is right before hydration and never mismatches. */}
+      <span className="sr-only dark:hidden">Switch to dark theme</span>
+      <span className="sr-only hidden dark:inline">Switch to light theme</span>
     </Button>
   );
 }

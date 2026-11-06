@@ -5,7 +5,7 @@ import { Button } from "@/src/components/ui/button";
 
 /** `contactEmail` comes from getContactEmail() on the server; without it, no contact line is shown. */
 export default function UnsubscribeClient({ token, contactEmail = null }: { token: string; contactEmail?: string | null }) {
-  const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error" | "busy-server" | "invalid">("idle");
 
   const confirm = async () => {
     setState("busy");
@@ -15,7 +15,7 @@ export default function UnsubscribeClient({ token, contactEmail = null }: { toke
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token })
       });
-      setState(res.ok ? "done" : "error");
+      setState(res.ok ? "done" : res.status === 429 ? "busy-server" : res.status === 400 ? "invalid" : "error");
     } catch {
       setState("error");
     }
@@ -24,7 +24,7 @@ export default function UnsubscribeClient({ token, contactEmail = null }: { toke
   if (state === "done") {
     return (
       <p role="status" className="text-foreground">
-        You&apos;re unsubscribed. You won&apos;t get any more emails from us.
+        You&apos;re unsubscribed. You won&apos;t get any more GHMO announcements or reminder emails. A sign-in email you ask for yourself still arrives.
         {contactEmail ? (
           <>
             {" "}
@@ -47,9 +47,23 @@ export default function UnsubscribeClient({ token, contactEmail = null }: { toke
       <Button size="lg" onClick={confirm} loading={state === "busy"} className="w-full sm:w-auto sm:self-start">
         Unsubscribe me
       </Button>
-      {state === "error" ? (
+      {state === "error" || state === "busy-server" || state === "invalid" ? (
         <p role="alert" className="text-destructive">
-          Something went wrong. Please try again in a moment.
+          {state === "invalid"
+            ? "This link is not valid. It may be incomplete; open it again from the email."
+            : state === "busy-server"
+              ? "Too many tries in a short time. Wait a few minutes, then try again."
+              : "Something went wrong. Please try again in a moment."}
+          {contactEmail ? (
+            <>
+              {" "}
+              Or email us at{" "}
+              <a href={`mailto:${contactEmail}`} className="font-semibold underline-offset-4 hover:underline">
+                {contactEmail}
+              </a>{" "}
+              and we&apos;ll take you off the list.
+            </>
+          ) : null}
         </p>
       ) : null}
     </>

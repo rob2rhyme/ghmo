@@ -11,7 +11,7 @@ import { Input } from "@/src/components/ui/input";
  * "Check another code": opens /verify/<code>. Accepts the code or the whole printed web address;
  * spaces and dashes are dropped and letters made capitals, as printed.
  */
-export default function CheckCodeForm() {
+export default function CheckCodeForm({ label = "Check another code" }: { label?: string }) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export default function CheckCodeForm() {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <Field label="Check another code" description="The code is at the end of the web address printed next to the QR code. You can paste the whole address." error={error}>
+      <Field label={label} description="The code is at the end of the web address printed next to the QR code. You can paste the whole address." error={error}>
         <Input
           id="verify-code"
           name="code"

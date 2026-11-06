@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { PublicPage, PublicPageHeader, PublicSectionTitle } from "@/src/components/public/PublicPage";
 import { DUE_DATE, formatDate, formatShortDate } from "@/src/lib/format";
 import { getArchiveEntry } from "@/src/lib/publicData.server";
+import { pageMetadata } from "@/src/lib/siteMetadata";
 
 // Built on first visit and refreshed every 5 minutes, or at once when minutes are approved (publicCache.server.ts).
 export const revalidate = 300;
@@ -19,10 +20,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const date = entry.eventDate ? formatDate(entry.eventDate) : null;
   const kind = entry.meetingType.trim().toLowerCase();
   const meeting = !kind || kind === "meeting" ? "meeting" : `${kind} meeting`;
-  return {
-    title: `${entry.eventTitle} minutes · GHMO`,
-    description: `Approved minutes of the ${meeting}${date ? ` on ${date}` : ""}, from the Greater Harrisburg Magar Organization.`
-  };
+  return pageMetadata(
+    `${entry.eventTitle} minutes · GHMO`,
+    `Approved minutes of the ${meeting}${date ? ` on ${date}` : ""}, from the Greater Harrisburg Magar Organization.`,
+    `/minutes/${encodeURIComponent(entry.id)}`
+  );
 }
 
 function List({ title, items }: { title: string; items: string[] }) {

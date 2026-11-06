@@ -43,7 +43,7 @@ export default function EditEventPage() {
           return;
         }
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.event) throw new Error(data.error || `The server answered ${res.status}.`);
+        if (!res.ok || !data.event) throw new Error(data.error || "This event couldn't be loaded. Check your connection and try again.");
         const evt = data.event;
         if (!active) return;
         setForm({
