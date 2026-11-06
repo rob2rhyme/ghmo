@@ -24,3 +24,5 @@ export const orgEventTasksCollectionPath = (orgSlug: string) => `${orgDocPath(or
 export const orgEventTaskTemplatesCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTaskTemplates`;
 export const orgEventTaskRemindersCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/eventTaskReminders`;
 export const orgTaskDigestCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/taskDigest`;
+// Phase 14 (plan §18): one server-only record per device that switched push notifications on.
+export const orgPushSubscriptionsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/pushSubscriptions`;

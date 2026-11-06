@@ -126,6 +126,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Push notification devices (plan §18): each record holds a device's secret push address and keys, so no browser
+    // reads or writes them, not even an admin's. The server sends through /api/admin/push and shows a person only
+    // their own devices, without the address.
+    match /organizations/{orgSlug}/pushSubscriptions/{doc=**} {
+      allow read, write: if false;
+    }
+
     // Call campaigns and their per-member call records (plan §12): written only through
     // /api/admin/call-campaigns, so attempts stay append-only and audited.
     match /organizations/{orgSlug}/callCampaigns/{doc=**} {

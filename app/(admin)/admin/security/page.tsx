@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import NotificationsPanel from "@/src/components/admin/security/NotificationsPanel";
+import PushPanel from "@/src/components/admin/security/PushPanel";
 import AuthenticatorPanel from "@/src/components/admin/security/AuthenticatorPanel";
 import PasskeysPanel from "@/src/components/admin/security/PasskeysPanel";
 import { AdminAccessError, isSuperAdmin, requireActiveAdmin } from "@/src/lib/admin";
@@ -27,7 +28,7 @@ export default async function AdminSecurityPage() {
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Security"
-        description="How you sign in to the admin area, and which emails you get."
+        description="How you sign in to the admin area, and which emails and push alerts you get."
       />
       <section aria-labelledby="security-sign-in" className="flex flex-col gap-4">
         <h2 id="security-sign-in" className="text-lg font-semibold">
@@ -41,6 +42,7 @@ export default async function AdminSecurityPage() {
           Notifications
         </h2>
         <NotificationsPanel />
+        <PushPanel />
       </section>
     </div>
   );

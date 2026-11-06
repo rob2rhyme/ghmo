@@ -4,15 +4,25 @@ import { orgAdminsCollectionPath } from "./firestorePaths";
 import { COMMUNITY_SLUG } from "./community";
 import { isMailConfigured, sendMail } from "./mailer.server";
 import { notificationMessage, pickRecipients, type NotificationKind, type NotifyCandidate } from "./notifications";
+import { isPushKind } from "./push";
+import { sendPushNotifications } from "./push.server";
 import { checkRateLimit } from "./rateLimit";
 
 const THROTTLE_MS = 30 * 60 * 1000;
 
 /**
- * Emails the other opted-in admins that there is activity. Best effort: failures never block the
- * action that caused them. Each person gets at most one email per kind every 30 minutes.
+ * Tells the other opted-in admins that there is activity: an email, and a push notification to the devices that
+ * switched it on (plan §18). Best effort: failures never block the action that caused them. Each person gets at most
+ * one email per kind every 30 minutes and one push per kind a minute. Returns how many emails were sent.
  */
 export async function notifyAdmins(kind: NotificationKind, actorUid: string, origin: string, onlyUids?: string[]): Promise<number> {
+  const push = isPushKind(kind) ? sendPushNotifications(kind, actorUid, onlyUids) : Promise.resolve(0);
+  const emailed = await emailAdmins(kind, actorUid, origin, onlyUids);
+  await push;
+  return emailed;
+}
+
+async function emailAdmins(kind: NotificationKind, actorUid: string, origin: string, onlyUids?: string[]): Promise<number> {
   if (!isMailConfigured()) return 0;
   try {
     const snap = await getAdminDb().collection(orgAdminsCollectionPath(COMMUNITY_SLUG)).get();
