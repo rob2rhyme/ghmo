@@ -58,6 +58,7 @@ The approved plan is [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md). In short:
   - `/admin/call-campaigns` and `/admin/call-campaigns/[id]` (one campaign per announcement: who was reached, RSVPs, call log, CSV export; plan §12)
   - `/admin/positions` (who holds each officer position and since when; super admins change it, plan §15) and `/admin/groups`, `/admin/groups/[groupId]` (teams of members with a lead, including the phone tree callers; any admin)
   - `/admin/events/templates` (ready-made task checklists) and, on each event's edit page, its Tasks section with Send reminders (plan §15 and §16)
+  - `/admin/admins` (who can sign in: add an admin, turn one off or on, change a role, fix a name; super admins only, plan §22)
   - `/admin/members/[memberId]` (a member's profile: member since, city and state, family members, notes, call history and how calls went; plan §17)
   - `/admin/gumba-project`
   - `/admin/document-generator`

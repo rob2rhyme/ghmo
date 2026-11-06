@@ -17,6 +17,7 @@ import {
   ScrollText,
   ShieldCheck,
   Users,
+  UserCog,
   UsersRound,
   type LucideIcon
 } from "lucide-react";
@@ -27,6 +28,8 @@ export type AdminNavItem = {
   icon: LucideIcon;
   /** Extra words the jump dialog (Ctrl/⌘ K) matches, so "passkey" finds Security. Comma separated. */
   keywords?: string;
+  /** Shown only to a super admin (the page and its routes also refuse everyone else). */
+  superAdminOnly?: boolean;
 };
 
 export type AdminNavGroup = { label: string; items: AdminNavItem[] };
@@ -69,11 +72,17 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     label: "Account",
     items: [
+      { href: "/admin/admins", label: "Admins", icon: UserCog, keywords: "add an admin, turn off, turn on, remove access, super admin, role, who is an admin", superAdminOnly: true },
       { href: "/admin/security", label: "Security", icon: ShieldCheck, keywords: "passkey, authenticator, sign-in, password, two-step, notifications" },
       { href: "/admin/encryption", label: "Encryption", icon: LockKeyhole, keywords: "devices, unlock, recovery key, approve device, lock" }
     ]
   }
 ];
+
+/** The navigation a person sees: super-admin-only pages are left out for everyone else. */
+export function navFor(superAdmin: boolean): AdminNavGroup[] {
+  return ADMIN_NAV.map(group => ({ ...group, items: group.items.filter(item => superAdmin || !item.superAdminOnly) })).filter(group => group.items.length > 0);
+}
 
 /** True when `pathname` is this item's page or one of its sub-pages. */
 export function isActiveNavItem(pathname: string, href: string): boolean {

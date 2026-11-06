@@ -11,12 +11,12 @@ import { Button } from "@/src/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/src/components/ui/sheet";
 import { cn } from "@/src/lib/utils";
 import { initialsOf } from "@/src/lib/adminView";
-import { ADMIN_NAV, isActiveNavItem } from "./adminNav";
+import { isActiveNavItem, navFor } from "./adminNav";
 import { AdminJumpDialog } from "./AdminJumpDialog";
 import { EncryptionStatusBadge } from "@/src/components/admin/encryption/EncryptionStatusBadge";
 import { E2eeProvider } from "@/src/lib/e2ee/client/E2eeProvider";
 
-export type AdminShellUser = { name: string; email?: string; roleLabel: string };
+export type AdminShellUser = { name: string; email?: string; roleLabel: string; superAdmin?: boolean };
 
 const noopSubscribe = () => () => {};
 const isMacClient = () => /mac|iphone|ipad/i.test(navigator.platform);
@@ -36,11 +36,11 @@ function Brand() {
   );
 }
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ onNavigate, superAdmin = false }: { onNavigate?: () => void; superAdmin?: boolean }) {
   const pathname = usePathname() ?? "/admin";
   return (
     <nav aria-label="Admin" className="flex flex-col gap-3 lg:gap-2">
-      {ADMIN_NAV.map(group => (
+      {navFor(superAdmin).map(group => (
         <div key={group.label} className="flex flex-col gap-px">
           {/* "Overview" holds only the Dashboard, so its heading is left out to save room. */}
           {group.label === "Overview" ? null : (
@@ -187,7 +187,7 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
             <Brand />
           </div>
           <div className="flex-1 overflow-y-auto px-4 pb-3">
-            <NavList />
+            <NavList superAdmin={user.superAdmin} />
           </div>
           <div className="px-4 pb-3">
             <SidebarFooter user={user} />
@@ -214,7 +214,7 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
                     <SheetDescription className="sr-only">Admin navigation</SheetDescription>
                   </SheetHeader>
                   {/* The whole menu scrolls as one, so every page stays reachable on short screens. */}
-                  <NavList onNavigate={() => setMenuOpen(false)} />
+                  <NavList onNavigate={() => setMenuOpen(false)} superAdmin={user.superAdmin} />
                   <div className="mt-2">
                     <ShellFooter user={user} />
                   </div>
@@ -243,7 +243,7 @@ export default function AdminShell({ children, user }: { children: ReactNode; us
           </main>
         </div>
       </div>
-      <AdminJumpDialog open={jumpOpen} onOpenChange={setJumpOpen} />
+      <AdminJumpDialog open={jumpOpen} onOpenChange={setJumpOpen} superAdmin={user.superAdmin} />
     </E2eeProvider>
   );
 }

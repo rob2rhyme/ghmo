@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/src/components/ui/dialog";
 import { cn } from "@/src/lib/utils";
-import { ADMIN_NAV } from "./adminNav";
+import { ADMIN_NAV, navFor } from "./adminNav";
 
 type Entry = {
   href: (typeof ADMIN_NAV)[number]["items"][number]["href"];
@@ -15,7 +15,7 @@ type Entry = {
   keywords: string[];
 };
 
-const ENTRIES: Entry[] = ADMIN_NAV.flatMap(group =>
+const entriesFor = (superAdmin: boolean): Entry[] => navFor(superAdmin).flatMap(group =>
   group.items.map(item => ({
     href: item.href,
     label: item.label,
@@ -35,15 +35,16 @@ function keywordHit(entry: Entry, q: string): string | null {
 }
 
 /** "Jump to…" palette (Ctrl/⌘ K): type a few letters of a page name or a task ("passkey", "donations"), press Enter. */
-export function AdminJumpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function AdminJumpDialog({ open, onOpenChange, superAdmin = false }: { open: boolean; onOpenChange: (open: boolean) => void; superAdmin?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
+  const entries = useMemo(() => entriesFor(superAdmin), [superAdmin]);
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? ENTRIES.filter(entry => `${entry.label} ${entry.group} ${entry.keywords.join(" ")}`.toLowerCase().includes(q)) : ENTRIES;
-  }, [query]);
+    return q ? entries.filter(entry => `${entry.label} ${entry.group} ${entry.keywords.join(" ")}`.toLowerCase().includes(q)) : entries;
+  }, [query, entries]);
   const q = query.trim().toLowerCase();
   const current = Math.min(active, Math.max(results.length - 1, 0));
 
