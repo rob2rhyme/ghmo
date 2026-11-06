@@ -218,6 +218,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 accepted 2026-11-06. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
 | **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 accepted 2026-11-06. | Owner reads §22.2 before 17-A is used. |
 | **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
+| **19** | Minutes for any meeting | **Planned 2026-11-06 (§26).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 proposed. | Owner reads §26.2 and accepts or changes D64–D69 before 19-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1646,3 +1647,46 @@ Each sub-phase runs the full gate (`npm run check`, emulator rules tests, the fu
 - `src/components/admin/members/EmailCard.tsx`: an **Email** card on the member profile, outside the encryption gate (the address is plain text). Every admin sees the address; a super admin gets **Edit email** / **Add email**: the new address typed twice (a mismatch keeps **Save email** greyed out), notes on what carries over (an opt-out, a bounced old address), and **Remove email…** only when the member has a name and a phone number, with its own confirmation. Other admins see "Only a super admin can change an email address." The row on the Members list gets no new button.
 - Browser spec (`member-email.spec.ts`): edit with a mismatch then a match; duplicate refused in words; no removal without a phone; an opted-out member's note and removal; adding to a phone-only member; a plain admin sees the address but no button.
 - Docs: admin guide §1h (Email, and the table of what a profile holds), runbook case O step 3, and the privacy page.
+
+## 26. Phase 19 — Minutes for any meeting (planned 2026-11-06)
+
+**Goal.** Minutes can only be written for an event that is already on the Events list and already in the past, and the meeting can't be changed once the minutes are saved. An unplanned board call, a meeting held by phone, or a meeting nobody added beforehand means leaving the minutes page, creating an event, coming back and starting again; a wrong pick means deleting the draft. On a new site with no past events, **Write minutes** on the dashboard leads straight to that dead end (§24.3). Phase 19 lets an admin record the meeting from the minutes page itself and fix the choice while the minutes are a draft.
+
+### 26.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| A minutes record needs an existing event (`eventId`), copies its title and start time when created, and there can be only one per event (409). | `app/api/admin/minutes/route.ts` POST | Keep minutes tied to an event: the archive, the event page's minutes card, attendance export, action items and the dashboard all rely on it. Instead, make creating that event part of writing the minutes. |
+| The picker lists every event that has started (drafts included), newest first, as a plain select; it is locked once the minutes are saved. | `MinutesEditorClient.tsx` (`pastEvents`, `disabled={Boolean(editingId)}`) | A searchable picker, and a way to change the meeting of a draft. |
+| Any admin can create an event; a new event is a **draft** unless published, and drafts never appear on the public Events list or calendar. Past dates are accepted. | events POST | An inline "meeting that isn't listed" is just a draft event created by the existing route, so it stays off the public site. |
+| Encrypted minutes are bound to the **minutes id**, not the event. | `minutesRecords.ts` (`minutesLoc`) | Moving a draft to another meeting needs no re-encryption. |
+| The public archive lists every approved record by its own title and date and does not link to the event. | `minutesArchive.server.ts`, `app/(public)/minutes` | Minutes of a meeting that was never published as an event still appear in the archive once approved, as they do today. |
+
+### 26.2 Decisions (proposed; accept or change before 19-A)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D64 | How is a meeting that isn't listed recorded? | In **Which meeting?**, a **Record a meeting that isn't listed** button opens a short form: title (for example "Board call"), date and start time (today or earlier; time prefilled 7:00 PM), and an optional place. Saving creates a **draft** event with those details and selects it. If a past event already exists on that date, the form shows it and offers to use it instead. | No trip to Events, no public announcement of an internal meeting, and fewer duplicate events. |
+| D65 | Who can do it? | Any admin, the same as writing minutes and adding events. | No new permission. |
+| D66 | The meeting picker | A searchable list (title or date), newest first, showing each meeting's date; meetings that already have minutes are shown but can't be picked, with "has minutes". | Easy to find the right meeting once there are many, and no 409 surprise. |
+| D67 | Changing the meeting | Allowed while the minutes are a **draft**: pick another meeting without minutes and save. The title and date are copied from the new meeting. Once submitted or approved, return them to draft first (existing **Return to draft**). The activity log says "moved minutes to another meeting" with both meeting titles. | A wrong pick is fixed in two clicks without losing the text. |
+| D68 | What happens to a meeting created here if its minutes move away? | Nothing automatic: it stays as a draft event under **Events** (drafts), where an admin can delete it. | No hidden deletions. |
+| D69 | The dashboard on a new site | **Write minutes** opens the editor with the inline form already open when there are no past meetings. | The first-run path works end to end. |
+
+### 26.3 Design
+
+- **19-A (server):** `PATCH /api/admin/minutes` accepts `eventId` for a **draft** only (409 when the target already has minutes, 400 when the target hasn't started, 409 "return to draft first" otherwise); it re-reads the event, copies `eventTitle` and `eventDate`, runs in a transaction with the one-per-event check, expires the public minutes cache, and writes `minutes_moved` to the activity log (new `ACTIVITY` label). The inline meeting uses the existing events POST (status `draft`), so no new route. A small pure helper picks "already on that day" candidates for D64 (unit tested). Rules unchanged; a rules test confirms a browser still can't write `eventId` on minutes.
+- **19-B (UI):** the **Which meeting?** card gets a searchable picker (D66), **Record a meeting that isn't listed** with its form and same-day suggestion (D64), and **Change meeting** on a draft (D67); the dashboard's first-run path (D69). Browser spec: record a new meeting and write minutes for it without leaving the page; the new event is a draft and absent from the public Events page; the same-day suggestion; a meeting with minutes can't be picked; move a draft to another meeting (title and date follow; audit entry); a submitted draft can't be moved; encrypted minutes stay readable after a move. Admin guide (minutes section) and plan status.
+
+### 26.4 Sub-phases
+
+- **19-A:** server move of draft minutes, same-day helper, audit label, tests.
+- **19-B:** editor UI, dashboard first-run path, browser spec, docs.
+
+Each sub-phase runs the full gate before any push, and is pushed only when the owner asks.
+
+### 26.5 Risks and out of scope
+
+- **Duplicate meetings:** two admins recording the same call at once can still create two draft events; D64's same-day check reduces it, and a spare draft is deleted from Events.
+- **Minutes with no event at all** were considered and left out: they would need changes to the archive, the event page, attendance export, action items and the dashboard for little gain over a draft event.
+- **Moving approved minutes** stays a two-step action (return to draft, then move), so a published record never changes meeting silently.
