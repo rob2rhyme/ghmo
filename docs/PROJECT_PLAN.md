@@ -1627,6 +1627,13 @@ The owner reported that adding board members and other officers "is not enabled"
 
 Each sub-phase runs the full gate (`npm run check`, emulator rules tests, the full browser suite, `npm run build`) before any push, and is pushed only when the owner asks.
 
+### 25.5 Risks and out of scope
+
+- **Wrong address typed:** the next broadcast goes to a stranger. The dialog asks for the address twice for a replacement, and shows it back in the confirmation.
+- **Merging two member records** (someone added twice) is out of scope; D59 refuses the clash and links to the other record.
+- **Admins' own emails** are unchanged by this phase (D55 still applies).
+- **Bulk changes** (an import that updates addresses) are out of scope.
+
 ### 25.6 18-A built (2026-11-06)
 
 - `src/lib/memberEmailChange.ts`: `planEmailChange`, the rules as one pure function (unit tests in `tests/unit/memberEmailChange.test.ts`). Changing only the letters' case keeps everything else as it is, including the sign-in link.
@@ -1639,10 +1646,3 @@ Each sub-phase runs the full gate (`npm run check`, emulator rules tests, the fu
 - `src/components/admin/members/EmailCard.tsx`: an **Email** card on the member profile, outside the encryption gate (the address is plain text). Every admin sees the address; a super admin gets **Edit email** / **Add email**: the new address typed twice (a mismatch keeps **Save email** greyed out), notes on what carries over (an opt-out, a bounced old address), and **Remove email…** only when the member has a name and a phone number, with its own confirmation. Other admins see "Only a super admin can change an email address." The row on the Members list gets no new button.
 - Browser spec (`member-email.spec.ts`): edit with a mismatch then a match; duplicate refused in words; no removal without a phone; an opted-out member's note and removal; adding to a phone-only member; a plain admin sees the address but no button.
 - Docs: admin guide §1h (Email, and the table of what a profile holds), runbook case O step 3, and the privacy page.
-
-### 25.5 Risks and out of scope
-
-- **Wrong address typed:** the next broadcast goes to a stranger. The dialog asks for the address twice for a replacement, and shows it back in the confirmation.
-- **Merging two member records** (someone added twice) is out of scope; D59 refuses the clash and links to the other record.
-- **Admins' own emails** are unchanged by this phase (D55 still applies).
-- **Bulk changes** (an import that updates addresses) are out of scope.
