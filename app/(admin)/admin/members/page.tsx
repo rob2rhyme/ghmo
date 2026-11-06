@@ -16,7 +16,8 @@ export const metadata: Metadata = { title: "Members" };
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function MembersPage() {
+export default async function MembersPage({ searchParams }: { searchParams?: Promise<{ q?: string }> }) {
+  const { q } = (await searchParams) ?? {};
   try {
     await requireActiveAdmin(undefined, COMMUNITY_SLUG);
   } catch (error) {
@@ -44,7 +45,7 @@ export default async function MembersPage() {
   return (
     <div className="flex flex-col gap-6">
       <AdminPageHeader title="Members" description="Everyone on the community list, and whether they agreed to be emailed or called." />
-      <MembersClient initialMembers={members ?? []} groups={groups} officers={officers} superAdmin={isSuperAdmin(check.admin)} />
+      <MembersClient initialMembers={members ?? []} groups={groups} officers={officers} superAdmin={isSuperAdmin(check.admin)} initialQuery={typeof q === "string" ? q.slice(0, 200) : ""} />
     </div>
   );
 }

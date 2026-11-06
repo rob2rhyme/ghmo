@@ -20,11 +20,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type AdminMinutesPageProps = {
-  searchParams?: Promise<{ mode?: string }>;
+  searchParams?: Promise<{ mode?: string; q?: string }>;
 };
 
 export default async function AdminMinutesPage({ searchParams }: AdminMinutesPageProps) {
-  const { mode: modeParam } = (await searchParams) ?? {};
+  const { mode: modeParam, q } = (await searchParams) ?? {};
   let actorInfo: Awaited<ReturnType<typeof requireActiveAdmin>>["actor"] | null = null;
   try {
     const guard = await requireActiveAdmin(undefined, COMMUNITY_SLUG);
@@ -63,7 +63,7 @@ export default async function AdminMinutesPage({ searchParams }: AdminMinutesPag
 
       <EncryptionGate what="the meeting minutes">
         {mode === "records" ? (
-          <MinutesRecordsClient initialMinutes={minutes} />
+          <MinutesRecordsClient initialMinutes={minutes} initialQuery={typeof q === "string" ? q.slice(0, 200) : ""} />
         ) : (
           <MinutesEditorClient minutes={minutes} adminActor={toPlain(actorInfo)} />
         )}

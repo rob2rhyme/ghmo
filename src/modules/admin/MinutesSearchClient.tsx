@@ -22,11 +22,12 @@ const statusOptions: MinutesStatus[] = ["draft", "submitted", "approved"];
 
 type MinutesSearchClientProps = {
   initialMinutes: MeetingMinutesRecord[];
+  initialQuery?: string;
 };
 
-export default function MinutesSearchClient({ initialMinutes: rawMinutes }: MinutesSearchClientProps) {
+export default function MinutesSearchClient({ initialMinutes: rawMinutes, initialQuery = "" }: MinutesSearchClientProps) {
   const initialMinutes = useUnpackedMinutes(rawMinutes);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [meetingTypeFilter, setMeetingTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [startDate, setStartDate] = useState("");
