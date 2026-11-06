@@ -28,3 +28,5 @@ export const orgTaskDigestCollectionPath = (orgSlug: string) => `${orgDocPath(or
 export const orgPushSubscriptionsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/pushSubscriptions`;
 // Phase 15 (plan §20): "do not email" records kept when a member who opted out is deleted. Server-only.
 export const orgEmailSuppressionsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/emailSuppressions`;
+// Phase 16 (plan §21): the site-wide push switch. Admin-read, server-written.
+export const orgPushSettingsCollectionPath = (orgSlug: string) => `${orgDocPath(orgSlug)}/pushSettings`;

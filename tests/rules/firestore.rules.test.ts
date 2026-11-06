@@ -291,6 +291,30 @@ describe("event tasks, templates, reminder records and the digest switch (plan �
   });
 });
 
+describe("the site-wide push switch (plan §21)", () => {
+  const path = `${ORG}/pushSettings/settings`;
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), path), { enabled: false, updatedBy: "active-admin" });
+    });
+  });
+
+  it("lets an active admin read it, and nobody write it from a browser", async () => {
+    await assertSucceeds(getDoc(doc(admin(), path)));
+    await assertFails(setDoc(doc(admin(), path), { enabled: true }, { merge: true }));
+    await assertFails(setDoc(doc(admin(), `${ORG}/pushSettings/other`), { enabled: true }));
+  });
+
+  it("keeps it from visitors, members and disabled admins", async () => {
+    const disabled = env.authenticatedContext("disabled-admin", ADMIN_CLAIMS).firestore();
+    for (const db of [disabled, env.authenticatedContext("someone").firestore(), env.unauthenticatedContext().firestore()]) {
+      await assertFails(getDoc(doc(db, path)));
+      await assertFails(setDoc(doc(db, path), { enabled: true }, { merge: true }));
+    }
+  });
+});
+
 describe("push notification devices (plan §18)", () => {
   const path = `${ORG}/pushSubscriptions/d1`;
 
