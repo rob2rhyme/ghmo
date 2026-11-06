@@ -74,8 +74,8 @@ describe("membersCsv", () => {
 
   it("writes disabled members and phone-only members honestly", () => {
     const rows = lines(membersCsv([member({ status: "disabled", emailState: "inactive", callState: "inactive" }), member({ email: "", name: "Maya Gurung", emailState: "no_email" })], { includePhones: false }));
-    expect(rows[1]).toContain(",Disabled,");
-    expect(rows[1]).toContain("Disabled,Disabled");
+    expect(rows[1]).toContain(",Turned off,");
+    expect(rows[1]).toContain("Turned off,Turned off");
     expect(rows[2].startsWith("Maya Gurung,,Active")).toBe(true);
     expect(rows[2]).toContain("No email");
   });

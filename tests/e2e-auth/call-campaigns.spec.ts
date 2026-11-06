@@ -187,7 +187,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   expect(csv).not.toContain("guests");
   expect((await db.collection(`${ORG}/auditLogs`).where("action", "==", "call_campaign_exported").get()).size).toBe(1);
 
-  await page.getByRole("button", { name: "Close campaign" }).click();
+  await page.getByRole("button", { name: "Close campaign…" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Close campaign" }).click();
   await expect(page.getByText("Campaign closed")).toBeVisible();
   expect((await db.doc(`${ORG}/callCampaigns/${campaignId}`).get()).data()).toMatchObject({ status: "closed", closedBy: "alice" });

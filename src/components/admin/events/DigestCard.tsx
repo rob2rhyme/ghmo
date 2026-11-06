@@ -27,7 +27,7 @@ const lastRunText = (run: NonNullable<Settings["lastRun"]>) => {
   return `Last run ${when}: it didn't finish. ${run.note ?? ""}`.trim();
 };
 
-/** The switch for the daily overdue-task digest (plan §16, 12-B). Off until a super admin turns it on. */
+/** The on/off control for the daily overdue-task digest (plan §16, 12-B). Off until a super admin turns it on. */
 export default function DigestCard() {
   const [data, setData] = useState<Response | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export default function DigestCard() {
     try {
       const result = await peopleApi<{ settings: Settings }>("/api/admin/task-digest", { method: "PUT", body: { enabled } });
       setData({ ...data, settings: result.settings });
-      toast.success(enabled ? "Daily digest switched on" : "Daily digest switched off");
+      toast.success(enabled ? "Daily digest turned on" : "Daily digest turned off");
       setConfirming(false);
     } catch (err) {
       toast.error(errorMessage(err));
@@ -105,11 +105,11 @@ export default function DigestCard() {
         superAdmin ? (
           settings.enabled ? (
             <Button variant="outline" size="row" onClick={() => void change(false)} loading={busy}>
-              Switch off
+              Turn off
             </Button>
           ) : (
             <Button size="row" onClick={() => setConfirming(true)}>
-              Switch on
+              Turn on…
             </Button>
           )
         ) : undefined
@@ -119,7 +119,7 @@ export default function DigestCard() {
         <Badge variant={settings.enabled ? "success" : "secondary"}>{settings.enabled ? "On" : "Off"}</Badge>
         {settings.lastRun ? <span className="text-sm text-muted-foreground">{lastRunText(settings.lastRun)}</span> : <span className="text-sm text-muted-foreground">It has not run yet.</span>}
       </div>
-      {!superAdmin ? <p className="text-sm text-muted-foreground">Only a super admin can switch it on or off.</p> : null}
+      {!superAdmin ? <p className="text-sm text-muted-foreground">Only a super admin can turn it on or off.</p> : null}
       {settings.enabled && !scheduleReady ? (
         <Alert variant="destructive">
           <AlertDescription>The daily schedule isn&apos;t set up on this site yet, so nothing will be sent. Ask whoever manages the website to add the schedule secret.</AlertDescription>
@@ -133,9 +133,9 @@ export default function DigestCard() {
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title="Switch on the daily digest?"
-        description="Every day, each member with an overdue task gets one email listing their overdue tasks, with an unsubscribe link. At most 50 people a day, and never more than half of the day's email limit. People who haven't agreed to emails are skipped. You can switch it off at any time."
-        confirmLabel="Switch on"
+        title="Turn on the daily digest?"
+        description="Every day, each member with an overdue task gets one email listing their overdue tasks, with an unsubscribe link. At most 50 people a day, and never more than half of the day's email limit. People who haven't agreed to emails are skipped. You can turn it off at any time."
+        confirmLabel="Turn on"
         busy={busy}
         onConfirm={() => change(true)}
       />

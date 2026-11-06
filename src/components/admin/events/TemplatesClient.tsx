@@ -122,7 +122,7 @@ export default function TemplatesClient() {
                   </Button>
                   {superAdmin ? (
                     <Button size="row" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleting(template)} aria-label={`Delete ${template.name}`}>
-                      <Trash2 aria-hidden="true" /> Delete
+                      <Trash2 aria-hidden="true" /> Delete…
                     </Button>
                   ) : null}
                 </>
@@ -247,7 +247,7 @@ function TemplateDialog({
                           {g.name}
                         </option>
                       ))}
-                      {row.groupId && !usable.some(g => g.id === row.groupId) ? <option value={row.groupId}>Removed or switched-off group</option> : null}
+                      {row.groupId && !usable.some(g => g.id === row.groupId) ? <option value={row.groupId}>Removed or turned-off group</option> : null}
                     </Select>
                   </Field>
                   <Field label="Days (blank = no date)">

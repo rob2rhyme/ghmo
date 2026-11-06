@@ -76,8 +76,8 @@ test("a super admin adds an admin, turns one off and on, changes a role and fixe
   await expect(list.getByRole("listitem").filter({ hasText: "Bob" }).getByText("Super admin", { exact: true })).toBeVisible();
   expect((await db.doc(`${ORG}/admins/bob`).get()).get("roles")).toEqual(["super_admin"]);
 
-  // --- Fix a name ---
-  await page.getByRole("button", { name: "Fix the name of Bob" }).click();
+  // --- Edit a name ---
+  await page.getByRole("button", { name: "Edit name of Bob" }).click();
   const rename = page.getByRole("dialog");
   await rename.getByLabel("Name").fill("Bob Rai");
   await rename.getByRole("button", { name: "Save name" }).click();

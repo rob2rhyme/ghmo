@@ -133,7 +133,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
             </Button>
             {superAdmin && !group.builtIn ? (
               <Button variant="ghost" size="row" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleting(true)}>
-                Delete
+                Delete…
               </Button>
             ) : null}
           </div>
@@ -141,7 +141,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
       >
         <div className="flex flex-wrap gap-2">
           {group.kind === "callers" ? <Badge>Phone tree callers</Badge> : null}
-          {!group.active ? <Badge variant="secondary">Switched off</Badge> : null}
+          {!group.active ? <Badge variant="secondary">Turned off</Badge> : null}
           {!group.leadMemberId ? <Badge variant="warning">No lead yet</Badge> : null}
         </div>
         {group.kind === "callers" ? (
@@ -176,7 +176,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
                       {adminAccess && member.status === "active" ? (
                         adminAccess[member.id] ? <Badge variant="success">Admin</Badge> : <Badge variant="warning">Needs admin access to use My Calls</Badge>
                       ) : null}
-                      {member.status === "disabled" ? <Badge variant="secondary">Disabled</Badge> : null}
+                      {member.status === "disabled" ? <Badge variant="secondary">Turned off</Badge> : null}
                     </>
                   }
                   actions={
@@ -201,7 +201,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
                         aria-label={`Remove ${name} from the group`}
                         onClick={() => setRemovingMember(member)}
                       >
-                        Remove
+                        Remove…
                       </Button>
                     </>
                   }
@@ -382,7 +382,7 @@ function EditGroupDialog({
           </Field>
           <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
             <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-primary" checked={active} onChange={e => setActive(e.target.checked)} />
-            <span>In use. Untick to switch the group off without deleting it.</span>
+            <span>In use. Untick to turn the group off without deleting it.</span>
           </label>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

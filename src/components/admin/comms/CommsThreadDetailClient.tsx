@@ -604,7 +604,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <Button type="button" onClick={() => setConfirmingFinalize(true)} loading={isFinalizing}>
-                      {isFinalizing ? "Finalizing…" : "Finalize close"}
+                      {isFinalizing ? "Finalizing…" : "Finalize close…"}
                     </Button>
                     <ConfirmDialog
                       open={confirmingFinalize}

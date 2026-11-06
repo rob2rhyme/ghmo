@@ -123,7 +123,7 @@ export default function GroupsClient() {
                   badges={
                     <>
                       {group.kind === "callers" ? <Badge variant="default">Phone tree callers</Badge> : null}
-                      {!group.active ? <Badge variant="secondary">Switched off</Badge> : null}
+                      {!group.active ? <Badge variant="secondary">Turned off</Badge> : null}
                       {group.active && !group.leadMemberId ? <Badge variant="warning">No lead</Badge> : null}
                     </>
                   }

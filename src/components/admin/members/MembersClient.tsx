@@ -81,7 +81,7 @@ const STATE_LABEL: Record<MemberEmailState, { label: string; variant: "success" 
   bounced: { label: "Address bounced", variant: "destructive" },
   // Many members don't use email; they are reached by phone and never emailed.
   no_email: { label: "No email (phone only)", variant: "secondary" },
-  inactive: { label: "Disabled", variant: "secondary" }
+  inactive: { label: "Turned off", variant: "secondary" }
 };
 
 const CALL_LABEL: Partial<Record<MemberCallState, { label: string; variant: "success" | "secondary" | "destructive" }>> = {
@@ -330,7 +330,7 @@ export default function MembersClient({
       return false;
     }
     if (!hasEmail(member) && !hasPhone) {
-      toast.error("Someone without an email needs a phone number. Disable them instead if they should no longer be contacted.");
+      toast.error("Someone without an email needs a phone number. Turn them off instead if they should no longer be contacted.");
       return false;
     }
     const empty = contactIsEmpty(contact);
@@ -395,7 +395,7 @@ export default function MembersClient({
     { key: "opted_out", label: "Opted out", count: counts.opted_out },
     { key: "bounced", label: "Bounced", count: counts.bounced },
     { key: "no_email", label: "Phone only", count: counts.no_email },
-    { key: "inactive", label: "Disabled", count: counts.inactive },
+    { key: "inactive", label: "Turned off", count: counts.inactive },
     { key: "has_phone", label: "With phone", count: counts.has_phone }
   ];
 
@@ -762,12 +762,12 @@ export default function MembersClient({
                           onClick={() => setDisabling(member)}
                         >
                           <UserX aria-hidden="true" />
-                          Disable
+                          Turn off…
                         </Button>
                       ) : (
-                        <Button size="row" variant="ghost" loading={busy} title="Turn this member back on" onClick={() => update(member, { status: "active" }, "Member enabled")}>
+                        <Button size="row" variant="ghost" loading={busy} title="Turn this member back on" onClick={() => update(member, { status: "active" }, "Member turned on")}>
                           <UserCheck aria-hidden="true" />
-                          Enable
+                          Turn on
                         </Button>
                       )}
                     </>
@@ -852,13 +852,13 @@ export default function MembersClient({
         open={disabling !== null}
         onOpenChange={open => (!open ? setDisabling(null) : null)}
         destructive
-        title={`Disable ${disabling ? memberDisplayName(disabling) : "this member"}?`}
-        description="They stay on the list but get no broadcasts and are left out of calls until you enable them again."
-        confirmLabel="Disable member"
+        title={`Turn off ${disabling ? memberDisplayName(disabling) : "this member"}?`}
+        description="They stay on the list but get no broadcasts and are left out of calls until you turn them on again."
+        confirmLabel="Turn off"
         busy={disabling !== null && busyId === disabling.id}
         onConfirm={async () => {
           if (!disabling) return;
-          await update(disabling, { status: "disabled" }, "Member disabled");
+          await update(disabling, { status: "disabled" }, "Member turned off");
           setDisabling(null);
         }}
       />

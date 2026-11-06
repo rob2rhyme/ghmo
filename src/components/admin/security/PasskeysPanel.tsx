@@ -232,7 +232,7 @@ export default function PasskeysPanel() {
                     aria-label={`Remove passkey ${p.name}`}
                   >
                     <Trash2 aria-hidden="true" />
-                    Remove
+                    Remove…
                   </Button>
                 }
               />

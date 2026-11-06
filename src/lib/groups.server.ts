@@ -147,7 +147,7 @@ export async function deleteGroup(id: string): Promise<{ ok: true; before: Group
   const snap = await ref.get();
   if (!snap.exists) return fail(404, "That group doesn't exist.");
   const before = mapGroup(id, snap.data() ?? {});
-  if (before.builtIn) return fail(409, "This group is built in and can't be deleted. You can switch it off instead.");
+  if (before.builtIn) return fail(409, "This group is built in and can't be deleted. You can turn it off instead.");
   const memberIds = await listGroupMemberIds(id);
   const db = getAdminDb();
   for (let i = 0; i < memberIds.length; i += BATCH_LIMIT) {

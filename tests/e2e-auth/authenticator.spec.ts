@@ -175,7 +175,7 @@ test("a super admin can reset another admin's authenticator, which signs that ad
   // Alice (super admin, passkey session) resets Bob.
   await signInWithNewPasskey(page, "alice", "/admin/security");
   await expect(page.getByText("Reset another admin's authenticator")).toBeVisible();
-  await page.getByRole("button", { name: "Reset" }).click();
+  await page.getByRole("button", { name: "Reset…" }).click();
   // The reset stays off until Alice confirms she spoke with Bob (an inbox alone could set up a new app after it).
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: "Reset authenticator" })).toBeDisabled();

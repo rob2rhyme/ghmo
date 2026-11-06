@@ -15,7 +15,7 @@ export const EMAIL_STATE_TEXT: Record<MemberEmailState, string> = {
   opted_out: "Opted out",
   bounced: "Address bounced",
   no_email: "No email",
-  inactive: "Disabled"
+  inactive: "Turned off"
 };
 
 export const CALL_STATE_TEXT: Record<MemberCallState, string> = {
@@ -23,7 +23,7 @@ export const CALL_STATE_TEXT: Record<MemberCallState, string> = {
   no_phone: "No phone",
   no_consent: "No call consent",
   opted_out: "Asked not to be called",
-  inactive: "Disabled"
+  inactive: "Turned off"
 };
 
 export type ExportMember = {
@@ -80,7 +80,7 @@ export function membersCsv(members: ExportMember[], options: { includePhones: bo
       );
     }
     cells.push(
-      { text: member.status === "active" ? "Active" : "Disabled" },
+      { text: member.status === "active" ? "Active" : "Turned off" },
       { text: member.memberSince ?? "" },
       { text: member.city ?? "" },
       { text: member.state ?? "" },

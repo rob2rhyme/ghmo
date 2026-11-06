@@ -221,7 +221,7 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<RecordAt
     const call = mapCall(callSnap.id, callSnap.data() ?? {});
     if (call.attempts.some(a => a.id === input.attemptId)) return { ok: false, status: 409, error: "This attempt was already recorded." } as const;
     if (!memberSnap.exists || memberCallState(memberSnap.data() as Parameters<typeof memberCallState>[0]) !== "ready") {
-      return { ok: false, status: 409, error: "This person can no longer be called (opted out, no number, or disabled)." } as const;
+      return { ok: false, status: 409, error: "This person can no longer be called (opted out, no number, or turned off)." } as const;
     }
     const plan = planAttempt({ campaignStatus: campaign.status, row: call, input: input.input, actorUid: input.actorUid, actorIsSuperAdmin: input.actorIsSuperAdmin });
     if (!plan.ok) return plan;

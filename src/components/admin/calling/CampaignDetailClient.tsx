@@ -212,7 +212,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
                   disabled={busy === "close"}
                   onClick={() => setClosing(true)}
                 >
-                  Close campaign
+                  Close campaign…
                 </Button>
               </>
             ) : null}

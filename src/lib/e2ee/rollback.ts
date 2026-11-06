@@ -7,7 +7,7 @@
 export type RollbackVerdict = { kind: "off" } | { kind: "unsealed" } | { kind: "verify" } | { kind: "failed"; reason: string };
 
 export const ROLLED_BACK_OFF =
-  "The server now says encryption is off, but this device saw it switched on before. Encryption can't be switched off in the app, so the stored settings were changed outside it.";
+  "The server now says encryption is off, but this device saw it turned on before. Encryption can't be turned off in the app, so the stored settings were changed outside it.";
 export const ROLLED_BACK_EMPTY = "The signed device list is now missing, but this device saw it before. It was removed outside the app.";
 
 /**

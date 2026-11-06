@@ -114,7 +114,7 @@ async function checkLinks(groupId: string | null | undefined, memberIds: string[
   if (groupId) {
     const group = await groupsCol().doc(groupId).get();
     if (!group.exists) return fail(404, "That group doesn't exist.");
-    if (group.get("active") === false) return fail(409, "That group is switched off. Switch it on first.");
+    if (group.get("active") === false) return fail(409, "That group is turned off. Turn it on first.");
   }
   if (memberIds && memberIds.length) {
     const snaps = await db().getAll(...memberIds.map(id => membersCol().doc(id)));

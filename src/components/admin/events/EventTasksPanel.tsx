@@ -259,15 +259,15 @@ export default function EventTasksPanel({ eventId }: { eventId: string }) {
       <ConfirmDialog
         open={Boolean(removing)}
         onOpenChange={open => !open && setRemoving(null)}
-        title="Remove this task?"
-        description={removing ? `"${removing.title}" will be taken off this event.` : ""}
-        confirmLabel="Remove task"
+        title="Delete this task?"
+        description={removing ? `"${removing.title}" will be deleted from this event.` : ""}
+        confirmLabel="Delete task"
         destructive
         busy={busy}
         onConfirm={async () => {
           if (!removing) return;
           setBusy(true);
-          const ok = await run(() => peopleApi(`${base(eventId)}/${removing.id}`, { method: "DELETE" }), "Task removed");
+          const ok = await run(() => peopleApi(`${base(eventId)}/${removing.id}`, { method: "DELETE" }), "Task deleted");
           setBusy(false);
           if (ok) {
             setRemoving(null);
@@ -348,7 +348,7 @@ function TaskDialog({
                 {choosable.map(g => (
                   <option key={g.id} value={g.id}>
                     {g.name}
-                    {g.active ? "" : " (switched off)"}
+                    {g.active ? "" : " (turned off)"}
                   </option>
                 ))}
               </Select>
@@ -378,7 +378,7 @@ function TaskDialog({
           <DialogFooter>
             {onDelete ? (
               <Button type="button" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive sm:mr-auto" onClick={onDelete}>
-                Remove task
+                Delete task…
               </Button>
             ) : null}
             <Button type="button" variant="outline" onClick={onClose}>

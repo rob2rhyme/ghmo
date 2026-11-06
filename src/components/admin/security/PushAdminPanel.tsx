@@ -92,7 +92,7 @@ export default function PushAdminPanel() {
     try {
       setSettings(await send<Settings>("/api/admin/push-settings", "PUT", { enabled }));
       setConfirmingOff(false);
-      toast.success(enabled ? "Push notifications switched on for the site" : "Push notifications switched off for the site");
+      toast.success(enabled ? "Push notifications turned on for the site" : "Push notifications turned off for the site");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not change it");
     } finally {
@@ -125,15 +125,15 @@ export default function PushAdminPanel() {
             {settings.enabled ? <Badge variant="success">On</Badge> : <Badge variant="destructive">Off</Badge>}
           </span>
         }
-        description="Switch push off to stop every alert on every phone and computer at once, for example if something is wrong. Email is not affected, and nobody has to set anything up again when you switch it back on."
+        description="Turn push off to stop every alert on every phone and computer at once, for example if something is wrong. Email is not affected, and nobody has to set anything up again when you turn it back on."
         actions={
           settings.enabled ? (
             <Button variant="outline" size="row" onClick={() => setConfirmingOff(true)}>
-              Switch push off…
+              Turn push off…
             </Button>
           ) : (
             <Button size="row" loading={busy} onClick={() => void switchTo(true)}>
-              Switch push on
+              Turn push on
             </Button>
           )
         }
@@ -148,10 +148,10 @@ export default function PushAdminPanel() {
         as="h3"
         icon={<Smartphone aria-hidden="true" />}
         title="Everyone's push devices"
-        description="Use this to turn off a lost or stolen phone. You see whose it is, its name and when it last got an alert, never its address. Turning a device off does not change anyone's admin access; its owner can switch it on again from that device."
+        description="Use this to turn off a lost or stolen phone. You see whose it is, its name and when it last got an alert, never its address. Turning a device off does not change anyone's admin access; its owner can turn it on again from that device."
       >
         {devices.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nobody has switched push on yet.</p>
+          <p className="text-sm text-muted-foreground">Nobody has turned push on yet.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {devices.map(device => (
@@ -163,10 +163,10 @@ export default function PushAdminPanel() {
                     <span className="font-normal text-muted-foreground">· {device.label}</span>
                   </span>
                   <Button variant="outline" size="row" disabled={busy} onClick={() => setRemoving(device)} aria-label={`Turn off ${device.label} for ${device.adminName}`}>
-                    Turn off
+                    Turn off…
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">{device.kinds.length > 0 ? device.kinds.map(pushKindLabel).join(" · ") : "No alerts are switched on for it."}</p>
+                <p className="text-sm text-muted-foreground">{device.kinds.length > 0 ? device.kinds.map(pushKindLabel).join(" · ") : "No alerts are turned on for it."}</p>
                 <p className="text-xs text-muted-foreground">
                   {device.createdAt ? `Added ${dayText(device.createdAt)}. ` : ""}
                   {device.lastSentAt ? `Last alert sent ${dayText(device.lastSentAt)}.` : "No alert has been sent to it yet."}
@@ -180,9 +180,9 @@ export default function PushAdminPanel() {
       <ConfirmDialog
         open={confirmingOff}
         onOpenChange={setConfirmingOff}
-        title="Switch push off for everyone?"
-        description="No phone or computer will get a push notification until you switch it back on. Email alerts are not affected, and nobody has to set anything up again."
-        confirmLabel="Switch push off"
+        title="Turn push off for everyone?"
+        description="No phone or computer will get a push notification until you turn it back on. Email alerts are not affected, and nobody has to set anything up again."
+        confirmLabel="Turn push off"
         destructive
         busy={busy}
         onConfirm={() => switchTo(false)}
@@ -191,7 +191,7 @@ export default function PushAdminPanel() {
         open={removing !== null}
         onOpenChange={open => !open && setRemoving(null)}
         title={removing ? `Turn off ${removing.label} for ${removing.adminName}?` : "Turn off this device?"}
-        description="It stops getting alerts now. It does not change their admin access, and they can switch it on again from that device."
+        description="It stops getting alerts now. It does not change their admin access, and they can turn it on again from that device."
         confirmLabel="Turn off device"
         destructive
         busy={busy}

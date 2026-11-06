@@ -41,7 +41,7 @@ test("revoking a device and rotating keys locks it out of new data", async ({ br
   // --- Bob's phone is "lost": Alice revokes it and rotates ---
   await nav(alice, "Encryption");
   await alice.getByLabel("Select Bob phone to remove").check();
-  await alice.getByRole("button", { name: "Remove selected and make new keys" }).click();
+  await alice.getByRole("button", { name: "Remove selected and make new keys…" }).click();
   await alice.getByRole("dialog", { name: "Remove 1 device and make new keys?" }).getByRole("button", { name: "Remove and make new keys" }).click();
   await expect(alice.getByText("Devices removed and new keys made")).toBeVisible({ timeout: 20_000 });
 

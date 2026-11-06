@@ -173,14 +173,14 @@ test("groups: create, add people, choose a lead, and see them on the Members pag
   // Deleting the group takes it off everyone; the built-in callers group cannot be deleted.
   await page.goto(`/admin/groups/${groupId}`);
   await waitForStreamedContent(page);
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete…", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete group" }).click();
   await expect(main(page).getByRole("heading", { name: "Groups" }).first()).toBeVisible();
   await expect.poll(async () => (await db.doc(`${ORG}/members/asha`).get()).get("groupIds") ?? []).toEqual([]);
   expect((await db.doc(`${ORG}/members/bina`).get()).get("groupIds") ?? []).toEqual([]);
   await page.goto("/admin/groups/phone_tree_callers");
   await waitForStreamedContent(page);
-  await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Delete…", exact: true })).toHaveCount(0);
   const refused = await page.request.delete("/api/admin/groups/phone_tree_callers");
   expect(refused.status()).toBe(409);
 });

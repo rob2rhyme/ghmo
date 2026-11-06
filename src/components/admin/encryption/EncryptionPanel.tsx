@@ -237,7 +237,7 @@ function UnsealedAlert() {
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button loading={busy} onClick={() => setConfirmOpen(true)}>
-                Seal the device list
+                Seal the device list…
               </Button>
             </div>
             <ConfirmDialog
@@ -409,7 +409,7 @@ function DevicesSection() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button variant="outline" loading={busy && selected.length === 0} onClick={() => setRotateIds([])}>
             <RefreshCw aria-hidden="true" />
-            Make new keys now
+            Make new keys now…
           </Button>
           {anyRevocable ? (
             <Button
@@ -420,7 +420,7 @@ function DevicesSection() {
               onClick={() => setRotateIds(selected)}
             >
               <Trash2 aria-hidden="true" />
-              Remove selected and make new keys
+              Remove selected and make new keys…
             </Button>
           ) : null}
         </div>
@@ -511,7 +511,7 @@ function RecoverySection() {
           ) : (
             <div className="flex flex-col items-start gap-2">
               <Button variant="outline" onClick={() => setReplaceOpen(true)}>
-                Replace recovery key
+                Replace recovery key…
               </Button>
               <p className="text-sm text-muted-foreground">
                 Do this when a trustee steps down or a paper copy may be lost or seen by someone else. The old copies stop working.
@@ -551,7 +551,7 @@ function ForgetDeviceButton({ mode }: { mode: "withdraw" | "remove" }) {
   return (
     <>
       <Button variant={withdraw ? "ghost" : "outline"} onClick={() => setOpen(true)}>
-        {withdraw ? "Withdraw this device" : "Remove keys from this browser"}
+        {withdraw ? "Withdraw this device…" : "Remove keys from this browser…"}
       </Button>
       <ConfirmDialog
         open={open}

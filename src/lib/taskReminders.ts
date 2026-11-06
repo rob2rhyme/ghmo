@@ -131,7 +131,7 @@ export function cannotEmailLabel(reason: CannotEmailReason): string {
     case "bounced":
       return "their address bounced";
     case "inactive":
-      return "is disabled";
+      return "is turned off";
     case "missing":
       return "is no longer on the list";
     default:

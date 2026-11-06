@@ -153,10 +153,10 @@ export async function createTerm(input: {
     ]);
     if (!positionSnap.exists) return fail(404, "That position doesn't exist.");
     const position = mapPosition(positionSnap.id, positionSnap.data() ?? {});
-    if (!position.active) return fail(409, "That position is switched off. Switch it on first.");
+    if (!position.active) return fail(409, "That position is turned off. Turn it on first.");
     if (!memberSnap.exists) return fail(404, "That person isn't on the member list.");
     const member = memberSnap.data() ?? {};
-    if (member.status !== "active") return fail(409, "That member is disabled. Enable them first.");
+    if (member.status !== "active") return fail(409, "That member is turned off. Turn them on first.");
     const plan = planTerm({
       terms: termSnap.docs.map(doc => mapTerm(doc.id, doc.data())),
       position,

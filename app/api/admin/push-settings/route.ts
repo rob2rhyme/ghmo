@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest) {
       orgSlug: COMMUNITY_SLUG,
       action: "push_switched",
       actor: auditActor(actor, admin),
-      resource: { type: "pushSettings", id: "settings", summary: parsed.data.enabled ? "Push notifications switched on for the site" : "Push notifications switched off for the site" },
+      resource: { type: "pushSettings", id: "settings", summary: parsed.data.enabled ? "Push notifications turned on for the site" : "Push notifications turned off for the site" },
       before: { enabled: before },
       after: { enabled: parsed.data.enabled },
       meta: auditMeta(req, ROUTE)

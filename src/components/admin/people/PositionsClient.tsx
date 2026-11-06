@@ -157,7 +157,7 @@ export default function PositionsClient() {
                     }
                     badges={
                       <>
-                        {!position.active ? <Badge variant="secondary">Switched off</Badge> : holders.length === 0 ? <Badge variant="warning">Vacant</Badge> : null}
+                        {!position.active ? <Badge variant="secondary">Turned off</Badge> : holders.length === 0 ? <Badge variant="warning">Vacant</Badge> : null}
                         {position.multiple ? <Badge variant="outline">Several people</Badge> : null}
                       </>
                     }
@@ -188,7 +188,7 @@ export default function PositionsClient() {
                             {term.note ? <span className="text-muted-foreground">· {term.note}</span> : null}
                             {superAdmin ? (
                               <Button size="sm" variant="ghost" onClick={() => setEnding(term)} aria-label={`End ${nameOf(term.memberId)}'s term as ${position.title}`}>
-                                End term
+                                End term…
                               </Button>
                             ) : null}
                           </li>
@@ -212,7 +212,7 @@ export default function PositionsClient() {
                 actions={
                   superAdmin ? (
                     <Button size="row" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setRemoving(term)}>
-                      Remove
+                      Delete…
                     </Button>
                   ) : undefined
                 }
@@ -267,14 +267,14 @@ export default function PositionsClient() {
       <ConfirmDialog
         open={Boolean(removing)}
         onOpenChange={open => !open && setRemoving(null)}
-        title="Remove this term?"
+        title="Delete this term?"
         description="Use this only for a term entered by mistake. The history of who served will lose this line."
-        confirmLabel="Remove"
+        confirmLabel="Delete term"
         destructive
         busy={busy}
         onConfirm={async () => {
           if (!removing) return;
-          const ok = await run(() => peopleApi(`/api/admin/position-terms/${removing.id}`, { method: "DELETE" }), "Term removed");
+          const ok = await run(() => peopleApi(`/api/admin/position-terms/${removing.id}`, { method: "DELETE" }), "Term deleted");
           if (ok) setRemoving(null);
         }}
       />

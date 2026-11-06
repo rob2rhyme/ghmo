@@ -293,7 +293,7 @@ export default function BroadcastDetailClient({
         <div className="flex flex-wrap gap-2">
           {broadcast.status === "approved" ? (
             <Button onClick={() => setConfirming(true)} disabled={Boolean(sendingBlocker) || count === 0}>
-              Send to {members(count)}
+              Send to {members(count)}…
             </Button>
           ) : null}
           {broadcast.status === "sending" && !running ? (
@@ -335,7 +335,7 @@ export default function BroadcastDetailClient({
         {canCancel ? (
           <div className="border-t border-border pt-4">
             <Button variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelling(true)} disabled={busy === "cancel"}>
-              Cancel broadcast
+              Cancel broadcast…
             </Button>
           </div>
         ) : null}

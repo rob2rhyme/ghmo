@@ -34,7 +34,7 @@ test("a plain admin sees no super-admin push cards, and sees the notice when pus
   await db.doc(`${ORG}/pushSettings/settings`).set({ enabled: false, updatedBy: "alice", updatedAt: new Date() });
   await signInWithNewPasskey(page, "bob", "/admin/security");
   await expect(page.getByRole("heading", { name: /Push notifications on this device/ })).toBeVisible();
-  await expect(page.getByText(/switched off for the whole site by a super admin/)).toBeVisible();
+  await expect(page.getByText(/turned off for the whole site by a super admin/)).toBeVisible();
   await expect(page.getByRole("heading", { name: /Push for the whole site/ })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Everyone's push devices" })).toHaveCount(0);
 });
@@ -48,14 +48,14 @@ test("a super admin switches push off and on for the site, and turns a device of
   const site = page.getByRole("heading", { name: /Push for the whole site/ });
   await expect(site).toBeVisible();
   await expect(site).toContainText("On");
-  await page.getByRole("button", { name: "Switch push off…" }).click();
+  await page.getByRole("button", { name: "Turn push off…" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Switch push off for everyone?" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Switch push off" }).click();
+  await expect(dialog.getByRole("heading", { name: "Turn push off for everyone?" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Turn push off" }).click();
   await expect(site).toContainText("Off");
   await expect(page.getByText(/Last changed by Alice on /)).toBeVisible();
   expect((await db.doc(`${ORG}/pushSettings/settings`).get()).get("enabled")).toBe(false);
-  await page.getByRole("button", { name: "Switch push on" }).click();
+  await page.getByRole("button", { name: "Turn push on" }).click();
   await expect(site).toContainText("On");
   expect((await db.doc(`${ORG}/pushSettings/settings`).get()).get("enabled")).toBe(true);
 

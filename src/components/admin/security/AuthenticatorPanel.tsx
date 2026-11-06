@@ -213,7 +213,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span>Recovery codes left: {status.totp.recoveryCodesLeft}</span>
               <Button variant="outline" size="row" onClick={() => setConfirmCodes(true)} loading={busy === "codes"} disabled={busy !== null}>
-                Make new recovery codes
+                Make new recovery codes…
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">Recovery codes let you sign in if you lose your phone. Each one works once.</p>
@@ -273,7 +273,7 @@ export default function AuthenticatorPanel({ superAdmin }: { superAdmin: boolean
                       loading={busy === a.uid}
                       disabled={busy !== null}
                     >
-                      Reset
+                      Reset…
                     </Button>
                   }
                 />
