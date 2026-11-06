@@ -221,6 +221,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 | **21** | Members list on phones, and changing many at once | **Built 2026-11-06 (21-A, 21-B, 21-C; §28.6 to §28.8).** Also: Set holder offers members' relatives (21-C). Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
+| **22** | Activity log page | **Planned 2026-11-06 (§29).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 proposed. | Owner reads §29.2 and accepts or changes D82–D87 before 22-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1828,3 +1829,47 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **Set holder** shows them under **Family of members**. Picking one fills the new-person form with the name and number (both editable). Saving creates the member, encrypting the number in the browser bound to the new member's id, and seats them. No email or call consent is recorded: listing a relative is not their consent, so they can't be emailed or called until an admin records it.
 - **Someone not on the member list yet** now also takes a phone number instead of an email on an unlocked device (encrypted the same way). On a locked device an email is still needed, with a pointer to unlock or use the Members page.
 - Browser spec `family-officer.spec.ts`: a relative with a number becomes treasurer and a member (number not in plain text, no consent); she then shows as a member, not a relative; a relative with neither email nor number can't be saved until one is given.
+
+## 29. Phase 22 — Activity log page (planned 2026-11-06)
+
+**Goal.** Every change in the admin area writes a line to the activity log (who, what, when, the internet address and browser), but the only place to read it is the dashboard's **Recent activity**, which shows the last 8 entries. The go-live checklist, the runbook and the admin guide keep saying "check the activity log", and after an incident the board needs to answer "who changed this, and when?". Phase 22 adds a page that reads the whole log.
+
+### 29.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| Entries live in `organizations/ghmo/auditLogs`: `action`, `actor` (`uid`, `name`, `email`, `role`), `resource` (`type`, `id`, `summary`), `before`/`after`, `meta` (`ip`, `userAgent`, `route`), `createdAt`. The database rules let any admin read them; nothing can write them from a browser. | `src/lib/audit.ts`, `firestore.rules` | Every admin may read the page (D82); the server reads it for them, page by page. |
+| `activitySentence` already turns an entry into plain words ("Asha changed a member's email"), using about 95 known actions; `tests/unit/auditLabels.test.ts` fails when an action has no words. | `src/lib/adminView.ts` | Reuse it, so the page and the dashboard read the same. |
+| `before`/`after` were built never to hold encrypted content, phone numbers or note text (member entries keep `hasEmail`, deletions keep counts); the browser specs check this for the sensitive actions. | member, minutes, deletion routes and specs | "What changed" can show them as stored. |
+| `resource.type` is not used consistently across routes, but `action` names are a fixed list. | routes | Group actions into areas by name (members, events and tasks, minutes, broadcasts, positions and groups, admins and security, calls), and filter on the action. |
+| Firestore needs a composite index for "one person, newest first" and "these actions, newest first"; a date window alone needs none. | `firestore.indexes.json` | Two new indexes: `actor.uid` + `createdAt` desc, and `action` + `createdAt` desc. |
+| The log is never trimmed today (§24.3 item 4). | | Out of scope here; the page pages backwards with "Load older" so size doesn't matter. |
+
+### 29.2 Decisions (proposed; accept or change before 22-A)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D82 | Who can see the page? | **Every admin**, as with Recent activity today. The **internet address and browser** of each entry show only to **super admins** (they are for incidents). | Transparency for the board; device details kept to the people who handle incidents. |
+| D83 | What does an entry show? | The sentence and detail (as on the dashboard), the date and time, the person's role, and when opened: **What changed** (each plain field before → after, as stored; nothing encrypted is ever stored there) and a **link to the record** while it still exists (member, event, minutes, broadcast, group, position, admin). | Answers "who changed this, and what was it before?". |
+| D84 | Finding entries | Filters for **person** (any admin, past or present), **area** (members, events and tasks, minutes, broadcasts, positions and groups, admins and security, calls, other) and **dates** (from, to), plus a text box that narrows the loaded entries by words in the sentence. 50 at a time, newest first, **Load older**. | Small, quick reads; works however long the log gets. |
+| D85 | Download | **Super admins** can download the filtered view as a CSV (date, person, sentence, detail, area, and for them the address and browser). The download itself is a new activity entry. | Evidence for the board or an attorney, without a trip to the Firebase console. |
+| D86 | Is anything changed or hidden? | No. The log stays append-only; the page only reads. Entries about deleted members still show (with "Removed member" where the profile is gone). | The record can't be tidied away. |
+| D87 | Where is it? | **Activity** in the admin menu (under Security), found by search, and **See all activity** on the dashboard's Recent activity card. | One click from where people already look. |
+
+### 29.3 Design
+
+- **22-A (server and rules):** `src/lib/activityLog.ts` (pure): `ACTIVITY_AREAS` (area → action names, built from the labelled actions; anything unknown is "Other"), `areaOf(action)`, `changedFields(before, after)` (plain scalar and short-list fields only, in a stable order), `recordHref(entry)` and `activityCsv(rows, { withDevice })`; unit tests, plus one that every labelled action belongs to an area. `GET /api/admin/activity?person=&area=&from=&to=&before=` (any active admin, rate limited): newest first, 50 per page, cursor by `createdAt` and id; `meta.ip` and `meta.userAgent` removed unless the caller is a super admin; area filters use `action in [...]` in chunks of 30 merged by time. `POST /api/admin/activity/export` (super admins): the same filters, up to 5,000 rows, logged as `activity_exported`. The two composite indexes in `firestore.indexes.json`.
+- **22-B (page):** `/admin/activity` with the filters, the list, an expandable entry (What changed, the record link, and the device line for super admins), **Load older**, and **Download CSV** for super admins; **Activity** in the nav and search; **See all activity** on the dashboard. Browser spec: entries from several people and areas; each filter narrows the list; Load older pages; a plain admin sees no address or browser and no Download, and the API leaves them out; a super admin downloads and the download is logged; a member-email change shows "Email changed" with no address; links open the record. Admin guide section and go-live checklist wording ("Admin → Activity").
+
+### 29.4 Sub-phases
+
+- **22-A:** pure rules, read and export routes, indexes, tests.
+- **22-B:** the page, nav and dashboard link, browser spec, docs.
+
+Each sub-phase runs the full gate before any push, and is pushed only when the owner asks. The new indexes need `npx firebase deploy --only firestore` before the person and area filters work on the live site.
+
+### 29.5 Risks and out of scope
+
+- **Older entries** written by the legacy `logAudit` helper have a slightly different shape; the page reads both, as the dashboard does.
+- **Trimming the log** (a retention policy) is a separate decision (§24.3 item 4); this page only reads.
+- **Searching inside every entry** server-side is out of scope; the text box narrows what is loaded, and the filters do the heavy lifting.
