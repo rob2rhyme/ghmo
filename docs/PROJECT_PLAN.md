@@ -1812,3 +1812,10 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Member rows show **Profile** and **More actions for {name}** (⋯); the menu holds the same actions as before, under the same conditions and handlers, with **Turn off…** / **Turn on** last after a divider.
 - The list shows the first 50 of what the search and filters match, then **Show N more** with "Showing 50 of 120"; a new search or filter starts again from 50. Export and the counts still use the whole list.
 - Specs press row actions through `memberAction` / `firstMemberAction` (in `tests/e2e-auth/helpers.ts`); a new test checks two controls per row on a phone, a menu with only what applies, and paging with 120 members.
+
+### 28.7 21-B built (2026-11-06)
+
+- `src/components/admin/members/MembersBulk.tsx`: the selection bar ("N selected", **Add to group…**, **Remove from group…**, **Turn on**, **Turn off…**, **Clear**; over 200 selected disables the actions with a note) and the group dialog. No consent, contact, name or delete action is offered (D79).
+- Members rows get a tick box (`Select {name}`) and the list a **Select all shown** box. Group changes go through the existing group route (one activity entry each); the toast says how many changed and how many were already in that state.
+- `POST /api/organizations/ghmo/members/bulk-status` (`{ ids, status }`, 1 to 200 ids, any active admin, 30 per hour): skips unknown and unchanged members, writes in batches, and logs one `members_status_bulk` entry ("Turned off 2 members") with no names.
+- Browser spec (`members.spec.ts`): add three to a group, remove two (one wasn't in it), turn two off through the confirmation naming the count, turn all shown on (two already on), one activity entry per action, no consent button in the bar, an empty request refused. Admin guide §1 updated for the menu, paging and selection.

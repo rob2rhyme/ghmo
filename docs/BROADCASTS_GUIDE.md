@@ -8,11 +8,14 @@ These are in `docs/GO_LIVE_CHECKLIST.md`. In short: a verified sending domain in
 
 ## 1. Keep the member list honest (Admin → Members)
 
-- Only people who **asked** to get email from us can be emailed. Tick "This person asked to receive email from us" when you add someone, or press **Record consent** when they ask later.
+- **Each row** has **Profile** and **⋯** (More actions). The actions for that person are in the ⋯ menu: **Record consent**, **They asked to stop**, call consent, **Edit contact**, **Edit name** (super admins), **Groups**, and **Turn off…** last. (Since 2026-11-06, plan §28.)
+- **Long lists** show 50 people at a time: press **Show 50 more** at the bottom. Search, the filters and **Export list** always cover everyone.
+- **Several people at once:** tick the box at the start of each row (or **Select all shown**). A bar appears with **Add to group…**, **Remove from group…**, **Turn on** and **Turn off…** (up to 200 at a time). Consent, opt-outs, contacts and names are always one person at a time, because consent is something each person tells you. Each bulk change is one line in the activity log with how many changed.
+- Only people who **asked** to get email from us can be emailed. Tick "This person asked to receive email from us" when you add someone, or choose **Record consent** in their ⋯ menu when they ask later.
 - Importing a list: only tick "These people agreed to receive email from us" if that is true for everyone on it. It is recorded with your name.
-- When someone asks to stop, press **They asked to stop**. If they ask to come back, **They asked to be added back**.
+- When someone asks to stop, choose **They asked to stop** in their ⋯ menu. If they ask to come back, **They asked to be added back**.
 - The page shows who can be emailed. People who unsubscribed by link, marked an email as spam, or whose address bounced are left out automatically.
-- **Fixing a typo in a name (super admin):** press **Edit name** on the person's row, correct it and save. Their email, phone number, consent and groups stay as they are, and the activity log keeps the old and new spelling. Someone without an email can't have an empty name. Other admins don't see the button.
+- **Fixing a typo in a name (super admin):** choose **Edit name** in the person's ⋯ menu, correct it and save. Their email, phone number, consent and groups stay as they are, and the activity log keeps the old and new spelling. Someone without an email can't have an empty name. Other admins don't see the button.
 - **Search box:** type part of a name or email to narrow the list. The **x** at the right end clears it (so does the Escape key). The same box in the group and task pickers works the same way.
 
 ## 1a. Turn on encryption and keep the recovery key safe (Admin → Encryption)

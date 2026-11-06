@@ -23,6 +23,7 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { UnlockCard } from "@/src/components/admin/encryption/UnlockCard";
 import { useMemberContacts, type ContactView } from "@/src/components/admin/members/useMemberContacts";
 import MemberGroupsDialog, { type GroupChoice } from "@/src/components/admin/people/MemberGroupsDialog";
+import { BulkActionBar, BulkGroupDialog } from "@/src/components/admin/members/MembersBulk";
 import RenameMemberDialog from "@/src/components/admin/people/RenameMemberDialog";
 import ExportMembersDialog, { type ExportChoice } from "@/src/components/admin/members/ExportMembersDialog";
 import { exportFileName, membersCsv, type ExportMember } from "@/src/lib/memberExport";
@@ -137,6 +138,11 @@ export default function MembersClient({
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<MemberRow | null>(null);
   const [disabling, setDisabling] = useState<MemberRow | null>(null);
+  // Several members at once (plan §28, D78): the ticked ids, and which bulk dialog is open.
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkGroup, setBulkGroup] = useState<"add" | "remove" | null>(null);
+  const [bulkTurningOff, setBulkTurningOff] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   /** Which form is open above the list, at every width. An empty list starts with the Add form open. */
   const [panel, setPanel] = useState<"add" | "import" | null>(initialMembers.length === 0 ? "add" : null);
 
@@ -212,6 +218,55 @@ export default function MembersClient({
   const [paging, setPaging] = useState({ key: pageKey, count: PAGE });
   const shownCount = paging.key === pageKey ? paging.count : PAGE;
   const shown = visible.slice(0, shownCount);
+
+  const toggleSelected = (id: string) =>
+    setSelected(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const allShownSelected = shown.length > 0 && shown.every(member => selected.has(member.id));
+  const selectedIds = [...selected].filter(id => members.some(member => member.id === id));
+
+  const bulkGroupChange = async (mode: "add" | "remove", groupId: string) => {
+    setBulkBusy(true);
+    try {
+      const result = await call<{ added: string[]; removed: string[] }>(`/api/admin/groups/${groupId}/members`, "POST", mode === "add" ? { add: selectedIds } : { remove: selectedIds });
+      const changed = mode === "add" ? result.added : result.removed;
+      setMembers(list =>
+        list.map(member =>
+          changed.includes(member.id)
+            ? { ...member, groupIds: mode === "add" ? [...(member.groupIds ?? []), groupId] : (member.groupIds ?? []).filter(id => id !== groupId) }
+            : member
+        )
+      );
+      const name = groups.find(group => group.id === groupId)?.name ?? "the group";
+      toast.success(`${changed.length} ${mode === "add" ? "added to" : "removed from"} ${name}${changed.length < selectedIds.length ? `; ${selectedIds.length - changed.length} already ${mode === "add" ? "in it" : "not in it"}` : ""}`);
+      setSelected(new Set());
+      setBulkGroup(null);
+    } catch (error) {
+      toast.error(errorText(error, "Could not change the group"));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkStatus = async (status: "active" | "disabled") => {
+    setBulkBusy(true);
+    try {
+      const result = await call<{ changed: number; skipped: number; ids: string[] }>("/api/organizations/ghmo/members/bulk-status", "POST", { ids: selectedIds, status });
+      setMembers(list => list.map(member => (result.ids.includes(member.id) ? { ...member, status } : member)));
+      const verb = status === "disabled" ? "turned off" : "turned on";
+      toast.success(`${result.changed} ${verb}${result.skipped ? `; ${result.skipped} already ${status === "disabled" ? "off" : "on"}` : ""}`);
+      setSelected(new Set());
+      setBulkTurningOff(false);
+    } catch (error) {
+      toast.error(errorText(error, "Could not save"));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const replace = (updated: MemberRow) => setMembers(list => list.map(m => (m.id === updated.id ? updated : m)));
 
@@ -661,6 +716,25 @@ export default function MembersClient({
             }
           />
         ) : (
+          <>
+          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={allShownSelected}
+              onChange={() =>
+                setSelected(current => {
+                  const next = new Set(current);
+                  for (const member of shown) {
+                    if (allShownSelected) next.delete(member.id);
+                    else next.add(member.id);
+                  }
+                  return next;
+                })
+              }
+            />
+            Select all shown
+          </label>
           <AdminList bare label="Members">
             {shown.map(member => {
               const state = memberEmailState(member);
@@ -674,6 +748,15 @@ export default function MembersClient({
               return (
                 <AdminListRow
                   key={member.id}
+                  leading={
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-5 accent-primary"
+                      aria-label={`Select ${displayName}`}
+                      checked={selected.has(member.id)}
+                      onChange={() => toggleSelected(member.id)}
+                    />
+                  }
                   title={<span className="break-all">{displayName}</span>}
                   meta={
                     member.name && hasEmail(member) ? (
@@ -784,6 +867,7 @@ export default function MembersClient({
               );
             })}
           </AdminList>
+          </>
         )}
         {visible.length > shown.length ? (
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -794,6 +878,18 @@ export default function MembersClient({
               Showing {shown.length} of {visible.length}
             </p>
           </div>
+        ) : null}
+        {selectedIds.length > 0 ? (
+          <BulkActionBar
+            count={selectedIds.length}
+            hasGroups={groups.length > 0}
+            busy={bulkBusy}
+            onAddToGroup={() => setBulkGroup("add")}
+            onRemoveFromGroup={() => setBulkGroup("remove")}
+            onTurnOff={() => setBulkTurningOff(true)}
+            onTurnOn={() => void bulkStatus("active")}
+            onClear={() => setSelected(new Set())}
+          />
         ) : null}
       </AdminSectionCard>
 
@@ -822,6 +918,20 @@ export default function MembersClient({
           }}
         />
       ) : null}
+
+      {bulkGroup ? (
+        <BulkGroupDialog mode={bulkGroup} groups={groups} count={selectedIds.length} busy={bulkBusy} onClose={() => setBulkGroup(null)} onSave={groupId => bulkGroupChange(bulkGroup, groupId)} />
+      ) : null}
+      <ConfirmDialog
+        open={bulkTurningOff}
+        onOpenChange={setBulkTurningOff}
+        title={`Turn off ${selectedIds.length} member${selectedIds.length === 1 ? "" : "s"}?`}
+        description="They get no emails or calls from the site until someone turns them on again. Nothing else about them changes."
+        confirmLabel={`Turn off ${selectedIds.length}`}
+        destructive
+        busy={bulkBusy}
+        onConfirm={() => bulkStatus("disabled")}
+      />
 
       {groupsFor ? (
         <MemberGroupsDialog
