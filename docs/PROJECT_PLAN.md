@@ -220,6 +220,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
 | **19** | Minutes for any meeting | **Built 2026-11-06 (19-A, 19-B; §26.6, §26.7).** Record minutes for a meeting that isn't an event yet (a board call, an unplanned meeting) without leaving the minutes page, find the meeting in a searchable list, and move draft minutes to the right meeting. Decisions D64–D69 accepted 2026-11-06. | None before 19-A. |
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
+| **21** | Members list on phones, and changing many at once | **Planned 2026-11-06 (§28).** Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 proposed. | Owner reads §28.2 and accepts or changes D76–D81 before 21-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1759,3 +1760,48 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **See all N matching** for members and minutes opens `/admin/members?q=` and `/admin/minutes?mode=records&q=` with the search box filled in.
 - Browser spec (`admin-search.spec.ts`): a member by part of a name with her position, Enter to the profile; an event, its minutes and a broadcast by a word; email search and the Turned off mark; See all to the Members list with the box filled; no super-admin pages for a plain admin. `admin-shell.spec.ts` follows the new names (Search, Results).
 - Admin guide §1m and the README line.
+
+## 28. Phase 21 — Members list on phones, and changing many at once (planned 2026-11-06)
+
+**Goal.** The Members page is the most used admin page and the most cramped on a phone. Each row can show up to nine buttons (consent, opt-out, call consent, call opt-out, Edit contact, Profile, Edit name, Groups, Turn off), which wrap into three or four lines; every member is drawn at once; and putting twenty people in the cooking team means opening twenty dialogs (§24.3). Phase 21 makes each row short, the list quick, and lets an admin change several members in one step.
+
+### 28.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| A row's buttons depend on the member: consent or opt-out (email and calls), Edit contact (only on an unlocked device), Profile, Edit name (super admins), Groups (when groups exist), Turn off / Turn on. Each acts on that one member through the existing routes. | `MembersClient.tsx` (row `actions`) | Keep every action and its route; move them into a menu, so the row has two controls. |
+| Search, the status and group filters, and Export all work on the full list; every member is rendered. | `MembersClient.tsx` (`visible`) | Show the first 50 of the filtered list with **Show 50 more**; filters, search and export keep using everything. |
+| Groups already take many members in one request (`add`, `remove`, up to 200), with one activity entry. | `app/api/admin/groups/[groupId]/members` | Bulk "add to / remove from group" reuses it. |
+| Turning a member off or on is a per-member `PATCH` (any admin), one activity entry each. | member route | Bulk turn off/on needs a small new route that does it in batches with one activity entry and a count. |
+| Recording consent is a statement about one person ("only tick this if this person told you so", D7, plan §10.2). | Members page, import attestation | Consent and opt-outs stay one person at a time, never in bulk. |
+| The radix-ui package (already a dependency) has an accessible dropdown menu; no menu component exists yet in `src/components/ui`. | `package.json` | Add a small `dropdown-menu.tsx` in the same style as the other UI pieces. |
+| Several browser specs press row buttons by name (members, member contact, rename, delete UI, positions/groups). | `tests/e2e-auth/*` | They move to "open More…, then the item"; a shared test helper keeps them short. |
+
+### 28.2 Decisions (proposed; accept or change before 21-A)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D76 | What stays on the row? | **Profile** and a **More actions for {name}** button (⋯) on every screen size. The menu lists the actions that apply to that member, in today's order, with **Turn off…** last and in red. Badges (email and call status, positions, groups) stay. | Two controls per row on a phone and a tidy list on a computer; one extra click for consent actions. |
+| D77 | How much of the list shows? | The first **50** of whatever the search and filters match, then **Show 50 more**, with "Showing 50 of 312". Search, filters and **Export list** always use everything. | The page opens fast with hundreds of members. |
+| D78 | Choosing several | A tick box at the start of each row, and **Select all shown**. While any are ticked, a bar shows "**N selected**" with **Add to group…**, **Remove from group…**, **Turn off…**, **Turn on** and **Clear**. Up to 200 at a time. | The everyday group work is one step. |
+| D79 | What is never done in bulk? | Recording **consent** or an **opt-out** (email or calls), editing contacts or names, and deleting. Those stay one person at a time. | Consent is always a statement about one person. |
+| D80 | Records and checks | A bulk group change is one activity entry, as today. A bulk turn off/on is one entry with the count ("turned off 12 members"). **Turn off…** asks first and names how many. The server re-checks each member and skips ones already in that state, reporting how many changed. | A readable activity log and no surprises. |
+| D81 | Who can do it? | Any admin, the same as the per-row actions today. | No new permission. |
+
+### 28.3 Design
+
+- **21-A (row and paging):** `src/components/ui/dropdown-menu.tsx` (radix DropdownMenu, the site's styles, 44 px items on touch). `MemberRowMenu` builds the items from the same conditions as today's buttons and calls the same handlers. The row keeps **Profile** and the menu; the phone line stays. Paging state resets when search or filters change. Browser specs updated through a helper `memberAction(page, name, label)`; new checks: a phone-width row has two controls, the menu has only the items that apply, **Show 50 more** with 120 seeded members.
+- **21-B (choosing several):** row tick boxes, **Select all shown**, the selection bar, and dialogs for group (pick a group) and turn off (count and confirm). `POST /api/organizations/ghmo/members/bulk-status` (`{ ids, status }`, up to 200, any active admin, rate limited): batched writes, skips unchanged, one `members_status_bulk` activity entry with the count. Group changes call the existing group route. Browser spec: add 3 to a group, remove 2, turn off 2 (confirmation names the count), turn on again; the selection clears after each; the activity log has one entry per action; no consent action appears in the bar. Admin guide (Members section) and plan status.
+
+### 28.4 Sub-phases
+
+- **21-A:** menu component, compact rows, paging, spec updates.
+- **21-B:** selection, bulk route, bar and dialogs, browser spec, docs.
+
+Each sub-phase runs the full gate before any push, and is pushed only when the owner asks.
+
+### 28.5 Risks and out of scope
+
+- **One more click** for consent and contact edits; worth it for a list that is usable on a phone. If the board misses one-click consent on computers, a later change can show the first action beside **Profile** on wide screens.
+- **Bulk delete** stays out of scope (D45 kept deletion one member at a time).
+- **Very long lists:** paging is in the browser; all members are still loaded once, as today. Loading pages from the server is the next step only if the list reaches the thousands.
