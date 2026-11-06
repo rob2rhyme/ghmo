@@ -112,6 +112,7 @@ On an event's **Tasks** section, **Send reminders** emails the people who own ta
 ## 1h. A member's profile (Admin → Members → Profile)
 
 Press **Profile** on a member's row to open their page. Only admins can see it.
+- **Email:** the member's address, or "No email address" for someone reached by phone. A **super admin** can press **Edit email** (or **Add email**), type the new address twice and press **Save email**. Everything else stays with the member: notes, calls, groups, positions, tasks, and whether they agreed to email or opted out. If they opted out, they stay opted out at the new address; if the old address bounced, the new one starts fresh. An address another member already uses is refused, with their name, so the same person isn't on the list twice. If the member had opted out or their old address bounced, the old address goes on the do-not-email list (a scrambled code, never the address), so importing it again won't start emails to it. **Remove email…** is offered only when the member has a name and a phone number, so they can still be reached. The activity log records "changed a member's email" with who and when, never either address. Other admins see the address and a note to ask a super admin. (Added 2026-11-06, plan §25.)
 - **Membership:** set **Member since** (the day they joined) and the page shows how long, for example "Member since Mar 2019 · 7 years, 8 months". If you don't know the date, **Use the day they were added** fills in the day they went on this list as a start. Dates in the future or before 1950 are refused. Add the **City** and **State** they live in. A state name such as "Pennsylvania" is saved as "PA". There is no street address anywhere. The Members list shows the city and state and the search finds them.
 - **Family:** press **Add family member** and give a name, and if you know it how they are related and a phone number. Up to ten. This is for reference, so a caller knows who else to ask for. Family members are never emailed or called by the site, and listing a number does not mean they agreed to be contacted. It is kept encrypted like phone numbers, so you need to unlock this device first, and numbers show as dots until you press **Show**.
 - **Edit contact** on the Members page keeps the family list.
@@ -122,7 +123,7 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
 
   | Item | Kept | Who can read it | Who can remove it |
   |---|---|---|---|
-  | Name, email, consent history, groups | Plain, on the member record | Every admin | A super admin can correct the name, and can delete the whole member (see "Deleting a member" below). Any admin can disable them |
+  | Name, email, consent history, groups | Plain, on the member record | Every admin | A super admin can correct the name, change or remove the email, and delete the whole member (see "Deleting a member" below). Any admin can disable them |
   | Member since, city, state | Plain | Every admin | Any admin (clear the field) |
   | Phone numbers, language, household, contact note, family | Encrypted | Admins on an approved, unlocked device | Any admin (Edit contact, Remove) |
   | Notes | Encrypted text; author and date plain | Admins on an approved, unlocked device | The author, or a super admin |

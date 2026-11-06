@@ -68,7 +68,7 @@ export default function PrivacyPage() {
 
       <Section title="Your choices">
         <p>
-          To see what we hold about you, correct it, stop emails or calls, or have your member record removed, {ask}. A board member can remove a member and what is held about
+          To see what we hold about you, correct it (including changing your email address), stop emails or calls, or have your member record removed, {ask}. A board member can remove a member and what is held about
           them from inside the site. If your record is removed after you asked us to stop emailing you, we keep only a scrambled copy of your address, so a later import doesn&apos;t start emails again.
         </p>
         <p>

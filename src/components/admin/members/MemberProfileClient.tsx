@@ -9,6 +9,7 @@ import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
 import DeleteMemberDialog from "@/src/components/admin/members/DeleteMemberDialog";
+import EmailCard from "@/src/components/admin/members/EmailCard";
 import { useMemberContacts } from "@/src/components/admin/members/useMemberContacts";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
@@ -47,6 +48,7 @@ import { formatPhone, maskPhone, memberCallState, memberContactLoc, memberDispla
 export type ProfileMember = {
   id: string;
   name?: string | null;
+  email?: string | null;
   emailLower?: string;
   status: "active" | "disabled";
   emailConsent?: { source?: string } | null;
@@ -114,6 +116,7 @@ export default function MemberProfileClient({
           </Badge>
         ))}
       </div>
+      <EmailCard member={member} superAdmin={me.superAdmin} onSaved={setMember} />
       <MembershipCard member={member} today={today} onSaved={setMember} />
       <EncryptionGate what="family details and notes">
         <div className="flex flex-col gap-6">

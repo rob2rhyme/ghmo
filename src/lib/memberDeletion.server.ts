@@ -63,9 +63,14 @@ export async function suppressionsFor(emailLowers: string[]): Promise<Map<string
   return found;
 }
 
-async function keepSuppression(emailLower: string, reason: SuppressionReason, at: Date) {
+/** Where an address's do-not-email record is written (under the current key). */
+export function suppressionRef(emailLower: string) {
   const [id] = suppressionIds(emailLower);
-  await suppressionsCol().doc(id).set({ reason, at }, { merge: true });
+  return suppressionsCol().doc(id);
+}
+
+async function keepSuppression(emailLower: string, reason: SuppressionReason, at: Date) {
+  await suppressionRef(emailLower).set({ reason, at }, { merge: true });
 }
 
 /** When they opted out, if the record says so, otherwise now (a bounce has no earlier time of its own). */

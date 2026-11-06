@@ -15,6 +15,7 @@ import { z } from "zod";
 import { newMemberSuppression } from "@/src/lib/memberDeletion";
 import { suppressionsFor } from "@/src/lib/memberDeletion.server";
 import { listMembers } from "@/src/lib/adminData.server";
+import { memberUsingEmail } from "@/src/lib/memberEmailChange.server";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orgSlu
       if (!body.contact?.hasPhone) return NextResponse.json({ error: "Add an email address or a phone number." }, { status: 400 });
       if (!name) return NextResponse.json({ error: "Add a name for someone without an email." }, { status: 400 });
       if (body.emailConsent) return NextResponse.json({ error: "Email consent needs an email address." }, { status: 400 });
+    }
+
+    // One address, one member (plan §25, D59).
+    if (emailLower) {
+      const other = await memberUsingEmail(emailLower);
+      if (other) return NextResponse.json({ error: `${other.name} already uses this address. One address can belong to only one member.`, memberId: other.id }, { status: 409 });
     }
 
     const status = body.status ?? "active";
