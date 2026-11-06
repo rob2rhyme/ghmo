@@ -18,6 +18,7 @@ import { Segmented } from "@/src/components/ui/segmented";
 import { Select } from "@/src/components/ui/select";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { NOTE_MAX, TITLE_MAX, monthYear, termStatus, type Position, type Term } from "@/src/lib/positions";
+import { REMOVED_MEMBER_LABEL } from "@/src/lib/memberDeletion";
 import { memberDisplayName } from "@/src/lib/members";
 
 type Data = { positions: Position[]; terms: Term[]; today: string; superAdmin: boolean };
@@ -53,7 +54,7 @@ export default function PositionsClient() {
     const byId = new Map(members.map(m => [m.id, m]));
     return (id: string) => {
       const member = byId.get(id);
-      return member ? memberDisplayName(member) : "Removed member";
+      return member ? memberDisplayName(member) : REMOVED_MEMBER_LABEL;
     };
   }, [members]);
 

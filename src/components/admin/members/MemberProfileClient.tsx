@@ -1,11 +1,14 @@
 "use client";
 
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, NotebookPen, PhoneCall, Pencil, Plus, UsersRound } from "lucide-react";
+import { Eye, EyeOff, NotebookPen, PhoneCall, Pencil, Plus, Trash2, UsersRound } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { EncryptionGate } from "@/src/components/admin/encryption/EncryptionGate";
+import DeleteMemberDialog from "@/src/components/admin/members/DeleteMemberDialog";
 import { useMemberContacts } from "@/src/components/admin/members/useMemberContacts";
 import { useE2ee } from "@/src/lib/e2ee/client/E2eeProvider";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
@@ -39,7 +42,7 @@ import {
   withFamily
 } from "@/src/lib/memberProfile";
 import { POSITION_TIME_ZONE, todayIn } from "@/src/lib/positions";
-import { formatPhone, maskPhone, memberCallState, memberContactLoc, memberEmailState, newMemberId, type FamilyMember } from "@/src/lib/members";
+import { formatPhone, maskPhone, memberCallState, memberContactLoc, memberDisplayName, memberEmailState, newMemberId, type FamilyMember } from "@/src/lib/members";
 
 export type ProfileMember = {
   id: string;
@@ -119,7 +122,54 @@ export default function MemberProfileClient({
           <CallsCard member={member} me={me} />
         </div>
       </EncryptionGate>
+      {me.superAdmin ? <DeleteMemberCard member={member} /> : null}
     </div>
+  );
+}
+
+/**
+ * Deleting this member and what is held about them (plan §20). Only a super admin sees it. It is outside the encryption
+ * gate because deleting needs no device key: the server removes the encrypted records without opening them.
+ */
+function DeleteMemberCard({ member }: { member: ProfileMember }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const label = memberDisplayName(member);
+
+  const remove = async (confirm: string) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/organizations/ghmo/members/${encodeURIComponent(member.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Could not delete the member");
+      toast.success("Member deleted");
+      router.replace("/admin/members" as Route);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete the member");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AdminSectionCard
+      as="h3"
+      icon={<Trash2 aria-hidden="true" />}
+      title="Delete this member"
+      description="For a removal request or a record made by mistake. It removes this person and what is held about them, and cannot be undone. To stop contacting someone, use Disable instead."
+      actions={
+        <Button variant="outline" size="row" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setOpen(true)}>
+          <Trash2 aria-hidden="true" />
+          Delete member…
+        </Button>
+      }
+    >
+      {open ? <DeleteMemberDialog memberId={member.id} label={label} busy={busy} onClose={() => setOpen(false)} onDelete={remove} /> : null}
+    </AdminSectionCard>
   );
 }
 
