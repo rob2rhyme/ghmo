@@ -4,7 +4,7 @@ import { sendMail } from "@/src/lib/mailer.server";
 
 describe("notification emails", () => {
   it("say that something happened and link to the page, with no content", () => {
-    for (const kind of ["chat", "thread", "minutes_submitted"] as NotificationKind[]) {
+    for (const kind of ["chat", "thread", "minutes_submitted", "broadcast_review"] as NotificationKind[]) {
       const { subject, text } = notificationMessage(kind, "https://ghmo.example");
       expect(subject).toMatch(/^GHMO: /);
       expect(text).toContain("https://ghmo.example/admin/");

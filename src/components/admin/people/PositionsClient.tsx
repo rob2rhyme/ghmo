@@ -282,7 +282,9 @@ function SeatDialog({
   const [startsOn, setStartsOn] = useState(today);
   const [endsOn, setEndsOn] = useState("");
   const [note, setNote] = useState("");
-  const [endPrevious, setEndPrevious] = useState(true);
+  // A seat held by one person is normally taken over; a seat for several people (board members, advisors) normally gains
+  // another person, so ending the others stays an explicit choice there.
+  const [endPrevious, setEndPrevious] = useState(!position.multiple);
   const people = members.filter(m => m.status === "active").sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)));
 
   return (

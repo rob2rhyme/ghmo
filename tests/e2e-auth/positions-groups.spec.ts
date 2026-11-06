@@ -22,6 +22,28 @@ test.beforeEach(async () => {
   }
 });
 
+test("several people can join a seat for several people on the same day, without ending each other", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signInWithNewPasskey(page, "alice", "/admin/positions");
+  await waitForStreamedContent(page);
+  await expect.poll(async () => (await admin().db.collection(`${ORG}/positions`).get()).size).toBe(16);
+
+  for (const name of ["Asha Rai", "Bina Thapa", "Deepak Gurung"]) {
+    await page.getByRole("button", { name: "Set holder for Board Member" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Member").selectOption({ label: name });
+    await dialog.getByLabel("Starts on").fill("2026-01-01");
+    // Adding alongside is the default for a seat that allows several people: the "end the others" box starts unticked.
+    const endOthers = dialog.getByRole("checkbox", { name: /the day before/ });
+    if (await endOthers.count()) await expect(endOthers).not.toBeChecked();
+    await dialog.getByRole("button", { name: "Save holder" }).click();
+    await expect(dialog).toHaveCount(0);
+  }
+  await expect.poll(async () => (await admin().db.collection(`${ORG}/positionTerms`).get()).size).toBe(3);
+  const terms = (await admin().db.collection(`${ORG}/positionTerms`).get()).docs.map(d => d.data() as { positionId: string; endsOn: string | null });
+  expect(terms.every(t => t.positionId === "board_member" && t.endsOn === null)).toBe(true);
+});
+
 test("a super admin seats an officer, replaces them, and the old term moves to the past", async ({ page }) => {
   test.setTimeout(120_000);
   await signInWithNewPasskey(page, "alice", "/admin/positions");

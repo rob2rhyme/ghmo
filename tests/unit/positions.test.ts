@@ -118,6 +118,15 @@ describe("planTerm", () => {
     expect((plan as { error: string }).error).toContain("starts on or after");
   });
 
+  it("tells a several-people position how to add someone alongside, when ending the others can't work", () => {
+    const sameDay = term({ id: "t1", memberId: "m1", positionId: "board_member", startsOn: "2026-03-01" });
+    const plan = planTerm({ terms: [sameDay], position: board, memberId: "m2", startsOn: "2026-03-01", endsOn: null, endPrevious: true });
+    expect(plan).toMatchObject({ ok: false });
+    expect((plan as { error: string }).error).toContain("untick");
+    // The same request without ending anyone is fine.
+    expect(planTerm({ terms: [sameDay], position: board, memberId: "m2", startsOn: "2026-03-01", endsOn: null, endPrevious: false })).toEqual({ ok: true, closes: [] });
+  });
+
   it("closes every overlapping holder, not just one", () => {
     const a = term({ id: "a", memberId: "m1", positionId: "board_member", startsOn: "2023-01-01" });
     const b = term({ id: "b", memberId: "m3", positionId: "board_member", startsOn: "2024-01-01" });

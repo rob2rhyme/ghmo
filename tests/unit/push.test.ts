@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanKinds, cleanSubscription, deviceLabel, isAllowedPushEndpoint, pickPushTargets, pushPayload, type PushDevice } from "@/src/lib/push";
+import { PUSH_KINDS, cleanKinds, cleanSubscription, deviceLabel, isAllowedPushEndpoint, pickPushTargets, pushPayload, type PushDevice } from "@/src/lib/push";
 
 const P256DH = "B" + "a".repeat(86);
 const AUTH = "a".repeat(22);
@@ -80,6 +80,22 @@ describe("pushPayload (D33)", () => {
     expect(pushPayload("thread").url).toBe("/admin/comms");
     expect(pushPayload("thread").url.startsWith("/")).toBe(true);
   });
+
+  it("has fixed, content-free words and a site path for every kind that can push (14-B)", () => {
+    expect(pushPayload("minutes_submitted")).toEqual({ title: "GHMO", body: "Minutes are waiting for approval", url: "/admin/minutes?mode=records", tag: "ghmo-minutes_submitted" });
+    expect(pushPayload("broadcast_review")).toEqual({ title: "GHMO", body: "A broadcast is waiting for approval", url: "/admin/broadcasts", tag: "ghmo-broadcast_review" });
+    expect(pushPayload("calls").url).toBe("/admin/my-calls");
+    expect(pushPayload("security").url).toBe("/admin/security");
+    const tags = new Set<string>();
+    for (const kind of PUSH_KINDS) {
+      const payload = pushPayload(kind);
+      expect(payload.url.startsWith("/") && !payload.url.startsWith("//"), kind).toBe(true);
+      expect(payload.title).toBe("GHMO");
+      expect(payload.body.length).toBeGreaterThan(0);
+      tags.add(payload.tag); // a different tag per kind, so one kind never replaces another in the tray
+    }
+    expect(tags.size).toBe(PUSH_KINDS.length);
+  });
 });
 
 const device = (id: string, uid: string, kinds: string[] = ["chat", "thread"], endpoint = "https://fcm.googleapis.com/fcm/send/" + id): PushDevice => ({
@@ -130,10 +146,10 @@ describe("pickPushTargets (D34)", () => {
 
 describe("cleanKinds", () => {
   it("defaults to every kind when none was asked", () => {
-    expect(cleanKinds(undefined)).toEqual(["chat", "thread"]);
+    expect(cleanKinds(undefined)).toEqual([...PUSH_KINDS]);
   });
   it("keeps only kinds that can push, in a fixed order", () => {
-    expect(cleanKinds(["thread", "calls", "chat", "nope"])).toEqual(["chat", "thread"]);
+    expect(cleanKinds(["security", "thread", "calls", "chat", "nope", "members"])).toEqual(["chat", "thread", "calls", "security"]);
     expect(cleanKinds([])).toEqual([]);
   });
 });

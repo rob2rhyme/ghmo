@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 9-B (plan §12): a super admin picks the callers and plans an equal split in the browser (the
@@ -72,7 +72,7 @@ test("a super admin plans an equal split, a caller sees only their own people, a
   const perCaller = assignments.reduce<Record<string, number>>((acc, a) => ({ ...acc, [a.callerUid]: (acc[a.callerUid] ?? 0) + 1 }), {});
   expect(Object.values(perCaller).sort()).toEqual([2, 3]);
   expect(assignments.every(a => a.assignedBy === "auto")).toBe(true);
-  expect(JSON.stringify(assignments)).not.toContain("555");
+  expect(plainJson(assignments)).not.toContain("555");
   const noConsent = (await db.collection(`${ORG}/members`).where("emailLower", "==", "noconsent@example.org").get()).docs[0];
   expect(assignments.some(a => a.id === noConsent.id)).toBe(false);
 

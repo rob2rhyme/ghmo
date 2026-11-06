@@ -132,6 +132,48 @@ Press **Profile** on a member's row to open their page. Only admins can see it.
 
 - **Keep notes useful and safe.** Write what the community needs: how to reach someone, when they prefer calls, what they offered to help with. Every admin with an approved device can read every note, so don't record health, immigration, money or family problems, and don't write opinions you wouldn't say to the person. A person who asks what is held about them, or to have it removed, is handled as in the runbook (case O; case M for numbers).
 
+## 1i. Exporting the member list (Admin → Members → Export list)
+
+Press **Export list** above the list. Choose everyone, or only the people the search and filters show right now (for example one group), and then **Download**. You get a spreadsheet file (CSV) with each member's name, email, status, member since, city and state, groups, officer positions, and whether they can be emailed or called. Notes, family members and call history are never in it.
+
+- **Phone numbers are optional.** Tick "Include phone numbers…" to add the number, alternate number, language and household. This works only on an unlocked device, because the numbers are encrypted until your browser opens them. With the device locked the box is greyed out and says so.
+- **The file is not encrypted.** Share it only with people who need it, do not put it in a chat or an open folder, and delete it when you are done. If a file with numbers is lost, tell the board and see `docs/RUNBOOK_INCIDENT.md` case P.
+- **Every download is recorded** in the activity log (who, when, how many people, with numbers or not; never their details).
+- **Importing it again:** the first columns are `Name`, `Email` and `Phone`, so the file can go back through Import a list. Names that start with `=`, `+`, `-` or `@` get a leading apostrophe so a spreadsheet shows them as text instead of running them.
+
+## 1j. Push notifications on your phone or computer (Admin → Security)
+
+A push notification is a short alert that pops up on your phone or computer when something needs you, even when the site is not open. It says only that something happened, such as "New activity in Admin chat" or "A broadcast is waiting for approval". It never shows a name, a message or a title, and tapping it opens the right page after you sign in.
+
+**Turn it on, on each device you want alerts on**
+
+1. Sign in on that device and open **Admin → Security → Push notifications on this device**.
+2. Press **Turn on push on this device**. Your browser asks whether to allow notifications. Choose **Allow**.
+3. Under **Your devices** tick the alerts you want on that device: Admin chat, Plans & Issues, minutes waiting for approval, a broadcast waiting for approval, calls to make, and a locked authenticator. A new device starts with all of them on.
+
+**Android and computers (Chrome, Edge, Firefox):** it works in the browser. You do not need to install anything.
+
+**iPhone and iPad (iOS or iPadOS 16.4 or later):** Apple only allows push for a site that is saved to the Home Screen, so do these steps first.
+1. Open the site in **Safari** (not inside another app's browser).
+2. Tap **Share**, then **Add to Home Screen**, then **Add**.
+3. Close Safari and open **GHMO from the Home Screen icon**.
+4. Sign in there, then follow "Turn it on" above from that icon.
+If the button says this browser cannot receive push, you opened the site in Safari instead of from the Home Screen icon.
+
+**What you will and will not get**
+- You get an alert for what **other** people do. You are never alerted about your own message.
+- At most **one alert of each kind a minute** per person. A busy chat will not buzz your phone for every line; a newer alert replaces the one still showing.
+- If your admin account is turned off, you get nothing.
+- Only people on the admin list ever get these. Members do not.
+
+**Turn it off.** Press **Turn off** next to a device (or untick one alert). Do this on any device you sell, give away or lose. You can switch off any of your own devices from any signed-in device. If you cannot sign in anywhere, ask a super admin to turn off your admin account (the runbook, case B).
+
+**If it does not work**
+- Nothing arrives: check that your phone or computer is not in Do Not Disturb or Focus mode, that notifications are allowed for the browser (or the Home Screen app) in the device settings, and that the card says **On** for this device.
+- "Notifications are blocked for this site": open the browser's site settings, allow notifications for this site, then press Turn on again.
+- The card says push is not set up on this site: the site's push keys have not been added yet. Tell whoever manages the website; the steps are in the go-live checklist.
+- A device that has not been sent an alert yet says so under its name; send a test by asking another admin to post in Admin chat.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.

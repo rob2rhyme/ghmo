@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 13-A (plan §17): a profile page per member. Member since, city and state are plain facts any admin can set;
@@ -114,7 +114,7 @@ test("family members are ciphertext, masked until shown, validated, and kept whe
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(family.getByText("Ram Lee", { exact: true })).toBeVisible();
   const stored = (await db.collection(`${ORG}/members`).where("emailLower", "==", "sam@example.org").get()).docs[0];
-  const raw = JSON.stringify(stored.data());
+  const raw = plainJson(stored.data());
   for (const secret of ["Sita", "Ram Lee", "spouse", "0111", "555"]) expect(raw).not.toContain(secret);
   expect(stored.get("hasPhone")).toBe(true);
   expect(JSON.stringify((await db.collection(`${ORG}/auditLogs`).get()).docs.map(d => d.data()))).not.toMatch(/Sita|0111/);

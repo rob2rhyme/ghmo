@@ -162,3 +162,12 @@ export async function enrollAndApprove(approver: Page, newAdmin: Page, newAdminN
   await newAdmin.getByRole("button", { name: "Check again" }).click();
   await expect(newAdmin.getByText("Devices with encryption keys")).toBeVisible();
 }
+
+/**
+ * JSON for "this record must not contain X" checks. Firestore timestamps serialise as long numbers (seconds and
+ * nanoseconds) that can contain any short digit string by chance, such as "555", so a check for a phone number or a
+ * name must not look at them. Their numbers are replaced by a fixed word.
+ */
+export function plainJson(value: unknown): string {
+  return JSON.stringify(value, (key, item) => (key === "_seconds" || key === "_nanoseconds" ? "time" : item));
+}

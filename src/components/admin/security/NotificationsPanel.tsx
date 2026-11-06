@@ -108,6 +108,7 @@ export default function NotificationsPanel() {
           <ul className="mt-1 list-disc pl-5 text-muted-foreground">
             <li>there is new activity in Admin chat or Plans &amp; Issues</li>
             <li>meeting minutes are waiting for approval</li>
+            <li>a broadcast to members is waiting for a second admin&apos;s approval</li>
             <li>a call campaign has calls for you to make (and a reminder while some are left)</li>
             <li>an admin&apos;s authenticator app is locked after too many wrong codes</li>
           </ul>
