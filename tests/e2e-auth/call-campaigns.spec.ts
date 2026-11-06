@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Timestamp } from "firebase-admin/firestore";
-import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 9-C (plan §12): a campaign is opened from an event, each caller logs outcomes and RSVPs from
@@ -108,7 +108,7 @@ test("a campaign from an event: callers log outcomes and RSVPs, counts match the
   expect(Object.keys(reachedRow.data().attempts[0].note).sort()).toEqual(["ct", "dev", "epoch", "iv", "sig", "v"]);
   const audit1 = (await db.collection(`${ORG}/auditLogs`).where("action", "==", "call_attempt_recorded").get()).docs[0].data();
   expect(audit1.after).toMatchObject({ memberId: reachedRow.id, outcome: "reached", rsvp: "yes", attempts: 1 });
-  expect(JSON.stringify(audit1)).not.toContain("555");
+  expect(plainJson(audit1)).not.toContain("555");
   expect(JSON.stringify(audit1)).not.toContain("guests");
 
   // A second attempt on the other person: voicemail, no RSVP allowed.

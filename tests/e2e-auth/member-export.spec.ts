@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "./helpers";
+import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption } from "./helpers";
 
 /**
  * The member list export: a CSV built in the browser from the list and, when asked, the phone numbers this device has
@@ -78,7 +78,7 @@ test("exports the list with or without phone numbers, only what is shown, and re
     { count: 2, scope: "all", includesPhones: true },
     { count: 1, scope: "shown", includesPhones: false }
   ]);
-  const json = JSON.stringify(entries);
+  const json = plainJson(entries);
   expect(json).not.toMatch(/Sam|evil|555|0100/);
   expect(entries[1].actor).toMatchObject({ uid: "alice" });
 });

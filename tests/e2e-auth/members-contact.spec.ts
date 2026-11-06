@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, clearEmulators, enrollAndApprove, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
+import { admin, clearEmulators, enrollAndApprove, plainJson, seedAdmin, signInWithNewPasskey, turnOnEncryption, waitForStreamedContent } from "./helpers";
 
 /**
  * Phase 9-A (plan §12): a member's phone number is encrypted in the admin's browser, stored as an
@@ -217,5 +217,5 @@ test("a member without an email is saved with a name and phone, keeps their numb
 
   const imported = (await admin().db.collection(`${ORG}/auditLogs`).where("action", "==", "members_imported").get()).docs[0].data();
   expect(imported.after).toMatchObject({ created: 1, phoneOnly: 1, attested: false, phoneAttested: true });
-  expect(JSON.stringify(imported)).not.toContain("555");
+  expect(plainJson(imported)).not.toContain("555");
 });
