@@ -5,7 +5,8 @@ import https from "node:https";
 import webpush from "web-push";
 import { COMMUNITY_SLUG } from "./community";
 import { getAdminDb } from "./firebaseAdmin";
-import { orgAdminsCollectionPath, orgPushSubscriptionsCollectionPath } from "./firestorePaths";
+import { orgAdminsCollectionPath, orgPushSettingsCollectionPath, orgPushSubscriptionsCollectionPath } from "./firestorePaths";
+import { adminDeviceRows, pushSwitchedOn, type AdminAccount, type AdminDeviceRow } from "./pushAdmin";
 import { checkRateLimit } from "./rateLimit";
 import {
   MAX_DEVICES_PER_ADMIN,
@@ -29,6 +30,7 @@ import { fail, type Failure } from "./adminRoute.server";
  */
 const subsCol = () => getAdminDb().collection(orgPushSubscriptionsCollectionPath(COMMUNITY_SLUG));
 const adminsCol = () => getAdminDb().collection(orgAdminsCollectionPath(COMMUNITY_SLUG));
+const settingsRef = () => getAdminDb().doc(`${orgPushSettingsCollectionPath(COMMUNITY_SLUG)}/settings`);
 
 export type PushConfig = { publicKey: string; privateKey: string; subject: string };
 
@@ -165,6 +167,8 @@ export async function sendPushNotifications(kind: PushKind, actorUid: string, on
   const config = pushConfig();
   if (!config) return 0;
   try {
+    // The site-wide switch (plan §21, D49) is read at send time, so switching off takes effect at once.
+    if (!(await readPushSettings()).enabled) return 0;
     const [deviceSnap, adminSnap] = await Promise.all([subsCol().get(), adminsCol().get()]);
     const admins = new Map(adminSnap.docs.map(doc => [doc.id, { status: doc.get("status") as string | undefined }]));
     const targets = pickPushTargets({
@@ -189,4 +193,52 @@ export async function sendPushNotifications(kind: PushKind, actorUid: string, on
     console.error("Push notification failed", error instanceof Error ? error.name : "unknown");
     return 0;
   }
+}
+
+// ---- the site-wide switch and the super-admin view (plan §21, Phase 16) ---------------------------------------------
+
+export type PushSettings = { enabled: boolean; updatedAt: number | null; updatedBy: string | null };
+
+/** The site-wide switch. A site that never touched it is on. */
+export async function readPushSettings(): Promise<PushSettings> {
+  const snap = await settingsRef().get();
+  return { enabled: pushSwitchedOn(snap.exists ? snap.data() : null), updatedAt: snap.exists ? millis(snap.get("updatedAt")) : null, updatedBy: snap.exists ? ((snap.get("updatedBy") as string | undefined) ?? null) : null };
+}
+
+/** Switches push on or off for the whole site. Devices and email are untouched, so switching on again resumes everything. */
+export async function setPushEnabled(enabled: boolean, byUid: string, now: Date): Promise<{ before: boolean }> {
+  const before = (await readPushSettings()).enabled;
+  await settingsRef().set({ enabled, updatedAt: now, updatedBy: byUid }, { merge: true });
+  return { before };
+}
+
+/** Every admin's devices for a super admin: names and times only, never an address or keys. */
+export async function listAllDevices(): Promise<AdminDeviceRow[]> {
+  const [deviceSnap, adminSnap] = await Promise.all([subsCol().get(), adminsCol().get()]);
+  const admins: AdminAccount[] = adminSnap.docs.map(doc => ({ id: doc.id, name: (doc.get("name") as string | undefined) ?? "", status: (doc.get("status") as string | undefined) ?? "disabled" }));
+  return adminDeviceRows(
+    deviceSnap.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        uid: String(data.uid ?? ""),
+        label: (data.label as string) || "This device",
+        kinds: Array.isArray(data.kinds) ? (data.kinds as string[]) : [],
+        createdAt: millis(data.createdAt),
+        lastSentAt: millis(data.lastSentAt)
+      };
+    }),
+    admins
+  );
+}
+
+/** Turns off one device, whoever owns it (a super admin's action). Returns who owned it and what it was called, for the log. */
+export async function removeAnyDevice(id: string): Promise<{ ok: true; uid: string; label: string } | Failure> {
+  const ref = subsCol().doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return fail(404, "That device isn't switched on.");
+  const uid = String(snap.get("uid") ?? "");
+  const label = (snap.get("label") as string | undefined) || "This device";
+  await ref.delete();
+  return { ok: true, uid, label };
 }

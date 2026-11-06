@@ -214,6 +214,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **13** | Member profile | **Built 2026-11-05 (13-A to 13-D, §17.6).** A page per member with how long they have been a member, city and state (no street address), family members with optional phone numbers, a log of notes admins add, the history of calls to them, and how polite or rude each call was. Admins only. Decisions D27–D31 taken as recommended. | Owner reads §17.2 (what is encrypted, who can write notes and ratings) and §17.5 (privacy). |
 | **14** | Push notifications | **Built 2026-11-06 (14-A, 14-B, 14-C; §18.6 to §18.8).** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner sets the three `VAPID_*` variables in Vercel and publishes the Firestore rules (go-live checklist) before push is used. |
 | **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 proposed. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
+| **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 proposed. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1286,7 +1287,7 @@ Built: `src/lib/memberExport.ts` (pure; formulas such as `=HYPERLINK(...)` are m
 - **Admin guide** (`docs/BROADCASTS_GUIDE.md` §1j): what a push says and never says, turning it on per device, the Android and computer steps, the iPhone and iPad Home Screen steps (iOS 16.4 or later; opened from the Home Screen icon, not Safari), the per-alert switches, the one-a-minute limit, turning a device off, and a short "if it does not work" list.
 - **Go-live checklist:** the keys line from 14-A already covers the three `VAPID_*` variables, the Firestore rules, per-device turn-on and a two-admin test; it now points at the per-alert switches and the broadcast test.
 - **Runbook case Q:** a push to the wrong person (disable the admin; a disabled admin gets nothing), too many alerts (untick kinds), a lost or sold phone (turn the device off from another device; an admin cannot see anyone else's devices, so ask the owner or disable the account), content that should not be there (a bug), stopping all pushes at once (remove a `VAPID_*` variable and redeploy; email is unaffected), a leaked key (new pair, every device switched on again), and a device that never receives anything. Case L (a caller's lost device) now points to it.
-- **Known gaps, not built:** a super admin cannot list or remove another admin's push devices (the data is server-only and per person); there is no site-wide switch besides removing a key; devices that never answer are not cleaned up automatically, only ones a push service reports as gone. Each is small if the board wants it.
+- **Known gaps, not built:** devices that never answer are not cleaned up automatically, only ones a push service reports as gone. (Two gaps listed here first, a super admin not being able to list or remove another admin's push devices and no site-wide switch, were closed by Phase 16, §21.) It is small if the board wants it.
 
 ## 20. Phase 15 — Delete a member (planned 2026-11-06)
 
@@ -1365,3 +1366,78 @@ Out of scope: bulk deletion, undoing a deletion, deleting an admin account (sepa
 - **Admin guide §1h:** the table says who can remove what now that a super admin can delete a member, and a new "Deleting a member" list explains the dialog, what stays, the do-not-email record and retrying.
 - **Go-live checklist:** a Phase 15 line: publish the rules, try a delete on a test member, check Positions shows "Removed member" and the log has one entry without a name, test that an opted-out address stays opted out when re-added, and check a plain admin sees no card.
 - **Known gaps, not built:** no bulk delete, no undo, no way to scrub older activity-log entries or minutes text, and a group whose lead was deleted is left without a lead (choose another on Admin → Groups). Each is small if the board wants it.
+
+## 21. Phase 16 — Admin devices and push controls (planned 2026-11-06)
+
+**Goal.** Phase 14 let each admin switch push on for their own devices, and §18.8 listed what it left out: a super admin cannot see or remove another admin's push devices (so a lost phone keeps getting alerts, and would start again if its admin were turned back on), and there is no site-wide switch other than removing a key in Vercel and redeploying. Phase 16 closes both, inside the app.
+
+### 21.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| A person sees only their own devices, without the address or keys; the records are closed to every browser. | `push.server.ts`, rules | The new super-admin views go through new routes and show the same fields, never the address or keys. |
+| A disabled admin gets no push, but their device records stay and would work again if the admin were re-enabled. | `pickPushTargets` | A super admin needs to be able to clear a lost device before re-enabling its owner (D50). |
+| Turning an admin on or off is only a Firestore console step; there is no admin management page. | runbook case B | Phase 16 does not add one. Devices of a turned-off admin are shown as such, so the super admin can remove them. |
+| The only way to stop all pushes today is to remove a `VAPID_*` variable in Vercel and redeploy. | runbook case Q step 5 | A switch in the app is faster and does not need a deploy (D49). |
+
+### 21.2 Decisions (proposed; accept or change before 16-A is used)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D47 | Who sees which devices? | A super admin sees every admin's push devices: the admin's name and whether their account is on, the device name ("Chrome on Android"), which alerts are on, when it was added and when an alert last went to it. Never the address or keys. Plain admins keep seeing only their own. | A lost phone can be found by name and owner. |
+| D48 | Who may turn a device off? | A super admin may turn off any device. It is recorded in the activity log (the device id, whose it was and the device name; never the address). The owner can switch it on again from that device. | Fast response to a lost phone. |
+| D49 | A site-wide switch? | A super admin can switch push off for the whole site and back on. Off stops every push at once; email, devices and settings are untouched, so switching on again resumes without anyone repeating set-up. Every admin sees the state on the Security page. Recorded in the activity log. Default on (when the keys are set). | No deploy needed in an incident; removing a key stays as the harder stop. |
+| D50 | Clean up devices of turned-off admins? | Not automatically. They are listed with "Account turned off" so a super admin can remove them, and runbook case Q says to clear a lost device before re-enabling its owner. | No surprise deletion; the choice stays with a person. |
+
+### 21.3 Design
+
+- **Pure rules** (`src/lib/pushAdmin.ts`): builds the super-admin list from the devices and the admin accounts (name, on or off, sorted by name then date), with no address or key fields at all.
+- **Settings:** `organizations/ghmo/pushSettings/settings`: `enabled` (missing means on), `updatedAt`, `updatedBy`. Admins may read it, nobody writes it from a browser.
+- **Sending:** `sendPushNotifications` does nothing while the switch is off (checked at send time, so it takes effect at once).
+- **Routes:** `GET /api/admin/push-devices` and `DELETE /api/admin/push-devices/[deviceId]` (super admin); `GET /api/admin/push-settings` (any admin) and `PUT` (super admin, `{ enabled }`); the existing `GET /api/admin/push` also says whether the site switch is on.
+- **UI (16-B):** on the Security page, a super-admin card "Push for the whole site" with the switch, and a card listing everyone's devices with Turn off; every admin's own card says when push is switched off for the site.
+- **Docs (16-C):** runbook case Q (use the switch and the list), admin guide, go-live checklist.
+
+### 21.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **16-A** | Pure list builder, settings storage, send-time check, the four routes, rules for the settings, audit labels | A super admin lists and removes any device; a plain admin is refused; the list has no address or key; switching off stops pushes at once and on resumes them; both actions are logged without an address |
+| **16-B** | The two cards on the Security page and the notice on each admin's own card | A super admin uses them; a plain admin sees neither card, only the notice |
+| **16-C** | Docs | Docs merged |
+
+### 21.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| The list leaks addresses or keys | The list builder has no such fields, and a test checks the response for them |
+| A super admin switches push off and forgets | The Security page shows the state to everyone, with who changed it and when |
+| A removed device comes back | It only comes back if its owner switches it on again from that device |
+
+Out of scope: admin management (turning admins on and off in the app), automatic cleanup of devices that never answer, and per-admin push switches set by someone else.
+
+### 21.6 16-A built (2026-11-06)
+
+- **Pure rules** (`src/lib/pushAdmin.ts`, 5 unit tests): the super-admin device list is built from names, status, labels, alerts and times only, so it has no field that could hold an address or key, even if the stored record carried one; devices of a turned-off or missing admin are listed and marked; the site switch is on unless a super admin switched it off.
+- **Server** (`push.server.ts`): `readPushSettings` and `setPushEnabled` (`organizations/ghmo/pushSettings/settings`), `listAllDevices`, `removeAnyDevice`, and `sendPushNotifications` now checks the switch at send time, so switching off takes effect at once. Email is unaffected.
+- **Routes:** `GET /api/admin/push-devices` and `DELETE /api/admin/push-devices/[deviceId]` (super admin; the removal is logged as `push_device_removed` with the device id, its owner and its name, never its address); `GET /api/admin/push-settings` (any admin: on or off, who changed it when, and whether the keys are set) and `PUT` (super admin, `{ enabled }`, logged as `push_switched` with the before and after); `GET /api/admin/push` also returns `siteEnabled`.
+- **Rules:** `pushSettings` is readable by an active admin and written by nobody from a browser (rules tests added).
+- **Browser tests** (3, in `push-notifications.spec.ts`): a plain admin is refused the list, the removal and the switch and can only read the state; a super admin lists everyone's devices (including a turned-off admin's, marked), sees no address or key in the response, turns one off, and the log entry holds no device address; switching off sends no push and leaves the device untouched, switching on resumes it with no repeated set-up, and both changes are logged with their before and after.
+- **Left for 16-B and 16-C:** the two cards on the Security page and the notice on each admin's own card, and the docs.
+
+### 21.7 16-B built (2026-11-06)
+
+- **Two super-admin cards on Admin → Security** (`PushAdminPanel`, shown only to a super admin; the server refuses everyone else anyway):
+  - **Push for the whole site:** the state (On or Off), the switch, and "Last changed by <name> on <date>". Switching off asks first ("Switch push off for everyone?", with a note that email is not affected and nobody has to set anything up again); switching on is one press. It says when the push keys are not set, since nothing is sent either way.
+  - **Everyone's push devices:** each device with the admin's name, "Account turned off" when their account is off, the device name, the alerts that are on (in the notification's own words), when it was added and last used, and a **Turn off** that asks first. Never an address or keys.
+- **Notice on every admin's own card:** when a super admin has switched push off for the site, the "Push notifications on this device" card says so ("none are being sent right now; your devices stay as they are and start again when it is switched back on").
+- **Server:** `GET /api/admin/push-settings` also returns the name of whoever last changed the switch. The alert wording used in lists now comes from one helper (`pushKindLabel`), shared with the existing device card.
+- **Tests:** `push-admin-ui.spec.ts` (2): a plain admin sees no super-admin card and sees the notice when push is off; a super admin switches push off (with the confirmation) and on, sees "Last changed by Alice", sees both devices (the turned-off admin's marked) with no address anywhere on the page, and turns one off with the confirmation, which is logged.
+- **Left for 16-C:** the docs: runbook case Q now uses the switch and the list instead of removing a key, the admin guide, and the go-live checklist.
+
+### 21.8 16-C built (2026-11-06)
+
+- **Runbook case Q:** step 2 and step 5 now use the site-wide switch (Admin → Security → Push for the whole site) as the quick stop, with removing a `VAPID_*` key and redeploying kept as the harder stop; step 3 (a lost, sold or stolen phone) gains the super-admin route (Everyone's push devices, find it by owner and device name, Turn off) and the reminder to do this before turning a disabled admin back on, because their old devices are kept.
+- **Admin guide §1j:** a "For super admins" part describing the two cards, what they show and never show, and that both actions are logged; the "Turn it off" paragraph now points a person who cannot sign in anywhere to it.
+- **Go-live checklist:** the push line now includes the super-admin check: switch push off and see nothing arrive and the notice appear, switch it on and see the next alert, check the device list shows no addresses and Turn off works, and publish the Firestore rules again first (the switch is a new settings document).
+- **Known gaps, not built:** devices that never answer are only removed when a push service reports them gone; admin management (turning an admin on or off) is still a Firestore console step (runbook case B).

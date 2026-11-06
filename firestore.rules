@@ -126,6 +126,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // The site-wide push switch (plan §21): admins may read it, only the server writes it.
+    match /organizations/{orgSlug}/pushSettings/{doc=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Push notification devices (plan §18): each record holds a device's secret push address and keys, so no browser
     // reads or writes them, not even an admin's. The server sends through /api/admin/push and shows a person only
     // their own devices, without the address.

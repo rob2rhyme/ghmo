@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import NotificationsPanel from "@/src/components/admin/security/NotificationsPanel";
+import PushAdminPanel from "@/src/components/admin/security/PushAdminPanel";
 import PushPanel from "@/src/components/admin/security/PushPanel";
 import AuthenticatorPanel from "@/src/components/admin/security/AuthenticatorPanel";
 import PasskeysPanel from "@/src/components/admin/security/PasskeysPanel";
@@ -43,6 +44,7 @@ export default async function AdminSecurityPage() {
         </h2>
         <NotificationsPanel />
         <PushPanel />
+        {superAdmin ? <PushAdminPanel /> : null}
       </section>
     </div>
   );

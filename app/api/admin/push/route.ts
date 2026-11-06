@@ -4,7 +4,7 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { failureResponse } from "@/src/lib/adminRoute.server";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { PUSH_KINDS, cleanKinds, cleanSubscription, deviceLabel } from "@/src/lib/push";
-import { addDevice, deviceId, listDevices, pushConfig, removeDevice, updateDeviceKinds } from "@/src/lib/push.server";
+import { addDevice, deviceId, listDevices, pushConfig, readPushSettings, removeDevice, updateDeviceKinds } from "@/src/lib/push.server";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { parseJsonBody } from "@/src/lib/validation";
 
@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
   const config = pushConfig();
   return NextResponse.json({
     configured: Boolean(config),
+    // A super admin can switch push off for the whole site (plan §21); every admin sees that here.
+    siteEnabled: (await readPushSettings()).enabled,
     publicKey: config?.publicKey ?? null,
     kinds: PUSH_KINDS,
     devices: await listDevices(guard.actor.uid)

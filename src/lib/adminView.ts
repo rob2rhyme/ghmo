@@ -116,6 +116,8 @@ const ACTIVITY: Record<string, { verb: string; detail?: boolean }> = {
   call_campaign_exported: { verb: "downloaded a call campaign", detail: true },
   members_exported: { verb: "downloaded the member list", detail: true },
   member_deleted: { verb: "deleted a member", detail: true },
+  push_device_removed: { verb: "turned off a push device", detail: true },
+  push_switched: { verb: "switched push notifications for the site", detail: true },
   call_manner_cleared: { verb: "cleared the rating on a call", detail: true },
   call_attempt_recorded: { verb: "logged a call", detail: true },
   broadcast_created: { verb: "started a broadcast" },

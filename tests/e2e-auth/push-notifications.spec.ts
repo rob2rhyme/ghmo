@@ -6,7 +6,7 @@ import { createServer as createHttpsServer } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { admin, clearEmulators, seedAdmin, signInWithNewPasskey } from "./helpers";
+import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey } from "./helpers";
 
 /**
  * Push notifications (plan §18, 14-A). A local HTTPS stub stands in for a browser's push service. It checks what a real
@@ -264,4 +264,97 @@ test("14-B: a submitted broadcast pushes a content-free approval alert, and a de
   });
   await page.waitForTimeout(1500);
   expect(received).toHaveLength(1);
+});
+
+test("16-A: a plain admin is refused the super-admin routes, and can only read the site switch", async ({ page }) => {
+  await seedDevice("b".repeat(32), "bob", makeDevice("/bob-phone"));
+  await signInWithNewPasskey(page, "bob", "/admin/security");
+  const api = page.request;
+  expect((await api.get("/api/admin/push-devices")).status()).toBe(403);
+  expect((await api.delete(`/api/admin/push-devices/${"b".repeat(32)}`)).status()).toBe(403);
+  expect((await api.put("/api/admin/push-settings", { data: { enabled: false } })).status()).toBe(403);
+  const read = await api.get("/api/admin/push-settings");
+  expect(read.status()).toBe(200);
+  expect(await read.json()).toMatchObject({ enabled: true, canChange: false });
+  expect((await admin().db.doc(`organizations/ghmo/pushSubscriptions/${"b".repeat(32)}`).get()).exists).toBe(true);
+  expect((await admin().db.doc("organizations/ghmo/pushSettings/settings").get()).exists).toBe(false);
+});
+
+test("16-A: a super admin lists everyone's devices without addresses, and turns one off", async ({ page }) => {
+  const bobPhone = makeDevice("/bob-phone");
+  const carolPhone = makeDevice("/carol-phone");
+  await seedDevice("b".repeat(32), "bob", bobPhone, ["chat", "calls"]);
+  await seedDevice("c".repeat(32), "carol", carolPhone);
+  await admin().db.doc("organizations/ghmo/admins/carol").update({ status: "disabled" });
+  await signInWithNewPasskey(page, "alice", "/admin/security");
+  const api = page.request;
+
+  const listed = await api.get("/api/admin/push-devices");
+  expect(listed.status()).toBe(200);
+  const { devices } = await listed.json();
+  expect(devices.map((d: { adminName: string }) => d.adminName)).toEqual(["Bob", "Carol"]);
+  expect(devices[0]).toMatchObject({ id: "b".repeat(32), uid: "bob", adminActive: true, label: "Chrome on Android", kinds: ["chat", "calls"] });
+  expect(devices[1]).toMatchObject({ uid: "carol", adminActive: false }); // listed so a lost device can be cleared before its owner is turned back on
+  const raw = JSON.stringify(devices);
+  expect(raw).not.toContain(bobPhone.endpoint);
+  expect(raw).not.toContain(bobPhone.keys.p256dh);
+  expect(raw).not.toContain(bobPhone.keys.auth);
+  expect(raw).not.toContain("127.0.0.1");
+
+  // Turn off Carol's device (her account is off; a lost phone would be cleared before she is re-enabled).
+  expect((await api.delete(`/api/admin/push-devices/${"d".repeat(32)}`)).status()).toBe(404);
+  expect((await api.delete("/api/admin/push-devices/not-an-id")).status()).toBe(404);
+  const removed = await api.delete(`/api/admin/push-devices/${"c".repeat(32)}`);
+  expect(removed.status()).toBe(200);
+  expect((await removed.json()).devices.map((d: { uid: string }) => d.uid)).toEqual(["bob"]);
+  expect((await admin().db.doc(`organizations/ghmo/pushSubscriptions/${"c".repeat(32)}`).get()).exists).toBe(false);
+  expect((await admin().db.doc(`organizations/ghmo/pushSubscriptions/${"b".repeat(32)}`).get()).exists).toBe(true);
+
+  const logged = await admin().db.collection("organizations/ghmo/auditLogs").where("action", "==", "push_device_removed").get();
+  expect(logged.size).toBe(1);
+  expect(logged.docs[0].data()).toMatchObject({ actor: { uid: "alice" }, resource: { id: "c".repeat(32) }, after: { ownerUid: "carol", label: "Chrome on Android" } });
+  // (The entry holds the requester's IP address like every entry does; the device's own address would be https://127.0.0.1:4011/carol-phone.)
+  expect(plainJson(logged.docs[0].data())).not.toMatch(/carol-phone|:4011|fcm\.googleapis|p256dh/);
+});
+
+test("16-A: switching push off for the site stops pushes at once, and switching on resumes them", async ({ page }) => {
+  const bobPhone = makeDevice("/bob-phone");
+  await seedDevice("b".repeat(32), "bob", bobPhone);
+  await signInWithNewPasskey(page, "alice", "/admin/chat");
+  const api = page.request;
+  const box = page.getByPlaceholder("Share an update or ask for help…");
+  const send = async (text: string) => {
+    await box.fill(text);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.locator("p", { hasText: text })).toBeVisible();
+  };
+
+  // On by default: a message pushes, and every admin sees the state.
+  expect((await (await api.get("/api/admin/push")).json()).siteEnabled).toBe(true);
+
+  const off = await api.put("/api/admin/push-settings", { data: { enabled: false } });
+  expect(off.status()).toBe(200);
+  expect(await off.json()).toMatchObject({ enabled: false, canChange: true });
+  expect((await (await api.get("/api/admin/push")).json()).siteEnabled).toBe(false);
+
+  // Off: a message sends no push, and the device is untouched.
+  await send("While push is off");
+  await page.waitForTimeout(2000);
+  expect(received).toHaveLength(0);
+  expect((await admin().db.doc(`organizations/ghmo/pushSubscriptions/${"b".repeat(32)}`).get()).exists).toBe(true);
+
+  // On again: the next message pushes, with nobody repeating set-up.
+  expect((await api.put("/api/admin/push-settings", { data: { enabled: true } })).status()).toBe(200);
+  await send("Now push is back");
+  await expect.poll(() => received.length, { timeout: 15_000 }).toBe(1);
+  expect(JSON.parse(decrypt(bobPhone, received[0].body)).body).toBe("New activity in Admin chat");
+
+  // Both changes are in the activity log, with the before and after.
+  const logged = await admin().db.collection("organizations/ghmo/auditLogs").where("action", "==", "push_switched").get();
+  const entries = logged.docs.map(doc => doc.data()).sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+  expect(entries.map(entry => [entry.before, entry.after])).toEqual([
+    [{ enabled: true }, { enabled: false }],
+    [{ enabled: false }, { enabled: true }]
+  ]);
+  expect(entries.every(entry => entry.actor.uid === "alice")).toBe(true);
 });
