@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { LayoutTemplate, Plus, Trash2 } from "lucide-react";
+import { LayoutTemplate, Plus, RefreshCw, Trash2 } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { errorMessage, peopleApi } from "@/src/components/admin/people/api";
@@ -31,6 +31,7 @@ export default function TemplatesClient() {
   const [editing, setEditing] = useState<TaskTemplate | "new" | null>(null);
   const [deleting, setDeleting] = useState<TaskTemplate | null>(null);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const load = () =>
     Promise.all([peopleApi<{ templates: TaskTemplate[]; superAdmin: boolean }>("/api/admin/task-templates"), peopleApi<{ groups: GroupLite[] }>("/api/admin/groups")])
@@ -44,16 +45,37 @@ export default function TemplatesClient() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [attempt]);
 
   if (error && !templates) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
+        <AlertDescription>
+          <p>{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setAttempt(n => n + 1);
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   }
-  if (!templates) return <Skeleton className="h-48 w-full" />;
+  if (!templates) {
+    return (
+      <div role="status">
+        <span className="sr-only">Loading templates…</span>
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
 
   const groupName = (id: string | null) => (id ? (groups.find(g => g.id === id)?.name ?? "Removed group") : null);
 

@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
@@ -96,6 +97,7 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
 
   const [finalizeStatus, setFinalizeStatus] = useState<string | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [confirmingFinalize, setConfirmingFinalize] = useState(false);
 
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -601,9 +603,22 @@ export default function CommsThreadDetailClient({ threadId, actor }: CommsThread
                     </Button>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button type="button" onClick={handleFinalizeClose} loading={isFinalizing}>
+                    <Button type="button" onClick={() => setConfirmingFinalize(true)} loading={isFinalizing}>
                       {isFinalizing ? "Finalizing…" : "Finalize close"}
                     </Button>
+                    <ConfirmDialog
+                      open={confirmingFinalize}
+                      onOpenChange={setConfirmingFinalize}
+                      title="Close this topic for good?"
+                      description="The topic closes with this conclusion. It can't be reopened, and no one can comment or vote on it after that."
+                      confirmLabel="Close topic"
+                      destructive
+                      busy={isFinalizing}
+                      onConfirm={async () => {
+                        await handleFinalizeClose();
+                        setConfirmingFinalize(false);
+                      }}
+                    />
                     <p className="text-sm text-muted-foreground">Closes the topic with this conclusion.</p>
                   </div>
                   {conclusionVoteStatus ? (

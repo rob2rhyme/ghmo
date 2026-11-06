@@ -174,7 +174,7 @@ export default function AdminsClient() {
               <Link href={"/admin/encryption" as Route} className="font-medium underline underline-offset-4">
                 Admin → Encryption
               </Link>
-              , tick their devices, and choose Revoke selected and rotate keys. That needs your own unlocked device, so it is a separate step.
+              , tick their devices, and choose Remove selected and make new keys. That needs your own unlocked device, so it is a separate step.
             </p>
             <div className="mt-3">
               <Button variant="outline" size="row" onClick={() => setOffNotice(null)}>

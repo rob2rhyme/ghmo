@@ -4,6 +4,7 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { checkRateLimit } from "@/src/lib/rateLimit";
 import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,10 @@ export async function POST(req: NextRequest) {
 
     const parsed = await parseJsonBody(req, bodySchema, { maxBytes: 16 * 1024 });
     if (!parsed.ok) return parsed.response;
+    // The browser writes these entries for its own encrypted actions; a generous ceiling stops one session filling the log.
+    if (!(await checkRateLimit(`audit-write:${actor.uid}`, 600, 60 * 60 * 1000)).success) {
+      return NextResponse.json({ error: "Too many activity entries. Wait a little and try again." }, { status: 429 });
+    }
     const payload = parsed.data;
     const action = payload.action;
     const meta = payload.meta

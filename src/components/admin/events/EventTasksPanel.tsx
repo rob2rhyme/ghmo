@@ -92,7 +92,14 @@ export default function EventTasksPanel({ eventId }: { eventId: string }) {
       </AdminSectionCard>
     );
   }
-  if (!data) return <Skeleton className="h-40 w-full" />;
+  if (!data) {
+    return (
+      <div role="status">
+        <span className="sr-only">Loading tasks…</span>
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
 
   const { tasks, today, counts, eventDay } = data;
 
@@ -538,7 +545,12 @@ function RemindDialog({ eventId, onClose }: { eventId: string; onClose: () => vo
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
-        {!plan && !error ? <Skeleton className="h-24 w-full" /> : null}
+        {!plan && !error ? (
+          <div role="status">
+            <span className="sr-only">Working out who gets a reminder…</span>
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : null}
         {preview?.blocker ? (
           <Alert variant="destructive">
             <AlertDescription>{preview.blocker}</AlertDescription>

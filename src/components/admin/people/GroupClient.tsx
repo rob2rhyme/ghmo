@@ -5,7 +5,7 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, UsersRound } from "lucide-react";
+import { ArrowLeft, RefreshCw, UserPlus, UsersRound } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { errorMessage, peopleApi, type MemberLite } from "@/src/components/admin/people/api";
@@ -40,6 +40,8 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removingMember, setRemovingMember] = useState<MemberLite | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const load = () =>
@@ -59,18 +61,39 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [groupId, attempt]);
 
   const byId = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
 
   if (error && !detail) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
+        <AlertDescription>
+          <p>{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setAttempt(n => n + 1);
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   }
-  if (!detail) return <Skeleton className="h-64 w-full" />;
+  if (!detail) {
+    return (
+      <div role="status">
+        <span className="sr-only">Loading the group…</span>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   const { group, memberIds, superAdmin, adminAccess } = detail;
   const inGroup = memberIds
@@ -176,7 +199,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
                         disabled={isLead}
                         title={isLead ? "Choose another lead first" : undefined}
                         aria-label={`Remove ${name} from the group`}
-                        onClick={() => run(() => peopleApi(`/api/admin/groups/${groupId}/members`, { method: "POST", body: { remove: [member.id] } }), "Removed from the group")}
+                        onClick={() => setRemovingMember(member)}
                       >
                         Remove
                       </Button>
@@ -253,6 +276,23 @@ export default function GroupClient({ groupId }: { groupId: string }) {
         onConfirm={async () => {
           const ok = await run(() => peopleApi(`/api/admin/groups/${groupId}`, { method: "DELETE" }), "Group deleted");
           if (ok) router.push("/admin/groups");
+        }}
+      />
+      <ConfirmDialog
+        open={removingMember !== null}
+        onOpenChange={open => {
+          if (!open) setRemovingMember(null);
+        }}
+        title={removingMember ? `Remove ${memberDisplayName(removingMember)} from ${group.name}?` : "Remove from the group?"}
+        description="This only takes them out of this group. They stay on the member list, and you can add them back at any time."
+        confirmLabel="Remove from group"
+        destructive
+        busy={busy}
+        onConfirm={async () => {
+          if (!removingMember) return;
+          const id = removingMember.id;
+          const ok = await run(() => peopleApi(`/api/admin/groups/${groupId}/members`, { method: "POST", body: { remove: [id] } }), "Removed from the group");
+          if (ok) setRemovingMember(null);
         }}
       />
     </div>

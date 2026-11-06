@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { parseJsonBody } from "@/src/lib/validation";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { memberIdFromToken, optOutMember } from "@/src/lib/memberSuppression.server";
@@ -25,8 +27,9 @@ export async function POST(req: NextRequest) {
   let token = req.nextUrl.searchParams.get("token");
   if (!token) {
     // The unsubscribe page sends the token in a small JSON body instead.
-    const body = (await req.json().catch(() => null)) as { token?: unknown } | null;
-    token = typeof body?.token === "string" ? body.token : null;
+    // At most a few hundred bytes are needed; the shared parser refuses anything big before reading it in full.
+    const parsed = await parseJsonBody(req, z.object({ token: z.string().max(300) }), { maxBytes: 2048 });
+    token = parsed.ok ? parsed.data.token : null;
   }
 
   const memberId = memberIdFromToken(token);

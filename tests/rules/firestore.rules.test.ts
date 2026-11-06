@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 const ORG = "organizations/ghmo";
@@ -183,7 +183,26 @@ describe("broadcasts", () => {
 });
 
 describe("server-only collections", () => {
-  it.each(["admins/active-admin", "admins/active-admin/passkeys/k1", "admins/active-admin/totp/main", "e2ee/state", "e2ee/state/devices/d1", "e2ee/state/wraps/1_recovery", "passkeyIndex/k1", "webauthnChallenges/c1", "rateLimits/abc", "config/bootstrap", "pins/old"])(
+  it.each([
+    "admins/active-admin",
+    "admins/active-admin/passkeys/k1",
+    "admins/active-admin/totp/main",
+    "e2ee/state",
+    "e2ee/state/devices/d1",
+    "e2ee/state/wraps/1_recovery",
+    "e2ee/state/epochs/1",
+    "e2ee/state/roster/000001",
+    "passkeyIndex/k1",
+    "webauthnChallenges/c1",
+    "rateLimits/abc",
+    "config/bootstrap",
+    "pins/old",
+    // Found by the 2026-11-06 audit: written only by the server, so they fall to the default deny.
+    "broadcastQuota/2026-11-06",
+    "counters/certificates-2026",
+    "events/e1",
+    "documents/d1"
+  ])(
     "denies client access to %s, even for admins",
     async path => {
       await assertFails(getDoc(doc(admin(), `${ORG}/${path}`)));
@@ -192,6 +211,45 @@ describe("server-only collections", () => {
 
   it("denies client access to signing sessions", async () => {
     await assertFails(getDoc(doc(admin(), "signingSessions/s1")));
+  });
+
+  it("denies client access to certificates and the legacy community paths", async () => {
+    for (const path of ["certificates/c1", "community/ghmo-site/events/e1", "community/ghmo-site/members/m1", "community/ghmo-site/donations/stats"]) {
+      await assertFails(getDoc(doc(admin(), path)));
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+    }
+  });
+});
+
+describe("blocks found untested by the 2026-11-06 audit", () => {
+  it("home blocks: anyone may read, only an admin may write", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), `${ORG}/home/blocks`), { blocks: [] });
+    });
+    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/home/blocks`)));
+    await assertSucceeds(setDoc(doc(admin(), `${ORG}/home/blocks`), { blocks: [{ type: "text" }] }));
+    await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/home/blocks`), { blocks: [] }));
+    await assertFails(setDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/home/blocks`), { blocks: [] }));
+  });
+
+  it("docgen and the legacy timeline: admins only", async () => {
+    for (const path of ["docgen/templates", "timeline/t1"]) {
+      await assertSucceeds(setDoc(doc(admin(), `${ORG}/${path}`), { x: 1 }));
+      await assertSucceeds(getDoc(doc(admin(), `${ORG}/${path}`)));
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `${ORG}/${path}`)));
+      await assertFails(getDoc(doc(env.authenticatedContext("someone").firestore(), `${ORG}/${path}`)));
+    }
+  });
+
+  it("comment likes: an admin may like as themselves only, and never edit a like", async () => {
+    const like = (uid: string) => `${ORG}/commsThreads/t1/comments/c1/likes/${uid}`;
+    const body = { createdAt: new Date(), createdBy: { uid: "active-admin", name: "Alice" } };
+    await assertSucceeds(setDoc(doc(admin(), like("active-admin")), body));
+    await assertSucceeds(getDoc(doc(admin(), like("active-admin"))));
+    await assertFails(setDoc(doc(admin(), like("someone-else")), { ...body, createdBy: { uid: "someone-else", name: "Bob" } }));
+    await assertFails(setDoc(doc(admin(), like("active-admin")), { ...body, createdBy: { uid: "active-admin", name: "Changed" } }, { merge: true }));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), like("active-admin"))));
+    await assertSucceeds(deleteDoc(doc(admin(), like("active-admin"))));
   });
 });
 

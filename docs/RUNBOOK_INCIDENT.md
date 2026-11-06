@@ -11,7 +11,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 ## 0. First 15 minutes (any incident)
 
 1. Write down what you saw, when, and who noticed. Don't delete anything.
-2. Decide which case below fits. If unsure, treat it as case A. Email problems are cases H to J.
+2. Decide which case below fits. If unsure, treat it as case A. Email problems are cases H to J, and N for task reminders.
 3. Tell the other admins by phone or in person, not in Admin Chat (it may be what's compromised).
 
 ## A. A device was lost, stolen or is suspected compromised
@@ -19,7 +19,7 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 *The data on the device is protected by the admin's passkey or encryption passphrase, but assume the worst.*
 
 1. The owner signs in on another device and goes to **Admin → Security**. If the lost device was a phone with their **authenticator app**, they sign in with a recovery code and move the app to a new phone (a super admin can **reset** it from Admin → Security; the owner is signed out everywhere and sets up a new app at their next email-link sign-in). If it held a passkey, they remove that passkey.
-2. A **super admin** opens **Admin → Encryption**, ticks the lost device, and clicks **Revoke selected and rotate keys**. This stops it reading anything written from now on. It keeps whatever it already decrypted; that can't be undone.
+2. A **super admin** opens **Admin → Encryption**, ticks the lost device, and clicks **Remove selected and make new keys**. This stops it reading anything written from now on. It keeps whatever it already decrypted; that can't be undone.
 3. Everything written **before** the rotation was readable by that device. If it held sensitive material (minutes drafts, documents), treat that as exposed and decide whether to tell the people concerned.
 4. The owner sets up encryption on their new device; another admin approves it after comparing the 20-digit safety code **by phone or in person**.
 5. Check the audit log (Firestore console: `organizations/ghmo/auditLogs`) for activity from the lost device after it went missing.
@@ -27,19 +27,19 @@ For the GHMO admin site. Keep a printed copy with the paper recovery keys. Times
 ## B. An admin session may be stolen (cookie theft, shared computer left signed in)
 
 1. Ask the admin to **Sign out** everywhere, then sign in again (passkey, or email link plus authenticator code). Sign-out ends the session on the server.
-2. If you can't reach them: a super admin sets the admin's status to disabled (Firestore console → `organizations/ghmo/admins/{uid}` → `status: "disabled"`). Their access ends within about a minute.
+2. If you can't reach them: a super admin opens **Admin → Admins**, presses **Turn off…** on that admin, keeps "Also turn off their push notification devices" ticked, and confirms. Their access ends within about a minute, and the activity log records who did it. (You cannot turn yourself off, and the last active super admin cannot be turned off; ask another super admin.) *If the app is unavailable:* Firestore console → `organizations/ghmo/admins/{id}` → set `status` to `"disabled"`.
 3. A stolen session alone cannot read encrypted data (it has no device keys) and cannot replace the recovery key (that needs the admin's unlocked device). Check the audit log for what it did anyway.
 
 ## C. An admin left, or must lose access
 
-1. Disable them (case B step 2).
-2. A super admin revokes **all** of their devices and rotates keys (case A step 2).
+1. Turn them off: **Admin → Admins → Turn off…** (case B step 2). If they were a super admin, make sure another active super admin remains first (the page will not let the last one be turned off).
+2. A super admin revokes **all** of their devices and rotates keys (case A step 2). The Admins page reminds you of this after turning someone off, with a link to Admin → Encryption.
 3. Remove their passkeys and reset their authenticator app (Admin → Security, super admin). Rotate any shared secrets they knew.
 
 ## D. Paper recovery key lost or exposed
 
 1. Do not panic: the key only matters if every admin device is lost, or if someone with the paper can also reach the database.
-2. If it was **exposed** (someone else may have seen it): a super admin goes to **Admin → Encryption → Replace recovery key** immediately, with both trustees present to take new paper copies, and then **Rotate keys now**. Destroy all old copies.
+2. If it was **exposed** (someone else may have seen it): a super admin goes to **Admin → Encryption → Replace recovery key** immediately, with both trustees present to take new paper copies, and then **Make new keys now**. Destroy all old copies.
 3. If it was only **lost**: replace it at the next convenient time with both trustees present.
 
 ## E. The database or hosting account may have been accessed (Google account compromise, leaked service-account key)
@@ -137,14 +137,14 @@ This is for a file made with **Admin → Members → Export list** (plan §19). 
 1. **Find out what it holds.** Open the activity log and look for "downloaded the member list": it shows who, when, how many people and whether phone numbers were included. It never shows the people themselves.
 2. **Get it back or deleted.** Ask the person who exported it where the file went (their downloads folder, email, a chat, a shared drive, a phone) and have every copy deleted, including cloud sync copies and email attachments. Ask whoever received it to delete it and tell you they did.
 3. **If it had phone numbers, or it reached someone it should not have:** treat it as a lost list of private details. Tell the board the same day. People on it have not been told that anything was wrong with the app, but their numbers may be known, so decide together whether to tell them (the list has the names and the dates).
-4. **Close the gap.** If the person should not be exporting, a super admin disables their admin access (case B step 2). If a device was lost, follow case L. Agree who may keep exported files and for how long, and write it down.
+4. **Close the gap.** If the person should not be exporting, a super admin turns their admin access off (Admin → Admins, case B step 2). If a device was lost, follow case L. Agree who may keep exported files and for how long, and write it down.
 5. **Record it** in Plans & Issues: the date, which download, what happened, what was done.
 
 ## Q. A push notification went to the wrong person, arrived too often, or a lost device still gets them
 
 *Push notifications say only that something happened and never what (plan §18), so a wrong or extra alert shows nobody anything private. The aim is to stop it and find the cause.*
 
-1. **Someone who should not get them:** a push goes only to an **active admin** on a device where they turned it on. If that person should not be an admin, a super admin disables their admin account (case B step 2): a disabled admin gets no push, even from a device that is still switched on. If they should be an admin but not get alerts, they turn push off for the device under **Admin → Security**.
+1. **Someone who should not get them:** a push goes only to an **active admin** on a device where they turned it on. If that person should not be an admin, a super admin turns their admin account off on **Admin → Admins** (case B step 2): a disabled admin gets no push, even from a device that is still switched on. If they should be an admin but not get alerts, they turn push off for the device under **Admin → Security**.
 2. **Too many alerts:** each person gets at most one push of each kind a minute, and a newer one replaces the old one. If someone still gets too many, ask them to untick the kinds they do not want under **Admin → Security → Your devices**. If it is one kind across everyone (for example Plans & Issues in a busy week), the board can agree to switch that kind off on their devices. To stop every push for a while, a super admin uses the site-wide switch (step 5).
 3. **A lost, sold or stolen phone still gets alerts:** a push on a locked phone shows only the fixed words, so no content leaks. Still turn it off: sign in on another device, open **Admin → Security → Your devices** and press **Turn off** on the lost one. Then follow case **A** (revoke the device and rotate keys) if the phone could open the admin area. If you cannot reach the owner, a **super admin** opens **Admin → Security → Everyone's push devices**, finds the phone by the owner's name and its name (for example "Chrome on Android"), and presses **Turn off**; the activity log records it. Do this **before** turning a disabled admin back on: their old devices are kept, and a lost phone would start getting alerts again. You see names and times only, never a device's address. The owner can switch the device on again from that device, so if the phone is truly lost, also follow case A.
 4. **"It showed something it should not have":** a push contains only a fixed title and one fixed line. If you ever see a name, a message or a title in one, treat it as a bug: turn off push (step 5), keep a screenshot, and tell whoever manages the website.

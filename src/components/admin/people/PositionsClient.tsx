@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Landmark, Plus } from "lucide-react";
+import { Landmark, Plus, RefreshCw } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { errorMessage, peopleApi, type MemberLite } from "@/src/components/admin/people/api";
@@ -36,6 +36,7 @@ export default function PositionsClient() {
   const [ending, setEnding] = useState<Term | null>(null);
   const [removing, setRemoving] = useState<Term | null>(null);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const load = () =>
     Promise.all([peopleApi<Data>("/api/admin/positions"), peopleApi<{ members: MemberLite[] }>("/api/organizations/ghmo/members")])
@@ -48,7 +49,7 @@ export default function PositionsClient() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [attempt]);
 
   const nameOf = useMemo(() => {
     const byId = new Map(members.map(m => [m.id, m]));
@@ -61,11 +62,32 @@ export default function PositionsClient() {
   if (error && !data) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
+        <AlertDescription>
+          <p>{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setAttempt(n => n + 1);
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   }
-  if (!data) return <Skeleton className="h-64 w-full" />;
+  if (!data) {
+    return (
+      <div role="status">
+        <span className="sr-only">Loading positions…</span>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   const { positions, terms, today, superAdmin } = data;
   const positionById = new Map(positions.map(p => [p.id, p]));

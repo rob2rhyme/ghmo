@@ -76,6 +76,8 @@ test("threads, comments, conclusions and votes are ciphertext at rest and decryp
 
   // Finalizing works with an encrypted conclusion.
   await alice.getByRole("button", { name: "Finalize Close" }).click();
+  // Closing for good asks first (audit 2026-11-06).
+  await alice.getByRole("dialog").getByRole("button", { name: "Close topic" }).click();
   await expect(alice.getByText(/Finalized/)).toBeVisible();
   expect((await threadDoc.ref.get()).data()?.status).toBe("closed");
 

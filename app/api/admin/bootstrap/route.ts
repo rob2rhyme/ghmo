@@ -9,6 +9,7 @@ import { normalizeMemberEmail } from "@/src/lib/members";
 import { checkRateLimit } from "@/src/lib/rateLimit";
 import { safeEqual } from "@/src/lib/security/compare";
 import { getClientIp } from "@/src/lib/security/clientIp";
+import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +44,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+  // Through the shared parser, so an oversized body is refused before it is read in full.
+  const parsed = await parseJsonBody(req, bodySchema, { maxBytes: 4096 });
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { secret, email, name } = parsed.data;
   if (!safeEqual(secret, bootstrapSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

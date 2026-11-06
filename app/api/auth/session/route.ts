@@ -11,6 +11,7 @@ import { checkRateLimit } from "@/src/lib/rateLimit";
 import { getClientIp } from "@/src/lib/security/clientIp";
 import { clearSessionCookies, createSessionResponse } from "@/src/lib/sessionCookies";
 import { AdminEnvError, getAdminEnvStatus } from "@/src/lib/env.server";
+import { parseJsonBody } from "@/src/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,9 @@ export async function POST(req: NextRequest) {
   const rate = await checkRateLimit(`session-create:${getClientIp(req.headers)}`, 20, 10 * 60 * 1000);
   if (!rate.success) return NextResponse.json({ error: "Too many attempts. Wait a few minutes and try again." }, { status: 429 });
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Missing token" }, { status: 400 });
+  // Through the shared parser, so an oversized body is refused before it is read in full.
+  const parsed = await parseJsonBody(req, bodySchema, { maxBytes: 16 * 1024 });
+  if (!parsed.ok) return NextResponse.json({ error: "Missing token" }, { status: parsed.response.status === 413 ? 413 : 400 });
 
   try {
     let decoded;

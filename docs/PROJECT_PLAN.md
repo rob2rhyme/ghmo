@@ -1,6 +1,6 @@
 # GHMO Platform — Upgraded Project Plan (v2)
 
-_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-11-01_
+_Status: **approved** (all §7 recommendations accepted 2026-10-21) · Last updated: 2026-11-06 (Phases 0–17 built; see §6)_
 
 This plan replaces the "Upcoming Roadmap" in `README.md` as the source of truth for what gets built next.
 It has three parts:
@@ -199,23 +199,24 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 
 | Phase | Name | Scope | Exit criteria |
 |---|---|---|---|
-| **0** | Foundation repair | Fix React/Next version mismatch (React 19 for Next 16). Add ESLint, Vitest, Playwright and GitHub Actions CI. | CI green on `main`; branch protection on. |
-| **1** | Security hardening | S-01 → S-21. Security headers + CSP. Revocable session cookies. Durable rate limiting. **Remove PIN login and PIN bootstrap.** Remove debug routes. Zod on every route. `proxy.ts`. | Header scan (securityheaders.com) A; disabled admin loses access within 1 minute in a test; no third-party script on `/admin`. |
-| **2** | Passkeys + UI foundation | WebAuthn passkeys **required** for admin login (magic link only for first enrollment and lost-device recovery). Tailwind v4 upgrade, design tokens, shadcn/ui primitives, new admin shell. | Every admin enrolled with a passkey; admin routes reject sessions without passkey auth; all admin pages on the new shell. |
-| **3** | E2EE core | `src/lib/e2ee/` (keys, envelopes, wrapping, sealing) with full tests. Keyring collection + rules. Device enrollment, safety codes, recovery key with two-trustee confirmation, Devices & keys page. | Two devices can share the WDK; removing one + rotating blocks it from new data (automated test); recovery drill passes. |
-| **4** | E2EE rollout | Encrypt Admin Chat → Plans & Issues → draft minutes → signatures (sealed) → document history. Client-side search. Migration job. Rules updated to envelope validation. | Firestore console shows no plaintext in E2EE collections; migration verified; plaintext backups scheduled for deletion. |
-| **5** | Governance features | Original roadmap items, built on the encrypted base: minutes approval workflow + versioning (with separation of duties: an admin cannot approve minutes they submitted, approval cannot change content in the same request, and approved minutes need an explicit, audited reopen), action-item tracking, template versioning, QR verification (signed hash of the published document; finalize must build the certificate PDF server-side from stored inputs and check each signature's role and certificate ID, instead of trusting a client-rendered PNG; store PDFs in Cloud Storage, not inside Firestore documents), attendance exports. | Per-feature acceptance. |
-| **6** | Public & integrations | Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
-| **7** | Assurance | External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
+| **0** | Foundation repair | **Built (§8).** Fix React/Next version mismatch (React 19 for Next 16). Add ESLint, Vitest, Playwright and GitHub Actions CI. | CI green on `main`; branch protection on. |
+| **1** | Security hardening | **Built (§8).** S-01 → S-21. Security headers + CSP. Revocable session cookies. Durable rate limiting. **Remove PIN login and PIN bootstrap.** Remove debug routes. Zod on every route. `proxy.ts`. | Header scan (securityheaders.com) A; disabled admin loses access within 1 minute in a test; no third-party script on `/admin`. |
+| **2** | Passkeys + UI foundation | **Built (§8); passkeys made optional by D6 (2026-10-25): sign-in is an email link plus an authenticator-app code.** WebAuthn passkeys **required** for admin login (magic link only for first enrollment and lost-device recovery). Tailwind v4 upgrade, design tokens, shadcn/ui primitives, new admin shell. | Every admin enrolled with a passkey; admin routes reject sessions without passkey auth; all admin pages on the new shell. |
+| **3** | E2EE core | **Built (§8).** `src/lib/e2ee/` (keys, envelopes, wrapping, sealing) with full tests. Keyring collection + rules. Device enrollment, safety codes, recovery key with two-trustee confirmation, Devices & keys page. | Two devices can share the WDK; removing one + rotating blocks it from new data (automated test); recovery drill passes. |
+| **4** | E2EE rollout | **Built (§8).** Encrypt Admin Chat → Plans & Issues → draft minutes → signatures (sealed) → document history. Client-side search. Migration job. Rules updated to envelope validation. | Firestore console shows no plaintext in E2EE collections; migration verified; plaintext backups scheduled for deletion. |
+| **5** | Governance features | **Built (§8).** Original roadmap items, built on the encrypted base: minutes approval workflow + versioning (with separation of duties: an admin cannot approve minutes they submitted, approval cannot change content in the same request, and approved minutes need an explicit, audited reopen), action-item tracking, template versioning, QR verification (signed hash of the published document; finalize must build the certificate PDF server-side from stored inputs and check each signature's role and certificate ID, instead of trusting a client-rendered PNG; store PDFs in Cloud Storage, not inside Firestore documents), attendance exports. | Per-feature acceptance. |
+| **6** | Public & integrations | **Built (§8).** Public governance archive, `.ics` export, notification emails (content-free), autosave drafts (encrypted locally). | — |
+| **7** | Assurance | **Built and merged; the external review, pen test and drills need people outside the codebase (§8, Phase 7).** External review of `src/lib/e2ee/`, pen-test of auth, incident-response runbook, key-rotation drill. | Findings fixed or accepted in writing. |
 | **8** | Email broadcasts to members | **Built (8-A to 8-E, §10.8). Waiting on the owner's set-up steps before the first real send.** (§10). Members page with consent fields, unsubscribe + suppression, composer with a second-admin approval, resumable sending through Resend, delivery log. | Decisions D7–D11 accepted; a test broadcast reaches a seed list; one-click unsubscribe works; nothing is sent without approval. |
 | **9** | Member outreach: calling tree and call campaigns | **Built and merged 2026-11-01 (9-A to 9-D, §12.7); members without email added 2026-11-04 (#82).** Encrypted phone numbers on the member roster, a persistent calling tree that splits members equally across BOD callers, call campaigns per announcement with an append-only, audited call log, a BOD progress view, and a "Copy for Messenger" bridge for the existing group chats. No SMS, voice, Messenger or Meta API integration (decisions D12–D16). | Decisions D12–D16 accepted; numbers are ciphertext in Firestore; a campaign splits members equally and every call attempt appears in the audit log without a number. |
+| **10** | UI layout audit and upgrade | **Built and merged 2026-11-03 (§13; PR #77).** Two layout audits of every page at phone, tablet and desktop widths, and the upgrades they called for. | Audit findings fixed or accepted. |
 | **11** | Officer positions, member groups and event tasks | **Built and merged 2026-11-05 (11-A to 11-D, §15.7; PRs #86, #87, #88, #94).** Editable officer positions with term dates, member groups with a lead (including the phone-tree callers group), a task checklist per event with templates, calling-tree suggestions from the callers group, and task counts on the Events list. Admins only. | Owner publishes the Firestore rules again and enters the officers (go-live checklist). |
 | **12** | Reminders to team members | **Built and merged 2026-11-05 (12-A to 12-C, §16.6; PRs #95 and #96).** Email reminders about the tasks a person owns: sent by an admin from the event page (12-A), and an optional automatic daily digest of overdue tasks that is off until a super admin switches it on (12-B). Consented members only, with the unsubscribe link and the shared daily email limit. Admins only trigger it. Decisions D21–D26 taken as recommended. | Owner adds `CRON_SECRET` in Vercel if they want the digest, publishes the Firestore rules again, and sends one test reminder (go-live checklist). |
 | **13** | Member profile | **Built 2026-11-05 (13-A to 13-D, §17.6).** A page per member with how long they have been a member, city and state (no street address), family members with optional phone numbers, a log of notes admins add, the history of calls to them, and how polite or rude each call was. Admins only. Decisions D27–D31 taken as recommended. | Owner reads §17.2 (what is encrypted, who can write notes and ratings) and §17.5 (privacy). |
 | **14** | Push notifications | **Built 2026-11-06 (14-A, 14-B, 14-C; §18.6 to §18.8).** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner sets the three `VAPID_*` variables in Vercel and publishes the Firestore rules (go-live checklist) before push is used. |
 | **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 proposed. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
 | **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 proposed. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
-| **17** | Admin management | **Planned 2026-11-06 (§22); 17-A and 17-B built (§22.6, §22.7); 17-C (docs) planned.** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 proposed. | Owner reads §22.2 before 17-A is used. |
+| **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 proposed. | Owner reads §22.2 before 17-A is used. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -326,7 +327,7 @@ All 21 findings (S-01 to S-21) are fixed. Four were found during this phase: S-1
 - the setup wizard (device keys → recovery key shown once with Print → re-type two groups → two trustees confirmed);
 - unlock and lock, plus a lock-state badge in the sidebar;
 - pending approvals with safety-code confirmation;
-- device list with revoke + rotate, and "Rotate keys now";
+- device list with revoke + rotate, and "Rotate keys now" (the button now reads "Make new keys now");
 - recovery-key test (drill), recovery-key replacement, and activating a device with the recovery key.
 
 **Exit criteria met:**
@@ -519,7 +520,7 @@ Residual limits: a server that also serves the site's JavaScript can still serve
 
 ---
 
-## 9. What is next (updated 2026-11-03)
+## 9. What is next (updated 2026-11-03; Phases 11–17 since built, see §6 and §15–§22)
 
 Phases 0–10 and decision D6 are built (Phase 10, the UI audits and upgrades, merged in PR #77), and the round-2 audit fixes and speed pass are done (§14). In the codebase, the round-3 leftover (L8 artwork) and the round-2 security lows (S7 per-email sign-in limit, S10 `__Host-` cookie, S15 Firestore rule shape checks, S16 SHA pinning, S18 permission matrix) are waiting; everything else left needs the owner or outside people. In order (the same list, with checkboxes, is `docs/GO_LIVE_CHECKLIST.md`; 6 of 38 items were ticked on 2026-11-03, including both Phase 10 audit reviews; the Dependabot line stays unticked while one dev-only alert waits on upstream):
 
@@ -555,7 +556,7 @@ Email broadcasts to members (no new provider, no number registration) are planne
 
 ---
 
-## 10. Phase 8 — Email broadcasts to members (planned 2026-10-27, not started)
+## 10. Phase 8 — Email broadcasts to members (planned 2026-10-27; built, §10.8)
 
 **Goal.** An admin writes one message and it is emailed to all active members (or a role), with a second admin's approval, one-click unsubscribe, and a record of what went out. Email only: no SMS, voice, open tracking or click tracking.
 
@@ -946,12 +947,12 @@ Existing unit, rules and browser suites must pass unchanged (layout work must no
 | Fact | Where | Effect on the design |
 |---|---|---|
 | Nothing like positions, groups or event tasks exists. Officer titles appear only in the wedding-certificate dropdown (23 titles, English + Nepali) and as free-text chair/secretary names on minutes. | `src/features/docgen/templates/weddingCertificate.ts:98-127`, `src/lib/minutes.ts:9-12` | The dropdown's titles seed the new positions list; the docgen dropdown is left as it is. |
-| `members.roles` is an allowlist of `["member"]` so a member record can never grant admin power. Admin power lives only in `admins/{uid}`; there is no admin-management UI. | `app/api/organizations/[orgSlug]/members/route.ts:56-60`, `src/lib/admin.ts:160` | Positions and groups get their own fields and collections; `roles` is untouched. |
+| `members.roles` is an allowlist of `["member"]` so a member record can never grant admin power. Admin power lives only in `admins/{uid}`; there was no admin-management UI (added in Phase 17, §22). | `app/api/organizations/[orgSlug]/members/route.ts:56-60`, `src/lib/admin.ts:160` | Positions and groups get their own fields and collections; `roles` is untouched. |
 | Members cannot use the app. The `/login` email link issues a cookie with no role claim, so every page and rule treats them as signed out; nothing links to `/login`. | `app/api/auth/session/route.ts:45-51`, `src/lib/auth.ts:84-88` | Decision: admins only for this phase. Nothing below depends on member sign-in, and nothing blocks adding it later. |
 | Callers in the calling tree must be active admins; only super admins edit the tree. | `src/lib/callingTree.server.ts:47-72` (D15) | The phone-tree group suggests callers; it never bypasses D15. |
 | Pages read Firestore directly through `adminData.server.ts`; audit actions need a sentence in `ACTIVITY`; composite indexes must be declared and created. | `src/lib/adminData.server.ts`, `src/lib/adminView.ts:63-126`, `firestore.indexes.json` | Every query below is single-field with in-memory sorting, so no new index. |
 
-### 15.2 Decisions for the owner (recommendations first; accept or change before 11-A starts)
+### 15.2 Decisions for the owner (accepted as recommended, see §15.7)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1184,7 +1185,7 @@ Out of scope: a street address, photos, member self-service or a member-facing p
 - Delete: the author or a super admin (the server decides; the button only shows for them). Notes cannot be edited.
 - Browser spec `tests/e2e-auth/member-notes.spec.ts` (2 tests): ciphertext and plain author and date in Firestore, no text in the log, order, length limit, author and super-admin delete, a plain admin refused on another's note, and encryption-off refusals.
 
-## 18. Phase 14 — Push notifications (planned 2026-11-05; 14-A built 2026-11-06)
+## 18. Phase 14 — Push notifications (planned 2026-11-05; 14-A to 14-C built 2026-11-06)
 
 **Goal.** An admin who switched it on gets a notification on their phone or computer when something needs them: a new message in Admin chat, new activity in Plans & Issues, and the other alerts that today only arrive as email (meeting minutes waiting for approval, calls to make, a broadcast waiting for its second approver, a security alert). It uses the installed web app (PWA) and the standard Web Push protocol, so no app store app and no third-party notification service or SDK is needed. Like the emails, a notification says that something happened, never what.
 
@@ -1290,7 +1291,7 @@ Built: `src/lib/memberExport.ts` (pure; formulas such as `=HYPERLINK(...)` are m
 - **Runbook case Q:** a push to the wrong person (disable the admin; a disabled admin gets nothing), too many alerts (untick kinds), a lost or sold phone (turn the device off from another device; an admin cannot see anyone else's devices, so ask the owner or disable the account), content that should not be there (a bug), stopping all pushes at once (remove a `VAPID_*` variable and redeploy; email is unaffected), a leaked key (new pair, every device switched on again), and a device that never receives anything. Case L (a caller's lost device) now points to it.
 - **Known gaps, not built:** devices that never answer are not cleaned up automatically, only ones a push service reports as gone. (Two gaps listed here first, a super admin not being able to list or remove another admin's push devices and no site-wide switch, were closed by Phase 16, §21.) It is small if the board wants it.
 
-## 20. Phase 15 — Delete a member (planned 2026-11-06)
+## 20. Phase 15 — Delete a member (planned 2026-11-06; 15-A to 15-C built 2026-11-06)
 
 **Goal.** Today the app can only **disable** a member. A person who asks to be removed, or a record added by mistake, needs a manual step in the Firebase console (runbook case O step 6), which is easy to get wrong and is not in the activity log. Phase 15 lets a **super admin** remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record.
 
@@ -1368,7 +1369,7 @@ Out of scope: bulk deletion, undoing a deletion, deleting an admin account (sepa
 - **Go-live checklist:** a Phase 15 line: publish the rules, try a delete on a test member, check Positions shows "Removed member" and the log has one entry without a name, test that an opted-out address stays opted out when re-added, and check a plain admin sees no card.
 - **Known gaps, not built:** no bulk delete, no undo, no way to scrub older activity-log entries or minutes text, and a group whose lead was deleted is left without a lead (choose another on Admin → Groups). Each is small if the board wants it.
 
-## 21. Phase 16 — Admin devices and push controls (planned 2026-11-06)
+## 21. Phase 16 — Admin devices and push controls (planned 2026-11-06; 16-A to 16-C built 2026-11-06)
 
 **Goal.** Phase 14 let each admin switch push on for their own devices, and §18.8 listed what it left out: a super admin cannot see or remove another admin's push devices (so a lost phone keeps getting alerts, and would start again if its admin were turned back on), and there is no site-wide switch other than removing a key in Vercel and redeploying. Phase 16 closes both, inside the app.
 
@@ -1441,9 +1442,9 @@ Out of scope: admin management (turning admins on and off in the app), automatic
 - **Runbook case Q:** step 2 and step 5 now use the site-wide switch (Admin → Security → Push for the whole site) as the quick stop, with removing a `VAPID_*` key and redeploying kept as the harder stop; step 3 (a lost, sold or stolen phone) gains the super-admin route (Everyone's push devices, find it by owner and device name, Turn off) and the reminder to do this before turning a disabled admin back on, because their old devices are kept.
 - **Admin guide §1j:** a "For super admins" part describing the two cards, what they show and never show, and that both actions are logged; the "Turn it off" paragraph now points a person who cannot sign in anywhere to it.
 - **Go-live checklist:** the push line now includes the super-admin check: switch push off and see nothing arrive and the notice appear, switch it on and see the next alert, check the device list shows no addresses and Turn off works, and publish the Firestore rules again first (the switch is a new settings document).
-- **Known gaps, not built:** devices that never answer are only removed when a push service reports them gone; admin management (turning an admin on or off) is still a Firestore console step (runbook case B).
+- **Known gaps, not built:** devices that never answer are only removed when a push service reports them gone; admin management (turning an admin on or off) was a Firestore console step until Phase 17 (§22) added the Admins page.
 
-## 22. Phase 17 — Admin management (planned 2026-11-06)
+## 22. Phase 17 — Admin management (planned 2026-11-06; 17-A to 17-C built 2026-11-06)
 
 **Goal.** Who is an admin is a Firestore document (`organizations/ghmo/admins/{id}`), and today the only way to add one, turn one off or on, or change a role is to edit it by hand in the Firebase console (runbook cases B and C). That is slow in an incident (a stolen session, an admin who left) and easy to get wrong. Phase 17 lets a super admin do it in the app, with guards that make the worst mistakes impossible and a record of every change.
 
@@ -1510,3 +1511,33 @@ Out of scope: emailing an invitation, changing an email address, deleting an adm
 - **Nav:** an **Admins** link in the Account group and in the jump dialog (Ctrl or ⌘ K), shown only to a super admin (`superAdminOnly` in `adminNav.ts`, `navFor`). A plain admin who types the address gets the not-found screen, and the routes refuse them anyway.
 - **Tests:** `admin-management-ui.spec.ts` (2): a plain admin has no link and gets not-found, no heading and no Add button; a super admin opens the page from the nav, sees themselves marked with no turn-off or role button, adds an admin (with the address repeated, the server's message shown), turns Bob off with the push-device box ticked (the notice and Encryption link appear, the row says Turned off, his push device is gone), turns him on, makes him a super admin, fixes his name, and the log has every change.
 - **Left for 17-C:** the docs: runbook cases B and C and the guide use the page instead of the console, and the go-live checklist.
+
+### 22.8 17-C built (2026-11-06)
+
+- **Runbook case B** (a stolen session): step 2 now turns the admin off on **Admin → Admins**, with push devices, and keeps the Firestore console edit only as the fallback when the app is unavailable. **Case C** (an admin left): step 1 uses the page and warns to keep another active super admin; step 2 notes the page's reminder and link to revoke their encryption devices. Cases P and Q point to the page instead of the console.
+- **Admin guide §1k "Who can sign in":** the list, adding (nothing is emailed; what to tell the new admin), turning off and on (with push devices and the encryption reminder), roles and what a super admin can do, fixing a name (and why an email can't be changed), what the page refuses, and that every change is logged without an email.
+- **Go-live checklist:** a Phase 17 line: check the list, turn off anyone who should not have access, keep at least two active super admins, and try add, sign-in and turn-off once with a test account.
+- **Known gaps, not built:** no invitation email, no email change, no admin deletion (by design, D52, D55, D56); the first admin is still created by the one-time bootstrap.
+
+## 23. Project-wide audit (2026-11-06)
+
+Four read-only reviews ran in parallel (docs against code; API routes, rules and audit log; admin UI; test coverage). Every finding below was checked in the code before it was fixed or listed.
+
+### 23.1 Fixed
+
+- **A real bug:** the calendar feed (`src/lib/ics.ts`) did not escape semicolons in titles, summaries and places (`"\;"` in JavaScript is just `";"`), so a semicolon reached calendar apps unescaped (RFC 5545 needs `\;`). The old test made the same mistake and passed; both are fixed.
+- **Wrong button names:** the Admins page, runbook cases A and D, admin guide §1a and the key-rotation drill named "Revoke selected and rotate keys" and "Rotate keys now"; the buttons say "Remove selected and make new keys" and "Make new keys now".
+- **Activity log:** eight actions the code writes had no words on the dashboard (`broadcast_sent`, `broadcast_retry_failed`, `comms_seed_created`, `edit_timeline`, `timeline_update`, and, as whole sentences with no actor, `member_email_opt_out`, `member_email_bounced`, `task_digest_run`). A new unit test (`tests/unit/auditLabels.test.ts`) finds every action the code logs and fails if one has no words, so this cannot drift again.
+- **Member emails in the log:** member entries (added, changed) now record whether there is an email, not the address (`memberAuditView`), so an address no longer outlives a deleted member in new entries. The name stays. Older entries are not rewritten, because the log is never edited (§20, D43).
+- **Request bodies:** the bootstrap, session and unsubscribe routes now read their bodies through the shared size-capped parser, like every other route. The browser-written activity route (`POST /api/admin/audit`) has a per-admin ceiling (600 an hour).
+- **UI:** removing someone from a group, the two "forget this device" encryption buttons and "Finalize close" on a topic now ask first; screens that showed a load error with no way out (Group, Groups, Positions, Templates, the profile's Notes and Calls) have **Try again**; the daily-digest card shows its error instead of vanishing; Action items shows a loading state instead of "No action items yet"; the minutes editor says when earlier versions could not be loaded; loading skeletons are announced to screen readers.
+- **Tests added:** 82 unit tests for helpers that had none (public event fields, calendar export, actor names, Plans & Issues decryption, app URL, passkey ids, authenticator errors, emulator detection), the label test, a member-audit test, 10 rules tests (home blocks, docgen, legacy timeline, comment likes, and every server-only collection the default deny covers), and a browser spec for creating an event from the New event page and opening the admin Document gallery and Gumba Project pages.
+- **Docs:** README routes, pages, data model, legacy paths and sign-in description; `.env.example` (`CRON_SECRET`, the media keys, `APP_PUBLIC_URL`; a dead variable removed); the plan's roadmap (status for phases 0–7, a Phase 10 row, headings that still said "planned"); runbook and guide cross-references (cases B, C, N–Q); the go-live checklist line that still said a member could not be deleted in the app.
+
+### 23.2 For the owner to decide (not changed)
+
+1. **Decisions still marked "proposed":** D32–D36 (§18.2), D41–D46 (§20.2), D47–D50 (§21.2), D51–D56 (§22.2). They were built as recommended; mark them accepted or say what to change.
+2. **Code with no caller** (kept until you decide): the three timeline routes and their rules block, `POST /api/admin/comms/seed`, `POST /api/admin/content` (writes home blocks, which the rules make world-readable, with little validation; no page shows them), the `gumba` rules block (no code uses it), the `docgen` rules block (admins may write from the browser), two unused path helpers, unused entries in the `AuditType` list and three unused `NEXT_PUBLIC_*` flags in `env.client.ts`. Removing them is small; it needs the rules published again.
+3. **Older activity entries** still hold member and admin emails, and the dashboard returns full entries (with IP addresses) and raw GoFundMe webhook payloads to admins. Admin-only, but worth knowing.
+4. **Wording:** members use Disable/Enable, admins use Turn off/Turn on, groups say Switched off; records are "deleted" in some places and "removed" in others. Harmless; can be made consistent in one pass if wanted.
+5. **Not covered by a browser test:** the GoFundMe webhook (signature-checked; covered by unit tests of its parts) and a few routes that are only driven through other pages.

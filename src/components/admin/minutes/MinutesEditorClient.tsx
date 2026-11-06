@@ -104,6 +104,8 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   const [approvalNotesInput, setApprovalNotesInput] = useState("");
   const [reopenReason, setReopenReason] = useState("");
   const [versions, setVersions] = useState<{ version: number; approvedAt?: number; contentHash: string }[]>([]);
+  // Which minutes (id and version) the versions list failed to load for, so a failure never reads as "no versions".
+  const [versionsFailedFor, setVersionsFailedFor] = useState<string | null>(null);
   const [statusActionStatus, setStatusActionStatus] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const hasText =
@@ -500,10 +502,16 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
   useEffect(() => {
     if (!editingId || !editingVersion) return;
     let cancelled = false;
+    const key = `${editingId}:${editingVersion}`;
     void fetch(`/api/admin/minutes?versionsFor=${editingId}`, { cache: "no-store" })
-      .then(res => (res.ok ? res.json() : { versions: [] }))
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error("versions"))))
       .then(data => {
-        if (!cancelled) setVersions(data.versions ?? []);
+        if (cancelled) return;
+        setVersions(data.versions ?? []);
+        setVersionsFailedFor(null);
+      })
+      .catch(() => {
+        if (!cancelled) setVersionsFailedFor(key);
       });
     return () => {
       cancelled = true;
@@ -818,6 +826,7 @@ export default function MinutesEditorClient({ minutes: rawMinutes, adminActor }:
             onAction={handleMinutesStatusAction}
             error={statusActionStatus?.replace(/^Error: /, "") ?? null}
             versions={versions}
+            versionsFailed={Boolean(editingId && editingVersion) && versionsFailedFor === `${editingId}:${editingVersion}`}
           />
         ) : null}
       </div>
@@ -887,7 +896,8 @@ function MinutesNextStep({
   busy,
   onAction,
   error,
-  versions
+  versions,
+  versionsFailed
 }: {
   status: MinutesStatus;
   description: string;
@@ -899,6 +909,7 @@ function MinutesNextStep({
   onAction: (action: "submit" | "approve" | "returnToDraft") => void;
   error: string | null;
   versions: MinutesVersion[];
+  versionsFailed: boolean;
 }) {
   return (
     <AdminSectionCard title="Next step" description={description}>
@@ -939,7 +950,12 @@ function MinutesNextStep({
           {error}
         </p>
       ) : null}
-      {versions.length ? (
+      {versionsFailed ? (
+        <div className="border-t border-border pt-4">
+          <h3 className="text-sm font-medium text-foreground">Approved versions</h3>
+          <p className="mt-1 text-sm text-destructive">Couldn&apos;t load earlier versions.</p>
+        </div>
+      ) : versions.length ? (
         <div className="border-t border-border pt-4">
           <h3 className="text-sm font-medium text-foreground">Approved versions</h3>
           <ul className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground">

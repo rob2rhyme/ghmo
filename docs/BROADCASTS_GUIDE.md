@@ -34,9 +34,9 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 
 **If something goes wrong: the recovery plan**
 1. **A forgotten passphrase or one lost device.** Set the device up again. Another admin approves it after comparing the safety code. This is why every community should have at least three admins with approved devices.
-2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Revoke selected and rotate keys**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
+2. **A device is lost or stolen.** A super admin ticks it under Admin → Encryption and presses **Remove selected and make new keys**. The device can no longer read anything written from then on. It keeps what it had already opened, so treat older material as possibly seen.
 3. **Every admin device is gone.** The **paper recovery key** is the way back. On the Encryption page, "Lost every device?" lets a trustee's paper copy activate a new device. You still have to sign in as an admin, so the paper alone is not enough. Treat it as highly sensitive anyway.
-4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key** with both trustees present, then **Rotate keys now**. Everyone destroys the old copies.
+4. **The paper key is lost, or someone saw it.** A super admin chooses **Replace recovery key** with both trustees present, then **Make new keys now**. Everyone destroys the old copies.
 5. **The worst case.** If every device is lost and no working paper key exists, the encrypted data is gone for good. That means phone numbers, admin chat and drafts. Names and emails are not encrypted, so they survive, and the numbers would have to be collected again.
 
 **Habits that make recovery work**
@@ -186,6 +186,17 @@ If the button says this browser cannot receive push, you opened the site in Safa
 - The card says push is not set up on this site: the site's push keys have not been added yet. Tell whoever manages the website; the steps are in the go-live checklist.
 - A device that has not been sent an alert yet says so under its name; send a test by asking another admin to post in Admin chat.
 
+## 1k. Who can sign in (Admin → Admins, super admins only)
+
+The **Admins** page lists everyone who can sign in to the admin area: super admins first, you marked **You**, each person's role (**Super admin** or **Admin**), whether they are **Active** or **Turned off**, their email and when they last signed in. Only super admins see the page and its link.
+
+- **Add an admin:** enter their name and email and choose the role, then **Add admin**. Nothing is emailed. Tell them to open the admin sign-in page and enter that email; they then set up their authenticator app as usual. An address already on the list is refused (if that person is turned off, turn them back on instead).
+- **Turn off…:** they can no longer sign in, and any open session ends within about a minute. Nothing they wrote is removed, and you can **Turn on** again at any time. Keep "Also turn off their push notification devices" ticked unless you have a reason not to. Afterwards the page reminds you to revoke their encryption devices under **Admin → Encryption** if they used encryption; that needs your own unlocked device, so it is a separate step.
+- **Make super admin / Make admin:** a super admin can also manage admins, delete members, set officers, edit the calling tree and control push for the whole site. Only give it to someone the board trusts with that.
+- **Fix name:** for a typo. An email address can't be changed, because a wrong one would lock the person out or let someone else in: add the right address as a new admin and turn the wrong one off.
+- **What the page will not let you do:** turn yourself off or change your own role (ask another super admin), or turn off or demote the last active super admin (make someone else a super admin first). These checks are made on the server, even if two super admins act at the same moment.
+- Every change is written to the activity log, with the admin's name and what changed, never their email.
+
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
@@ -214,4 +225,4 @@ If the button says this browser cannot receive push, you opened the site in Safa
 
 ## If something goes wrong
 
-A lost device or recovery key: see §1a and `docs/RUNBOOK_INCIDENT.md`, cases A and D. Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M.
+A lost device or recovery key: see §1a and `docs/RUNBOOK_INCIDENT.md`, cases A and D. Wrong text or wrong people, many complaints, or a leaked key: see `docs/RUNBOOK_INCIDENT.md`, cases H, I and J. A wrong group-chat post, a lost caller device, or a member who asks to be removed: cases K, L and M. A stolen admin session or an admin who left: cases B and C (use Admin → Admins). A wrong task reminder: case N. A member who asks what is held or to be deleted: case O. A lost or over-shared member export: case P. A push notification problem or a lost phone that still gets alerts: case Q.
