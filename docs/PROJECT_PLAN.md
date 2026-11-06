@@ -215,6 +215,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **14** | Push notifications | **Built 2026-11-06 (14-A, 14-B, 14-C; §18.6 to §18.8).** A phone or desktop notification for new admin chat messages, Plans & Issues activity and other alerts (minutes waiting, calls to make, a broadcast waiting for approval, security), on the devices where an admin switched it on. Content-free, like the emails. Admins only. Decisions D32–D36 proposed. | Owner sets the three `VAPID_*` variables in Vercel and publishes the Firestore rules (go-live checklist) before push is used. |
 | **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 proposed. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
 | **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 proposed. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
+| **17** | Admin management | **Planned 2026-11-06 (§22); 17-A built (§22.6); 17-B and 17-C planned.** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 proposed. | Owner reads §22.2 before 17-A is used. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1441,3 +1442,63 @@ Out of scope: admin management (turning admins on and off in the app), automatic
 - **Admin guide §1j:** a "For super admins" part describing the two cards, what they show and never show, and that both actions are logged; the "Turn it off" paragraph now points a person who cannot sign in anywhere to it.
 - **Go-live checklist:** the push line now includes the super-admin check: switch push off and see nothing arrive and the notice appear, switch it on and see the next alert, check the device list shows no addresses and Turn off works, and publish the Firestore rules again first (the switch is a new settings document).
 - **Known gaps, not built:** devices that never answer are only removed when a push service reports them gone; admin management (turning an admin on or off) is still a Firestore console step (runbook case B).
+
+## 22. Phase 17 — Admin management (planned 2026-11-06)
+
+**Goal.** Who is an admin is a Firestore document (`organizations/ghmo/admins/{id}`), and today the only way to add one, turn one off or on, or change a role is to edit it by hand in the Firebase console (runbook cases B and C). That is slow in an incident (a stolen session, an admin who left) and easy to get wrong. Phase 17 lets a super admin do it in the app, with guards that make the worst mistakes impossible and a record of every change.
+
+### 22.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| An admin is one document, matched at sign-in by `emailLower`; the sign-in link is sent only when the address belongs to an **active** admin, and verifying it binds the account to that document. | `auth/email/start`, `auth/email/verify` | Adding an admin is creating that document. The new admin opens the normal sign-in page, enters their email and sets up their authenticator; no new sign-in machinery. |
+| Access is checked against the document on every request and in the database rules. | `requireActiveAdmin`, `hasActiveAdminRecord` | Turning an admin off ends their access within about a minute with no extra work. |
+| Roles are `super_admin` or `admin`. Only a super admin can do the sensitive things (positions, deleting members, the push controls). | `admin.ts` | Role changes are super-admin only, and the last active super admin must always remain. |
+| A turned-off admin keeps their push devices and their encrypted-data devices. | Phase 16, runbook case C | Turning off offers to turn off their push devices too, and reminds the super admin to revoke their encryption devices (which needs an unlocked device, so it stays a separate step). |
+
+### 22.2 Decisions (proposed; accept or change before 17-A is used)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D51 | Who may manage admins? | Super admins only. | Same rule as the other sensitive controls. |
+| D52 | What does "add an admin" do? | Creates an active admin record from a name, an email and a role (Admin or Super admin). Nothing is emailed by the app: the person opens the sign-in page, enters that email, and follows the normal steps. An address already on the admin list (turned off or not) is refused with a pointer to turn the existing one on. | Fewer moving parts; a typo is fixed by turning the wrong record off and adding the right one. |
+| D53 | Turning off and on | A super admin can turn any other admin off or back on. They can never turn **themselves** off, and the last **active** super admin can never be turned off. Turning off can also turn off that admin's push devices (ticked by default). The result tells the super admin to revoke their encryption devices under Admin → Encryption if the admin held any. | Prevents lock-out and covers the lost-phone case. |
+| D54 | Roles | A super admin can make another admin a super admin or an ordinary admin. They cannot change **their own** role, and the last active super admin cannot be made an ordinary admin. | A site always has at least one super admin who can fix things. |
+| D55 | Names and emails | A super admin can fix a name. An email cannot be changed: a mistyped address would lock the person out, or let the wrong person in. Add the right one and turn the wrong one off. | No account-takeover by editing an email. |
+| D56 | Deleting an admin | Not offered. Turning off is enough, and it keeps their name on the history (the activity log refers to admins by id). | The audit trail stays readable. |
+
+### 22.3 Design
+
+- **Pure rules** (`src/lib/adminManagement.ts`): the checks above as functions of the full admin list: add (name, email shape, role, no duplicate address), turn off or on (not yourself, not the last active super admin), role change (not yourself, not the last active super admin), and a clean view of an admin (no secrets; only what the admin list already shows).
+- **Server** (`adminManagement.server.ts`): each change runs in a transaction over the whole admin list (a handful of documents), so two super admins acting at once cannot both remove the last one.
+- **Routes** (super admin only): `GET /api/admin/admins`, `POST /api/admin/admins`, `PATCH /api/admin/admins/[adminId]` with `{ status }` (and `removePushDevices` when turning off), `{ role }` or `{ name }`.
+- **Activity log:** `admin_added`, `admin_turned_off`, `admin_turned_on`, `admin_role_changed`, `admin_renamed`: the admin's id, name and the change, never an email.
+- **UI (17-B):** an **Admins** page for super admins (nav link), listing everyone with role, state, last sign-in, and the actions above with confirmations.
+- **Docs (17-C):** runbook cases B and C and the guide use the page; the console steps become the fallback.
+
+### 22.4 Sub-phases
+
+| Step | Scope | Exit criteria |
+|---|---|---|
+| **17-A** | Pure rules, server transactions, the routes, audit labels | A super admin adds, turns off and on, changes roles and renames; a plain admin is refused; you cannot turn off or demote yourself or the last super admin (also under two requests at once); turning off can clear push devices; a new admin can start sign-in; every change is logged |
+| **17-B** | The Admins page and nav link | A super admin uses it; a plain admin sees no link and the page refuses them |
+| **17-C** | Docs | Docs merged |
+
+### 22.5 Risks and out of scope
+
+| Risk | Mitigation |
+|---|---|
+| Nobody can manage admins any more | The last active super admin can never be turned off or demoted, checked inside a transaction |
+| A new admin is added with a mistyped email | The wrong person cannot sign in unless it is a real address they control; the mistake is turned off, and the log shows who added it |
+| A turned-off admin's devices still hold old data | Stated in the result and the runbook; revoking them is a separate, deliberate step |
+
+Out of scope: emailing an invitation, changing an email address, deleting an admin, per-admin permissions beyond the two roles, and the first admin (still created by the one-time bootstrap).
+
+### 22.6 17-A built (2026-11-06)
+
+- **Pure rules** (`src/lib/adminManagement.ts`, 15 unit tests): add (a name, a valid address, a role, no address already on the list, with a different message for a turned-off one), turn off or on (not yourself, not the last **active** super admin; a turned-off super admin does not count as another; the state they are already in is accepted as a no-op), role change (not your own, the last active super admin stays), and the admin view (no secrets; super admins first; you marked).
+- **Server** (`adminManagement.server.ts`): each change reads the whole admin list inside a transaction, so two super admins acting at once cannot both remove the last one. `removeDevicesOfAdmin` (in `push.server.ts`) turns off one admin's push devices.
+- **Routes** (super admin only): `GET /api/admin/admins`, `POST /api/admin/admins` (`{ name, email, role }`; nothing is emailed, 20 an hour), `PATCH /api/admin/admins/[adminId]` with one of `{ status, removePushDevices? }`, `{ role }` or `{ name }` (an email cannot be sent: the body is strict). Turning off answers with `pushDevicesRemoved` and `encryptionReminder: true`, so the page can tell the super admin to revoke the admin's encryption devices.
+- **Activity log:** `admin_added`, `admin_turned_off`, `admin_turned_on`, `admin_role_changed`, `admin_renamed`: the admin's id, name and the change, never an email; a change that changes nothing logs nothing.
+- **Browser tests** (3): a plain admin is refused every route; a super admin lists (super admins first, you marked), adds (the record is active and findable by the sign-in lookup; a duplicate, bad address, empty name, unknown role and extra field are refused), renames, turns bob off (his access ends at once, only his push devices go, a repeat does nothing), turns him on, re-roles, is refused for turning themselves off or changing their own role, and the log has every change with no email; two super admins turning each other off at the same moment leave exactly one active.
+- **Left for 17-B and 17-C:** the Admins page and nav link, and the docs (runbook cases B and C, the guide, the go-live checklist).
