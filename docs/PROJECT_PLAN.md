@@ -222,6 +222,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 | **21** | Members list on phones, and changing many at once | **Built 2026-11-06 (21-A, 21-B, 21-C; §28.6 to §28.8).** Also: Set holder offers members' relatives (21-C). Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
 | **22** | Activity log page | **Built 2026-11-06 (22-A, 22-B; §29.6, §29.7).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 accepted 2026-11-06. | Owner runs the Firestore deploy for the two new indexes after it ships. |
+| **23** | Copy, and email one group | **Planned 2026-11-06 (§30).** **Copy** an event (optionally with its tasks) or a broadcast as a new draft, and send a broadcast to **one group** (for example the cooking team) instead of everyone. Decisions D88–D93 proposed. | Owner reads §30.2 and accepts or changes D88–D93 before 23-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1888,3 +1889,46 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **Activity** in the admin menu under Account (and so in Search), and **See all activity** on the dashboard's Recent activity card.
 - Browser spec (`activity-log.spec.ts`, third test): from the dashboard link to 50 entries, an entry's changes and record link, Load older to 62, the Minutes area, a person, a word; a plain admin has no device line or Download; a super admin's device line and a CSV download that is logged as "1 entry (Minutes)".
 - Docs: admin guide §1n, a runbook section on reading the log in an incident (and case P points to it), and a go-live checklist step for the new indexes.
+
+## 30. Phase 23 — Copy, and email one group (planned 2026-11-06)
+
+**Goal.** Two everyday gaps from the audit (§24.3). First, a yearly event (Lhosar, the picnic) or a monthly reminder email is typed again from scratch each time; a cancelled broadcast can't be reused at all. Second, a broadcast can only go to **every** member who agreed to email; the cooking team or the callers can't be emailed on their own. Phase 23 adds **Copy** for events and broadcasts, and a group audience for broadcasts.
+
+### 30.1 What was checked (2026-11-06)
+
+| Fact | Where | Effect on the design |
+|---|---|---|
+| An approval is bound to a hash of the content, which already contains `audience: "all"` as a fixed value; editing after approval returns the broadcast to draft. | `broadcastHash.ts`, `broadcast.ts` | The audience joins the hashed content: an approval covers who it goes to, and changing the group after approval needs approval again. Existing broadcasts keep the same hash, because "everyone" hashes exactly as today. |
+| Recipients are chosen when sending starts: every member whose email state is "ready" (active, agreed, not opted out or bounced). | `broadcastSender.server.ts` (`loadRecipients`, `selectRecipients`) | A group audience adds one condition: the member's `groupIds` contains the group. Nothing else about consent changes. |
+| Unsubscribing stops all GHMO announcement emails; there is one list, not one per group. | `memberSuppression.server.ts`, unsubscribe page | A group email keeps the same unsubscribe link and meaning, and its footer says why the person got it. |
+| An event is a document with title, summary, body, location, time zone, dates, status and flyer settings; tasks are separate documents with an `eventId`. Task templates already copy titles, notes and groups. | events route, `eventTasks` | Copying an event is a new draft with the same text and place and no dates; copying its tasks reuses the template logic. |
+| Creating events and broadcasts is open to any admin; broadcasts need a second admin's approval before sending (D8). | routes | Copies follow the same rules: a copied broadcast is a new draft that needs approval again. |
+
+### 30.2 Decisions (proposed; accept or change before 23-A)
+
+| ID | Question | Recommendation | Effect |
+|---|---|---|---|
+| D88 | Copying an event | **Copy event…** on the event's edit page. The copy is a **draft** with the same title (with " (copy)" added), summary, description, place, time zone and flyer settings, and **no dates**; it opens straight away so the new dates can be set. | Next year's Lhosar starts from this year's wording. |
+| D89 | The event's tasks | A box in the copy dialog, ticked by default: **Also copy its tasks**. Copied tasks keep their title, notes and group; they start **not done**, with **no people** and **no due dates**. | The checklist comes along without stale names or dates. |
+| D90 | Copying a broadcast | **Copy as new draft** on any broadcast, including sent and cancelled ones. The copy has the same subject, text and audience, is a draft, and needs approval like any other; it remembers which broadcast it came from. | A monthly reminder is two clicks plus an edit. |
+| D91 | Emailing one group | When writing a broadcast, **Send to**: **Everyone who agreed to email** (as today) or **One group**, then the group. Only members of that group who can be emailed (active, agreed, not opted out or bounced) get it; the page shows how many that is now. Turned-off groups are not offered. | The cooking team gets the cooking email; nobody else does. |
+| D92 | Approval and the audience | The approver sees **To: Cooking team (12 people)**. The audience is part of what is approved: changing it after approval returns the broadcast to draft. Members are counted again when sending starts, as today, so someone who joined the group in between is included. | Nobody can widen the audience after approval. |
+| D93 | Unsubscribe and the footer | One list, as today: the link in a group email still stops all GHMO announcements. The footer adds "You got this because you are in the Cooking team." The activity log names the group for group broadcasts. | No new kinds of consent to keep track of. |
+
+### 30.3 Design
+
+- **23-A (copies):** `POST /api/admin/organizations/ghmo/events/[eventId]/copy` (`{ withTasks }`, any admin): new draft event; tasks copied in a batch through the same pure rule as templates (`copyTasksForEvent`); audit `event_copied` ("copied an event", with the source title). `POST /api/admin/broadcasts/[id]/copy` (any admin): new draft with `copiedFrom`; audit `broadcast_copied`. Buttons on the event edit page (a dialog with the tasks box) and on the broadcast page. Browser spec: copy an event with tasks (draft, no dates, tasks not done and unassigned), without tasks; copy a sent broadcast (new draft, needs approval, the original untouched).
+- **23-B (one group):** `BroadcastContent` gains `audience: { kind: "all" } | { kind: "group"; groupId: string }`; `hashBroadcast` hashes `"all"` or `"group:<id>"` (old hashes unchanged); create and edit accept it; `loadRecipients` filters by group; the recipient count on the page follows the choice; the approve view and the detail page say who it goes to; the footer line for group emails; audit details name the group. Unit tests for the hash (old broadcasts still approved) and recipient selection; browser spec: a group broadcast goes only to ready members of that group, changing the group after approval returns it to draft, a turned-off group isn't offered, the footer line is present. Admin guide and plan status.
+
+### 30.4 Sub-phases
+
+- **23-A:** copy an event (with or without tasks) and copy a broadcast.
+- **23-B:** the group audience for broadcasts.
+
+Each sub-phase runs the full gate before any push, and is pushed only when the owner asks.
+
+### 30.5 Risks and out of scope
+
+- **A wrong group** sends to the wrong people: the approval step shows the group and the count, and the approver is a second admin (D8).
+- **Several groups at once, or "everyone except"**, are out of scope; one group, or everyone.
+- **Per-group unsubscribe** is out of scope (D93): it would need a consent record per group.
