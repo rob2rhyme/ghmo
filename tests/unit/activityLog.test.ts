@@ -19,8 +19,9 @@ describe("areas", () => {
     expect(areaOf("something_new")).toBe("other");
   });
 
-  it("lists an area's actions within Firestore's 30-value limit, and every labelled action has an area", () => {
-    for (const area of ACTIVITY_AREAS) expect(actionsInArea(area, LABELLED_ACTIONS).length).toBeLessThanOrEqual(30);
+  it("lists each area's actions, and every labelled action has an area", () => {
+    // The read route asks Firestore in chunks of 30 (its limit for "in"), so an area may hold more.
+    for (const area of ACTIVITY_AREAS.filter(area => area !== "other")) expect(actionsInArea(area, LABELLED_ACTIONS).length).toBeGreaterThan(0);
     const covered = ACTIVITY_AREAS.flatMap(area => actionsInArea(area, LABELLED_ACTIONS));
     expect(new Set(covered).size).toBe(new Set(LABELLED_ACTIONS).size);
     expect(actionsInArea("minutes", LABELLED_ACTIONS)).toContain("minutes_moved");
