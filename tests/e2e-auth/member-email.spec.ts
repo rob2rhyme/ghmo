@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey } from "./helpers";
+import { admin, clearEmulators, plainJson, seedAdmin, signInWithNewPasskey, waitForStreamedContent } from "./helpers";
 
 /**
  * Changing a member's email (plan §25, 18-A): super admins only; history stays with the member id; one address per
@@ -88,4 +88,70 @@ test("a super admin changes, adds and removes addresses; every guard holds", asy
     // The actor (Alice) is named, as in every entry; the members' names and addresses never are.
     expect(entry).not.toMatch(/asha|bina|deepak/i);
   }
+});
+
+test("on the profile: a super admin edits, adds and removes an email; a plain admin only sees it", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const alice = await browser.newPage();
+  await signInWithNewPasskey(alice, "alice", `/admin/members/${ASHA}`);
+  await waitForStreamedContent(alice);
+  await expect(alice.getByTestId("member-email")).toHaveText("asha@example.org");
+
+  // Change, typing the address twice; a mismatch keeps Save greyed out.
+  await alice.getByRole("button", { name: "Edit email" }).click();
+  let dialog = alice.getByRole("dialog");
+  await expect(dialog.getByText("The old address bounced; the new one starts fresh.")).toBeVisible();
+  await dialog.getByLabel("New email").fill("asha.rai@example.org");
+  await dialog.getByLabel("Type it again").fill("asha.ria@example.org");
+  await expect(dialog.getByText("The two addresses don't match.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save email" })).toBeDisabled();
+  await dialog.getByLabel("Type it again").fill("asha.rai@example.org");
+  await dialog.getByRole("button", { name: "Save email" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(alice.getByTestId("member-email")).toHaveText("asha.rai@example.org");
+  expect((await member(ASHA)).emailLower).toBe("asha.rai@example.org");
+
+  // A duplicate is refused in plain words, and nothing changes.
+  await alice.getByRole("button", { name: "Edit email" }).click();
+  dialog = alice.getByRole("dialog");
+  await dialog.getByLabel("New email").fill("bina@example.org");
+  await dialog.getByLabel("Type it again").fill("bina@example.org");
+  await dialog.getByRole("button", { name: "Save email" }).click();
+  await expect(alice.getByText(/Bina Thapa already uses this address/).first()).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  // Asha has no phone number, so her email can't be removed.
+  await alice.getByRole("button", { name: "Edit email" }).click();
+  await expect(alice.getByRole("dialog").getByRole("button", { name: "Remove email…" })).toHaveCount(0);
+  await alice.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+
+  // Bina opted out and has a phone: the dialog says she stays opted out, and her email can be removed.
+  await alice.goto(`/admin/members/${BINA}`);
+  await waitForStreamedContent(alice);
+  await alice.getByRole("button", { name: "Edit email" }).click();
+  dialog = alice.getByRole("dialog");
+  await expect(dialog.getByText("They opted out of email, and stay opted out at the new address.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Remove email…" }).click();
+  await expect(alice.getByRole("dialog")).toHaveCount(1);
+  await alice.getByRole("dialog").getByRole("button", { name: "Remove email", exact: true }).click();
+  await expect(alice.getByTestId("member-email")).toContainText("No email address");
+  expect(await member(BINA)).toMatchObject({ emailLower: "", email: null });
+
+  // Deepak has no email yet: Add email.
+  await alice.goto(`/admin/members/${DEEP}`);
+  await waitForStreamedContent(alice);
+  await alice.getByRole("button", { name: "Add email" }).click();
+  dialog = alice.getByRole("dialog");
+  await dialog.getByLabel("New email").fill("deepak@example.org");
+  await dialog.getByLabel("Type it again").fill("Deepak@example.org");
+  await dialog.getByRole("button", { name: "Save email" }).click();
+  await expect(alice.getByTestId("member-email")).toHaveText("deepak@example.org");
+  await alice.close();
+
+  const bob = await browser.newPage();
+  await signInWithNewPasskey(bob, "bob", `/admin/members/${ASHA}`);
+  await waitForStreamedContent(bob);
+  await expect(bob.getByTestId("member-email")).toHaveText("asha.rai@example.org");
+  await expect(bob.getByText("Only a super admin can change an email address.")).toBeVisible();
+  await expect(bob.getByRole("button", { name: /Edit email|Add email/ })).toHaveCount(0);
+  await bob.close();
 });

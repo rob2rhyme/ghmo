@@ -217,7 +217,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **15** | Delete a member | **Built 2026-11-06 (15-A, 15-B, 15-C; §20.6 to §20.8).** A super admin can remove a member and what is held about them from inside the app, with a preview, a typed confirmation and a record in the activity log, so a removal request no longer needs the Firebase console. Decisions D41–D46 accepted 2026-11-06. | Owner reads §20.2 and publishes the Firestore rules (go-live checklist). |
 | **16** | Admin devices and push controls | **Built 2026-11-06 (16-A, 16-B, 16-C; §21.6 to §21.8).** A super admin can see every admin's push devices and turn any of them off, and can switch push off for the whole site and back on, closing the gaps listed in §18.8 (a lost phone that still gets alerts, no site-wide switch). Decisions D47–D50 accepted 2026-11-06. | Owner reads §21.2 and publishes the Firestore rules (go-live checklist). |
 | **17** | Admin management | **Built 2026-11-06 (17-A, 17-B, 17-C; §22.6 to §22.8).** A super admin can see who is an admin, add an admin, turn an admin off or on, and change a role, inside the app, instead of editing Firestore by hand (runbook cases B and C). It can never turn off the last active super admin or yourself. Decisions D51–D56 accepted 2026-11-06. | Owner reads §22.2 before 17-A is used. |
-| **18** | Change a member's email | **Planned 2026-11-06 (§25).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
+| **18** | Change a member's email | **Built 2026-11-06 (18-A, 18-B; §25.6, §25.7).** A super admin can add, correct or remove a member's email address from the profile, keeping their history, notes, calls, groups and positions, instead of deleting and re-adding them. Decisions D57–D63 accepted 2026-11-06. | None before 18-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1584,7 +1584,7 @@ The owner reported that adding board members and other officers "is not enabled"
    - a **retention policy** for records that grow forever (activity log with internet addresses, broadcast deliveries, reminders).
 5. **Public site, smaller:** a per-event share image, linking an event's place to a map and a Share button, a Contact/About page, optimising the Media page's thumbnails and moving its Facebook feed off Graph v18, and making the donate page's "time left" count in the browser.
 
-## 25. Phase 18 — Change a member's email (planned 2026-11-06; decisions accepted 2026-11-06)
+## 25. Phase 18 — Change a member's email (planned 2026-11-06; decisions accepted; 18-A and 18-B built 2026-11-06)
 
 **Goal.** Today a member's email address can't be changed: the update route has no email field (`members/[memberId]/route.ts`). A typo, a new address, or adding an address to someone who only gave a phone number means deleting the member and adding them again, which throws away their notes, call history, groups, positions and tasks. Phase 18 lets a super admin change it in place, safely.
 
@@ -1633,6 +1633,12 @@ Each sub-phase runs the full gate (`npm run check`, emulator rules tests, the fu
 - `src/lib/memberEmailChange.server.ts`: one transaction reads the member and the duplicate check, writes the change and, when D61 applies, the old address's do-not-email record (`suppressionRef` is now exported from `memberDeletion.server.ts`). `memberUsingEmail` is also used by **Add a member**, which now refuses an address another member has (409, with that member's name).
 - `PUT /api/organizations/ghmo/members/[memberId]/email`: super admins only; audit action `member_email_changed` ("changed a member's email") with the kind of change, never an address.
 - Rules test: a browser can't write a member's `email`, `emailLower` or `uid`, or a do-not-email record. Browser spec `member-email.spec.ts`: a plain admin gets 403; change, duplicate, bad input, add to a phone-only member, opted-out member, removal rules, and an activity entry without names or addresses.
+
+### 25.7 18-B built (2026-11-06)
+
+- `src/components/admin/members/EmailCard.tsx`: an **Email** card on the member profile, outside the encryption gate (the address is plain text). Every admin sees the address; a super admin gets **Edit email** / **Add email**: the new address typed twice (a mismatch keeps **Save email** greyed out), notes on what carries over (an opt-out, a bounced old address), and **Remove email…** only when the member has a name and a phone number, with its own confirmation. Other admins see "Only a super admin can change an email address." The row on the Members list gets no new button.
+- Browser spec (`member-email.spec.ts`): edit with a mismatch then a match; duplicate refused in words; no removal without a phone; an opted-out member's note and removal; adding to a phone-only member; a plain admin sees the address but no button.
+- Docs: admin guide §1h (Email, and the table of what a profile holds), runbook case O step 3, and the privacy page.
 
 ### 25.5 Risks and out of scope
 
