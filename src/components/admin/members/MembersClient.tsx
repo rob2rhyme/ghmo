@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, Lock, Mail, Phone, SearchX, ShieldOff, Upload, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Pencil, Phone, PhoneCall, PhoneOff, SearchX, ShieldOff, Upload, UserCheck, UserPlus, UserRound, UserX, Users } from "lucide-react";
 import AdminSectionCard from "@/src/components/admin/AdminSectionCard";
 import { AdminList, AdminListRow } from "@/src/components/admin/AdminList";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -648,11 +648,13 @@ export default function MembersClient({
                           loading={busy}
                           onClick={() => update(member, { emailConsent: { source: "admin_on_request" } }, "Consent recorded")}
                         >
+                          <Mail aria-hidden="true" />
                           {state === "opted_out" ? "They asked to be added back" : "Record consent"}
                         </Button>
                       ) : null}
                       {state === "ready" ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
+                        <Button size="row" variant="outline" loading={busy} title="Record that they asked to stop getting email" onClick={() => update(member, { emailOptOut: true }, "Opt-out recorded")}>
+                          <ShieldOff aria-hidden="true" />
                           They asked to stop
                         </Button>
                       ) : null}
@@ -663,31 +665,37 @@ export default function MembersClient({
                           loading={busy}
                           onClick={() => update(member, { phoneConsent: { source: "admin_on_request" } }, "Call consent recorded")}
                         >
+                          <PhoneCall aria-hidden="true" />
                           {callState === "opted_out" ? "They asked to be called again" : "Record call consent"}
                         </Button>
                       ) : null}
                       {callState === "ready" ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
+                        <Button size="row" variant="outline" loading={busy} title="Record that they asked not to be called" onClick={() => update(member, { callOptOut: true }, "Call opt-out recorded")}>
+                          <PhoneOff aria-hidden="true" />
                           They asked not to be called
                         </Button>
                       ) : null}
                       {phonesReady ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`}>
+                        <Button size="row" variant="outline" loading={busy} onClick={() => setEditing(member)} aria-label={`Edit contact for ${displayName}`} title="Phone numbers, language, household and family">
+                          <Phone aria-hidden="true" />
                           {member.hasPhone || member.contact ? "Edit contact" : "Add phone"}
                         </Button>
                       ) : null}
                       <Button asChild size="row" variant="outline">
-                        <Link href={`/admin/members/${member.id}` as Route} aria-label={`Profile of ${displayName}`}>
+                        <Link href={`/admin/members/${member.id}` as Route} aria-label={`Profile of ${displayName}`} title="Open the profile: membership, family, notes and calls">
+                          <UserRound aria-hidden="true" />
                           Profile
                         </Link>
                       </Button>
                       {superAdmin ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => setRenaming(member)} aria-label={`Edit name of ${displayName}`}>
+                        <Button size="row" variant="outline" loading={busy} onClick={() => setRenaming(member)} aria-label={`Edit name of ${displayName}`} title="Fix a typo in the name (super admin)">
+                          <Pencil aria-hidden="true" />
                           Edit name
                         </Button>
                       ) : null}
                       {groups.length > 0 ? (
-                        <Button size="row" variant="outline" loading={busy} onClick={() => setGroupsFor(member)} aria-label={`Groups for ${displayName}`}>
+                        <Button size="row" variant="outline" loading={busy} onClick={() => setGroupsFor(member)} aria-label={`Groups for ${displayName}`} title="Choose the groups they belong to">
+                          <Users aria-hidden="true" />
                           Groups
                         </Button>
                       ) : null}
@@ -699,12 +707,15 @@ export default function MembersClient({
                           variant="ghost"
                           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                           loading={busy}
+                          title="Turn this member off (asks first)"
                           onClick={() => setDisabling(member)}
                         >
+                          <UserX aria-hidden="true" />
                           Disable
                         </Button>
                       ) : (
-                        <Button size="row" variant="ghost" loading={busy} onClick={() => update(member, { status: "active" }, "Member enabled")}>
+                        <Button size="row" variant="ghost" loading={busy} title="Turn this member back on" onClick={() => update(member, { status: "active" }, "Member enabled")}>
+                          <UserCheck aria-hidden="true" />
                           Enable
                         </Button>
                       )}
