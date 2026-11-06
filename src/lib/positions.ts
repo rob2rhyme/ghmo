@@ -137,7 +137,12 @@ export function planTerm(params: {
 
   if (endPrevious) {
     if (others.some(term => term.startsOn >= startsOn)) {
-      return { ok: false, error: "Someone else starts on or after that date, so their term can't be ended before it begins. Change the date." };
+      return {
+        ok: false,
+        error: position.multiple
+          ? "Someone else starts on or after that date, so their term can't be ended before it begins. To add this person alongside them, untick \"End … the day before\". Otherwise change the date."
+          : "Someone else starts on or after that date, so their term can't be ended before it begins. Change the date."
+      };
     }
     return { ok: true, closes: others.map(term => ({ termId: term.id, endsOn: addDays(startsOn, -1) })) };
   }
