@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/src/components/ui/badge";
@@ -331,6 +333,7 @@ export default function BroadcastDetailClient({
               Withdraw to edit
             </Button>
           ) : null}
+          <CopyBroadcastButton broadcastId={broadcast.id} />
         </div>
         {canCancel ? (
           <div className="border-t border-border pt-4">
@@ -439,5 +442,31 @@ function MessengerCard({ broadcast, onRecorded }: { broadcast: BroadcastDetail; 
         )}
       </div>
     </AdminSectionCard>
+  );
+}
+
+/** "Copy as new draft" on any broadcast, sent and cancelled ones included (plan §30, D90). The copy needs approval again. */
+function CopyBroadcastButton({ broadcastId }: { broadcastId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const copy = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/broadcasts/${encodeURIComponent(broadcastId)}/copy`, { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (!res.ok || !data.id) throw new Error(data.error || "Couldn't copy the broadcast. Try again.");
+      toast.success("Copied as a new draft. Edit it, then submit it for approval.");
+      router.push(`/admin/broadcasts/${data.id}` as Route);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't copy the broadcast. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button variant="outline" onClick={() => void copy()} loading={busy}>
+      <Copy aria-hidden="true" />
+      Copy as new draft
+    </Button>
   );
 }

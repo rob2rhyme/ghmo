@@ -222,7 +222,7 @@ Every phase ends with: typecheck, lint, tests and build green; a deploy; and REA
 | **20** | Search people and records | **Built 2026-11-06 (20-A, 20-B; §27.6, §27.7).** Ctrl/⌘ K (and the search button on phones) finds members, events, minutes, groups, positions and broadcasts by name, not only pages, and opens the record with Enter. Decisions D70–D75 accepted 2026-11-06. | None before 20-A. |
 | **21** | Members list on phones, and changing many at once | **Built 2026-11-06 (21-A, 21-B, 21-C; §28.6 to §28.8).** Also: Set holder offers members' relatives (21-C). Each member row shows **Profile** and a **More…** menu instead of up to nine buttons, the list loads 50 at a time, and admins can tick several members to add them to a group, take them out of one, or turn them off or on in one step. Decisions D76–D81 accepted 2026-11-06. | None before 21-A. |
 | **22** | Activity log page | **Built 2026-11-06 (22-A, 22-B; §29.6, §29.7).** A page that lists everything in the activity log, newest first, 50 at a time, filtered by person, area and dates, with links to the record and what changed; super admins also see the internet address and browser, and can download the filtered list. Decisions D82–D87 accepted 2026-11-06. | Owner runs the Firestore deploy for the two new indexes after it ships. |
-| **23** | Copy, and email one group | **Planned 2026-11-06 (§30).** **Copy** an event (optionally with its tasks) or a broadcast as a new draft, and send a broadcast to **one group** (for example the cooking team) instead of everyone. Decisions D88–D93 proposed. | Owner reads §30.2 and accepts or changes D88–D93 before 23-A. |
+| **23** | Copy, and email one group | **Planned 2026-11-06 (§30).** **Copy** an event (optionally with its tasks) or a broadcast as a new draft, and send a broadcast to **one group** (for example the cooking team) instead of everyone. Decisions D88–D93 accepted 2026-11-06. | None before 23-A. |
 
 **Dropped (decision D4):** silent Admin Activity Analytics and the Admin Leaderboard. They conflict with the privacy goal. Aggregate governance stats (e.g. attendance per meeting) computed from approved minutes are still allowed.
 
@@ -1890,7 +1890,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - Browser spec (`activity-log.spec.ts`, third test): from the dashboard link to 50 entries, an entry's changes and record link, Load older to 62, the Minutes area, a person, a word; a plain admin has no device line or Download; a super admin's device line and a CSV download that is logged as "1 entry (Minutes)".
 - Docs: admin guide §1n, a runbook section on reading the log in an incident (and case P points to it), and a go-live checklist step for the new indexes.
 
-## 30. Phase 23 — Copy, and email one group (planned 2026-11-06)
+## 30. Phase 23 — Copy, and email one group (planned 2026-11-06; decisions accepted 2026-11-06)
 
 **Goal.** Two everyday gaps from the audit (§24.3). First, a yearly event (Lhosar, the picnic) or a monthly reminder email is typed again from scratch each time; a cancelled broadcast can't be reused at all. Second, a broadcast can only go to **every** member who agreed to email; the cooking team or the callers can't be emailed on their own. Phase 23 adds **Copy** for events and broadcasts, and a group audience for broadcasts.
 
@@ -1904,7 +1904,7 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 | An event is a document with title, summary, body, location, time zone, dates, status and flyer settings; tasks are separate documents with an `eventId`. Task templates already copy titles, notes and groups. | events route, `eventTasks` | Copying an event is a new draft with the same text and place and no dates; copying its tasks reuses the template logic. |
 | Creating events and broadcasts is open to any admin; broadcasts need a second admin's approval before sending (D8). | routes | Copies follow the same rules: a copied broadcast is a new draft that needs approval again. |
 
-### 30.2 Decisions (proposed; accept or change before 23-A)
+### 30.2 Decisions (accepted by the owner 2026-11-06)
 
 | ID | Question | Recommendation | Effect |
 |---|---|---|---|
@@ -1932,3 +1932,11 @@ Each sub-phase runs the full gate before any push, and is pushed only when the o
 - **A wrong group** sends to the wrong people: the approval step shows the group and the count, and the approver is a second admin (D8).
 - **Several groups at once, or "everyone except"**, are out of scope; one group, or everyone.
 - **Per-group unsubscribe** is out of scope (D93): it would need a consent record per group.
+
+### 30.6 23-A built (2026-11-06)
+
+- `src/lib/copies.ts` (pure, unit tested): `copyTitle` ("… (copy)" within 120 characters), `eventCopyFields` (same words, place, time zone and flyer settings; draft, not featured, no dates) and `taskCopyFields` (title, notes, order and a still-active group; open, nobody on it, no due date).
+- `src/lib/copies.server.ts` with `POST /api/admin/organizations/ghmo/events/[eventId]/copy` (`{ withTasks }`, default true; one batch for the event and its tasks) and `POST /api/admin/broadcasts/[broadcastId]/copy` (any state; a new draft with `copiedFrom` and a fresh content hash, never an approval). Both any active admin; activity entries `event_copied` ("copied an event", with the source title and task count) and `broadcast_copied`.
+- **Copy event…** on the event's edit page (a dialog with **Also copy its tasks**, then straight to the new event) and **Copy as new draft** on every broadcast page.
+- Browser spec `copies.spec.ts`: copy with tasks (draft, no dates, not featured; tasks open, unassigned, undated; a turned-off group dropped), copy without tasks, the original untouched; a cancelled broadcast copied as a draft without approval, the original still cancelled, unknown ids refused.
+- Admin guide §1f and §2.
