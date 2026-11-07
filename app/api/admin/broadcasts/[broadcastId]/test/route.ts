@@ -3,6 +3,7 @@ import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { logAuditEvent } from "@/src/lib/audit";
 import { getAppOrigin } from "@/src/lib/appUrl";
 import { normalizeBroadcastContent } from "@/src/lib/broadcast";
+import { audienceGroupName } from "@/src/lib/broadcastAudience.server";
 import { footerFromEnv, withUnsubscribeFooter } from "@/src/lib/broadcastMail";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
 import { getAdminDb } from "@/src/lib/firebaseAdmin";
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ broadc
   const origin = getAppOrigin(req);
   const text =
     "THIS IS A TEST. Only you received it; the unsubscribe link below is a preview and does nothing.\n\n" +
-    withUnsubscribeFooter(content.content.body, { origin, token: "preview", footer });
+    withUnsubscribeFooter(content.content.body, { origin, token: "preview", footer, groupName: await audienceGroupName(content.content.audience) });
   const sent = await sendMail({ to, subject: `[TEST] ${content.content.subject}`, text });
   if (!sent) return NextResponse.json({ error: "The email could not be sent. Try again in a moment." }, { status: 502 });
 

@@ -19,7 +19,7 @@ describe("normalizeBroadcastContent", () => {
   it("trims, collapses subject whitespace and normalizes line endings", () => {
     expect(normalizeBroadcastContent({ subject: "  Hello \n  world ", body: "Line 1\r\nLine 2\r\n" })).toEqual({
       ok: true,
-      content: { subject: "Hello world", body: "Line 1\nLine 2" }
+      content: { subject: "Hello world", body: "Line 1\nLine 2", audience: { kind: "all" } }
     });
   });
 

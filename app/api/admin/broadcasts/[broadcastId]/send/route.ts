@@ -3,6 +3,8 @@ import { z } from "zod";
 import { enforceActiveAdmin } from "@/src/lib/adminHttp";
 import { getAppOrigin } from "@/src/lib/appUrl";
 import { logAuditEvent } from "@/src/lib/audit";
+import { AUDIENCE_ALL, normalizeBroadcastContent } from "@/src/lib/broadcast";
+import { audienceAudit, audienceSummary, checkAudience } from "@/src/lib/broadcastAudience.server";
 import { sendingConfigFromEnv } from "@/src/lib/broadcastSending";
 import { loadRecipients, retryFailed, sendNextChunk, sendingBlocker, startSending, type SenderDeps } from "@/src/lib/broadcastSender.server";
 import { COMMUNITY_SLUG } from "@/src/lib/community";
@@ -52,12 +54,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ broadc
     serverKeys: serverEncryptionKeys(),
     sendBatch: (messages, key) => sendMailBatch(messages, key)
   };
-  const audit = (action: string, after: Record<string, unknown>) =>
+  const audit = (action: string, after: Record<string, unknown>, summary?: string) =>
     logAuditEvent({
       orgSlug: COMMUNITY_SLUG,
       action,
       actor: { uid: actor.uid, adminId: admin.id, role: actor.roles[0] ?? "admin", name: admin.name, email: admin.email },
-      resource: { type: "broadcast", id: broadcastId, path: `${orgBroadcastsCollectionPath(COMMUNITY_SLUG)}/${broadcastId}` },
+      resource: { type: "broadcast", id: broadcastId, path: `${orgBroadcastsCollectionPath(COMMUNITY_SLUG)}/${broadcastId}`, ...(summary ? { summary } : {}) },
       after,
       meta: { ip: getClientIp(req.headers), userAgent: req.headers.get("user-agent") ?? null, route: ROUTE }
     });
@@ -67,9 +69,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ broadc
     if (!limited.success) {
       return NextResponse.json({ error: "You started a broadcast less than an hour ago. Try again later." }, { status: 429, headers: { "Retry-After": String(Math.ceil(limited.retryInMs / 1000)) } });
     }
-    const outcome = await startSending(deps, broadcastId, await loadRecipients(db));
+    // The audience is part of the approval; a group must still exist and be turned on (plan §30, D91–D92).
+    const snap = await db.doc(`${orgBroadcastsCollectionPath(COMMUNITY_SLUG)}/${broadcastId}`).get();
+    if (!snap.exists) return NextResponse.json({ error: "Broadcast not found" }, { status: 404 });
+    const content = normalizeBroadcastContent(snap.data() ?? {});
+    if (!content.ok) return NextResponse.json({ error: content.error }, { status: 409 });
+    const audience = content.content.audience ?? AUDIENCE_ALL;
+    const checked = await checkAudience(audience);
+    if (!checked.ok) return NextResponse.json({ error: checked.error, code: checked.code }, { status: checked.status });
+    const outcome = await startSending(deps, broadcastId, await loadRecipients(db, audience), { audience, groupName: checked.groupName });
     if (!outcome.ok) return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: outcome.status });
-    await audit("broadcast_sending_started", { total: outcome.progress.total });
+    await audit("broadcast_sending_started", { total: outcome.progress.total, ...audienceAudit(audience, checked.groupName) }, audienceSummary(audience, checked.groupName));
     return NextResponse.json({ ok: true, progress: outcome.progress });
   }
 

@@ -21,13 +21,21 @@ import {
   MANUAL_CHANNELS,
   MANUAL_CHANNEL_LABELS,
   SUBJECT_MAX,
+  audienceFields,
+  audienceKey,
+  audienceLabel,
   messengerText,
+  readAudience,
+  type AudienceOptions,
   type BroadcastAction,
+  type BroadcastAudience,
   type BroadcastStatus,
   type ManualChannel
 } from "@/src/lib/broadcast.shared";
+import { groupFooterLine } from "@/src/lib/broadcastMail";
 import { formatDateTime } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
+import { AudienceSelect } from "./AudienceSelect";
 import { BroadcastSteps } from "./BroadcastSteps";
 
 /** Where the broadcast is in Write → Approve → Send (3 = all done). */
@@ -54,6 +62,10 @@ export type BroadcastDetail = {
   createdByName?: string;
   submittedByUid?: string | null;
   approvedHash?: string | null;
+  /** Who it goes to (plan §30, D91): "all" (or missing, for older broadcasts) or "group" with the group's id. */
+  audience?: "all" | "group";
+  audienceGroupId?: string | null;
+  audienceGroupName?: string | null;
   /** Hand posts to the Messenger group chats (plan §12, 9-D); dates arrive as epoch milliseconds. */
   manualPosts?: { channel: ManualChannel; at: number; byUid: string; byName: string }[];
 };
@@ -71,10 +83,16 @@ export default function BroadcastDetailClient({
   uid,
   footer,
   initialProgress = null,
-  sendingBlocker = null
+  sendingBlocker = null,
+  audienceOptions = null,
+  audienceGroup = null
 }: {
   initial: BroadcastDetail;
   recipientCount: number;
+  /** Everyone and each turned-on group, with counts; null when they couldn't be counted. */
+  audienceOptions?: AudienceOptions | null;
+  /** The saved group as it is now: its current name, and whether it is still turned on. */
+  audienceGroup?: { id: string; name: string | null; active: boolean; exists: boolean } | null;
   uid: string;
   footer: { orgName: string; postalAddress: string } | null;
   initialProgress?: SendProgress | null;
@@ -84,6 +102,8 @@ export default function BroadcastDetailClient({
   const [count, setCount] = useState(initialCount);
   const [subject, setSubject] = useState(initial.subject);
   const [body, setBody] = useState(initial.body);
+  const [audience, setAudience] = useState<BroadcastAudience>(() => readAudience(initial) ?? { kind: "all" });
+  const [group, setGroup] = useState(audienceGroup);
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState<SendProgress | null>(initialProgress);
   const [running, setRunning] = useState(false);
@@ -93,7 +113,23 @@ export default function BroadcastDetailClient({
   const stopRef = useRef(false);
 
   const editable = broadcast.status === "draft";
-  const dirty = subject !== broadcast.subject || body !== broadcast.body;
+  const savedAudience = readAudience(broadcast) ?? { kind: "all" as const };
+  const dirty = subject !== broadcast.subject || body !== broadcast.body || audienceKey(audience) !== audienceKey(savedAudience);
+  // The group's current name; the saved name if the page has no fresher one.
+  const groupName = savedAudience.kind === "group" ? (group?.id === savedAudience.groupId ? group.name : null) ?? broadcast.audienceGroupName ?? null : null;
+  const groupProblem =
+    savedAudience.kind === "group" && group?.id === savedAudience.groupId && !group.active
+      ? group.exists
+        ? `The ${group.name ?? "chosen"} group is turned off, so this can't be submitted, approved or sent. Withdraw it if needed, then pick another group or everyone.`
+        : "The group this was for no longer exists, so it can't be submitted, approved or sent. Withdraw it if needed, then pick another group or everyone."
+      : null;
+  // While editing, the count follows the unsaved choice.
+  const previewCount =
+    dirty && audienceOptions
+      ? audience.kind === "group"
+        ? (audienceOptions.groups.find(option => option.id === audience.groupId)?.count ?? 0)
+        : audienceOptions.all
+      : count;
   const badge = statusBadge("broadcast", broadcast.status);
   const wroteIt = broadcast.createdByUid === uid || broadcast.submittedByUid === uid;
 
@@ -113,13 +149,19 @@ export default function BroadcastDetailClient({
       setBroadcast(data.broadcast);
       setSubject(data.broadcast.subject);
       setBody(data.broadcast.body);
+      const saved = readAudience(data.broadcast) ?? { kind: "all" as const };
+      setAudience(saved);
+      if (saved.kind === "group") {
+        const option = audienceOptions?.groups.find(item => item.id === saved.groupId);
+        setGroup(option ? { id: option.id, name: option.name, active: true, exists: true } : { id: saved.groupId, name: data.broadcast.audienceGroupName ?? null, active: true, exists: true });
+      } else setGroup(null);
     }
     if (typeof data.recipientCount === "number") setCount(data.recipientCount);
   };
 
   const save = () =>
     run("save", async () => {
-      apply(await send(`/api/admin/broadcasts/${broadcast.id}`, "PATCH", { subject, body }));
+      apply(await send(`/api/admin/broadcasts/${broadcast.id}`, "PATCH", { subject, body, ...audienceFields(audience) }));
       toast.success("Draft saved");
     });
 
@@ -193,11 +235,35 @@ export default function BroadcastDetailClient({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={badge.variant}>{badge.label}</Badge>
+          <span className="text-sm font-semibold" data-testid="audience-line">
+            To: {audienceLabel(savedAudience, groupName)}
+            {savedAudience.kind === "group" ? ` (${members(count)})` : ""}
+          </span>
           <span className="text-sm text-muted-foreground" aria-live="polite">
-            Would go to {members(count)} (active, agreed to email, not unsubscribed).
+            Would go to {members(count)} (active, agreed to email, not unsubscribed{savedAudience.kind === "group" ? ", in this group" : ""}).
           </span>
         </div>
-        {count === 0 && broadcast.status !== "sent" && broadcast.status !== "cancelled" ? (
+        {groupProblem && broadcast.status !== "sent" && broadcast.status !== "sending" && broadcast.status !== "cancelled" ? (
+          <Alert variant="warning">
+            <MailWarning />
+            <AlertTitle>Pick who it goes to again</AlertTitle>
+            <AlertDescription>{groupProblem}</AlertDescription>
+          </Alert>
+        ) : null}
+        {count === 0 && !groupProblem && savedAudience.kind === "group" && broadcast.status !== "sent" && broadcast.status !== "cancelled" ? (
+          <Alert variant="warning">
+            <MailWarning />
+            <AlertTitle>Nobody in this group can be emailed</AlertTitle>
+            <AlertDescription>
+              Nobody in {groupName ?? "this group"} has agreed to email (or they all opted out). Pick another group or everyone, or record who agreed on{" "}
+              <Link href="/admin/members" className="font-semibold text-foreground underline underline-offset-2">
+                Members
+              </Link>
+              .
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {count === 0 && savedAudience.kind === "all" && broadcast.status !== "sent" && broadcast.status !== "cancelled" ? (
           <Alert variant="warning">
             <MailWarning />
             <AlertTitle>Nobody can be emailed yet</AlertTitle>
@@ -228,6 +294,22 @@ export default function BroadcastDetailClient({
             <Textarea id="b-body" rows={10} value={body} onChange={e => setBody(e.target.value)} maxLength={BODY_MAX} readOnly={!editable} />
           </Field>
           {editable ? (
+            <>
+              <AudienceSelect
+                id="b-audience"
+                value={audience}
+                onChange={setAudience}
+                options={audienceOptions}
+                current={savedAudience.kind === "group" ? { id: savedAudience.groupId, name: group?.exists === false ? null : groupName } : null}
+              />
+              {dirty && audienceKey(audience) !== audienceKey(savedAudience) ? (
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  After saving, it would go to {members(previewCount)}.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          {editable ? (
             <div className="flex flex-wrap gap-2">
               <Button onClick={save} loading={busy === "save"} disabled={!dirty} variant={dirty ? "default" : "outline"} className="max-sm:h-11">
                 Save draft
@@ -244,7 +326,14 @@ export default function BroadcastDetailClient({
           <hr className="border-border" />
           {footer ? (
             <p className="whitespace-pre-wrap text-muted-foreground" data-testid="footer-preview">
-              {`You get this email because you asked to hear from ${footer.orgName}.\nTo stop these emails, open: (a personal unsubscribe link)\n\n${footer.orgName}\n${footer.postalAddress}`}
+              {[
+                `You get this email because you asked to hear from ${footer.orgName}.`,
+                ...(savedAudience.kind === "group" && groupName ? [groupFooterLine(groupName)] : []),
+                "To stop these emails, open: (a personal unsubscribe link)",
+                "",
+                footer.orgName,
+                footer.postalAddress
+              ].join("\n")}
             </p>
           ) : (
             <Alert variant="warning">
@@ -265,7 +354,9 @@ export default function BroadcastDetailClient({
           <>
             {broadcast.status === "draft" && "Send yourself a test, then submit it so another admin can approve it."}
             {broadcast.status === "pending_approval" &&
-              (wroteIt ? "Waiting for another admin. You wrote or submitted this, so you can't approve it." : "Read the message above. Approving means you checked exactly this text.")}
+              (wroteIt
+                ? "Waiting for another admin. You wrote or submitted this, so you can't approve it."
+                : `Read the message above. Approving means you checked exactly this text, going to ${savedAudience.kind === "group" ? `${groupName ?? "this group"} (${members(count)})` : "everyone who agreed to email"}.`)}
             {broadcast.status === "approved" &&
               (sendingBlocker ? `Approved by a second admin. It can't be sent yet. ${sendingBlocker}` : `Approved by a second admin. Ready to send to ${members(count)}.`)}
             {broadcast.status === "sending" && "Sending in small batches. Keep this page open; if you close it, sending pauses and you (or another admin) can resume here."}
@@ -294,7 +385,7 @@ export default function BroadcastDetailClient({
         ) : null}
         <div className="flex flex-wrap gap-2">
           {broadcast.status === "approved" ? (
-            <Button onClick={() => setConfirming(true)} disabled={Boolean(sendingBlocker) || count === 0}>
+            <Button onClick={() => setConfirming(true)} disabled={Boolean(sendingBlocker) || count === 0 || Boolean(groupProblem)}>
               Send to {members(count)}…
             </Button>
           ) : null}
@@ -309,12 +400,17 @@ export default function BroadcastDetailClient({
             </Button>
           ) : null}
           {broadcast.status === "draft" ? (
-            <Button onClick={() => act("submit", "Submitted for approval")} loading={busy === "submit"} disabled={dirty} title={dirty ? "Save your changes first." : undefined}>
+            <Button
+              onClick={() => act("submit", "Submitted for approval")}
+              loading={busy === "submit"}
+              disabled={dirty || Boolean(groupProblem)}
+              title={dirty ? "Save your changes first." : groupProblem ? "Pick another group or everyone first." : undefined}
+            >
               Submit for approval
             </Button>
           ) : null}
           {broadcast.status === "pending_approval" && !wroteIt ? (
-            <Button onClick={() => act("approve", "Approved")} loading={busy === "approve"}>
+            <Button onClick={() => act("approve", "Approved")} loading={busy === "approve"} disabled={Boolean(groupProblem)}>
               Approve this message
             </Button>
           ) : null}

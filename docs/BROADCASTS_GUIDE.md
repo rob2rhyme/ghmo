@@ -231,15 +231,17 @@ Every change in the admin area is written down: who, what and when. **Admin → 
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
+- **Send to:** choose **Everyone who agreed to email** (the usual), or one group, for example the cooking team. Each choice shows how many people could be emailed right now: members who are active, agreed to email and haven't unsubscribed, and for a group, only those in it. Groups that are turned off aren't offered. If a group is turned off or deleted after you saved the draft, the page warns you and the draft can't be submitted until you pick another group or everyone. (Added 2026-11-07, plan §30.)
 - **Reusing an earlier one:** open any broadcast (sent, cancelled or still a draft) and press **Copy as new draft**. You get a new draft with the same subject and text; edit it, and it needs approval like any other. The original stays as it was. (Added 2026-11-06, plan §30.)
-- Check **How it will look**: every email ends with a footer saying why they got it, a personal unsubscribe link, and our name and postal address.
+- Check **How it will look**: every email ends with a footer saying why they got it, a personal unsubscribe link, and our name and postal address. A group email adds one line: "You got this because you are in this group: Cooking team." The unsubscribe link still stops all GHMO announcement emails; there is no separate list per group.
 - Press **Send a test to me** and read it in your own inbox.
 - Press **Submit for approval**.
 
 ## 3. A second admin approves
 
-- Another admin opens the broadcast, reads it, and presses **Approve this message**. Whoever wrote or submitted it can't approve it.
-- If anyone changes the text after that, it goes back to draft and needs approval again. To change it yourself, use **Withdraw to edit**.
+- Another admin opens the broadcast, reads it and who it goes to (**To: Cooking team (12 members)** at the top), and presses **Approve this message**. Whoever wrote or submitted it can't approve it.
+- If anyone changes the text or who it goes to after that, it goes back to draft and needs approval again. To change it yourself, use **Withdraw to edit**.
+- Members are counted again when sending starts, so someone who joined the group or agreed to email in between is included, and someone who left the group or unsubscribed is skipped.
 
 ## 4. Send it
 

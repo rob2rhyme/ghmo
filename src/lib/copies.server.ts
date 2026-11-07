@@ -3,6 +3,7 @@ import { COMMUNITY_SLUG } from "./community";
 import { fail, type Failure } from "./adminRoute.server";
 import { normalizeBroadcastContent } from "./broadcast";
 import { hashBroadcast } from "./broadcastHash";
+import { audienceFields } from "./broadcast.shared";
 import { eventCopyFields, taskCopyFields } from "./copies";
 import { listTasksForEvent } from "./eventTasks.server";
 import { findEventDoc, primaryEventsPath } from "./events";
@@ -48,12 +49,15 @@ export async function copyBroadcast(input: { broadcastId: string; actorUid: stri
   const source = await col.doc(input.broadcastId).get();
   if (!source.exists) return fail(404, "That broadcast doesn't exist.");
   const data = source.data() ?? {};
-  const checked = normalizeBroadcastContent({ subject: data.subject, body: data.body });
+  // The same audience: everyone, or the same group (D90). A group turned off since then is caught on submit.
+  const checked = normalizeBroadcastContent({ subject: data.subject, body: data.body, audience: data.audience, audienceGroupId: data.audienceGroupId });
   if (!checked.ok) return fail(400, checked.error);
   const ref = col.doc();
   await ref.create({
-    ...checked.content,
-    audience: data.audience ?? "all",
+    subject: checked.content.subject,
+    body: checked.content.body,
+    ...audienceFields(checked.content.audience),
+    audienceGroupName: checked.content.audience?.kind === "group" ? (data.audienceGroupName ?? null) : null,
     status: "draft",
     contentHash: hashBroadcast(checked.content),
     copiedFrom: input.broadcastId,

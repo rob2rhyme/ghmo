@@ -242,3 +242,56 @@ describe("broadcast sender", () => {
     expect(provider.delivered).toHaveLength(2);
   });
 });
+
+describe("broadcast sender, one group (plan §30, 23-B)", () => {
+  const cooking = { kind: "group" as const, groupId: "cooking" };
+  const groupContent = { ...content, audience: cooking };
+
+  async function seedGroupApproved(id = "g1") {
+    const hash = hashBroadcast(groupContent);
+    await getAdminDb()
+      .doc(`${ORG}/broadcasts/${id}`)
+      .set({ ...content, audience: "group", audienceGroupId: "cooking", audienceGroupName: "Cooking", status: "approved", contentHash: hash, approvedHash: hash, createdByUid: "alice", approvedByUid: "bob" });
+    return id;
+  }
+
+  it("emails only the group's members who can be emailed, with the group line in the footer", async () => {
+    await seedMembers(4);
+    const db = getAdminDb();
+    for (const id of ["m0", "m1", "x2"]) await db.doc(`${ORG}/members/${id}`).update({ groupIds: ["cooking"] });
+    await db.doc(`${ORG}/members/m2`).update({ groupIds: ["callers"] });
+    const provider = fakeProvider();
+    const d = deps(provider);
+    const id = await seedGroupApproved();
+
+    const recipients = await loadRecipients(db, cooking);
+    expect(recipients.map(r => r.id).sort()).toEqual(["m0", "m1"]);
+    expect(await startSending(d, id, recipients, { audience: cooking, groupName: "Cooking team" })).toMatchObject({ ok: true, progress: { total: 2 } });
+    expect((await db.doc(`${ORG}/broadcasts/${id}`).get()).get("audienceGroupName")).toBe("Cooking team");
+
+    // m1 leaves the group after sending started: skipped, not emailed.
+    await db.doc(`${ORG}/members/m1`).update({ groupIds: [] });
+    expect(await sendAll(d, id)).toMatchObject({ ok: true, progress: { sent: 1, skipped: 1, done: true } });
+    expect(provider.delivered.map(m => m.to)).toEqual(["m0@example.org"]);
+    expect(provider.delivered[0].message.text).toContain("You got this because you are in this group: Cooking team.");
+  });
+
+  it("refuses to start for a different audience than the one stored", async () => {
+    await seedMembers(2);
+    const provider = fakeProvider();
+    const id = await seedGroupApproved();
+    expect(await startSending(deps(provider), id, [{ id: "m0" }], { audience: { kind: "all" }, groupName: null })).toMatchObject({ ok: false, code: "CONTENT_CHANGED" });
+    // The stored group swapped without a new approval.
+    await getAdminDb().doc(`${ORG}/broadcasts/${id}`).update({ audienceGroupId: "callers" });
+    expect(await startSending(deps(provider), id, [{ id: "m0" }], { audience: { kind: "group", groupId: "callers" }, groupName: "Callers" })).toMatchObject({ ok: false, code: "CONTENT_CHANGED" });
+  });
+
+  it("an 'everyone' broadcast stored before groups existed still sends", async () => {
+    await seedMembers(1);
+    const provider = fakeProvider();
+    const id = await seedApproved();
+    expect(await startSending(deps(provider), id, await loadRecipients(getAdminDb()), { audience: { kind: "all" }, groupName: null })).toMatchObject({ ok: true });
+    await sendAll(deps(provider), id);
+    expect(provider.delivered[0].message.text).not.toContain("this group");
+  });
+});
