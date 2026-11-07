@@ -8,6 +8,7 @@ import { loadBroadcastDetail } from "@/src/lib/adminData.server";
 import { footerFromEnv } from "@/src/lib/broadcastMail";
 import { emailSetupProblem } from "@/src/components/admin/broadcasts/sendingSetup.server";
 import type { SendProgress } from "@/src/lib/broadcastSender.server";
+import type { AudienceOptions } from "@/src/lib/broadcast.shared";
 
 /** Tab title: "Broadcast · GHMO admin" (the admin layout adds the suffix). */
 export const metadata: Metadata = { title: "Broadcast" };
@@ -27,9 +28,11 @@ export default async function BroadcastPage({ params }: { params: Promise<{ broa
   }
   const detail = await loadBroadcastDetail(await requireActiveAdmin(undefined, COMMUNITY_SLUG), broadcastId);
   if (!detail) notFound();
-  const { broadcast, recipientCount, progress, sendingBlocker } = detail as unknown as {
+  const { broadcast, recipientCount, progress, sendingBlocker, audienceOptions, audienceGroup } = detail as unknown as {
     broadcast: BroadcastDetail;
     recipientCount: number;
+    audienceOptions: AudienceOptions;
+    audienceGroup: { id: string; name: string | null; active: boolean; exists: boolean } | null;
     progress: SendProgress | null;
     sendingBlocker: string | null;
   };
@@ -44,6 +47,8 @@ export default async function BroadcastPage({ params }: { params: Promise<{ broa
       <BroadcastDetailClient
         initial={broadcast}
         recipientCount={recipientCount}
+        audienceOptions={audienceOptions}
+        audienceGroup={audienceGroup}
         uid={uid}
         footer={footerFromEnv()}
         initialProgress={progress}

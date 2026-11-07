@@ -9,6 +9,7 @@ import { CalendarX2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import AdminPageHeader from "@/src/components/admin/AdminPageHeader";
 import EventTasksPanel from "@/src/components/admin/events/EventTasksPanel";
+import CopyEventButton from "@/src/components/admin/events/CopyEventButton";
 import { EMPTY_EVENT_FORM, EventForm, toInputDate, validateEventForm, type EventFormValues } from "@/src/components/admin/events/EventForm";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Button } from "@/src/components/ui/button";
@@ -174,6 +175,7 @@ export default function EditEventPage() {
         <Button size="lg" variant="outline" onClick={() => router.back()} disabled={saving || deleting}>
           Cancel
         </Button>
+        <CopyEventButton eventId={eventId} title={form.title} disabled={saving || deleting} />
         <Button variant="ghost" className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>
           <Trash2 aria-hidden="true" />
           Delete event…

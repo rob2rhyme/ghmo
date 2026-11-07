@@ -89,6 +89,7 @@ Phone numbers can only be saved once encryption is on, so this comes first. It i
 ## 1f. Event tasks and templates (Admin → Events)
 
 Open an event to edit it and scroll to **Tasks**. This is the checklist for who does what: cook, shopping, marketing, setting up the hall.
+- **Copy event…** (next to Save on the event's page) starts next year's or next month's event from this one: a new **draft** with the same title (marked "(copy)"), description, place and flyer, and **no dates**. Leave **Also copy its tasks** ticked to bring the checklist along: the tasks start not done, with nobody on them and no due dates. Set the dates and people, then publish. (Added 2026-11-06, plan §30.)
 - **Add task** takes a title, an optional group, optional named people (up to 20), a due date and notes. Keep notes about the work, not about people. Phone numbers stay on the member's contact card. Tasks save the moment you press **Save task**, separately from **Save changes** for the event itself.
 - Tick the box to mark a task done, and untick it to reopen it. A task past its due date that is still open shows **Overdue**.
 - A group's page lists every task given to that group across all events, and the Groups list shows how many are still open.
@@ -230,14 +231,17 @@ Every change in the admin area is written down: who, what and when. **Admin → 
 ## 2. Write it (Admin → Broadcasts)
 
 - Start a draft with a subject and plain-text message. Nothing is sent by saving.
-- Check **How it will look**: every email ends with a footer saying why they got it, a personal unsubscribe link, and our name and postal address.
+- **Send to:** choose **Everyone who agreed to email** (the usual), or one group, for example the cooking team. Each choice shows how many people could be emailed right now: members who are active, agreed to email and haven't unsubscribed, and for a group, only those in it. Groups that are turned off aren't offered. If a group is turned off or deleted after you saved the draft, the page warns you and the draft can't be submitted until you pick another group or everyone. (Added 2026-11-07, plan §30.)
+- **Reusing an earlier one:** open any broadcast (sent, cancelled or still a draft) and press **Copy as new draft**. You get a new draft with the same subject and text; edit it, and it needs approval like any other. The original stays as it was. (Added 2026-11-06, plan §30.)
+- Check **How it will look**: every email ends with a footer saying why they got it, a personal unsubscribe link, and our name and postal address. A group email adds one line: "You got this because you are in this group: Cooking team." The unsubscribe link still stops all GHMO announcement emails; there is no separate list per group.
 - Press **Send a test to me** and read it in your own inbox.
 - Press **Submit for approval**.
 
 ## 3. A second admin approves
 
-- Another admin opens the broadcast, reads it, and presses **Approve this message**. Whoever wrote or submitted it can't approve it.
-- If anyone changes the text after that, it goes back to draft and needs approval again. To change it yourself, use **Withdraw to edit**.
+- Another admin opens the broadcast, reads it and who it goes to (**To: Cooking team (12 members)** at the top), and presses **Approve this message**. Whoever wrote or submitted it can't approve it.
+- If anyone changes the text or who it goes to after that, it goes back to draft and needs approval again. To change it yourself, use **Withdraw to edit**.
+- Members are counted again when sending starts, so someone who joined the group or agreed to email in between is included, and someone who left the group or unsubscribed is skipped.
 
 ## 4. Send it
 

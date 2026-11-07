@@ -1,7 +1,18 @@
 import "server-only";
 
 import { memberEmailState } from "./members";
-import { BODY_MAX, MANUAL_CHANNELS, SUBJECT_MAX, type BroadcastAction, type BroadcastContent, type BroadcastStatus, type ManualChannel } from "./broadcast.shared";
+import {
+  BODY_MAX,
+  MANUAL_CHANNELS,
+  SUBJECT_MAX,
+  audienceFields,
+  readAudience,
+  type BroadcastAction,
+  type BroadcastAudience,
+  type BroadcastContent,
+  type BroadcastStatus,
+  type ManualChannel
+} from "./broadcast.shared";
 import { hashBroadcast } from "./broadcastHash";
 
 /**
@@ -10,34 +21,45 @@ import { hashBroadcast } from "./broadcastHash";
  * and cancelled from any status before sent (cancelling while sending stops the remaining chunks).
  *
  *  - A second admin must approve: nobody who wrote or submitted a broadcast can approve it.
- *  - Approval is bound to the exact subject and body (hash): the approver sends the hash they were
- *    shown, and it must match what is stored.
+ *  - Approval is bound to the exact subject, body and audience (hash): the approver sends the hash they
+ *    were shown, and it must match what is stored.
  *  - Editing a submitted or approved broadcast sends it back to draft, so what goes out is always
  *    exactly what was approved.
  */
-export type { BroadcastAction, BroadcastContent, BroadcastStatus, ManualChannel } from "./broadcast.shared";
-export { BODY_MAX, MANUAL_CHANNELS, MANUAL_CHANNEL_LABELS, SUBJECT_MAX, messengerText } from "./broadcast.shared";
+export type { BroadcastAction, BroadcastAudience, BroadcastContent, BroadcastStatus, ManualChannel } from "./broadcast.shared";
+export { AUDIENCE_ALL, BODY_MAX, MANUAL_CHANNELS, MANUAL_CHANNEL_LABELS, SUBJECT_MAX, audienceFields, audienceKey, audienceLabel, messengerText, readAudience } from "./broadcast.shared";
 export { hashBroadcast } from "./broadcastHash";
 
-export function normalizeBroadcastContent(input: { subject?: unknown; body?: unknown }): { ok: true; content: BroadcastContent } | { ok: false; error: string } {
+/** Checks subject, body and audience (stored or posted). A missing audience means everyone. */
+export function normalizeBroadcastContent(input: { subject?: unknown; body?: unknown; audience?: unknown; audienceGroupId?: unknown }): { ok: true; content: BroadcastContent } | { ok: false; error: string } {
   const subject = typeof input.subject === "string" ? input.subject.replace(/\s+/g, " ").trim() : "";
   const body = typeof input.body === "string" ? input.body.replace(/\r\n/g, "\n").trim() : "";
   if (!subject) return { ok: false, error: "Add a subject." };
   if (subject.length > SUBJECT_MAX) return { ok: false, error: `The subject is longer than ${SUBJECT_MAX} characters.` };
   if (!body) return { ok: false, error: "Write the message." };
   if (body.length > BODY_MAX) return { ok: false, error: `The message is longer than ${BODY_MAX.toLocaleString("en-US")} characters.` };
-  return { ok: true, content: { subject, body } };
+  const audience = readAudience(input);
+  if (!audience) return { ok: false, error: "Pick who it goes to: everyone, or one group." };
+  return { ok: true, content: { subject, body, audience } };
 }
 
-/** Members who may be emailed right now (active, consent recorded, no opt-out, no bounce). */
-export function selectRecipients<T extends Parameters<typeof memberEmailState>[0]>(members: T[]): T[] {
-  return members.filter(member => memberEmailState(member) === "ready");
+/** Whether a member is in the audience (the group check only; consent is checked separately). */
+export function inAudience(member: { groupIds?: unknown }, audience: BroadcastAudience | undefined): boolean {
+  if (audience?.kind !== "group") return true;
+  return Array.isArray(member.groupIds) && member.groupIds.includes(audience.groupId);
+}
+
+/** Members who may be emailed right now (active, consent recorded, no opt-out, no bounce), within the audience. */
+export function selectRecipients<T extends Parameters<typeof memberEmailState>[0] & { groupIds?: unknown }>(members: T[], audience?: BroadcastAudience): T[] {
+  return members.filter(member => memberEmailState(member) === "ready" && inAudience(member, audience));
 }
 
 type Stored = {
   status?: BroadcastStatus;
   subject?: string;
   body?: string;
+  audience?: unknown;
+  audienceGroupId?: unknown;
   createdByUid?: string;
   submittedByUid?: string | null;
   submittedHash?: string | null;
@@ -51,12 +73,12 @@ const refuse = (status: number, error: string, code?: string): BroadcastPlan => 
 
 const RESET = { submittedAt: null, submittedByUid: null, submittedHash: null, approvedAt: null, approvedByUid: null, approvedHash: null };
 
-/** Saving new content: only drafts keep their status; submitted or approved broadcasts go back to draft. */
+/** Saving new content or a new audience: only drafts keep their status; submitted or approved broadcasts go back to draft. */
 export function planContentEdit(before: Stored, content: BroadcastContent, now: Date): BroadcastPlan {
   const status = before.status ?? "draft";
   if (status === "cancelled") return refuse(409, "This broadcast was canceled.");
   if (status === "sending" || status === "sent") return refuse(409, "This broadcast is being sent or was sent, so it can't be changed.");
-  const updates: Record<string, unknown> = { subject: content.subject, body: content.body, contentHash: hashBroadcast(content), updatedAt: now };
+  const updates: Record<string, unknown> = { subject: content.subject, body: content.body, ...audienceFields(content.audience), contentHash: hashBroadcast(content), updatedAt: now };
   if (status !== "draft") Object.assign(updates, { status: "draft", ...RESET });
   return { ok: true, updates, audit: status === "draft" ? "broadcast_updated" : "broadcast_edited_returned_to_draft" };
 }

@@ -15,34 +15,47 @@ import { EmptyState } from "@/src/components/ui/empty-state";
 import { Field } from "@/src/components/ui/field";
 import { Input } from "@/src/components/ui/input";
 import { Textarea } from "@/src/components/ui/textarea";
-import { BODY_MAX, SUBJECT_MAX, type BroadcastStatus } from "@/src/lib/broadcast.shared";
+import { AUDIENCE_ALL, BODY_MAX, SUBJECT_MAX, audienceFields, type AudienceOptions, type BroadcastAudience, type BroadcastStatus } from "@/src/lib/broadcast.shared";
 import { formatShortDate } from "@/src/lib/format";
 import { statusBadge } from "@/src/lib/statusBadges";
+import { AudienceSelect } from "./AudienceSelect";
 import { BroadcastSteps } from "./BroadcastSteps";
 
-export type BroadcastSummary = { id: string; subject: string; status: BroadcastStatus; updatedAt?: string; createdByName?: string };
+export type BroadcastSummary = {
+  id: string;
+  subject: string;
+  status: BroadcastStatus;
+  updatedAt?: string;
+  createdByName?: string;
+  audience?: string;
+  audienceGroupName?: string | null;
+};
 
 export default function BroadcastsClient({
   initial,
   recipientCount = null,
+  audienceOptions = null,
   emailProblem = null
 }: {
   initial: BroadcastSummary[];
   /** Members a broadcast would reach now; null when it couldn't be counted. */
   recipientCount?: number | null;
+  /** Everyone and each turned-on group, with how many could be emailed now; null when it couldn't be counted. */
+  audienceOptions?: AudienceOptions | null;
   /** Why email can't go out yet (plain words), or null when sending is set up. */
   emailProblem?: string | null;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [audience, setAudience] = useState<BroadcastAudience>(AUDIENCE_ALL);
   const [busy, setBusy] = useState(false);
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     try {
-      const res = await fetch("/api/admin/broadcasts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body }) });
+      const res = await fetch("/api/admin/broadcasts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body, ...audienceFields(audience) }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save the draft");
       router.push(`/admin/broadcasts/${data.broadcast.id}` as Route);
@@ -74,6 +87,7 @@ export default function BroadcastsClient({
               placeholder="Write the announcement"
             />
           </Field>
+          <AudienceSelect id="new-audience" value={audience} onChange={setAudience} options={audienceOptions} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={busy} className="max-sm:h-11">
               Save draft
@@ -94,7 +108,13 @@ export default function BroadcastsClient({
           <AdminList label="Broadcasts">
             {initial.map(item => {
               const badge = statusBadge("broadcast", item.status);
-              const meta = [item.createdByName ? `Started by ${item.createdByName}` : "", item.updatedAt ? `updated ${formatShortDate(item.updatedAt)}` : ""].filter(Boolean).join(" · ");
+              const meta = [
+                item.audience === "group" ? `To: ${item.audienceGroupName || "a group"}` : "",
+                item.createdByName ? `Started by ${item.createdByName}` : "",
+                item.updatedAt ? `updated ${formatShortDate(item.updatedAt)}` : ""
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <AdminListRow
                   key={item.id}

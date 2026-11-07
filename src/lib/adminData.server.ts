@@ -1,7 +1,9 @@
 import "server-only";
 
-import { selectRecipients } from "./broadcast";
-import { broadcastProgress, sendingBlocker } from "./broadcastSender.server";
+import { normalizeBroadcastContent, type BroadcastAudience } from "./broadcast";
+import { audienceOptions } from "./broadcastAudience.server";
+import { broadcastProgress, loadRecipients, sendingBlocker } from "./broadcastSender.server";
+import { readGroup } from "./groups.server";
 import { sendingConfigFromEnv } from "./broadcastSending";
 import { COMMUNITY_SLUG } from "./community";
 import { normalizeEvent, queryAllEvents } from "./events";
@@ -188,10 +190,9 @@ export async function loadBroadcastDoc(_check: AdminCheck, broadcastId: string) 
   return snap.exists ? { ref, data: snap.data() as Record<string, unknown> } : null;
 }
 
-/** How many members a broadcast would reach now. */
-export async function broadcastRecipientCount(_check: AdminCheck): Promise<number> {
-  const snap = await getAdminDb().collection(orgMembersCollectionPath(COMMUNITY_SLUG)).get();
-  return selectRecipients(snap.docs.map(doc => doc.data() as Parameters<typeof selectRecipients>[0][number])).length;
+/** How many members a broadcast would reach now: everyone who can be emailed, or those in its group. */
+export async function broadcastRecipientCount(_check: AdminCheck, audience?: BroadcastAudience): Promise<number> {
+  return (await loadRecipients(getAdminDb(), audience)).length;
 }
 
 /** Everything the broadcast detail page shows, or null when the broadcast doesn't exist. */
@@ -199,13 +200,20 @@ export async function loadBroadcastDetail(check: AdminCheck, broadcastId: string
   const found = await loadBroadcastDoc(check, broadcastId);
   if (!found) return null;
   const sendingState = found.data.status === "sending" || found.data.status === "sent";
-  const [recipientCount, progress] = await Promise.all([
-    broadcastRecipientCount(check),
-    sendingState ? broadcastProgress(found.ref) : Promise.resolve(null)
+  const stored = normalizeBroadcastContent(found.data);
+  const audience = stored.ok ? stored.content.audience : undefined;
+  const [recipientCount, progress, options, group] = await Promise.all([
+    broadcastRecipientCount(check, audience),
+    sendingState ? broadcastProgress(found.ref) : Promise.resolve(null),
+    audienceOptions(),
+    audience?.kind === "group" ? readGroup(audience.groupId) : Promise.resolve(null)
   ]);
   return asJson({
     broadcast: toPlain({ id: found.ref.id, ...found.data }),
     recipientCount,
+    audienceOptions: options,
+    // The broadcast's group as it is now (renamed, turned off or deleted since it was saved).
+    audienceGroup: audience?.kind === "group" ? { id: audience.groupId, name: group?.name ?? null, active: Boolean(group?.active), exists: Boolean(group) } : null,
     progress,
     sendingBlocker: sendingBlocker(sendingConfigFromEnv(), isMailConfigured())
   });

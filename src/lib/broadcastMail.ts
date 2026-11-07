@@ -28,13 +28,20 @@ export function footerFromEnv(env: Record<string, string | undefined> = process.
   return orgName && postalAddress ? { orgName, postalAddress } : null;
 }
 
-export function withUnsubscribeFooter(text: string, params: { origin: string; token: string; footer: BroadcastFooter }): string {
+/** The extra footer line on an email sent to one group (plan §30, D93). Worded to fit any group name. */
+export function groupFooterLine(groupName: string): string {
+  return `You got this because you are in this group: ${groupName}.`;
+}
+
+export function withUnsubscribeFooter(text: string, params: { origin: string; token: string; footer: BroadcastFooter; groupName?: string | null }): string {
   const { origin, token, footer } = params;
+  const groupName = params.groupName?.trim();
   return [
     text.trimEnd(),
     "",
     "--",
     `You get this email because you asked to hear from ${footer.orgName}.`,
+    ...(groupName ? [groupFooterLine(groupName)] : []),
     `To stop these emails, open: ${unsubscribePageUrl(origin, token)}`,
     "",
     footer.orgName,

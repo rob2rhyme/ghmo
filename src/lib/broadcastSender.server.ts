@@ -1,7 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { FieldValue, type DocumentReference, type Firestore } from "firebase-admin/firestore";
-import { hashBroadcast, normalizeBroadcastContent, selectRecipients } from "./broadcast";
+import { audienceKey, hashBroadcast, inAudience, normalizeBroadcastContent, selectRecipients, type BroadcastAudience } from "./broadcast";
 import { footerFromEnv, unsubscribeHeaders, withUnsubscribeFooter } from "./broadcastMail";
 import {
   MAX_ATTEMPTS,
@@ -83,10 +83,20 @@ async function progressOf(ref: DocumentReference, extra: Partial<SendProgress> =
   return { status: String(data.status ?? ""), total, sent, failed, skipped, remaining, done: data.status === "sent", ...extra };
 }
 
-/** Snapshots the recipients and moves an approved broadcast to "sending". */
-export async function startSending(deps: SenderDeps, broadcastId: string, recipients: { id: string }[]): Promise<Outcome> {
+/**
+ * Snapshots the recipients and moves an approved broadcast to "sending". `audience` is the audience the
+ * recipients were chosen for: if the stored audience is different by the time the transaction runs, nothing starts.
+ */
+export async function startSending(
+  deps: SenderDeps,
+  broadcastId: string,
+  recipients: { id: string }[],
+  audience?: { audience: BroadcastAudience; groupName: string | null }
+): Promise<Outcome> {
   const ref = broadcastRef(deps.db, broadcastId);
-  if (recipients.length === 0) return fail(400, "Nobody can be emailed: no member has agreed to email (or all opted out).");
+  if (recipients.length === 0) {
+    return fail(400, audience?.audience.kind === "group" ? "Nobody in this group can be emailed: no one in it has agreed to email (or all opted out)." : "Nobody can be emailed: no member has agreed to email (or all opted out).");
+  }
   if (recipients.length > deps.config.maxRecipients) {
     return fail(400, `This would go to ${recipients.length} members, more than this site allows in one broadcast (${deps.config.maxRecipients}). Ask whoever manages the website to raise the limit.`);
   }
@@ -98,7 +108,21 @@ export async function startSending(deps: SenderDeps, broadcastId: string, recipi
     const data = snap.data() as Record<string, unknown>;
     if (data.status !== "approved") return fail(409, "Only an approved broadcast can be sent.");
     if (!approvedTextMatches(data)) return fail(409, "The text no longer matches what was approved.", "CONTENT_CHANGED");
-    tx.update(ref, { status: "sending", startedAt: now, total: recipients.length, sentCount: 0, failedCount: 0, skippedCount: 0, updatedAt: now });
+    const stored = normalizeBroadcastContent(data);
+    if (audience && (!stored.ok || audienceKey(stored.content.audience) !== audienceKey(audience.audience))) {
+      return fail(409, "Who this goes to changed. Reload the page.", "CONTENT_CHANGED");
+    }
+    tx.update(ref, {
+      status: "sending",
+      startedAt: now,
+      total: recipients.length,
+      sentCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      // The group's name as it is now, for the footer line ("…you are in this group: …").
+      ...(audience?.audience.kind === "group" ? { audienceGroupName: audience.groupName } : {}),
+      updatedAt: now
+    });
     return null;
   });
   if (started) return started;
@@ -184,18 +208,23 @@ export async function sendNextChunk(deps: SenderDeps, broadcastId: string): Prom
   }
 
   const deliveries = ref.collection("deliveries");
-  const memberSnaps = await deps.db.getAll(...claim.memberIds.map(id => deps.db.doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${id}`)));
-  const ready = memberSnaps.filter(member => member.exists && memberEmailState(member.data() ?? {}) === "ready");
-  const skipped = claim.memberIds.filter(id => !ready.some(member => member.id === id));
-
   const content = normalizeBroadcastContent(data);
   if (!content.ok) return fail(409, content.error);
+  const audience = content.content.audience;
+  const groupName = audience?.kind === "group" ? String(data.audienceGroupName ?? "").trim() || null : null;
+
+  const memberSnaps = await deps.db.getAll(...claim.memberIds.map(id => deps.db.doc(`${orgMembersCollectionPath(COMMUNITY_SLUG)}/${id}`)));
+  // Consent and, for a group email, group membership are checked again for every chunk: someone who
+  // unsubscribed or left the group after sending started is skipped.
+  const ready = memberSnaps.filter(member => member.exists && memberEmailState(member.data() ?? {}) === "ready" && inAudience(member.data() ?? {}, audience));
+  const skipped = claim.memberIds.filter(id => !ready.some(member => member.id === id));
+
   const messages: BatchMessage[] = ready.map(member => {
     const token = signUnsubscribeToken(member.id, deps.serverKeys);
     return {
       to: String(member.get("email") || member.get("emailLower")),
       subject: content.content.subject,
-      text: withUnsubscribeFooter(content.content.body, { origin: deps.origin, token, footer }),
+      text: withUnsubscribeFooter(content.content.body, { origin: deps.origin, token, footer, groupName }),
       headers: unsubscribeHeaders(deps.origin, token)
     };
   });
@@ -254,11 +283,12 @@ export async function retryFailed(deps: SenderDeps, broadcastId: string): Promis
   return { ok: true, progress: await progressOf(ref) };
 }
 
-/** Members to snapshot when sending starts. */
-export async function loadRecipients(db: Firestore): Promise<{ id: string }[]> {
-  const snap = await db.collection(orgMembersCollectionPath(COMMUNITY_SLUG)).get();
-  const members = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as Parameters<typeof memberEmailState>[0]) }));
-  return selectRecipients(members).map(member => ({ id: member.id }));
+/** Members to snapshot when sending starts: everyone who can be emailed, or only those in the group. */
+export async function loadRecipients(db: Firestore, audience?: BroadcastAudience): Promise<{ id: string }[]> {
+  const col = db.collection(orgMembersCollectionPath(COMMUNITY_SLUG));
+  const snap = audience?.kind === "group" ? await col.where("groupIds", "array-contains", audience.groupId).get() : await col.get();
+  const members = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as Parameters<typeof memberEmailState>[0] & { groupIds?: unknown }) }));
+  return selectRecipients(members, audience).map(member => ({ id: member.id }));
 }
 
 export { progressOf as broadcastProgress };
